@@ -4,6 +4,8 @@
 
 Define the core command structure and patterns for the wai CLI, including the verb-noun command hierarchy, global flags, and foundational commands like init and status.
 
+See also: onboarding spec for first-run and no-args welcome behavior.
+
 ## Requirements
 
 ### Requirement: Command Structure
@@ -34,10 +36,20 @@ The CLI SHALL use consistent verb-noun command patterns with four primary verbs:
 
 The CLI SHALL support global verbosity and quiet flags that work with all commands.
 
-#### Scenario: Verbose output
+#### Scenario: Verbose output (level 1)
 
-- **WHEN** user passes `-v` or `--verbose` (up to 3 times)
-- **THEN** output verbosity increases incrementally
+- **WHEN** user passes `-v` or `--verbose`
+- **THEN** output includes additional context and metadata
+
+#### Scenario: Verbose output (level 2)
+
+- **WHEN** user passes `-vv` or `--verbose --verbose`
+- **THEN** output includes debug information
+
+#### Scenario: Verbose output (level 3)
+
+- **WHEN** user passes `-vvv` or `--verbose --verbose --verbose`
+- **THEN** output includes trace-level details
 
 #### Scenario: Quiet mode
 
@@ -75,7 +87,4 @@ The CLI SHALL provide `wai status` to show project overview and suggest next ste
 
 #### Scenario: Contextual suggestions
 
-- **WHEN** user runs `wai status` with no beads
-- **THEN** suggestions include "Create your first bead"
-- **WHEN** user runs `wai status` with ready beads
-- **THEN** suggestions include "Start implementing ready beads"
+See [context-suggestions](../context-suggestions/spec.md) for the complete suggestion logic.

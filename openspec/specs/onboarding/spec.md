@@ -4,6 +4,8 @@
 
 Define the first-run experience and welcome flow that helps new users get started quickly with wai.
 
+This spec owns the no-args welcome behavior for both first-run (no project) and in-project contexts.
+
 ## Requirements
 
 ### Requirement: Welcome Screen
