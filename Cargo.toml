@@ -1,0 +1,52 @@
+[package]
+name = "wai"
+version = "0.1.0"
+edition = "2024"
+description = "Workflow manager for AI-driven development"
+license = "MIT"
+repository = "https://github.com/charly-vibes/wai"
+keywords = ["cli", "workflow", "ai", "development"]
+categories = ["command-line-utilities", "development-tools"]
+
+[dependencies]
+# CLI argument parsing
+clap = { version = "4", features = ["derive", "env", "wrap_help"] }
+
+# Error handling - beautiful diagnostics
+miette = { version = "7", features = ["fancy"] }
+thiserror = "2"
+
+# Interactive prompts
+cliclack = "0.3"
+
+# Progress indicators
+indicatif = "0.17"
+
+# Colors (respects NO_COLOR)
+owo-colors = "4"
+
+# Serialization for config
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+
+# Async runtime (optional, for future use)
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs"], optional = true }
+
+# Directories for config/data paths
+dirs = "6"
+
+[features]
+default = []
+async = ["tokio"]
+
+[dev-dependencies]
+assert_cmd = "2"
+predicates = "3"
+
+[[bin]]
+name = "wai"
+path = "src/main.rs"
+
+[profile.release]
+lto = true
+strip = true
