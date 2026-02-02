@@ -4,6 +4,29 @@
 
 Define self-healing error message patterns that suggest fixes instead of just reporting problems, making errors educational and actionable.
 
+## Problem Statement
+
+Cryptic, unhelpful error messages are a major source of user frustration in command-line tools. When an error occurs and the application simply reports "failed" or "invalid input," it forces the user to halt their workflow, consult external documentation, and waste time diagnosing the issue. This increases cognitive load and creates a steep, frustrating learning curve, especially for new users.
+
+## Design Rationale
+
+The error recovery strategy for `wai` is to treat errors not as failures, but as opportunities to guide the user toward the correct action.
+
+- **Actionable, "Self-Healing" Errors:** Instead of just reporting what went wrong, `wai` errors will explain the problem and suggest the specific command to fix it. This approach makes the tool feel more like a helpful assistant and less like a rigid instruction parser.
+- **Use of `miette`:** The `miette` library was chosen specifically for its ability to produce rich, diagnostic error messages. It supports error codes, actionable help text, and code snippets, which are key components of our "self-healing" error philosophy.
+- **Diagnostic Codes:** Every `wai`-specific error includes a stable, machine-readable code (e.g., `wai::project::not_initialized`). This aids in debugging, allows for more specific documentation, and provides a reliable way to reference errors in tests or external tools.
+
+## Scope and Requirements
+
+This spec defines the user-facing format and content for common, recoverable errors in `wai`.
+
+### Non-Goals
+
+- **Internal Error Logging:** This spec does not cover how errors are logged internally for developer analysis.
+- **Automated Fixes:** The system will only *suggest* corrective actions; it will not execute commands automatically on the user's behalf.
+- **Localization:** All error messages will be presented in a single language.
+- **Exhaustive Error Catalog:** This document specifies the pattern for key errors but is not an exhaustive list of every possible error condition.
+
 ## Requirements
 
 ### Requirement: Diagnostic Error Format

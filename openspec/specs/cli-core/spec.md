@@ -6,7 +6,32 @@ Define the core command structure and patterns for the wai CLI, including the ve
 
 See also: onboarding spec for first-run and no-args welcome behavior.
 
-## Requirements
+## Problem Statement
+
+Development and research projects often involve tracking numerous small units of work, ideas, or tasks (called "beads"). Without a standardized workflow and tooling, managing the lifecycle of these beads is inconsistent, manual, and difficult to track. This leads to a lack of visibility into project status and makes it hard to maintain momentum.
+
+## Design Rationale
+
+The design of the CLI core follows a few key principles to ensure it is intuitive, consistent, and extensible.
+
+### Command Structure: Verb-Noun
+
+The chosen `verb-noun` pattern (e.g., `wai new project`) was selected for its readability and similarity to natural language. It establishes a predictable rhythm for the user, making commands easy to discover and remember. An alternative `noun-verb` pattern (e.g., `wai project new`) was considered but deemed less intuitive.
+
+### Core Verbs
+
+The four primary verbs (`new`, `add`, `show`, `move`) provide a minimal, orthogonal set of operations that map directly to the core lifecycle of managing project items.
+
+## Scope and Requirements
+
+This spec covers the foundational elements of the CLI.
+
+### Non-Goals
+
+- The detailed implementation of every command's functionality (e.g., the specific content parsing for `wai add research`).
+- A plugin or extension system (which is covered in its own spec).
+- Specific output formats like JSON or YAML, beyond the standard text output.
+- A graphical user interface.
 
 ### Requirement: Command Structure
 
@@ -34,7 +59,7 @@ The CLI SHALL use consistent verb-noun command patterns with four primary verbs:
 
 ### Requirement: Global Flags
 
-The CLI SHALL support global verbosity and quiet flags that work with all commands.
+The CLI SHALL support global verbosity and quiet flags that work with all all commands.
 
 #### Scenario: Verbose output (level 1)
 

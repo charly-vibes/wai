@@ -1,4 +1,31 @@
-## ADDED Requirements
+# Spec: Enhanced Onboarding Experience
+
+## Purpose
+
+Define a rich, interactive first-run experience that actively guides new users through the core `wai` workflow, building confidence and accelerating adoption.
+
+## Problem Statement
+
+While a basic welcome message is a good start, it is often insufficient for users new to a workflow-oriented tool like `wai`. Passive suggestions and help text still require the user to learn and synthesize information on their own. To truly overcome the initial learning curve, users need a more hands-on, guided experience that demonstrates the core value proposition of the tool without requiring them to read extensive documentation.
+
+## Design Rationale
+
+The proposed onboarding experience is based on the "learn-by-doing" principle.
+
+- **Interactive Tutorial:** A built-in, interactive tutorial (`wai tutorial`) is the most effective way to teach the core workflow. It keeps the user in their terminal, allows them to run actual commands in a safe environment, and builds muscle memory. This is superior to passive video or web tutorials as it provides direct, hands-on experience.
+- **Proactive Guidance:** The system proactively detects first-time users and offers guidance at key moments, such as during project initialization (`wai init`), ensuring they understand the structure and purpose of the tool from the beginning.
+
+## Scope and Requirements
+
+This spec covers the high-level design and flow of an enhanced, interactive onboarding process.
+
+### Non-Goals
+
+- **Exact Tutorial Script:** The detailed, word-for-word content of the tutorial is a content design task and is not defined in this technical spec.
+- **Advanced User Tracking:** "First-run" detection is based on a simple configuration check, not complex user analytics.
+- **Graphical Tutorial:** The entire experience is text-based and confined to the terminal.
+
+## Requirements
 
 ### Requirement: First-Run Detection
 
