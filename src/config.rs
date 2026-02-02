@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use crate::error::WaiError;
 
-pub const CONFIG_DIR: &str = ".para";
+pub const CONFIG_DIR: &str = ".wai";
 pub const CONFIG_FILE: &str = "config.toml";
 
 #[derive(Debug, Serialize, Deserialize, Default)]

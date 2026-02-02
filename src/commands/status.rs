@@ -11,7 +11,7 @@ pub fn run() -> Result<()> {
 
     intro(format!("Project: {}", config.project.name.bold())).into_diagnostic()?;
 
-    // TODO: Load actual bead counts from .para/beads/
+    // TODO: Load actual bead counts from .wai/beads/
     let bead_counts = BeadCounts::default();
 
     println!();

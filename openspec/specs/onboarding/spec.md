@@ -14,7 +14,7 @@ The initial user experience with a new command-line tool can be a significant ba
 
 The onboarding experience is designed to be intuitive, context-aware, and minimalist, providing immediate value without unnecessary complexity.
 
--   **Context-Aware "No-Args" Behavior:** Tailoring the output based on whether a project exists (`.para/` directory) provides immediate, relevant guidance. For first-time users, it suggests how to begin; for in-project users, it offers quick access to common next actions. This avoids generic responses and reduces user friction.
+-   **Context-Aware "No-Args" Behavior:** Tailoring the output based on whether a project exists (`.wai/` directory) provides immediate, relevant guidance. For first-time users, it suggests how to begin; for in-project users, it offers quick access to common next actions. This avoids generic responses and reduces user friction.
 -   **Minimalist Guidance:** Instead of an interactive wizard or verbose documentation, the system offers direct, actionable command suggestions. This respects the CLI user's preference for efficiency and direct control, allowing them to quickly engage with the tool.
 
 ## Scope and Requirements
@@ -36,7 +36,7 @@ When wai is run without arguments and no project is detected, it SHALL show a we
 #### Scenario: No project detected
 
 - **WHEN** user runs `wai` with no arguments
-- **AND** no `.para/` directory exists in current or parent directories
+- **AND** no `.wai/` directory exists in current or parent directories
 - **THEN** the system shows "wai - Workflow manager for AI-driven development"
 - **AND** shows context: "No project detected in current directory"
 - **AND** suggests: `wai init`, `wai new project`, `wai --help`
@@ -48,5 +48,5 @@ When wai is run without arguments inside a project, it SHALL show project-releva
 #### Scenario: Inside project
 
 - **WHEN** user runs `wai` with no arguments
-- **AND** a `.para/` directory exists
+- **AND** a `.wai/` directory exists
 - **THEN** the system suggests: `wai status`, `wai show beads`, `wai new bead`

@@ -34,7 +34,7 @@ wai new bead "Add user authentication"
 ## Project Structure
 
 ```
-.para/
+.wai/
 ├── config.toml      # Project configuration
 ├── beads/           # Work units (features, fixes, etc.)
 ├── research/        # Research notes and findings

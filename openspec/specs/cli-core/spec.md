@@ -89,7 +89,7 @@ The CLI SHALL provide `wai init` to initialize a project in the current director
 
 - **WHEN** user runs `wai init` without arguments
 - **THEN** the system prompts for project name (defaulting to directory name)
-- **AND** creates `.para/` structure with config, beads, research, and plugins directories
+- **AND** creates `.wai/` structure with config, beads, research, and plugins directories
 
 #### Scenario: Named initialization
 

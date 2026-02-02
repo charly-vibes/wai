@@ -8,7 +8,7 @@ Wai is a workflow manager for AI-driven development. It helps developers manage 
 
 - Rust (clap for CLI, miette for diagnostics, cliclack for interactive prompts)
 - TOML for configuration
-- File-based storage in `.para/` directory
+- File-based storage in `.wai/` directory
 
 ## Project Conventions
 
@@ -49,7 +49,7 @@ Wai is a workflow manager for AI-driven development. It helps developers manage 
 ### Directory Structure
 
 ```
-.para/
+.wai/
 ├── config.toml      # Project configuration
 ├── beads/           # Work unit files
 ├── research/        # Research notes

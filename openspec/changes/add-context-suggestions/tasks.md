@@ -2,7 +2,7 @@
 
 - [ ] 1.1 Create `src/workflows.rs` module
 - [ ] 1.2 Define workflow patterns (new project, research phase, implement phase)
-- [ ] 1.3 Implement state detection from `.para/` contents
+- [ ] 1.3 Implement state detection from `.wai/` contents
 
 ## 2. Post-Command Suggestions
 

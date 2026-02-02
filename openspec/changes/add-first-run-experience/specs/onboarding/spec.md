@@ -67,7 +67,7 @@ The `wai init` command SHALL provide extra guidance for new users.
 
 - **WHEN** user runs `wai init`
 - **AND** this is their first project
-- **THEN** the system explains what `.para/` contains
+- **THEN** the system explains what `.wai/` contains
 - **AND** shows what they can do next with examples
 
 ### Requirement: Example Workflows

@@ -64,7 +64,7 @@ The CLI SHALL infer project context from directory hierarchy.
 #### Scenario: In project subdirectory
 
 - **WHEN** user runs a project command from a subdirectory of a project
-- **AND** `.para/` exists in a parent directory
+- **AND** `.wai/` exists in a parent directory
 - **THEN** the system automatically uses the project context from the parent directory
 - **AND** informs the user which context is being used (e.g., "Running command in project '/path/to/project'").
 

@@ -47,7 +47,7 @@ pub fn run(name: Option<String>) -> Result<()> {
     // Create directory structure
     create_project_structure(&current_dir, &config)?;
 
-    log::success(format!("Created .para/ directory")).into_diagnostic()?;
+    log::success(format!("Created .wai/ directory")).into_diagnostic()?;
     log::info("Next steps:").into_diagnostic()?;
     println!("  → wai new bead \"First feature\"  Create your first work unit");
     println!("  → wai status                    Check project status");
@@ -59,7 +59,7 @@ pub fn run(name: Option<String>) -> Result<()> {
 fn create_project_structure(root: &PathBuf, config: &ProjectConfig) -> Result<()> {
     let para_dir = root.join(CONFIG_DIR);
 
-    // Create .para directory and subdirectories
+    // Create .wai directory and subdirectories
     std::fs::create_dir_all(para_dir.join("beads")).into_diagnostic()?;
     std::fs::create_dir_all(para_dir.join("research")).into_diagnostic()?;
     std::fs::create_dir_all(para_dir.join("plugins")).into_diagnostic()?;
@@ -67,7 +67,7 @@ fn create_project_structure(root: &PathBuf, config: &ProjectConfig) -> Result<()
     // Save config
     config.save(root)?;
 
-    // Create .gitignore for .para if needed
+    // Create .gitignore for .wai if needed
     let gitignore_path = para_dir.join(".gitignore");
     if !gitignore_path.exists() {
         std::fs::write(
