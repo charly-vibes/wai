@@ -6,13 +6,13 @@ Define progressive disclosure patterns for help and command output, showing simp
 
 ## Problem Statement
 
-Effective command-line tools require an intuitive and helpful user assistance system. Without one, users face a steep learning curve, leading to frustration and inefficient use. A common failure mode for help systems is providing a "one-size-fits-all" output that is either too verbose for novices trying to perform a simple task, or too sparse for experts needing advanced details. This spec addresses the need for a help system that serves both audiences effectively by being clear, concise, and progressively more detailed on demand.
+Effective command-line tools require an intuitive and helpful user assistance system. Without one, users face a steep learning curve, leading to frustration and inefficient use. This spec addresses the need for a help system that serves both audiences effectively by being clear, concise, and progressively more detailed on demand, representing a **Type 1 commitment** to an improved user experience. A "one-size-fits-all" help output is insufficient, being either too verbose for novices trying to perform a simple task, or too sparse for experts needing advanced details.
 
 ## Design Rationale
 
-The design of the help system is centered on the principle of progressive disclosure to enhance usability for all user levels.
+The design of the help system is centered on the principle of progressive disclosure, which represents a **Type 1 architectural decision** for help content structure and rendering logic, significantly enhancing usability for all user levels.
 
-- **Progressive Disclosure:** By default, help is concise and focused on common use cases. Users can request more detail using verbosity flags (`-v`, `-vv`). This respects the user's attention and avoids overwhelming them with irrelevant information, while still making advanced details accessible. This pattern is consistent with the CLI's global verbosity flags.
+- **Progressive Disclosure:** By default, help is concise and focused on common use cases. Users can request more detail using verbosity flags (`-v`, `-vv`). This **commits to a layered content structure** and respects the user's attention, avoiding overwhelming them with irrelevant information while still making advanced details accessible. This pattern is consistent with the CLI's global verbosity flags.
 - **In-line Usage Examples:** Including practical examples directly within the help output is a highly effective way to teach users how to perform common tasks, reducing the need to consult external documentation.
 - **Adherence to Convention:** Using the standard `--help` and `-h` flags ensures that the help system is immediately familiar and predictable to anyone with prior CLI experience.
 
@@ -22,7 +22,7 @@ This spec defines the user-facing behavior and output structure of the CLI's hel
 
 ### Non-Goals
 
-- **Help Content Generation:** The internal mechanism for authoring and maintaining help text (e.g., code comment parsing, external files) is an implementation detail not covered here.
+- **Help Content Generation:** This spec defines the desired *output and behavior* of the help system. The internal mechanism for authoring and maintaining help text (e.g., code comment parsing, external files) is an implementation detail not covered here.
 - **Interactive Help Systems:** Features like a `man`-style pager, guided tutorials, or interactive prompts are out of scope.
 - **Localization:** Translating help content into multiple languages is not covered by this specification.
 - **Web-based Documentation:** This spec is limited to the help available directly within the CLI application.

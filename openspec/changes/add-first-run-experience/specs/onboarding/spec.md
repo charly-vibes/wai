@@ -6,14 +6,14 @@ Define a rich, interactive first-run experience that actively guides new users t
 
 ## Problem Statement
 
-While a basic welcome message is a good start, it is often insufficient for users new to a workflow-oriented tool like `wai`. Passive suggestions and help text still require the user to learn and synthesize information on their own. To truly overcome the initial learning curve, users need a more hands-on, guided experience that demonstrates the core value proposition of the tool without requiring them to read extensive documentation.
+While a basic welcome message is a good start, it is often insufficient for users new to a workflow-oriented tool like `wai`. Passive suggestions and help text still require the user to learn and synthesize information on their own. To truly overcome the initial learning curve, users need a more hands-on, guided experience that demonstrates the core value proposition of the tool without requiring them to read extensive documentation. This spec represents a **Type 1 commitment** to an aggressive, proactive onboarding strategy.
 
 ## Design Rationale
 
-The proposed onboarding experience is based on the "learn-by-doing" principle.
+The proposed onboarding experience is based on the "learn-by-doing" principle, representing a **Type 1 commitment** to a specific pedagogical approach for user adoption.
 
-- **Interactive Tutorial:** A built-in, interactive tutorial (`wai tutorial`) is the most effective way to teach the core workflow. It keeps the user in their terminal, allows them to run actual commands in a safe environment, and builds muscle memory. This is superior to passive video or web tutorials as it provides direct, hands-on experience.
-- **Proactive Guidance:** The system proactively detects first-time users and offers guidance at key moments, such as during project initialization (`wai init`), ensuring they understand the structure and purpose of the tool from the beginning.
+- **Interactive Tutorial:** A built-in, interactive tutorial (`wai tutorial`) is a **Type 1 decision** to teach the core workflow through hands-on experience. It keeps the user in their terminal, allows them to run actual commands in a safe environment, and builds muscle memory, which is superior to passive video or web tutorials for building proficiency.
+- **Proactive Guidance:** The system proactively detects first-time users and offers guidance at key moments (e.g., during project initialization). This is a **Type 1 decision** for an assertive onboarding philosophy, ensuring users understand the structure and purpose of the tool from the beginning.
 
 ## Scope and Requirements
 

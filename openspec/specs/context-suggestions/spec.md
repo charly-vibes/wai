@@ -6,14 +6,14 @@ Define context-aware suggestion patterns that help users discover the next logic
 
 ## Problem Statement
 
-A status command that only presents data often leaves the user with the question, "What should I do next?" Without guidance, users may experience decision fatigue or make suboptimal choices about where to focus their effort. This leads to inefficient workflows and reduced momentum. A proactive suggestion system can bridge the gap between information and action, making the user more effective.
+A status command that only presents data often leaves the user with the question, "What should I do next?" Without proactive guidance, users experience decision fatigue, make suboptimal choices about where to focus effort, and lose workflow momentum. This spec proposes a **Type 1 commitment** to integrating a proactive suggestion system within the `wai status` command, bridging the gap between information and action, and making the user more effective.
 
 ## Design Rationale
 
-The suggestion system is designed to be proactive, integrated, and based on a clear workflow priority.
+The suggestion system is designed to be proactive, integrated, and based on a clear workflow priority, representing **Type 1 decisions** that establish a core UX pattern.
 
-- **Integrated with `status`:** Placing suggestions directly within the `wai status` output is intentional. It answers the user's implicit next question immediately after they review the project's state, requiring no extra commands.
-- **Urgency-Based Priority:** The suggestion priority (`blocked > in-progress > ready > draft`) is based on a sound project management heuristic. It guides the user to first unblock the project, then continue existing work to maintain momentum, and finally to start new work.
+- **Integrated with `status`:** Placing suggestions directly within the `wai status` output is a deliberate **Type 1 decision**. It establishes a proactive UX pattern where `wai` guides the user immediately after reviewing the project's state, reducing cognitive load and driving workflow.
+- **Urgency-Based Priority:** The suggestion priority (`blocked > in-progress > ready > draft`) is a **Type 1 decision** based on a sound project management heuristic. This strict prioritization guides the user to address the most impactful items first, fostering efficient workflow and allowing users to build trust in `wai`'s recommendations.
 
 ## Scope, Dependencies, and Requirements
 
@@ -22,7 +22,7 @@ This spec defines the logic for generating suggestions within the `wai status` c
 ### Dependencies
 
 -   **Bead Lifecycle:** The suggestion logic depends on the phase definitions (`draft`, `ready`, `in-progress`, `done`) outlined in the `bead-lifecycle` spec.
--   **Dependency Tracking:** The "Blocked beads" scenario requires a mechanism to define and track dependencies between beads. The implementation of that tracking system is outside the scope of this document.
+-   **Dependency Tracking:** The "Blocked beads" scenario introduces a **critical Type 1 dependency** on a robust mechanism to define and track dependencies between beads. The effectiveness and "intelligence" of the suggestion system fundamentally rely on the accurate implementation of this external system, which is explicitly outside the scope of *this* document.
 
 ### Non-Goals
 

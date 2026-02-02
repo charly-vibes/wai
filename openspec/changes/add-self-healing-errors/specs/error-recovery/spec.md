@@ -8,15 +8,15 @@ This document specifies a suite of "self-healing" and resilient features designe
 
 ## Problem Statement
 
-Most command-line tools are brittle. They demand perfect syntax, word order, and execution context. A simple typo, a reversed command, or running a command from a subdirectory often results in a hard, unhelpful failure. This forces the user to carry a high cognitive load—remembering exact syntax and file locations—and leads to a frustrating, pedantic experience where the user is serving the tool, not the other way around.
+Most command-line tools are brittle, demanding perfect syntax, word order, and execution context. Simple mistakes like typos or reversed commands often result in hard, unhelpful failures. This forces the user to carry a high cognitive load, remembering exact syntax and file locations, leading to a frustrating, pedantic experience. This spec represents a **Type 1 commitment** to transforming `wai` into a resilient, forgiving CLI that anticipates and helps correct common user errors, empowering the user rather than frustrating them.
 
 ## Design Rationale
 
-The design philosophy is to create a resilient, forgiving CLI that understands user intent.
+The design philosophy is to create a resilient, forgiving CLI that understands user intent. The features outlined here represent **Type 1 decisions** for building a truly intelligent and user-centric command-line experience.
 
-- **Anticipate and Correct Common Errors:** Instead of failing on simple mistakes, the tool should be smart enough to detect typos or reversed command structures and offer a correction. This turns a failure into a success.
-- **Reduce User Burden:** The CLI should handle environmental context automatically. It should find the project root so the user doesn't have to think about it. It should present clear choices during complex operations like sync conflicts. The goal is to let the user focus on their work, not on appeasing the tool.
-- **Conversational Tone:** Using friendly, helpful language in error messages reinforces the idea that the tool is an assistant, not an obstacle.
+- **Anticipate and Correct Common Errors:** This is a **Type 1 decision** to transform user errors into learning opportunities. Instead of failing on simple mistakes, `wai` will proactively detect typos or reversed command structures and offer corrections, turning a potential failure into a quick success.
+- **Reduce User Burden:** The CLI should handle environmental context automatically. This is a **Type 1 decision** to reduce the cognitive load on the user. `wai` will infer the project root and present clear choices during complex operations like sync conflicts, allowing the user to focus on their primary task.
+- **Conversational Tone:** Using friendly, helpful language in error messages reinforces the idea that the tool is an assistant, not an obstacle, enhancing the overall user experience.
 
 ## Scope and Requirements
 
@@ -24,9 +24,9 @@ This spec covers the high-level design for several features that enhance CLI res
 
 ### Non-Goals
 
-- **Specific Algorithms:** This spec does not prescribe a specific string-similarity algorithm for typo detection.
-- **The Sync Engine:** The "Sync Conflict Resolution" requirement defines how to handle conflicts, but the underlying sync mechanism is out of scope.
-- **Artificial Intelligence:** All "intelligent" behavior is based on defined heuristics, not complex AI or NLP.
+- **Specific Algorithms:** This spec defines the desired *behavior* for features like typo detection but does not prescribe a specific string-similarity algorithm or its implementation details.
+- **The Sync Engine:** The "Sync Conflict Resolution" requirement defines how to handle conflicts, but the underlying sync mechanism and its implementation are explicitly out of scope for this high-level design.
+- **Artificial Intelligence:** All "intelligent" behavior in this spec is based on defined heuristics and pattern matching, not complex AI or Natural Language Processing (NLP), allowing for a more predictable and auditable system.
 
 ## Requirements
 

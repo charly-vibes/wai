@@ -6,15 +6,15 @@ Define a system of progressive disclosure for the output of all CLI commands, an
 
 ## Problem Statement
 
-A "one-size-fits-all" output for CLI commands serves no one well. Novice users are often overwhelmed by technical details they don't need, making the tool feel intimidating. Expert users, on the other hand, are starved of the deep diagnostic information they require for debugging complex issues. Furthermore, traditional help pages that lead with syntax force users to learn the "how" before they understand the "what" and "why" from a practical example.
+A "one-size-fits-all" output for CLI commands fundamentally fails to serve the diverse needs of its users. Novice users are often overwhelmed by technical details they don't need, making the tool feel intimidating. Expert users, on the other hand, are starved of the deep diagnostic information required for debugging complex issues. This architectural problem leads to a fragmented user experience. Furthermore, traditional help pages that prioritize syntax over practical examples hinder user adoption and understanding.
 
 ## Design Rationale
 
-This design introduces two core principles: tailoring command output to the user's intent and structuring help around practical examples.
+This design introduces two core principles: tailoring command output to the user's intent and structuring help around practical examples. These represent **Type 1 architectural decisions** that redefine how `wai` communicates with its users.
 
-- **Intent-Based Verbosity:** The verbosity (`-v`) flag should control the level of detail in the *user-facing* output. This allows a user to specify whether they want a simple confirmation or a more detailed report of the outcome.
-- **Separation of Concerns (Logs vs. Output):** Deeply technical diagnostics (execution traces, state machine transitions) are invaluable for debugging but are noise for most users. This information should not be tied to the `-v` flag, but instead controlled by a separate mechanism, such as a `--debug` flag or a `WAI_LOG` environment variable. This keeps the primary output clean and user-focused.
-- **Examples-First Help:** Users learn most effectively by seeing a command in action. By placing practical, workflow-oriented examples at the top of help pages, we lower the cognitive barrier to entry and allow users to get started much faster.
+- **Intent-Based Verbosity (User-Facing Output):** The verbosity (`-v`) flag is dedicated to controlling the level of detail in the *user-facing* output. This is a **Type 1 decision** for the CLI's interaction pattern, allowing users to specify whether they want a simple confirmation or a more detailed report of the outcome without being overwhelmed by internal diagnostics.
+- **Separation of Concerns (Logs vs. Output):** This is a critical **Type 1 correction** to avoid conflating user-facing detail with internal debugging information. Deeply technical diagnostics (execution traces, state machine transitions) are invaluable for developers but are noise for most users. This information will be controlled by a separate mechanism (e.g., a `--debug` flag or `WAI_LOG` environment variable), keeping the primary output clean and user-focused.
+- **Examples-First Help:** Users learn most effectively by seeing a command in action. This is a **Type 1 decision** for help content structure. By placing practical, workflow-oriented examples at the top of help pages, we lower the cognitive barrier to entry and allow users to get started much faster.
 
 ## Scope and Requirements
 
@@ -22,8 +22,8 @@ This spec defines an architectural, cross-cutting change to command output and h
 
 ### Non-Goals
 
-- **Immediate Implementation on All Commands:** The verbosity levels are an architectural pattern that should be applied to new commands, and retrofitted onto existing commands opportunistically. A single PR will not implement this everywhere.
-- **Specific Logging Framework:** This spec separates the *idea* of diagnostic logging from user-facing output, but does not mandate a specific logging library or implementation.
+- **Immediate Implementation on All Commands:** The progressive disclosure for command output is an **architectural pattern**. While it should be applied to new commands, retrofitting it onto existing commands will be done opportunistically and iteratively. This represents a **phased approach** to a cross-cutting concern.
+- **Specific Logging Framework:** This spec separates the *idea* of diagnostic logging from user-facing output, but does not mandate a specific logging library or implementation, allowing flexibility in the underlying technical choices.
 
 ## Requirements
 

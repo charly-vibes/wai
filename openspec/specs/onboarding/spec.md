@@ -8,13 +8,13 @@ This spec owns the no-args welcome behavior for both first-run (no project) and 
 
 ## Problem Statement
 
-The initial user experience with a new command-line tool can be a significant barrier to adoption. If a user runs `wai` for the first time without arguments and is met with a cryptic error, an overwhelming help page, or an unhelpful generic message, it can lead to frustration, confusion, and ultimately, abandonment of the tool. Even experienced users inside a project might run `wai` without arguments and benefit from quick, context-relevant reminders or next steps rather than a full help display.
+The initial user experience with a new command-line tool can be a significant barrier to adoption. If a user runs `wai` for the first time without arguments and is met with a cryptic error, an overwhelming help page, or an unhelpful generic message, it can lead to frustration, confusion, and ultimately, abandonment of the tool. This spec represents a **Type 1 commitment** to improving this fundamental user experience. Even experienced users inside a project might run `wai` without arguments and benefit from quick, context-relevant reminders or next steps rather than a full help display.
 
 ## Design Rationale
 
-The onboarding experience is designed to be intuitive, context-aware, and minimalist, providing immediate value without unnecessary complexity.
+The onboarding experience is designed to be intuitive, context-aware, and minimalist, providing immediate value without unnecessary complexity. The **Context-Aware "No-Args" Behavior** is a **Type 1 decision** for the fundamental user experience.
 
--   **Context-Aware "No-Args" Behavior:** Tailoring the output based on whether a project exists (`.wai/` directory) provides immediate, relevant guidance. For first-time users, it suggests how to begin; for in-project users, it offers quick access to common next actions. This avoids generic responses and reduces user friction.
+-   **Context-Aware "No-Args" Behavior:** Tailoring the output based on whether a project exists (`.wai/` directory) provides immediate, relevant guidance. For first-time users, it suggests how to begin; for in-project users, it offers quick access to common next actions. This avoids generic responses, reduces user friction, and establishes a proactive engagement pattern.
 -   **Minimalist Guidance:** Instead of an interactive wizard or verbose documentation, the system offers direct, actionable command suggestions. This respects the CLI user's preference for efficiency and direct control, allowing them to quickly engage with the tool.
 
 ## Scope and Requirements

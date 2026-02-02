@@ -8,19 +8,19 @@ See also: onboarding spec for first-run and no-args welcome behavior.
 
 ## Problem Statement
 
-Development and research projects often involve tracking numerous small units of work, ideas, or tasks (called "beads"). Without a standardized workflow and tooling, managing the lifecycle of these beads is inconsistent, manual, and difficult to track. This leads to a lack of visibility into project status and makes it hard to maintain momentum.
+For `wai` to effectively support development and research projects, it requires a **stable and predictable foundation**. Without a clearly defined and consistent core command structure and project organization, users would face a steep learning curve, inconsistent interactions, and an unstable platform for automation. This lack of a standardized and predictable interface would hinder adoption and make it difficult to build reliable workflows around `wai`.
 
 ## Design Rationale
 
-The design of the CLI core follows a few key principles to ensure it is intuitive, consistent, and extensible.
+The design of the CLI core follows a few key principles to establish a **stable foundation** that is intuitive, consistent, and extensible, making it a reliable platform for future growth.
 
 ### Command Structure: Verb-Noun
 
-The chosen `verb-noun` pattern (e.g., `wai new project`) was selected for its readability and similarity to natural language. It establishes a predictable rhythm for the user, making commands easy to discover and remember. An alternative `noun-verb` pattern (e.g., `wai project new`) was considered but deemed less intuitive.
+The chosen `verb-noun` pattern (e.g., `wai new project`) is a foundational **Type 1 decision** for `wai`'s grammar. It was selected for its readability and similarity to natural language, establishing a **predictable and consistent rhythm** for the user. This stable grammar makes commands easy to discover and remember, and crucially, **enables future extensibility** by providing a clear framework for applying existing verbs to new nouns. An alternative `noun-verb` pattern (e.g., `wai project new`) was considered but deemed less intuitive for `wai`'s action-oriented approach.
 
 ### Core Verbs
 
-The four primary verbs (`new`, `add`, `show`, `move`) provide a minimal, orthogonal set of operations that map directly to the core lifecycle of managing project items.
+The four primary verbs (`new`, `add`, `show`, `move`) provide a minimal, orthogonal set of operations. This deliberate choice keeps the **core surface area small and focused**, establishing a clear foundation without premature complexity, while allowing for new verbs to be introduced as `wai` evolves.
 
 ## Scope and Requirements
 

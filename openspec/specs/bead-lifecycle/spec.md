@@ -6,14 +6,14 @@ Define the phases and valid state transitions for beads, providing a clear workf
 
 ## Problem Statement
 
-Without a clearly defined and enforced lifecycle, the status of individual "beads" (work items) can become ambiguous. This leads to confusion among team members about what needs to be done, inconsistent tracking of progress, and difficulties in reporting accurate project status. The absence of structured transitions also makes it easy for work items to be mismanaged, leading to lost effort and project delays. A formalized bead lifecycle is essential for maintaining clarity, consistency, and effective project execution.
+Without a clearly defined and enforced lifecycle, the status of individual "beads" (work items) becomes ambiguous, leading to a **lack of predictability and consistency**. This results in confusion about priorities, inconsistent tracking of progress, and difficulties in accurate status reporting. Such ambiguity makes it easy for work items to be mismanaged, causing lost effort and project delays. A formalized bead lifecycle is therefore a **Type 1 foundational decision** for `wai`, essential for establishing clarity, consistency, and effective project execution.
 
 ## Design Rationale
 
-The chosen four-phase lifecycle model (Draft, Ready, In-Progress, Done) and strict transition rules are designed to balance simplicity with sufficient granularity for effective work item management.
+The chosen four-phase lifecycle model (Draft, Ready, In-Progress, Done) and strict transition rules represent a **Type 1 foundational decision** for `wai`. This design intentionally embraces an **opinionated workflow** that trades extreme flexibility for clarity, predictability, and consistency.
 
--   **Four-Phase Model:** This model is widely adopted in various project management methodologies, offering a clear progression from initial concept to completion without over-complicating the workflow. Each phase represents a distinct and meaningful state of a bead.
--   **Strict Transition Rules:** Enforcing valid forward and backward transitions ensures data integrity and prevents beads from entering illogical states. This predictability aids in automation and reporting, maintaining a consistent understanding of a bead's journey.
+-   **Four-Phase Model:** This model, widely adopted in project management, offers a clear progression from concept to completion. By adopting this fixed model, `wai` ensures each phase represents a distinct and meaningful state, forming a predictable backbone for all operations.
+-   **Strict Transition Rules:** Enforcing valid forward and backward transitions is critical. This predictability ensures data integrity, prevents illogical bead states, and is the cornerstone for building reliable automation, accurate reporting, and context-aware suggestions. This **intentional rigidity** creates a "pit of success" for users.
 
 ## Scope and Requirements
 
@@ -25,7 +25,7 @@ This spec exclusively defines the states and transitions within the bead lifecyc
 -   **Specific CLI/UI Commands for Transitions:** While transitions are defined here, the user-facing commands or UI elements to trigger these transitions are defined elsewhere (e.g., `cli-core`'s `move` verb).
 -   **Role-Based Permissions:** This spec does not define access control or permissions for who can perform state transitions.
 -   **Notifications or Automated Actions:** Automated responses or notifications triggered by phase changes are out of scope.
--   **Complex Workflow Branching:** This spec defines a linear progression with limited backward transitions; complex branching workflows are not supported.
+-   **Complex Workflow Branching:** This spec intentionally defines a linear progression with limited backward transitions. Complex, user-defined branching workflows are explicitly not supported, reinforcing `wai`'s **opinionated core workflow**.
 
 ## Requirements
 

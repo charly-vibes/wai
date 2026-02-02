@@ -6,15 +6,15 @@ Define a suite of advanced features to make the CLI more interactive and assisti
 
 ## Problem Statement
 
-A command-line interface can often feel like a series of disconnected, atomic operations. Users are left to figure out the next logical step on their own, interrupting their flow. Furthermore, when a command is ambiguous (e.g., a name matches multiple items), the tool typically fails, forcing a frustrating cycle of listing items and re-running the command. This creates a rigid, unforgiving user experience.
+A command-line interface can often feel like a series of disconnected, atomic operations. Users are left to figure out the next logical step on their own, interrupting their flow. When commands are ambiguous, the tool typically fails, forcing a frustrating cycle of listing items and re-running the command. This creates a rigid, unforgiving user experience. This spec represents a **Type 1 commitment** to evolving `wai` from a passive instruction parser into an active, helpful, and interactive assistant.
 
 ## Design Rationale
 
-This proposal aims to evolve `wai` from a simple instruction parser into a more helpful, interactive assistant.
+This proposal aims to evolve `wai` from a simple instruction parser into a more helpful, interactive assistant. The features outlined here represent **Type 1 decisions** that establish core UX patterns for proactive guidance and error handling.
 
-- **Post-Command Suggestions:** By suggesting next steps after a successful command, the CLI guides the user through a natural workflow, reducing cognitive load and improving discoverability of features.
-- **Interactive Ambiguity Resolution:** Instead of failing, the tool should help the user succeed. When ambiguity is detected, prompting the user with a list of choices turns a moment of failure into an efficient, successful interaction. The `--no-interactive` flag provides an escape hatch for scripting.
-- **Workflow Pattern Detection:** This is a move towards a more intelligent agent that can recognize the user's context at a higher level (e.g., "it looks like you're in a research phase") and provide more tailored, insightful guidance.
+- **Post-Command Suggestions:** This is a **Type 1 decision** for guiding the user through a natural workflow. By suggesting next steps after a successful command, the CLI reduces cognitive load and improves feature discoverability, making the tool feel more like a conversational partner.
+- **Interactive Ambiguity Resolution:** This is a **Type 1 decision** to transform moments of failure into efficient, successful interactions. Instead of failing, the tool helps the user succeed by prompting with choices when ambiguity is detected. The `--no-interactive` flag provides an essential escape hatch for scripting, preserving automation capabilities.
+- **Workflow Pattern Detection:** This is a **Type 1 decision** to move towards a more intelligent agent. By recognizing the user's context at a higher level (e.g., "it looks like you're in a research phase"), `wai` can provide more tailored, insightful guidance, enhancing user effectiveness.
 
 ## Scope and Requirements
 
@@ -22,10 +22,10 @@ This spec covers the design for several advanced interactive features.
 
 ### Non-Goals
 
-- **Suggestions for all commands:** The initial implementation will focus on a few high-value commands, not the entire command suite.
-- **Detecting all workflow anti-patterns:** The system will only be designed to detect a small, well-defined set of common workflow patterns.
-- **Resolving all types of ambiguity:** The initial focus for interactive resolution is on bead selection, not all possible forms of ambiguity.
-- **Natural Language Processing (NLP):** All detection and suggestion logic will be based on defined heuristics, not complex NLP.
+- **Suggestions for all commands:** Given the broad scope, the initial implementation will focus on a few high-value commands, representing a **phased approach** rather than an immediate, exhaustive implementation across the entire command suite.
+- **Detecting all workflow anti-patterns:** The system will initially detect a small, well-defined set of common workflow patterns, incrementally expanding based on user need and feasibility.
+- **Resolving all types of ambiguity:** The initial focus for interactive resolution is on bead selection; expanding to other forms of ambiguity will be a future consideration.
+- **Natural Language Processing (NLP):** All detection and suggestion logic will be based on defined heuristics, not complex NLP, keeping the implementation manageable and predictable.
 
 ## Requirements
 

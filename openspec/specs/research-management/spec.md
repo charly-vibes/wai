@@ -6,14 +6,14 @@ Define how research artifacts (notes, links, documents) are captured, organized,
 
 ## Problem Statement
 
-In many development and research workflows, valuable insights, notes, and external resources are often scattered across various tools and locations. This fragmentation makes it challenging to consistently link supporting research directly to specific work items or "beads." As a result, context is lost, informed decision-making is hindered, and teams may inadvertently duplicate efforts or miss critical information. A centralized, easily accessible research management system integrated with `wai` is needed to ensure research directly supports ongoing work.
+Valuable insights, notes, and external resources in development and research workflows are often scattered, making it challenging to consistently link supporting research directly to specific work items or "beads." This leads to lost context, hindered decision-making, and duplicated effort. A **Type 1 strategic decision** is made here to address this by tightly integrating a centralized, easily accessible research management system directly within `wai`, ensuring research directly supports ongoing work.
 
 ## Design Rationale
 
-The design for research management within `wai` prioritizes simplicity, direct association with work items, and integration with the CLI workflow.
+The design for research management within `wai` prioritizes simplicity, direct association with work items, and seamless integration with the CLI workflow, while carefully considering long-term data portability and optionality.
 
-- **Integrated with CLI:** Managing research through `wai` commands provides a consistent experience and allows direct linking of research to `beads` within the project's context.
-- **File-based Storage:** Storing research as transparent, accessible files in the project structure simplifies data management and allows users to leverage existing file system tools and version control. This avoids the overhead of a dedicated database for initial use cases.
+- **Integrated with CLI:** Managing research through `wai` commands provides a consistent experience and allows direct linking of research to `beads` within the project's context, making research an active part of the workflow.
+- **File-based Storage:** Storing research as transparent, accessible files in the project structure (e.g., Markdown) is a **key optionality-preserving choice**. It simplifies data management, allows users to leverage existing file system tools and version control, and importantly, ensures **data portability and resilience**. This avoids the overhead of a dedicated database for initial use cases while keeping user data accessible outside `wai`.
 
 ## Scope and Requirements
 
@@ -25,7 +25,7 @@ This spec focuses on the core functionality for capturing, associating, and retr
 - **Advanced Search:** Beyond basic listing and tag-based filtering, full-text search capabilities are not in scope.
 - **Rich Media & Complex Formatting:** Support for complex rich-text editing or embedded media within research content is not covered.
 - **Integration with External Tools:** This spec focuses on `wai`'s native capabilities rather than direct integration with third-party research management software.
-- **Version Control for Research Entries:** While the underlying files may be under source control, explicit versioning of individual research entries within `wai` is out of scope.
+- **Version Control for Research Entries:** While the underlying files (due to file-based storage) are naturally amenable to user-managed source control (e.g., Git), explicit versioning features *within* `wai` for individual research entries are out of scope.
 
 ## Requirements
 

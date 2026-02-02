@@ -6,14 +6,14 @@ Define the plugin architecture that allows extending wai with additional capabil
 
 ## Problem Statement
 
-As the `wai` tool matures, users will require specialized functionality and integrations that are not part of the core vision. Adding every feature request to the core application would lead to bloat and increased maintenance complexity. A plugin system is needed to allow for community-driven and user-specific extensions while keeping the core tool lean and focused.
+As the `wai` tool matures, the diversity of user needs for specialized functionality and integrations will grow. Without a robust extension mechanism, `wai` risks becoming either **bloated** from incorporating every niche feature request, or **insufficient** for users with specific workflow demands. A plugin system is a foundational **Type 1 architectural decision** needed to prevent core bloat, meet community-driven and user-specific extension needs, and keep the core tool lean, focused, and maintainable.
 
 ## Design Rationale
 
-The plugin management system is designed to be simple and align with the existing `wai` CLI patterns.
+The plugin management system is designed to be simple and align with the existing `wai` CLI patterns, carefully balancing immediate user needs with preserving architectural optionality for the future.
 
-- **CLI-Based Management:** Managing plugins via `add`, `show`, and `remove` commands provides a consistent user experience for developers already familiar with `wai` and other command-line tools.
-- **Flexible Installation:** Supporting installation by `name` (implying a future registry) and by local `path` offers a balance between easy discovery of public plugins and streamlined development of private or local ones.
+- **CLI-Based Management:** Managing plugins via `add`, `show`, and `remove` commands establishes a **consistent user interface** for extensibility. This decision focuses on the user-facing experience, **preserving optionality** for the internal plugin architecture (how plugins are developed, executed, etc.) to be defined later.
+- **Flexible Installation:** Supporting installation by `name` (implying a future registry) and by local `path` offers a practical balance. It provides easy discovery of public plugins while streamlining development of private or local ones, without locking into a single distribution model.
 
 ## Scope and Requirements
 
@@ -21,9 +21,9 @@ This document specifies the user-facing CLI for managing plugins. It does not co
 
 ### Non-Goals
 
-- **Plugin Development API:** This spec does not define how plugins are authored, what hooks they can use, or the API they must conform to.
-- **Plugin Execution & Security:** The runtime environment, sandboxing, and security model for plugins are complex topics and are explicitly out of scope.
-- **Plugin Registry Implementation:** While the spec assumes a registry for name-based installation, the design and implementation of that service are not covered here.
+- **Plugin Development API:** This spec explicitly defers defining how plugins are authored, what hooks they can use, or the API they must conform to. This **preserves flexibility** to design a robust API based on future needs and early feedback.
+- **Plugin Execution & Security:** The runtime environment, sandboxing, and security model for plugins are complex topics. These are explicitly out of scope for this spec, **preserving optionality** for future architectural decisions in these critical areas.
+- **Plugin Registry Implementation:** While the spec assumes a registry for name-based installation, the design and implementation of that service are not covered here, **allowing the ecosystem to evolve** before committing to a specific registry architecture.
 
 ## Requirements
 
