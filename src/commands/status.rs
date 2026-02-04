@@ -2,8 +2,9 @@ use cliclack::{intro, outro};
 use miette::{IntoDiagnostic, Result};
 use owo_colors::OwoColorize;
 
-use crate::config::{find_project_root, ProjectConfig};
+use crate::config::{find_project_root, projects_dir, ProjectConfig, STATE_FILE};
 use crate::error::WaiError;
+use crate::state::{Phase, ProjectState};
 
 pub fn run() -> Result<()> {
     let project_root = find_project_root().ok_or(WaiError::NotInitialized)?;
@@ -11,45 +12,95 @@ pub fn run() -> Result<()> {
 
     intro(format!("Project: {}", config.project.name.bold())).into_diagnostic()?;
 
-    // TODO: Load actual bead counts from .wai/beads/
-    let bead_counts = BeadCounts::default();
+    // List projects and their phases
+    let proj_dir = projects_dir(&project_root);
+    let mut project_count = 0;
 
     println!();
-    println!("  {} Beads", "◆".cyan());
-    println!(
-        "    {} draft  {} ready  {} in-progress  {} done",
-        bead_counts.draft.to_string().dimmed(),
-        bead_counts.ready.to_string().yellow(),
-        bead_counts.in_progress.to_string().blue(),
-        bead_counts.done.to_string().green(),
-    );
+    println!("  {} Projects", "◆".cyan());
 
-    println!();
-    println!("  {} Suggestions", "◆".cyan());
-    
-    if bead_counts.total() == 0 {
-        println!("    {} Create your first bead: wai new bead \"Feature name\"", "→".dimmed());
-    } else if bead_counts.ready > 0 {
-        println!("    {} You have {} beads ready to implement", "→".dimmed(), bead_counts.ready);
-        println!("    {} Start with: wai move bead <id> --to in-progress", "→".dimmed());
-    } else if bead_counts.in_progress > 0 {
-        println!("    {} {} beads in progress", "→".dimmed(), bead_counts.in_progress);
+    if proj_dir.exists() {
+        let mut entries: Vec<_> = std::fs::read_dir(&proj_dir)
+            .into_diagnostic()?
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
+            .collect();
+        entries.sort_by_key(|e| e.file_name());
+
+        for entry in entries {
+            if let Some(name) = entry.file_name().to_str() {
+                let state_path = entry.path().join(STATE_FILE);
+                let phase = if state_path.exists() {
+                    match ProjectState::load(&state_path) {
+                        Ok(state) => format_phase(state.current),
+                        Err(_) => "unknown".dimmed().to_string(),
+                    }
+                } else {
+                    "no state".dimmed().to_string()
+                };
+
+                println!("    {} {}  [{}]", "•".dimmed(), name, phase);
+                project_count += 1;
+            }
+        }
     }
 
-    outro("Run 'wai show beads' for details").into_diagnostic()?;
+    if project_count == 0 {
+        println!("    {}", "(no projects yet)".dimmed());
+    }
+
+    // Plugin status
+    println!();
+    println!("  {} Plugins", "◆".cyan());
+
+    let beads_detected = project_root.join(".beads").exists();
+    let git_detected = project_root.join(".git").exists();
+    let openspec_detected = project_root.join("openspec").exists();
+
+    if beads_detected {
+        println!("    {} beads  {}", "•".dimmed(), "detected".green());
+    }
+    if git_detected {
+        println!("    {} git    {}", "•".dimmed(), "detected".green());
+    }
+    if openspec_detected {
+        println!("    {} openspec  {}", "•".dimmed(), "detected".green());
+    }
+    if !beads_detected && !git_detected && !openspec_detected {
+        println!("    {}", "(none detected)".dimmed());
+    }
+
+    // Suggestions
+    println!();
+    println!("  {} Suggestions", "◆".cyan());
+
+    if project_count == 0 {
+        println!(
+            "    {} Create your first project: wai new project \"my-app\"",
+            "→".dimmed()
+        );
+    } else {
+        println!(
+            "    {} View project phase: wai phase",
+            "→".dimmed()
+        );
+        println!(
+            "    {} Add artifacts: wai add research \"...\"",
+            "→".dimmed()
+        );
+    }
+
+    outro("Run 'wai show' for full overview").into_diagnostic()?;
     Ok(())
 }
 
-#[derive(Default)]
-struct BeadCounts {
-    draft: usize,
-    ready: usize,
-    in_progress: usize,
-    done: usize,
-}
-
-impl BeadCounts {
-    fn total(&self) -> usize {
-        self.draft + self.ready + self.in_progress + self.done
+fn format_phase(phase: Phase) -> String {
+    match phase {
+        Phase::Research => "research".yellow().to_string(),
+        Phase::Plan => "plan".blue().to_string(),
+        Phase::Design => "design".magenta().to_string(),
+        Phase::Implement => "implement".green().to_string(),
+        Phase::Review => "review".cyan().to_string(),
+        Phase::Archive => "archive".dimmed().to_string(),
     }
 }

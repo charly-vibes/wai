@@ -22,7 +22,7 @@ This spec defines the user-facing behavior and output structure of the CLI's hel
 
 ### Non-Goals
 
-- **Help Content Generation:** This spec defines the desired *output and behavior* of the help system. The internal mechanism for authoring and maintaining help text (e.g., code comment parsing, external files) is an implementation detail not covered here.
+- **Help Content Generation:** This spec defines the desired *output and behavior* of the help system. The internal mechanism for authoring and maintaining help text is an implementation detail not covered here.
 - **Interactive Help Systems:** Features like a `man`-style pager, guided tutorials, or interactive prompts are out of scope.
 - **Localization:** Translating help content into multiple languages is not covered by this specification.
 - **Web-based Documentation:** This spec is limited to the help available directly within the CLI application.

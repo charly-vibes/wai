@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Define context-aware suggestion patterns that help users discover the next logical step based on current project state.
+Define context-aware suggestion patterns that help users discover the next logical step based on current project state and phase.
 
 ## Problem Statement
 
@@ -10,10 +10,10 @@ A status command that only presents data often leaves the user with the question
 
 ## Design Rationale
 
-The suggestion system is designed to be proactive, integrated, and based on a clear workflow priority, representing **Type 1 decisions** that establish a core UX pattern.
+The suggestion system is designed to be proactive, integrated, and based on project phase awareness, representing **Type 1 decisions** that establish a core UX pattern.
 
 - **Integrated with `status`:** Placing suggestions directly within the `wai status` output is a deliberate **Type 1 decision**. It establishes a proactive UX pattern where `wai` guides the user immediately after reviewing the project's state, reducing cognitive load and driving workflow.
-- **Urgency-Based Priority:** The suggestion priority (`blocked > in-progress > ready > draft`) is a **Type 1 decision** based on a sound project management heuristic. This strict prioritization guides the user to address the most impactful items first, fostering efficient workflow and allowing users to build trust in `wai`'s recommendations.
+- **Phase-Based Priority:** Suggestions are driven by the current project phase (research, plan, design, implement, review, archive) and available plugin data. Each phase has natural next actions that wai can suggest contextually.
 
 ## Scope, Dependencies, and Requirements
 
@@ -21,50 +21,76 @@ This spec defines the logic for generating suggestions within the `wai status` c
 
 ### Dependencies
 
--   **Bead Lifecycle:** The suggestion logic depends on the phase definitions (`draft`, `ready`, `in-progress`, `done`) outlined in the `bead-lifecycle` spec.
--   **Dependency Tracking:** The "Blocked beads" scenario introduces a **critical Type 1 dependency** on a robust mechanism to define and track dependencies between beads. The effectiveness and "intelligence" of the suggestion system fundamentally rely on the accurate implementation of this external system, which is explicitly outside the scope of *this* document.
+- **Project State Machine:** The suggestion logic depends on the phase definitions outlined in the `project-state-machine` spec.
+- **Plugin System:** Plugins (beads, git, openspec) provide additional context for richer suggestions.
 
 ### Non-Goals
 
--   **Implementation of Dependency Tracking:** This spec only consumes the "blocked" state; it does not define how that state is determined.
--   **Implementation of Wrap-up Actions:** The `archive` and `retrospective` actions are suggested, but their implementation is not covered here.
--   **Suggestions in Other Commands:** This system is limited to the `wai status` command.
--   **Exact UI/Formatting:** This spec defines the logic, not the precise color or formatting of the output.
+- Implementation of suggested actions — suggestions are informational only
+- Suggestions in commands other than `wai status`
+- Exact UI/formatting — this spec defines logic, not presentation
 
 ## Requirements
 
-### Requirement: Status Suggestions
+### Requirement: Phase-Based Suggestions
 
-The status command SHALL provide contextual next-step suggestions based on current project state.
+The status command SHALL provide contextual next-step suggestions based on the current project phase.
 
-#### Scenario: Empty project
+#### Scenario: Research phase
 
-- **WHEN** project has no beads
-- **THEN** suggest creating first bead
+- **WHEN** project is in "research" phase
+- **THEN** suggest adding research notes: `wai add research "..."`
+- **AND** suggest advancing when ready: `wai phase next`
 
-#### Scenario: Ready beads available
+#### Scenario: Plan phase
 
-- **WHEN** project has beads in "ready" phase
-- **THEN** suggest starting implementation
+- **WHEN** project is in "plan" phase
+- **THEN** suggest adding a plan: `wai add plan "..."`
+- **AND** suggest advancing to design: `wai phase next`
 
-#### Scenario: In-progress beads
+#### Scenario: Design phase
 
-- **WHEN** project has beads in "in-progress" phase
-- **THEN** suggest continuing work on active beads
-- **AND** show which beads are currently in progress
+- **WHEN** project is in "design" phase
+- **THEN** suggest adding designs: `wai add design "..."`
+- **AND** suggest advancing to implementation: `wai phase next`
 
-#### Scenario: Blocked beads
+#### Scenario: Implement phase
 
-- **WHEN** project has beads with unmet dependencies
-- **THEN** suggest resolving blockers first
-- **AND** show what is blocking each bead
+- **WHEN** project is in "implement" phase
+- **THEN** suggest creating a handoff when pausing: `wai handoff create`
+- **AND** suggest advancing to review: `wai phase next`
 
-#### Scenario: Completed project
+#### Scenario: Review phase
 
-- **WHEN** all beads are in "done" phase
-- **THEN** suggest project wrap-up actions (archive, retrospective)
+- **WHEN** project is in "review" phase
+- **THEN** suggest completing and archiving: `wai phase next`
+- **AND** suggest going back if issues found: `wai phase back`
 
-#### Scenario: Mixed states
+#### Scenario: Archive phase
 
-- **WHEN** project has beads in multiple phases
-- **THEN** prioritize suggestions: blocked > in-progress > ready > draft
+- **WHEN** project is in "archive" phase
+- **THEN** suggest starting a new project: `wai new project`
+
+### Requirement: Plugin-Enhanced Suggestions
+
+When plugins are active, suggestions SHALL incorporate plugin context.
+
+#### Scenario: Beads plugin active
+
+- **WHEN** beads plugin reports open issues
+- **THEN** status includes issue count and suggests reviewing: `wai beads list`
+
+#### Scenario: Git plugin active
+
+- **WHEN** git plugin reports uncommitted changes
+- **THEN** status includes change summary
+
+### Requirement: Empty Project Suggestions
+
+When a project has no artifacts, suggestions SHALL guide initial setup.
+
+#### Scenario: New empty project
+
+- **WHEN** project has no research, plans, or designs
+- **THEN** suggest starting with research: `wai add research "..."`
+- **AND** suggest checking phase: `wai phase`

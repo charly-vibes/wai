@@ -1,8 +1,11 @@
-use cliclack::{intro, log, outro, input};
+use cliclack::{input, intro, log, outro};
 use miette::{IntoDiagnostic, Result};
-use std::path::PathBuf;
 
-use crate::config::{ProjectConfig, ProjectSettings, CONFIG_DIR};
+use crate::config::{
+    ProjectConfig, ProjectSettings, CONFIG_DIR,
+    PROJECTS_DIR, AREAS_DIR, RESOURCES_DIR, ARCHIVES_DIR, PLUGINS_DIR,
+    AGENT_CONFIG_DIR, SKILLS_DIR, RULES_DIR, CONTEXT_DIR,
+};
 
 pub fn run(name: Option<String>) -> Result<()> {
     let current_dir = std::env::current_dir().into_diagnostic()?;
@@ -45,35 +48,74 @@ pub fn run(name: Option<String>) -> Result<()> {
     };
 
     // Create directory structure
-    create_project_structure(&current_dir, &config)?;
+    create_para_structure(&current_dir, &config)?;
 
-    log::success(format!("Created .wai/ directory")).into_diagnostic()?;
+    // Auto-detect plugins
+    let mut detected = Vec::new();
+    if current_dir.join(".beads").exists() {
+        detected.push("beads");
+    }
+    if current_dir.join("openspec").exists() {
+        detected.push("openspec");
+    }
+    if current_dir.join(".git").exists() {
+        detected.push("git");
+    }
+
+    log::success("Created .wai/ directory with PARA structure").into_diagnostic()?;
+
+    if !detected.is_empty() {
+        log::info(format!("Detected plugins: {}", detected.join(", "))).into_diagnostic()?;
+    }
+
     log::info("Next steps:").into_diagnostic()?;
-    println!("  → wai new bead \"First feature\"  Create your first work unit");
-    println!("  → wai status                    Check project status");
+    println!("  → wai new project \"my-app\"    Create your first project");
+    println!("  → wai status                   Check project status");
 
-    outro(format!("Project '{}' initialized!", project_name)).into_diagnostic()?;
+    outro(format!("Workspace '{}' initialized!", project_name)).into_diagnostic()?;
     Ok(())
 }
 
-fn create_project_structure(root: &PathBuf, config: &ProjectConfig) -> Result<()> {
-    let para_dir = root.join(CONFIG_DIR);
+fn create_para_structure(root: &std::path::Path, config: &ProjectConfig) -> Result<()> {
+    let wai_dir = root.join(CONFIG_DIR);
 
-    // Create .wai directory and subdirectories
-    std::fs::create_dir_all(para_dir.join("beads")).into_diagnostic()?;
-    std::fs::create_dir_all(para_dir.join("research")).into_diagnostic()?;
-    std::fs::create_dir_all(para_dir.join("plugins")).into_diagnostic()?;
+    // Create PARA directories
+    std::fs::create_dir_all(wai_dir.join(PROJECTS_DIR)).into_diagnostic()?;
+    std::fs::create_dir_all(wai_dir.join(AREAS_DIR)).into_diagnostic()?;
+    std::fs::create_dir_all(wai_dir.join(RESOURCES_DIR)).into_diagnostic()?;
+    std::fs::create_dir_all(wai_dir.join(ARCHIVES_DIR)).into_diagnostic()?;
+    std::fs::create_dir_all(wai_dir.join(PLUGINS_DIR)).into_diagnostic()?;
+
+    // Create agent-config structure
+    let agent_config = wai_dir.join(RESOURCES_DIR).join(AGENT_CONFIG_DIR);
+    std::fs::create_dir_all(agent_config.join(SKILLS_DIR)).into_diagnostic()?;
+    std::fs::create_dir_all(agent_config.join(RULES_DIR)).into_diagnostic()?;
+    std::fs::create_dir_all(agent_config.join(CONTEXT_DIR)).into_diagnostic()?;
+
+    // Create default .projections.yml
+    let projections_content = "# Agent config projections — defines how configs are synced to tool-specific locations\n\
+        # Strategies: symlink, inline, reference\n\
+        projections: []\n";
+    std::fs::write(
+        agent_config.join(".projections.yml"),
+        projections_content,
+    ).into_diagnostic()?;
+
+    // Create resource subdirectories
+    std::fs::create_dir_all(wai_dir.join(RESOURCES_DIR).join("templates")).into_diagnostic()?;
+    std::fs::create_dir_all(wai_dir.join(RESOURCES_DIR).join("patterns")).into_diagnostic()?;
 
     // Save config
     config.save(root)?;
 
     // Create .gitignore for .wai if needed
-    let gitignore_path = para_dir.join(".gitignore");
+    let gitignore_path = wai_dir.join(".gitignore");
     if !gitignore_path.exists() {
         std::fs::write(
             gitignore_path,
             "# Local-only files\n*.local\n*.cache\n",
-        ).into_diagnostic()?;
+        )
+        .into_diagnostic()?;
     }
 
     Ok(())

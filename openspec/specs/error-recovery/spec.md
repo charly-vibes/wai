@@ -14,7 +14,7 @@ The error recovery strategy for `wai` is to treat errors not as failures, but as
 
 - **Actionable, "Self-Healing" Errors:** This is a **Type 1 decision** for `wai`'s core user experience. Instead of just reporting what went wrong, `wai` errors will explain the problem and suggest the specific command to fix it. This approach makes the tool feel more like a helpful assistant and less like a rigid instruction parser, significantly reducing user friction.
 - **Use of `miette`:** The selection of the `miette` library is a **Type 1 architectural dependency**. It was chosen specifically for its ability to produce rich, diagnostic error messages with features like error codes, actionable help text, and code snippets, which are key components of our "self-healing" error philosophy.
-- **Diagnostic Codes:** Every `wai`-specific error includes a stable, machine-readable code (e.g., `wai::project::not_initialized`). This is a **Type 1 decision** for error identification, aiding in debugging, enabling more specific documentation, and providing a reliable way to reference errors in tests or external tools.
+- **Diagnostic Codes:** Every `wai`-specific error includes a stable, machine-readable code (e.g., `wai::project::not_found`). This is a **Type 1 decision** for error identification, aiding in debugging, enabling more specific documentation, and providing a reliable way to reference errors in tests or external tools.
 
 ## Scope and Requirements
 
@@ -36,7 +36,7 @@ All errors SHALL include a diagnostic code and actionable help text using miette
 #### Scenario: Error structure
 
 - **WHEN** any error occurs
-- **THEN** the error includes a code (e.g., `wai::project::not_initialized`)
+- **THEN** the error includes a code (e.g., `wai::project::not_found`)
 - **AND** the error includes help text with a suggested fix
 
 ### Requirement: Project Not Initialized Error
@@ -49,15 +49,35 @@ When commands require a project context but none exists, the error SHALL suggest
 - **THEN** error message is "No project initialized in current directory"
 - **AND** help suggests "Run `wai init` or `wai new project <name>` first"
 
-### Requirement: Bead Not Found Error
+### Requirement: Project Not Found Error
 
-When a referenced bead doesn't exist, the error SHALL suggest how to find valid beads.
+When a referenced project doesn't exist, the error SHALL suggest how to find valid projects.
 
-#### Scenario: Invalid bead reference
+#### Scenario: Invalid project reference
 
-- **WHEN** user references a bead ID that doesn't exist
-- **THEN** error message is "Bead '{id}' not found"
-- **AND** help suggests "Run `wai show beads` to see available beads"
+- **WHEN** user references a project name that doesn't exist
+- **THEN** error message is "Project '{name}' not found"
+- **AND** help suggests "Run `wai show projects` to see available projects"
+
+### Requirement: Area Not Found Error
+
+When a referenced area doesn't exist, the error SHALL suggest alternatives.
+
+#### Scenario: Invalid area reference
+
+- **WHEN** user references an area name that doesn't exist
+- **THEN** error message is "Area '{name}' not found"
+- **AND** help suggests "Run `wai show areas` to see available areas"
+
+### Requirement: Resource Not Found Error
+
+When a referenced resource doesn't exist, the error SHALL suggest alternatives.
+
+#### Scenario: Invalid resource reference
+
+- **WHEN** user references a resource name that doesn't exist
+- **THEN** error message is "Resource '{name}' not found"
+- **AND** help suggests "Run `wai show resources` to see available resources"
 
 ### Requirement: Invalid Phase Transition Error
 
@@ -65,9 +85,29 @@ When a phase transition is invalid, the error SHALL show valid options.
 
 #### Scenario: Invalid transition
 
-- **WHEN** user attempts to move a bead to an invalid phase
+- **WHEN** user attempts an invalid phase transition (e.g., already at the last phase and running `phase next`)
 - **THEN** error message is "Invalid phase transition from '{from}' to '{to}'"
 - **AND** help lists valid target phases from the current phase
+
+### Requirement: Config Sync Error
+
+When agent config sync fails, the error SHALL explain what went wrong and suggest remediation.
+
+#### Scenario: Sync failure
+
+- **WHEN** a projection fails during `wai sync`
+- **THEN** error message describes which projection failed and why
+- **AND** help suggests checking `.projections.yml` configuration
+
+### Requirement: Handoff Error
+
+When handoff generation fails, the error SHALL explain the issue.
+
+#### Scenario: Handoff generation failure
+
+- **WHEN** `wai handoff create` fails
+- **THEN** error message describes the failure (e.g., project not found, template missing)
+- **AND** help suggests the corrective action
 
 ### Requirement: Plugin Not Found Error
 
@@ -77,4 +117,4 @@ When a plugin doesn't exist, the error SHALL suggest how to find available plugi
 
 - **WHEN** user references a plugin that isn't installed
 - **THEN** error message is "Plugin '{name}' not found"
-- **AND** help suggests "Run `wai show plugins --available` to see installable plugins"
+- **AND** help suggests "Run `wai plugin list` to see available plugins"

@@ -19,12 +19,26 @@ pub enum WaiError {
     )]
     ProjectExists { path: String },
 
-    #[error("Bead '{id}' not found")]
+    #[error("Project '{name}' not found")]
     #[diagnostic(
-        code(wai::bead::not_found),
-        help("Run `wai show beads` to see available beads")
+        code(wai::project::not_found),
+        help("Run `wai show` to see available projects")
     )]
-    BeadNotFound { id: String },
+    ProjectNotFound { name: String },
+
+    #[error("Area '{name}' not found")]
+    #[diagnostic(
+        code(wai::area::not_found),
+        help("Run `wai show` to see available areas")
+    )]
+    AreaNotFound { name: String },
+
+    #[error("Resource '{name}' not found")]
+    #[diagnostic(
+        code(wai::resource::not_found),
+        help("Run `wai show` to see available resources")
+    )]
+    ResourceNotFound { name: String },
 
     #[error("Invalid phase transition from '{from}' to '{to}'")]
     #[diagnostic(
@@ -37,10 +51,31 @@ pub enum WaiError {
         valid_targets: String,
     },
 
+    #[error("No active project context")]
+    #[diagnostic(
+        code(wai::project::no_context),
+        help("Run a command within a project directory or specify --project <name>")
+    )]
+    NoProjectContext,
+
+    #[error("Config sync error: {message}")]
+    #[diagnostic(
+        code(wai::sync::error),
+        help("Check `.wai/resources/agent-config/.projections.yml` configuration")
+    )]
+    ConfigSyncError { message: String },
+
+    #[error("Handoff error: {message}")]
+    #[diagnostic(
+        code(wai::handoff::error),
+        help("{suggestion}")
+    )]
+    HandoffError { message: String, suggestion: String },
+
     #[error("Plugin '{name}' not found")]
     #[diagnostic(
         code(wai::plugin::not_found),
-        help("Run `wai show plugins --available` to see installable plugins")
+        help("Run `wai plugin list` to see available plugins")
     )]
     PluginNotFound { name: String },
 
@@ -51,4 +86,8 @@ pub enum WaiError {
     #[error("IO error: {0}")]
     #[diagnostic(code(wai::io::error))]
     Io(#[from] std::io::Error),
+
+    #[error("YAML error: {0}")]
+    #[diagnostic(code(wai::yaml::error))]
+    Yaml(#[from] serde_yaml::Error),
 }

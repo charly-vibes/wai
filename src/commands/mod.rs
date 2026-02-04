@@ -5,17 +5,41 @@ use crate::cli::{Cli, Commands};
 use crate::config::find_project_root;
 use crate::error::WaiError;
 
+mod add;
+mod config_cmd;
+mod handoff;
+mod import;
 mod init;
+mod move_cmd;
+mod new;
+mod phase;
+mod plugin;
+mod search;
+mod show;
 mod status;
+mod sync;
+mod timeline;
 
 pub fn run(cli: Cli) -> Result<()> {
     match cli.command {
         Some(Commands::Init { name }) => init::run(name),
         Some(Commands::Status) => status::run(),
-        Some(Commands::New(cmd)) => handle_new(cmd),
-        Some(Commands::Add(cmd)) => handle_add(cmd),
-        Some(Commands::Show(cmd)) => handle_show(cmd),
-        Some(Commands::Move(cmd)) => handle_move(cmd),
+        Some(Commands::New(cmd)) => new::run(cmd),
+        Some(Commands::Add(cmd)) => add::run(cmd),
+        Some(Commands::Show { name }) => show::run(name),
+        Some(Commands::Move(args)) => move_cmd::run(args),
+        Some(Commands::Phase(sub)) => phase::run(sub),
+        Some(Commands::Sync { status }) => sync::run(status),
+        Some(Commands::Config(cmd)) => config_cmd::run(cmd),
+        Some(Commands::Handoff(cmd)) => handoff::run(cmd),
+        Some(Commands::Search {
+            query,
+            type_filter,
+            project,
+        }) => search::run(query, type_filter, project),
+        Some(Commands::Timeline { project }) => timeline::run(project),
+        Some(Commands::Plugin(cmd)) => plugin::run(cmd),
+        Some(Commands::Import { path }) => import::run(path),
         None => show_welcome(),
     }
 }
@@ -32,98 +56,36 @@ fn show_welcome() -> Result<()> {
             "○".dimmed()
         );
         println!();
-        println!("  {} wai init           Initialize in current directory", "→".cyan());
-        println!("  {} wai new project    Create a new project", "→".cyan());
+        println!(
+            "  {} wai init           Initialize in current directory",
+            "→".cyan()
+        );
+        println!(
+            "  {} wai new project    Create a new project",
+            "→".cyan()
+        );
         println!("  {} wai --help         Show all commands", "→".cyan());
     } else {
         println!();
-        println!("  {} wai status         Check project status", "→".cyan());
-        println!("  {} wai show beads     List all beads", "→".cyan());
-        println!("  {} wai new bead       Create a new work unit", "→".cyan());
+        println!(
+            "  {} wai status         Check project status",
+            "→".cyan()
+        );
+        println!(
+            "  {} wai phase          Show current project phase",
+            "→".cyan()
+        );
+        println!(
+            "  {} wai new project    Create a new project",
+            "→".cyan()
+        );
     }
 
     outro("Run 'wai <command> --help' for detailed usage").into_diagnostic()?;
     Ok(())
 }
 
-fn handle_new(cmd: crate::cli::NewCommands) -> Result<()> {
-    use crate::cli::NewCommands;
-
-    match cmd {
-        NewCommands::Project { name, template } => {
-            println!("Creating project: {} (template: {:?})", name, template);
-            // TODO: Implement project creation
-            Ok(())
-        }
-        NewCommands::Bead { title, bead_type } => {
-            require_project()?;
-            println!("Creating bead: {} (type: {})", title, bead_type);
-            // TODO: Implement bead creation
-            Ok(())
-        }
-    }
-}
-
-fn handle_add(cmd: crate::cli::AddCommands) -> Result<()> {
-    use crate::cli::AddCommands;
-
-    require_project()?;
-
-    match cmd {
-        AddCommands::Research { content, bead } => {
-            println!("Adding research: {} (bead: {:?})", content, bead);
-            // TODO: Implement research addition
-            Ok(())
-        }
-        AddCommands::Plugin { name } => {
-            println!("Adding plugin: {}", name);
-            // TODO: Implement plugin addition
-            Ok(())
-        }
-    }
-}
-
-fn handle_show(cmd: crate::cli::ShowCommands) -> Result<()> {
-    use crate::cli::ShowCommands;
-
-    require_project()?;
-
-    match cmd {
-        ShowCommands::Project => {
-            println!("Showing project info...");
-            // TODO: Implement project display
-            Ok(())
-        }
-        ShowCommands::Beads { phase } => {
-            println!("Showing beads (phase: {:?})...", phase);
-            // TODO: Implement beads display
-            Ok(())
-        }
-        ShowCommands::Phase => {
-            println!("Showing current phase...");
-            // TODO: Implement phase display
-            Ok(())
-        }
-    }
-}
-
-fn handle_move(cmd: crate::cli::MoveCommands) -> Result<()> {
-    use crate::cli::MoveCommands;
-
-    require_project()?;
-
-    match cmd {
-        MoveCommands::Bead { id, to } => {
-            println!("Moving bead {} to phase {}", id, to);
-            // TODO: Implement bead movement
-            Ok(())
-        }
-    }
-}
-
-fn require_project() -> Result<()> {
-    if find_project_root().is_none() {
-        return Err(WaiError::NotInitialized.into());
-    }
-    Ok(())
+pub fn require_project() -> Result<std::path::PathBuf> {
+    find_project_root()
+        .ok_or_else(|| WaiError::NotInitialized.into())
 }

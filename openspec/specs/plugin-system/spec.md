@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Define the plugin architecture that allows extending wai with additional capabilities, including installation, management, and discovery of plugins.
+Define the plugin architecture that allows extending wai with additional capabilities, including YAML-based configuration, hook points, command pass-through, and built-in plugins for common tools.
 
 ## Problem Statement
 
@@ -10,61 +10,134 @@ As the `wai` tool matures, the diversity of user needs for specialized functiona
 
 ## Design Rationale
 
-The plugin management system is designed to be simple and align with the existing `wai` CLI patterns, carefully balancing immediate user needs with preserving architectural optionality for the future.
+### YAML-Based Plugin Configuration
 
-- **CLI-Based Management:** Managing plugins via `add`, `show`, and `remove` commands establishes a **consistent user interface** for extensibility. This decision focuses on the user-facing experience, **preserving optionality** for the internal plugin architecture (how plugins are developed, executed, etc.) to be defined later.
-- **Flexible Installation:** Supporting installation by `name` (implying a future registry) and by local `path` offers a practical balance. It provides easy discovery of public plugins while streamlining development of private or local ones, without locking into a single distribution model.
+Plugins are configured via YAML files in `.wai/plugins/`, replacing the earlier TOML-based manifest approach. YAML provides better support for complex nested structures like hook definitions and command mappings. Each plugin declares:
+
+- **Detector patterns**: How to detect if the plugin's tool is present (e.g., `.beads/` directory, `.git/` directory)
+- **Commands**: CLI commands the plugin provides or passes through to external tools
+- **Hooks**: Event handlers for project lifecycle events
+
+### Hook Points
+
+Plugins can respond to lifecycle events through defined hook points. This is a **Type 1 decision** establishing the integration pattern:
+
+- `on_project_create` — called when a new project is created
+- `on_phase_transition` — called when a project changes phase
+- `on_handoff_generate` — called when generating a handoff document
+- `on_status` — called when displaying project status
+
+### Built-in Plugins
+
+Three plugins ship with wai as built-ins:
+
+- **beads** — detects `.beads/` directory, provides issue data for handoffs and status
+- **openspec** — detects `openspec/` directory, provides spec change data
+- **git** — detects `.git/` directory, provides commit history and status
+
+### Command Pass-Through
+
+Plugins can register commands that pass through to external CLIs. For example, `wai beads list` delegates to `bd list --json`. This provides a unified interface while leveraging existing tools.
 
 ## Scope and Requirements
 
-This document specifies the user-facing CLI for managing plugins. It does not cover the internal architecture of the plugin system itself.
+This spec covers the plugin configuration format, lifecycle hooks, command routing, and built-in plugin definitions.
 
 ### Non-Goals
 
-- **Plugin Development API:** This spec explicitly defers defining how plugins are authored, what hooks they can use, or the API they must conform to. This **preserves flexibility** to design a robust API based on future needs and early feedback.
-- **Plugin Execution & Security:** The runtime environment, sandboxing, and security model for plugins are complex topics. These are explicitly out of scope for this spec, **preserving optionality** for future architectural decisions in these critical areas.
-- **Plugin Registry Implementation:** While the spec assumes a registry for name-based installation, the design and implementation of that service are not covered here, **allowing the ecosystem to evolve** before committing to a specific registry architecture.
+- Plugin registry or marketplace
+- Plugin sandboxing or security model
+- Plugin versioning or dependency resolution
+- Remote plugin installation
 
-## Requirements
+### Requirement: Plugin Configuration
 
-### Requirement: Plugin Installation
+Plugins SHALL be configured via YAML files in `.wai/plugins/`.
 
-The CLI SHALL support adding plugins to extend functionality.
+#### Scenario: Plugin config format
 
-#### Scenario: Install plugin by name
+- **WHEN** a plugin is defined
+- **THEN** its configuration file follows this format:
+  ```yaml
+  name: beads
+  description: Integration with beads issue tracker
+  detector:
+    type: directory
+    path: .beads/
+  commands:
+    - name: list
+      description: List beads issues
+      passthrough: bd list --json
+    - name: show
+      description: Show beads issue details
+      passthrough: bd show
+  hooks:
+    on_handoff_generate:
+      command: bd list --status=open --json
+      inject_as: open_issues
+    on_status:
+      command: bd stats --json
+      inject_as: beads_status
+  ```
 
-- **WHEN** user runs `wai add plugin <name>`
-- **THEN** the system downloads and installs the plugin
-- **AND** the plugin is available for use in the current project
+### Requirement: Plugin Detection
 
-#### Scenario: Install plugin from path
+Plugins SHALL auto-detect whether their associated tool is present.
 
-- **WHEN** user runs `wai add plugin --path <local-path>`
-- **THEN** the system installs the plugin from the local directory
-- **AND** the plugin is linked to the project
+#### Scenario: Auto-detect on init
 
-### Requirement: Plugin Listing
+- **WHEN** user runs `wai init`
+- **THEN** the system checks each built-in plugin's detector pattern
+- **AND** enables plugins whose tools are detected
 
-The CLI SHALL support viewing installed and available plugins.
+#### Scenario: Detector types
 
-#### Scenario: Show installed plugins
+- **WHEN** a plugin has a directory detector
+- **THEN** the system checks for the specified directory relative to project root
+- **WHEN** a plugin has a file detector
+- **THEN** the system checks for the specified file
 
-- **WHEN** user runs `wai show plugins`
-- **THEN** the system lists all plugins installed in the current project
-- **AND** shows plugin name, version, and status
+### Requirement: Plugin Hooks
 
-#### Scenario: Show available plugins
+Plugins SHALL respond to lifecycle events through hook points.
 
-- **WHEN** user runs `wai show plugins --available`
-- **THEN** the system lists plugins available for installation
-- **AND** shows plugin name and brief description
+#### Scenario: Hook execution
 
-### Requirement: Plugin Removal
+- **WHEN** a lifecycle event occurs (e.g., project creation, phase transition)
+- **THEN** the system calls all registered hooks for that event
+- **AND** collects hook output for use by the triggering command
 
-The CLI SHALL support removing plugins from a project.
+#### Scenario: Handoff enrichment
 
-#### Scenario: Remove installed plugin
+- **WHEN** generating a handoff
+- **THEN** the system calls `on_handoff_generate` hooks on all enabled plugins
+- **AND** injects the collected data into the handoff template
 
-- **WHEN** user runs `wai remove plugin <name>`
-- **THEN** the system removes the plugin from the project
-- **AND** confirms the removal to the user
+### Requirement: Command Pass-Through
+
+Plugins SHALL support routing CLI commands to external tools.
+
+#### Scenario: Plugin command execution
+
+- **WHEN** user runs `wai <plugin-name> <command>`
+- **THEN** the system looks up the command in the plugin's command list
+- **AND** executes the passthrough command
+
+### Requirement: Plugin Management
+
+The CLI SHALL support listing, enabling, and disabling plugins.
+
+#### Scenario: List plugins
+
+- **WHEN** user runs `wai plugin list`
+- **THEN** the system shows all known plugins with their status (enabled/disabled/not detected)
+
+#### Scenario: Enable plugin
+
+- **WHEN** user runs `wai plugin enable <name>`
+- **THEN** the system enables the specified plugin
+
+#### Scenario: Disable plugin
+
+- **WHEN** user runs `wai plugin disable <name>`
+- **THEN** the system disables the specified plugin without removing its configuration

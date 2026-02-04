@@ -28,12 +28,22 @@ owo-colors = "4"
 # Serialization for config
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
+serde_yaml = "0.9"
+
+# Date/time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Directory traversal
+walkdir = "2"
 
 # Async runtime (optional, for future use)
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs"], optional = true }
 
 # Directories for config/data paths
 dirs = "6"
+
+# Slug generation for filenames
+slug = "0.1"
 
 [features]
 default = []
@@ -42,6 +52,7 @@ async = ["tokio"]
 [dev-dependencies]
 assert_cmd = "2"
 predicates = "3"
+tempfile = "3"
 
 [[bin]]
 name = "wai"

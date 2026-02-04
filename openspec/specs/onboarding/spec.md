@@ -49,4 +49,4 @@ When wai is run without arguments inside a project, it SHALL show project-releva
 
 - **WHEN** user runs `wai` with no arguments
 - **AND** a `.wai/` directory exists
-- **THEN** the system suggests: `wai status`, `wai show beads`, `wai new bead`
+- **THEN** the system suggests: `wai status`, `wai phase`, `wai new project`
