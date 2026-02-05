@@ -2,6 +2,7 @@ use miette::Result;
 use owo_colors::OwoColorize;
 
 use crate::cli::PluginCommands;
+use crate::plugin;
 
 use super::require_project;
 
@@ -14,54 +15,58 @@ pub fn run(cmd: PluginCommands) -> Result<()> {
             println!("  {} Plugins", "◆".cyan());
             println!();
 
-            // Built-in plugins with auto-detection
-            let plugins = [
-                ("beads", ".beads/", "Integration with beads issue tracker"),
-                ("git", ".git/", "Git version control integration"),
-                (
-                    "openspec",
-                    "openspec/",
-                    "OpenSpec specification management",
-                ),
-            ];
+            let plugins = plugin::detect_plugins(&project_root);
 
-            for (name, detector, description) in &plugins {
-                let detected = project_root.join(detector).exists();
-                let status = if detected {
+            for p in &plugins {
+                let status = if p.detected {
                     "detected".green().to_string()
                 } else {
                     "not found".dimmed().to_string()
                 };
-                println!(
-                    "    {} {}  {}  [{}]",
-                    "•".dimmed(),
-                    name.bold(),
-                    description.dimmed(),
-                    status
-                );
-            }
 
-            // Check for custom plugins in .wai/plugins/
-            let plugins_dir = crate::config::plugins_dir(&project_root);
-            if plugins_dir.exists()
-                && let Ok(entries) = std::fs::read_dir(&plugins_dir) {
-                    for entry in entries.filter_map(|e| e.ok()) {
-                        if entry
-                            .path()
-                            .extension()
-                            .and_then(|e| e.to_str())
-                            .map(|e| e == "yml" || e == "yaml")
-                            .unwrap_or(false)
-                            && let Some(name) = entry.path().file_stem().and_then(|n| n.to_str()) {
-                                println!(
-                                    "    {} {}  {}",
-                                    "•".dimmed(),
-                                    name,
-                                    "custom".dimmed()
-                                );
-                            }
+                let source = if p.def.detector.is_some() {
+                    "built-in"
+                } else {
+                    "custom"
+                };
+
+                println!(
+                    "    {} {}  {}  [{}] ({})",
+                    "•".dimmed(),
+                    p.def.name.bold(),
+                    p.def.description.dimmed(),
+                    status,
+                    source.dimmed()
+                );
+
+                // Show commands if any
+                if !p.def.commands.is_empty() {
+                    for cmd in &p.def.commands {
+                        println!(
+                            "      {} wai {} {}  — {}",
+                            "↳".dimmed(),
+                            p.def.name,
+                            cmd.name,
+                            cmd.description.dimmed()
+                        );
                     }
                 }
+
+                // Show hooks if any
+                if !p.def.hooks.is_empty() {
+                    let hook_names: Vec<&String> = p.def.hooks.keys().collect();
+                    println!(
+                        "      {} hooks: {}",
+                        "↳".dimmed(),
+                        hook_names
+                            .iter()
+                            .map(|h| h.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                            .dimmed()
+                    );
+                }
+            }
 
             println!();
             Ok(())

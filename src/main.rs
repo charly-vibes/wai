@@ -7,6 +7,7 @@ mod cli;
 mod commands;
 mod config;
 mod error;
+pub mod plugin;
 mod state;
 
 use cli::Cli;

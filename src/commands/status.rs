@@ -4,6 +4,7 @@ use owo_colors::OwoColorize;
 
 use crate::config::{find_project_root, projects_dir, ProjectConfig, STATE_FILE};
 use crate::error::WaiError;
+use crate::plugin;
 use crate::state::{Phase, ProjectState};
 
 pub fn run() -> Result<()> {
@@ -49,25 +50,38 @@ pub fn run() -> Result<()> {
         println!("    {}", "(no projects yet)".dimmed());
     }
 
-    // Plugin status
+    // Plugin status via plugin system
     println!();
     println!("  {} Plugins", "◆".cyan());
 
-    let beads_detected = project_root.join(".beads").exists();
-    let git_detected = project_root.join(".git").exists();
-    let openspec_detected = project_root.join("openspec").exists();
-
-    if beads_detected {
-        println!("    {} beads  {}", "•".dimmed(), "detected".green());
+    let plugins = plugin::detect_plugins(&project_root);
+    let mut any_detected = false;
+    for p in &plugins {
+        if p.detected {
+            println!(
+                "    {} {}  {}",
+                "•".dimmed(),
+                p.def.name.bold(),
+                "detected".green()
+            );
+            any_detected = true;
+        }
     }
-    if git_detected {
-        println!("    {} git    {}", "•".dimmed(), "detected".green());
-    }
-    if openspec_detected {
-        println!("    {} openspec  {}", "•".dimmed(), "detected".green());
-    }
-    if !beads_detected && !git_detected && !openspec_detected {
+    if !any_detected {
         println!("    {}", "(none detected)".dimmed());
+    }
+
+    // Run on_status hooks for enrichment
+    let hook_outputs = plugin::run_hooks(&project_root, "on_status");
+    if !hook_outputs.is_empty() {
+        println!();
+        println!("  {} Plugin Info", "◆".cyan());
+        for output in &hook_outputs {
+            println!("    {} {}:", "•".dimmed(), output.label.bold());
+            for line in output.content.lines().take(5) {
+                println!("      {}", line.dimmed());
+            }
+        }
     }
 
     // Suggestions

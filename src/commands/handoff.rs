@@ -5,6 +5,7 @@ use miette::{IntoDiagnostic, Result};
 use crate::cli::HandoffCommands;
 use crate::config::{projects_dir, HANDOFFS_DIR, STATE_FILE};
 use crate::error::WaiError;
+use crate::plugin;
 use crate::state::ProjectState;
 
 use super::require_project;
@@ -42,34 +43,14 @@ pub fn run(cmd: HandoffCommands) -> Result<()> {
                 counter += 1;
             }
 
-            // Gather plugin context
+            // Gather plugin context via hook system
             let mut plugin_context = String::new();
-
-            // Git status
-            if project_root.join(".git").exists()
-                && let Ok(output) = std::process::Command::new("git")
-                    .args(["status", "--short"])
-                    .current_dir(&project_root)
-                    .output()
-                    && !output.stdout.is_empty() {
-                        plugin_context.push_str("### Git Status\n\n```\n");
-                        plugin_context
-                            .push_str(&String::from_utf8_lossy(&output.stdout));
-                        plugin_context.push_str("```\n\n");
-                    }
-
-            // Beads status
-            if project_root.join(".beads").exists()
-                && let Ok(output) = std::process::Command::new("bd")
-                    .args(["list", "--status=open"])
-                    .current_dir(&project_root)
-                    .output()
-                    && output.status.success() && !output.stdout.is_empty() {
-                        plugin_context.push_str("### Open Issues (Beads)\n\n```\n");
-                        plugin_context
-                            .push_str(&String::from_utf8_lossy(&output.stdout));
-                        plugin_context.push_str("```\n\n");
-                    }
+            let hook_outputs = plugin::run_hooks(&project_root, "on_handoff_generate");
+            for output in &hook_outputs {
+                plugin_context.push_str(&format!("### {}\n\n```\n", output.label));
+                plugin_context.push_str(&output.content);
+                plugin_context.push_str("```\n\n");
+            }
 
             // Generate handoff content
             let content = format!(
