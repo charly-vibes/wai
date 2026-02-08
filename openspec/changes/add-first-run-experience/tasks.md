@@ -12,7 +12,7 @@
 ## 3. Guided Flows
 
 - [ ] 3.1 Enhanced `wai init` with more guidance
-- [ ] 3.2 First bead creation walkthrough
+- [ ] 3.2 First research addition walkthrough
 - [ ] 3.3 First phase transition walkthrough
 
 ## 4. Welcome Improvements

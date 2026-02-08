@@ -24,7 +24,7 @@ This spec covers the design for several advanced interactive features.
 
 - **Suggestions for all commands:** Given the broad scope, the initial implementation will focus on a few high-value commands, representing a **phased approach** rather than an immediate, exhaustive implementation across the entire command suite.
 - **Detecting all workflow anti-patterns:** The system will initially detect a small, well-defined set of common workflow patterns, incrementally expanding based on user need and feasibility.
-- **Resolving all types of ambiguity:** The initial focus for interactive resolution is on bead selection; expanding to other forms of ambiguity will be a future consideration.
+- **Resolving all types of ambiguity:** The initial focus for interactive resolution is on project selection; expanding to other forms of ambiguity will be a future consideration.
 - **Natural Language Processing (NLP):** All detection and suggestion logic will be based on defined heuristics, not complex NLP, keeping the implementation manageable and predictable.
 
 ## Requirements
@@ -36,17 +36,17 @@ After each command, the CLI SHALL suggest logical next steps based on what just 
 #### Scenario: After creating project
 
 - **WHEN** user successfully runs `wai init` or `wai new project`
-- **THEN** output suggests: create first bead, add research, check status
+- **THEN** output suggests: add research, check phase, check status
 
 #### Scenario: After adding research
 
 - **WHEN** user successfully adds research
-- **THEN** output suggests: create bead from research, add more research, show beads
+- **THEN** output suggests: add plan, review research, check phase
 
-#### Scenario: After moving bead to in-progress
+#### Scenario: After advancing to implement phase
 
-- **WHEN** user moves a bead to in-progress phase
-- **THEN** output suggests: show bead details, add notes, complete bead
+- **WHEN** user advances to the implement phase
+- **THEN** output suggests: show project details, add notes, check status
 
 ### Requirement: Workflow Pattern Detection
 
@@ -54,23 +54,23 @@ The CLI SHALL detect common workflow patterns and tailor suggestions.
 
 #### Scenario: Implementation phase detected
 
-- **WHEN** project has beads in ready phase
-- **AND** no beads are in-progress
-- **THEN** status command highlights "Ready to implement" with specific beads
+- **WHEN** project is in plan or design phase
+- **AND** has designs ready
+- **THEN** status command highlights "Ready to implement" with next steps
 
 #### Scenario: Research phase detected
 
-- **WHEN** project has draft beads but no research
-- **THEN** status command suggests adding research before moving to ready
+- **WHEN** project is in research phase with minimal research
+- **THEN** status command suggests adding research before advancing phases
 
 ### Requirement: Interactive Ambiguity Resolution
 
 When a command is ambiguous, the CLI SHALL prompt for clarification instead of failing.
 
-#### Scenario: Multiple matching beads
+#### Scenario: Multiple matching projects
 
-- **WHEN** user references a bead with an ambiguous identifier
-- **AND** multiple beads match
+- **WHEN** user references a project with an ambiguous identifier
+- **AND** multiple projects match
 - **THEN** the system shows a selection prompt with matching options
 - **AND** user can choose or cancel
 

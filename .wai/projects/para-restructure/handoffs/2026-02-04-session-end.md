@@ -5,7 +5,7 @@ phase: implement
 agent: claude-opus-4.5
 ---
 
-# Session Handoff — PARA Restructure (Phases 1–2)
+# Session Handoff — PARA Restructure (Phases 1–5)
 
 ## What Was Done
 
@@ -34,6 +34,27 @@ agent: claude-opus-4.5
 - Updated `status.rs` — shows projects with phases, plugin detection, phase-based suggestions
 - Updated `README.md` — new architecture, command table, phase documentation
 
+### Phase 3: Agent Config Projections (complete — code existed, verified)
+
+- `src/commands/sync.rs` — parses `.projections.yml`, supports symlink/inline/reference strategies, `--status` flag
+- `src/commands/config_cmd.rs` — `wai config add skill|rule|context <file>`, `wai config list`
+- `src/commands/import.rs` — imports directories or files, auto-categorizes by filename patterns
+
+### Phase 4–5: Plugin Architecture + Handoff Wiring (complete)
+
+- `src/plugin.rs` — NEW: centralized plugin abstraction layer
+  - `PluginDef`, `HookDef`, `PluginCommand`, `ActivePlugin` structs with serde YAML deserialization
+  - `builtin_plugins()` — defines git, beads, openspec with detectors, hooks, and commands
+  - `detect_plugins()` — auto-detects built-in plugins + loads custom YAML plugins from `.wai/plugins/`
+  - `run_hooks()` — executes all hooks for a given event across detected plugins
+  - `execute_hook()` — runs a single hook command and captures output
+  - `find_plugin_command()` — looks up a specific plugin command by name
+  - `execute_passthrough()` — runs plugin pass-through commands with extra args
+- `src/commands/handoff.rs` — replaced hardcoded `git status --short` and `bd list --status=open` calls with `plugin::run_hooks("on_handoff_generate")`
+- `src/commands/status.rs` — replaced hardcoded `.beads`/`.git`/`openspec` existence checks with `plugin::detect_plugins()`, added `on_status` hook output display (shows recent commits, beads stats)
+- `src/commands/plugin.rs` — replaced hardcoded plugin array with `plugin::detect_plugins()`, now shows commands and hooks per plugin
+- `src/main.rs` — added `pub mod plugin`
+
 ## Verification
 
 - `cargo build` — compiles clean
@@ -43,36 +64,42 @@ agent: claude-opus-4.5
 ## Key Decisions
 
 - `Phase` is a required subcommand (not optional) — `wai phase` requires `wai phase show` explicitly, because clap doesn't support `Option<Subcommand>`. The plan's `Phase(Option<PhaseCommands>)` was changed to `Phase(PhaseCommands)`.
-- Handoffs use `std::process::Command` to call `git` and `bd` directly rather than going through a plugin abstraction. This works but isn't pluggable yet.
+- Plugin hooks use `std::process::Command` under the hood but are now routed through the centralized `plugin::run_hooks()` system rather than hardcoded per-command.
+- Built-in plugins have a `detector` field (e.g. `.git` directory); custom plugins without a detector default to `detected: true`.
 - `resolve_project()` in `add.rs` picks the first project alphabetically when `--project` isn't specified. Multi-project workflows may need a "default project" concept.
 - The `PROJECTIONS_FILE` constant exists but is unused (the string is hardcoded where needed). Left for future use.
+- Plugin enable/disable remains stubbed — no persistence mechanism yet for disabling a detected plugin.
 
-## What Remains (Phases 3–8)
+## What Remains (Phases 6–8)
 
-### Phase 3: Agent config projections
+### Phase 6: Timeline + Search polish
 
-The sync command reads `.projections.yml` and executes projections (symlink/inline/reference). The code is already written and functional but hasn't been tested end-to-end. The `config add/list` and `import` commands work but are basic.
-
-### Phase 4: Handoff system
-
-Handoff generation works, enriches from git and beads plugins. The template is hardcoded — could be made configurable via `.wai/resources/templates/`.
-
-### Phase 5: Plugin architecture
-
-Plugin detection works (auto-detect on `init` and `status`). Plugin enable/disable is stubbed. YAML-based plugin configs in `.wai/plugins/` are read by the `plugin list` command but the full hook execution pipeline isn't wired through all commands yet. Command pass-through routing (e.g., `wai beads list` → `bd list`) is not yet implemented.
-
-### Phase 6: Timeline + Search
-
-Both commands are implemented and functional. Search uses walkdir + string matching. Timeline extracts dates from filename prefixes.
+Both commands are implemented and functional. Potential improvements:
+- Date range filtering for timeline (`--from`, `--to`)
+- `--reverse` flag for timeline
+- Regex support for search
+- Result count limiting for search
 
 ### Phase 7: Update existing code
 
-Status and init are already updated. The change proposals in `openspec/changes/` (self-healing-errors, progressive-disclosure, context-suggestions, first-run-experience) haven't been addressed and may need revision to match the new architecture.
+- Change proposals in `openspec/changes/` (self-healing-errors, progressive-disclosure, context-suggestions, first-run-experience) haven't been revised to match the new PARA architecture
+- Command pass-through routing (e.g., `wai beads list` → `bd list`) is not yet wired into the CLI dispatch — the `find_plugin_command()` and `execute_passthrough()` functions exist in `plugin.rs` but aren't called from `commands/mod.rs`
 
-### Phase 8: Build verification
+### Phase 8: Integration tests
 
-Build is clean. No integration tests exist yet.
+No integration tests exist yet. Key scenarios:
+- `wai init` creates correct PARA structure
+- `wai new project` creates project with `.state`
+- `wai phase next/back/set` transitions work
+- `wai add research` creates date-prefixed files
+- `wai move` relocates between categories
+- `wai search` finds content
+- `wai timeline` shows chronological entries
+- `wai handoff create` generates handoff with plugin enrichment
+- `wai plugin list` shows built-in and custom plugins
 
-## Commit
+## Commits
 
-`ed52596` on `main` — "refactor: restructure wai from bead-centric to PARA-based architecture"
+- `ed52596` — "refactor: restructure wai from bead-centric to PARA-based architecture" (Phases 1–2)
+- `5d7431d` — "docs: add handoff and plan for PARA restructure project"
+- `4ab7e05` — "feat(plugin): Add plugin abstraction layer and wire through commands" (Phases 4–5)

@@ -53,9 +53,9 @@ The CLI SHALL detect reversed verb-noun patterns and suggest the correct order.
 
 #### Scenario: Reversed command pattern
 
-- **WHEN** user types `wai bead new "Title"`
-- **THEN** error says "Unknown command 'bead'"
-- **AND** suggests "Did you mean 'wai new bead \"Title\"'?"
+- **WHEN** user types `wai project new "Title"`
+- **THEN** error says "Unknown command 'project'"
+- **AND** suggests "Did you mean 'wai new project \"Title\"'?"
 
 ### Requirement: Context Inference
 

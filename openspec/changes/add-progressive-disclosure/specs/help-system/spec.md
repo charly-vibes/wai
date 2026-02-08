@@ -36,14 +36,14 @@ The CLI SHALL support two levels of user-facing output detail for its commands.
 - **WHEN** user runs a command without `-v`
 - **THEN** output is a simple, high-level summary of the result
 - **AND** may include a suggestion for the next logical step.
-- **EXAMPLE:** `Bead 'my-bead' created.`
+- **EXAMPLE:** `Project 'my-project' created.`
 
 #### Scenario: Detailed Output (Intermediate)
 
 - **WHEN** user runs a command with `-v`
 - **THEN** output includes a more detailed log of the user-relevant outcomes.
 - **AND** might list files created or modified, or key value changes.
-- **EXAMPLE:** `✔ Bead 'my-bead' created at ./beads/my-bead.md`
+- **EXAMPLE:** `✔ Project 'my-project' created at .wai/projects/my-project/`
 
 ### Requirement: Diagnostic Trace Mode
 

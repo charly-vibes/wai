@@ -49,7 +49,7 @@ The CLI SHALL provide an interactive tutorial command.
 #### Scenario: Tutorial flow
 
 - **WHEN** user runs `wai tutorial`
-- **THEN** the system walks through: create project → create bead → move through phases
+- **THEN** the system walks through: create project → add research → move through phases
 - **AND** each step explains what's happening
 - **AND** user can exit at any time
 

@@ -8,7 +8,7 @@ Current errors suggest fixes but don't detect common user mistakes like typos, w
 
 - Add typo detection with "did you mean?" suggestions
 - Add context inference (guess project from current directory)
-- Add wrong-order detection (e.g., `wai bead new` → `wai new bead`)
+- Add wrong-order detection (e.g., `wai project new` → `wai new project`)
 - Add sync conflict resolution suggestions
 - Make errors conversational ("Let's fix this" not "Command failed")
 

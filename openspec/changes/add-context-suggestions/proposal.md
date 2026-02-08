@@ -7,8 +7,8 @@ Users often don't know the next logical step. The CLI should detect common workf
 ## What Changes
 
 - Post-command suggestions based on what just happened
-- Workflow detection (after creating project → suggest first bead)
-- Phase-aware suggestions (ready beads → start implementing)
+- Workflow detection (after creating project → suggest adding research)
+- Phase-aware suggestions (implement phase → start implementing)
 - Command chaining suggestions after success or error
 
 ## Impact

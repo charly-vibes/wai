@@ -7,19 +7,18 @@
 ## 2. Post-Command Suggestions
 
 - [ ] 2.1 Add suggestions after `wai new project`
-- [ ] 2.2 Add suggestions after `wai new bead`
-- [ ] 2.3 Add suggestions after `wai add research`
-- [ ] 2.4 Add suggestions after `wai move bead`
+- [ ] 2.2 Add suggestions after `wai add research`
+- [ ] 2.3 Add suggestions after `wai phase next`
 
 ## 3. Phase-Aware Suggestions
 
-- [ ] 3.1 Detect when beads are ready for implementation
-- [ ] 3.2 Suggest starting work on ready beads
+- [ ] 3.1 Detect when project is ready for implementation
+- [ ] 3.2 Suggest starting implementation
 - [ ] 3.3 Detect when research might be needed
 
 ## 4. Interactive Ambiguity Resolution
 
-- [ ] 4.1 Detect ambiguous commands (e.g., multiple matching beads)
+- [ ] 4.1 Detect ambiguous commands (e.g., multiple matching projects)
 - [ ] 4.2 Prompt for selection instead of erroring
 - [ ] 4.3 Add --no-interactive flag to disable prompts
 

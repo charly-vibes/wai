@@ -16,7 +16,7 @@
 
 ## 4. Wrong Order Detection
 
-- [ ] 4.1 Detect reversed verb-noun patterns (e.g., `bead new` → `new bead`)
+- [ ] 4.1 Detect reversed verb-noun patterns (e.g., `project new` → `new project`)
 - [ ] 4.2 Show corrected command in error message
 
 ## 5. Conversational Tone
