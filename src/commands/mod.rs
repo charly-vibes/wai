@@ -36,8 +36,10 @@ pub fn run(cli: Cli) -> Result<()> {
             query,
             type_filter,
             project,
-        }) => search::run(query, type_filter, project),
-        Some(Commands::Timeline { project }) => timeline::run(project),
+            regex,
+            limit,
+        }) => search::run(query, type_filter, project, regex, limit),
+        Some(Commands::Timeline { project, from, to, reverse }) => timeline::run(project, from, to, reverse),
         Some(Commands::Plugin(cmd)) => plugin::run(cmd),
         Some(Commands::Import { path }) => import::run(path),
         Some(Commands::External(args)) => run_external(args),
@@ -94,17 +96,17 @@ fn run_external(args: Vec<String>) -> Result<()> {
 
     let plugins = crate::plugin::detect_plugins(&project_root);
 
-    if let Some(cmd_name) = command_name {
-        if let Some(cmd) = crate::plugin::find_plugin_command(&plugins, plugin_name, cmd_name) {
-            let extra_args: Vec<String> = args[2..].to_vec();
-            let status =
-                crate::plugin::execute_passthrough(&project_root, &cmd.passthrough, &extra_args)
-                    .into_diagnostic()?;
-            if !status.success() {
-                std::process::exit(status.code().unwrap_or(1));
-            }
-            return Ok(());
+    if let Some(cmd_name) = command_name
+        && let Some(cmd) = crate::plugin::find_plugin_command(&plugins, plugin_name, cmd_name)
+    {
+        let extra_args: Vec<String> = args[2..].to_vec();
+        let status =
+            crate::plugin::execute_passthrough(&project_root, &cmd.passthrough, &extra_args)
+                .into_diagnostic()?;
+        if !status.success() {
+            std::process::exit(status.code().unwrap_or(1));
         }
+        return Ok(());
     }
 
     // Check if the plugin exists at all (even without a matching command)

@@ -71,7 +71,7 @@ pub enum Commands {
 
     /// Search across all artifacts
     Search {
-        /// Search query
+        /// Search query (supports regex with --regex flag)
         query: String,
 
         /// Filter by artifact type (research, plan, design, handoff)
@@ -81,12 +81,32 @@ pub enum Commands {
         /// Search within a specific project
         #[arg(long = "in")]
         project: Option<String>,
+
+        /// Treat query as a regular expression
+        #[arg(long)]
+        regex: bool,
+
+        /// Limit number of results shown
+        #[arg(short = 'n', long)]
+        limit: Option<usize>,
     },
 
     /// View chronological timeline of artifacts
     Timeline {
         /// Project name
         project: String,
+
+        /// Show only entries from this date onward (YYYY-MM-DD)
+        #[arg(long)]
+        from: Option<String>,
+
+        /// Show only entries up to this date (YYYY-MM-DD)
+        #[arg(long)]
+        to: Option<String>,
+
+        /// Show oldest entries first
+        #[arg(long)]
+        reverse: bool,
     },
 
     /// Manage plugins

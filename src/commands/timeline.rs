@@ -12,7 +12,7 @@ struct TimelineEntry {
     title: String,
 }
 
-pub fn run(project: String) -> Result<()> {
+pub fn run(project: String, from: Option<String>, to: Option<String>, reverse: bool) -> Result<()> {
     let project_root = require_project()?;
     let proj_dir = projects_dir(&project_root).join(&project);
 
@@ -50,6 +50,18 @@ pub fn run(project: String) -> Result<()> {
             continue;
         };
 
+        // Apply date range filters
+        if let Some(ref from_date) = from
+            && date.as_str() < from_date.as_str()
+        {
+            continue;
+        }
+        if let Some(ref to_date) = to
+            && date.as_str() > to_date.as_str()
+        {
+            continue;
+        }
+
         // Determine artifact type from parent directory
         let parent = entry
             .path()
@@ -81,8 +93,12 @@ pub fn run(project: String) -> Result<()> {
         });
     }
 
-    // Sort newest first
-    entries.sort_by(|a, b| b.date.cmp(&a.date));
+    // Sort by date
+    if reverse {
+        entries.sort_by(|a, b| a.date.cmp(&b.date));
+    } else {
+        entries.sort_by(|a, b| b.date.cmp(&a.date));
+    }
 
     if entries.is_empty() {
         println!();
