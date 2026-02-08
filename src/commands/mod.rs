@@ -40,6 +40,7 @@ pub fn run(cli: Cli) -> Result<()> {
         Some(Commands::Timeline { project }) => timeline::run(project),
         Some(Commands::Plugin(cmd)) => plugin::run(cmd),
         Some(Commands::Import { path }) => import::run(path),
+        Some(Commands::External(args)) => run_external(args),
         None => show_welcome(),
     }
 }
@@ -83,6 +84,53 @@ fn show_welcome() -> Result<()> {
 
     outro("Run 'wai <command> --help' for detailed usage").into_diagnostic()?;
     Ok(())
+}
+
+fn run_external(args: Vec<String>) -> Result<()> {
+    let project_root = require_project()?;
+
+    let plugin_name = &args[0];
+    let command_name = args.get(1).map(|s| s.as_str());
+
+    let plugins = crate::plugin::detect_plugins(&project_root);
+
+    if let Some(cmd_name) = command_name {
+        if let Some(cmd) = crate::plugin::find_plugin_command(&plugins, plugin_name, cmd_name) {
+            let extra_args: Vec<String> = args[2..].to_vec();
+            let status =
+                crate::plugin::execute_passthrough(&project_root, &cmd.passthrough, &extra_args)
+                    .into_diagnostic()?;
+            if !status.success() {
+                std::process::exit(status.code().unwrap_or(1));
+            }
+            return Ok(());
+        }
+    }
+
+    // Check if the plugin exists at all (even without a matching command)
+    let plugin_exists = plugins
+        .iter()
+        .any(|p| p.def.name == *plugin_name && p.detected);
+
+    if plugin_exists {
+        if let Some(cmd_name) = command_name {
+            miette::bail!(
+                "Plugin '{}' has no command '{}'. Run 'wai plugin list' to see available commands.",
+                plugin_name,
+                cmd_name
+            );
+        } else {
+            miette::bail!(
+                "Plugin '{}' requires a command. Run 'wai plugin list' to see available commands.",
+                plugin_name
+            );
+        }
+    } else {
+        miette::bail!(
+            "Unknown command '{}'. Run 'wai --help' to see available commands or 'wai plugin list' to see plugins.",
+            plugin_name
+        );
+    }
 }
 
 pub fn require_project() -> Result<std::path::PathBuf> {

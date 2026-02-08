@@ -98,6 +98,10 @@ pub enum Commands {
         /// Path to import from (e.g., .claude/, .cursorrules)
         path: String,
     },
+
+    /// Pass-through to plugin commands (e.g., wai beads list)
+    #[command(external_subcommand)]
+    External(Vec<String>),
 }
 
 #[derive(Subcommand)]
