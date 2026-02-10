@@ -3,7 +3,12 @@ use clap::{Parser, Subcommand};
 #[derive(Parser)]
 #[command(
     name = "wai",
-    about = "Workflow manager for AI-driven development",
+    about = "wai /waɪ/ — know why it was built that way",
+    long_about = "wai /waɪ/ — pronounced like \"why\", also read as \"way\"\n\n\
+        Most specs define what to build. Wai extends the workflow to also inform —\n\
+        preserving the research, reasoning, and decisions that shaped the design.\n\n\
+        Organizes artifacts using the PARA method (Projects, Areas, Resources, Archives)\n\
+        with project phase tracking, agent config sync, handoff generation, and plugin integration.",
     version,
     after_help = "Run 'wai <command> --help' for more information on a command."
 )]
