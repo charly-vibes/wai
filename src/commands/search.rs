@@ -2,7 +2,10 @@ use miette::Result;
 use owo_colors::OwoColorize;
 use walkdir::WalkDir;
 
-use crate::config::{wai_dir, projects_dir};
+use crate::config::{projects_dir, wai_dir};
+use crate::context::current_context;
+use crate::json::{SearchPayload, SearchResult};
+use crate::output::print_json;
 
 use super::require_project;
 
@@ -14,6 +17,7 @@ pub fn run(
     limit: Option<usize>,
 ) -> Result<()> {
     let project_root = require_project()?;
+    let context = current_context();
 
     let search_root = if let Some(ref proj_name) = project {
         let dir = projects_dir(&project_root).join(proj_name);
@@ -32,18 +36,18 @@ pub fn run(
     let matcher: Matcher = if use_regex {
         let re = regex::Regex::new(&query)
             .map_err(|e| miette::miette!("Invalid regex '{}': {}", query, e))?;
-        Box::new(move |line: &str| {
-            re.find(line).map(|m| (m.start(), m.end()))
-        })
+        Box::new(move |line: &str| re.find(line).map(|m| (m.start(), m.end())))
     } else {
         let query_lower = query.to_lowercase();
         Box::new(move |line: &str| {
             let lower = line.to_lowercase();
-            lower.find(&query_lower).map(|pos| (pos, pos + query_lower.len()))
+            lower
+                .find(&query_lower)
+                .map(|pos| (pos, pos + query_lower.len()))
         })
     };
 
-    let mut results = Vec::new();
+    let mut results: Vec<(String, usize, String, usize, usize, Vec<String>)> = Vec::new();
 
     for entry in WalkDir::new(&search_root)
         .into_iter()
@@ -79,12 +83,14 @@ pub fn run(
                         .path()
                         .strip_prefix(&project_root)
                         .unwrap_or(entry.path());
+                    let context_lines = extract_context_lines(&content, line_num, 1);
                     results.push((
                         rel_path.display().to_string(),
                         line_num + 1,
                         line.to_string(),
                         start,
                         end,
+                        context_lines,
                     ));
 
                     if let Some(max) = limit
@@ -101,6 +107,24 @@ pub fn run(
         {
             break;
         }
+    }
+
+    if context.json {
+        let payload = SearchPayload {
+            query: query.clone(),
+            results: results
+                .iter()
+                .map(
+                    |(path, line_num, line, _start, _end, context_lines)| SearchResult {
+                        path: path.clone(),
+                        line_number: *line_num,
+                        line: line.clone(),
+                        context: context_lines.clone(),
+                    },
+                )
+                .collect(),
+        };
+        return print_json(&payload);
     }
 
     if results.is_empty() {
@@ -124,7 +148,7 @@ pub fn run(
     println!();
 
     let mut current_file = String::new();
-    for (path, line_num, line, start, end) in &results {
+    for (path, line_num, line, start, end, _context_lines) in &results {
         if *path != current_file {
             current_file = path.clone();
             println!("  {}", path.cyan());
@@ -138,6 +162,16 @@ pub fn run(
 
     println!();
     Ok(())
+}
+
+fn extract_context_lines(content: &str, line_num: usize, context: usize) -> Vec<String> {
+    let lines: Vec<&str> = content.lines().collect();
+    let start = line_num.saturating_sub(context);
+    let end = (line_num + context + 1).min(lines.len());
+    lines[start..end]
+        .iter()
+        .map(|line| (*line).to_string())
+        .collect()
 }
 
 fn highlight_match(line: &str, start: usize, end: usize) -> String {

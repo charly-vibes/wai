@@ -4,6 +4,8 @@ use std::path::Path;
 use std::process::Command;
 
 use crate::config::plugins_dir;
+use crate::context::current_context;
+use crate::error::WaiError;
 
 /// Data returned by a plugin hook execution.
 #[derive(Debug, Default)]
@@ -18,6 +20,8 @@ pub struct PluginCommand {
     pub name: String,
     pub description: String,
     pub passthrough: String,
+    #[serde(default)]
+    pub read_only: bool,
 }
 
 /// Hook definition from plugin config.
@@ -94,16 +98,19 @@ pub fn builtin_plugins() -> Vec<PluginDef> {
                     name: "list".to_string(),
                     description: "List beads issues".to_string(),
                     passthrough: "bd list".to_string(),
+                    read_only: true,
                 },
                 PluginCommand {
                     name: "show".to_string(),
                     description: "Show beads issue details".to_string(),
                     passthrough: "bd show".to_string(),
+                    read_only: true,
                 },
                 PluginCommand {
                     name: "ready".to_string(),
                     description: "Show ready issues".to_string(),
                     passthrough: "bd ready".to_string(),
+                    read_only: true,
                 },
             ],
             hooks: HashMap::from([
@@ -180,10 +187,7 @@ pub fn detect_plugins(project_root: &Path) -> Vec<ActivePlugin> {
 }
 
 /// Execute a plugin hook and return its output.
-pub fn execute_hook(
-    project_root: &Path,
-    hook: &HookDef,
-) -> Option<HookOutput> {
+pub fn execute_hook(project_root: &Path, hook: &HookDef) -> Option<HookOutput> {
     let parts: Vec<&str> = hook.command.split_whitespace().collect();
     if parts.is_empty() {
         return None;
@@ -206,10 +210,7 @@ pub fn execute_hook(
 }
 
 /// Run all hooks for a given event across all detected plugins.
-pub fn run_hooks(
-    project_root: &Path,
-    event: &str,
-) -> Vec<HookOutput> {
+pub fn run_hooks(project_root: &Path, event: &str) -> Vec<HookOutput> {
     let plugins = detect_plugins(project_root);
     let mut outputs = Vec::new();
 
@@ -251,11 +252,30 @@ pub fn execute_passthrough(
     passthrough: &str,
     extra_args: &[String],
 ) -> std::io::Result<std::process::ExitStatus> {
+    let context = current_context();
     let parts: Vec<&str> = passthrough.split_whitespace().collect();
     if parts.is_empty() {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
             "Empty passthrough command",
+        ));
+    }
+
+    if context.no_input {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            WaiError::NonInteractive {
+                message: "Plugin passthrough requires interactive input".to_string(),
+            },
+        ));
+    }
+
+    if context.safe {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            WaiError::SafeModeViolation {
+                action: "plugin passthrough".to_string(),
+            },
         ));
     }
 

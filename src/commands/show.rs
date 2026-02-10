@@ -1,7 +1,7 @@
 use miette::{IntoDiagnostic, Result};
 use owo_colors::OwoColorize;
 
-use crate::config::{projects_dir, areas_dir, resources_dir, archives_dir};
+use crate::config::{archives_dir, areas_dir, projects_dir, resources_dir};
 
 use super::require_project;
 

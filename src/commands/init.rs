@@ -2,14 +2,22 @@ use cliclack::{input, intro, log, outro};
 use miette::{IntoDiagnostic, Result};
 
 use crate::config::{
-    ProjectConfig, ProjectSettings, CONFIG_DIR,
-    PROJECTS_DIR, AREAS_DIR, RESOURCES_DIR, ARCHIVES_DIR, PLUGINS_DIR,
-    AGENT_CONFIG_DIR, SKILLS_DIR, RULES_DIR, CONTEXT_DIR,
+    AGENT_CONFIG_DIR, ARCHIVES_DIR, AREAS_DIR, CONFIG_DIR, CONTEXT_DIR, PLUGINS_DIR, PROJECTS_DIR,
+    ProjectConfig, ProjectSettings, RESOURCES_DIR, RULES_DIR, SKILLS_DIR,
 };
+use crate::context::current_context;
 
 pub fn run(name: Option<String>) -> Result<()> {
     let current_dir = std::env::current_dir().into_diagnostic()?;
     let config_dir = current_dir.join(CONFIG_DIR);
+    let context = current_context();
+
+    if context.safe {
+        return Err(crate::error::WaiError::SafeModeViolation {
+            action: "initialize project".to_string(),
+        }
+        .into());
+    }
 
     intro("Initialize wai project").into_diagnostic()?;
 
@@ -24,16 +32,27 @@ pub fn run(name: Option<String>) -> Result<()> {
     let project_name = match name {
         Some(n) => n,
         None => {
+            if context.no_input && !context.yes {
+                return Err(crate::error::WaiError::NonInteractive {
+                    message: "Project name is required for wai init".to_string(),
+                }
+                .into());
+            }
+
             let default_name = current_dir
                 .file_name()
                 .and_then(|n| n.to_str())
                 .unwrap_or("my-project")
                 .to_string();
 
-            input("Project name?")
-                .default_input(&default_name)
-                .interact()
-                .into_diagnostic()?
+            if context.yes {
+                default_name
+            } else {
+                input("Project name?")
+                    .default_input(&default_name)
+                    .interact()
+                    .into_diagnostic()?
+            }
         }
     };
 
@@ -96,10 +115,7 @@ fn create_para_structure(root: &std::path::Path, config: &ProjectConfig) -> Resu
     let projections_content = "# Agent config projections — defines how configs are synced to tool-specific locations\n\
         # Strategies: symlink, inline, reference\n\
         projections: []\n";
-    std::fs::write(
-        agent_config.join(".projections.yml"),
-        projections_content,
-    ).into_diagnostic()?;
+    std::fs::write(agent_config.join(".projections.yml"), projections_content).into_diagnostic()?;
 
     // Create resource subdirectories
     std::fs::create_dir_all(wai_dir.join(RESOURCES_DIR).join("templates")).into_diagnostic()?;
@@ -111,11 +127,8 @@ fn create_para_structure(root: &std::path::Path, config: &ProjectConfig) -> Resu
     // Create .gitignore for .wai if needed
     let gitignore_path = wai_dir.join(".gitignore");
     if !gitignore_path.exists() {
-        std::fs::write(
-            gitignore_path,
-            "# Local-only files\n*.local\n*.cache\n",
-        )
-        .into_diagnostic()?;
+        std::fs::write(gitignore_path, "# Local-only files\n*.local\n*.cache\n")
+            .into_diagnostic()?;
     }
 
     Ok(())

@@ -3,6 +3,9 @@ use owo_colors::OwoColorize;
 use walkdir::WalkDir;
 
 use crate::config::projects_dir;
+use crate::context::current_context;
+use crate::json::{TimelineEntry as JsonTimelineEntry, TimelinePayload};
+use crate::output::print_json;
 
 use super::require_project;
 
@@ -10,11 +13,13 @@ struct TimelineEntry {
     date: String,
     artifact_type: String,
     title: String,
+    path: String,
 }
 
 pub fn run(project: String, from: Option<String>, to: Option<String>, reverse: bool) -> Result<()> {
     let project_root = require_project()?;
     let proj_dir = projects_dir(&project_root).join(&project);
+    let context = current_context();
 
     if !proj_dir.exists() {
         return Err(crate::error::WaiError::ProjectNotFound {
@@ -37,11 +42,7 @@ pub fn run(project: String, from: Option<String>, to: Option<String>, reverse: b
                 .unwrap_or(false)
         })
     {
-        let filename = entry
-            .file_name()
-            .to_str()
-            .unwrap_or("")
-            .to_string();
+        let filename = entry.file_name().to_str().unwrap_or("").to_string();
 
         // Extract date prefix (YYYY-MM-DD)
         let date = if filename.len() >= 10 && filename.chars().nth(4) == Some('-') {
@@ -86,10 +87,18 @@ pub fn run(project: String, from: Option<String>, to: Option<String>, reverse: b
             .unwrap_or(&filename)
             .replace('-', " ");
 
+        let path = entry
+            .path()
+            .strip_prefix(&project_root)
+            .unwrap_or(entry.path())
+            .display()
+            .to_string();
+
         entries.push(TimelineEntry {
             date,
             artifact_type: artifact_type.to_string(),
             title,
+            path,
         });
     }
 
@@ -98,6 +107,22 @@ pub fn run(project: String, from: Option<String>, to: Option<String>, reverse: b
         entries.sort_by(|a, b| a.date.cmp(&b.date));
     } else {
         entries.sort_by(|a, b| b.date.cmp(&a.date));
+    }
+
+    if context.json {
+        let payload = TimelinePayload {
+            project: project.clone(),
+            entries: entries
+                .iter()
+                .map(|entry| JsonTimelineEntry {
+                    date: entry.date.clone(),
+                    artifact_type: entry.artifact_type.clone(),
+                    title: entry.title.clone(),
+                    path: entry.path.clone(),
+                })
+                .collect(),
+        };
+        return print_json(&payload);
     }
 
     if entries.is_empty() {
@@ -116,11 +141,7 @@ pub fn run(project: String, from: Option<String>, to: Option<String>, reverse: b
     }
 
     println!();
-    println!(
-        "  {} Timeline for '{}'",
-        "◆".cyan(),
-        project.bold()
-    );
+    println!("  {} Timeline for '{}'", "◆".cyan(), project.bold());
     println!();
 
     let mut current_date = String::new();

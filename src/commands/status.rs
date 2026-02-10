@@ -2,20 +2,29 @@ use cliclack::{intro, outro};
 use miette::{IntoDiagnostic, Result};
 use owo_colors::OwoColorize;
 
-use crate::config::{find_project_root, projects_dir, ProjectConfig, STATE_FILE};
+use crate::config::{ProjectConfig, STATE_FILE, find_project_root, projects_dir};
+use crate::context::current_context;
 use crate::error::WaiError;
+use crate::json::{HookOutput, StatusPayload, StatusPlugin, StatusProject, Suggestion};
+use crate::output::print_json;
 use crate::plugin;
 use crate::state::{Phase, ProjectState};
 
 pub fn run() -> Result<()> {
     let project_root = find_project_root().ok_or(WaiError::NotInitialized)?;
     let config = ProjectConfig::load(&project_root)?;
+    let context = current_context();
+
+    if context.json {
+        return render_json(&project_root, &config.project.name);
+    }
 
     intro(format!("Project: {}", config.project.name.bold())).into_diagnostic()?;
 
     // List projects and their phases
     let proj_dir = projects_dir(&project_root);
     let mut project_count = 0;
+    let mut suggestions: Vec<Suggestion> = Vec::new();
 
     println!();
     println!("  {} Projects", "◆".cyan());
@@ -89,15 +98,24 @@ pub fn run() -> Result<()> {
     println!("  {} Suggestions", "◆".cyan());
 
     if project_count == 0 {
+        suggestions.push(Suggestion {
+            label: "Create your first project".to_string(),
+            command: "wai new project \"my-app\"".to_string(),
+        });
         println!(
             "    {} Create your first project: wai new project \"my-app\"",
             "→".dimmed()
         );
     } else {
-        println!(
-            "    {} View project phase: wai phase",
-            "→".dimmed()
-        );
+        suggestions.push(Suggestion {
+            label: "View project phase".to_string(),
+            command: "wai phase".to_string(),
+        });
+        suggestions.push(Suggestion {
+            label: "Add artifacts".to_string(),
+            command: "wai add research \"...\"".to_string(),
+        });
+        println!("    {} View project phase: wai phase", "→".dimmed());
         println!(
             "    {} Add artifacts: wai add research \"...\"",
             "→".dimmed()
@@ -105,6 +123,87 @@ pub fn run() -> Result<()> {
     }
 
     outro("Run 'wai show' for full overview").into_diagnostic()?;
+    Ok(())
+}
+
+fn render_json(project_root: &std::path::Path, _project_name: &str) -> Result<()> {
+    let mut projects = Vec::new();
+    let proj_dir = projects_dir(project_root);
+    if proj_dir.exists() {
+        let mut entries: Vec<_> = std::fs::read_dir(&proj_dir)
+            .into_diagnostic()?
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
+            .collect();
+        entries.sort_by_key(|e| e.file_name());
+
+        for entry in entries {
+            if let Some(name) = entry.file_name().to_str() {
+                let state_path = entry.path().join(STATE_FILE);
+                let phase = if state_path.exists() {
+                    match ProjectState::load(&state_path) {
+                        Ok(state) => state.current.to_string(),
+                        Err(_) => "unknown".to_string(),
+                    }
+                } else {
+                    "no state".to_string()
+                };
+                projects.push(StatusProject {
+                    name: name.to_string(),
+                    phase,
+                });
+            }
+        }
+    }
+
+    let plugins = plugin::detect_plugins(project_root)
+        .into_iter()
+        .map(|p| StatusPlugin {
+            name: p.def.name,
+            status: if p.detected {
+                "detected".to_string()
+            } else {
+                "not found".to_string()
+            },
+            detected: p.detected,
+        })
+        .collect();
+
+    let hook_outputs = plugin::run_hooks(project_root, "on_status")
+        .into_iter()
+        .map(|output| HookOutput {
+            label: output.label,
+            content: output.content,
+        })
+        .collect();
+
+    let suggestions = if projects.is_empty() {
+        vec![Suggestion {
+            label: "Create your first project".to_string(),
+            command: "wai new project \"my-app\"".to_string(),
+        }]
+    } else {
+        vec![
+            Suggestion {
+                label: "View project phase".to_string(),
+                command: "wai phase".to_string(),
+            },
+            Suggestion {
+                label: "Add artifacts".to_string(),
+                command: "wai add research \"...\"".to_string(),
+            },
+        ]
+    };
+
+    let payload = StatusPayload {
+        project_root: project_root.display().to_string(),
+        projects,
+        plugins,
+        hook_outputs,
+        suggestions,
+    };
+
+    print_json(&payload)?;
     Ok(())
 }
 

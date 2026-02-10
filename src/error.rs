@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use miette::Diagnostic;
+use serde::Serialize;
 use thiserror::Error;
 
 #[derive(Error, Diagnostic, Debug)]
@@ -66,10 +67,7 @@ pub enum WaiError {
     ConfigSyncError { message: String },
 
     #[error("Handoff error: {message}")]
-    #[diagnostic(
-        code(wai::handoff::error),
-        help("{suggestion}")
-    )]
+    #[diagnostic(code(wai::handoff::error), help("{suggestion}"))]
     HandoffError { message: String, suggestion: String },
 
     #[error("Plugin '{name}' not found")]
@@ -78,6 +76,20 @@ pub enum WaiError {
         help("Run `wai plugin list` to see available plugins")
     )]
     PluginNotFound { name: String },
+
+    #[error("Non-interactive mode: {message}")]
+    #[diagnostic(
+        code(wai::cli::non_interactive),
+        help("Re-run without --no-input or supply required flags")
+    )]
+    NonInteractive { message: String },
+
+    #[error("Safe mode prevented action: {action}")]
+    #[diagnostic(
+        code(wai::cli::safe_mode),
+        help("Re-run without --safe to allow this action")
+    )]
+    SafeModeViolation { action: String },
 
     #[error("Configuration error: {message}")]
     #[diagnostic(code(wai::config::invalid))]
@@ -90,4 +102,27 @@ pub enum WaiError {
     #[error("YAML error: {0}")]
     #[diagnostic(code(wai::yaml::error))]
     Yaml(#[from] serde_yaml::Error),
+}
+
+#[derive(Debug, Serialize)]
+pub struct ErrorPayload {
+    pub code: String,
+    pub message: String,
+    pub help: Option<String>,
+    pub details: Option<String>,
+}
+
+impl WaiError {
+    pub fn as_payload(&self) -> ErrorPayload {
+        let diagnostic = self as &dyn Diagnostic;
+        ErrorPayload {
+            code: diagnostic
+                .code()
+                .map(|c| c.to_string())
+                .unwrap_or_else(|| "wai::error::unknown".to_string()),
+            message: self.to_string(),
+            help: diagnostic.help().map(|h| h.to_string()),
+            details: None,
+        }
+    }
 }

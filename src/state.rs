@@ -149,21 +149,27 @@ impl ProjectState {
     }
 
     pub fn advance(&mut self) -> Result<Phase, WaiError> {
-        let next = self.current.next().ok_or_else(|| WaiError::InvalidPhaseTransition {
-            from: self.current.to_string(),
-            to: "next".to_string(),
-            valid_targets: "already at final phase (archive)".to_string(),
-        })?;
+        let next = self
+            .current
+            .next()
+            .ok_or_else(|| WaiError::InvalidPhaseTransition {
+                from: self.current.to_string(),
+                to: "next".to_string(),
+                valid_targets: "already at final phase (archive)".to_string(),
+            })?;
         self.transition_to(next)?;
         Ok(next)
     }
 
     pub fn go_back(&mut self) -> Result<Phase, WaiError> {
-        let prev = self.current.prev().ok_or_else(|| WaiError::InvalidPhaseTransition {
-            from: self.current.to_string(),
-            to: "previous".to_string(),
-            valid_targets: "already at first phase (research)".to_string(),
-        })?;
+        let prev = self
+            .current
+            .prev()
+            .ok_or_else(|| WaiError::InvalidPhaseTransition {
+                from: self.current.to_string(),
+                to: "previous".to_string(),
+                valid_targets: "already at first phase (research)".to_string(),
+            })?;
         self.transition_to(prev)?;
         Ok(prev)
     }

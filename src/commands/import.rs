@@ -3,6 +3,7 @@ use miette::{IntoDiagnostic, Result};
 use std::path::Path;
 
 use crate::config::agent_config_dir;
+use crate::context::require_safe_mode;
 
 use super::require_project;
 
@@ -10,6 +11,8 @@ pub fn run(path: String) -> Result<()> {
     let project_root = require_project()?;
     let config_dir = agent_config_dir(&project_root);
     let source = Path::new(&path);
+
+    require_safe_mode("import configs")?;
 
     if !source.exists() {
         return Err(miette::miette!("Path not found: {}", path));

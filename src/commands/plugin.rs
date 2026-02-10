@@ -2,15 +2,50 @@ use miette::Result;
 use owo_colors::OwoColorize;
 
 use crate::cli::PluginCommands;
+use crate::context::current_context;
+use crate::json::{PluginCommandInfo, PluginDetector, PluginListItem};
+use crate::output::print_json;
 use crate::plugin;
 
 use super::require_project;
 
 pub fn run(cmd: PluginCommands) -> Result<()> {
     let project_root = require_project()?;
+    let context = current_context();
 
     match cmd {
         PluginCommands::List => {
+            if context.json {
+                let plugins = plugin::detect_plugins(&project_root)
+                    .into_iter()
+                    .map(|p| PluginListItem {
+                        name: p.def.name,
+                        description: p.def.description,
+                        status: if p.detected {
+                            "detected".to_string()
+                        } else {
+                            "not found".to_string()
+                        },
+                        detected: p.detected,
+                        detector: p.def.detector.as_ref().map(|detector| PluginDetector {
+                            detector_type: detector.detector_type.clone(),
+                            path: detector.path.clone(),
+                        }),
+                        commands: p
+                            .def
+                            .commands
+                            .iter()
+                            .map(|cmd| PluginCommandInfo {
+                                name: cmd.name.clone(),
+                                description: cmd.description.clone(),
+                                read_only: cmd.read_only,
+                            })
+                            .collect(),
+                        hooks: p.def.hooks.keys().cloned().collect(),
+                    })
+                    .collect::<Vec<_>>();
+                return print_json(&plugins);
+            }
             println!();
             println!("  {} Plugins", "◆".cyan());
             println!();
@@ -49,6 +84,9 @@ pub fn run(cmd: PluginCommands) -> Result<()> {
                             cmd.name,
                             cmd.description.dimmed()
                         );
+                        if cmd.read_only {
+                            println!("        {} read-only", "·".dimmed());
+                        }
                     }
                 }
 

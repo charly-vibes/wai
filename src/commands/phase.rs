@@ -3,7 +3,8 @@ use miette::{IntoDiagnostic, Result};
 use owo_colors::OwoColorize;
 
 use crate::cli::PhaseCommands;
-use crate::config::{projects_dir, STATE_FILE};
+use crate::config::{STATE_FILE, projects_dir};
+use crate::context::require_safe_mode;
 use crate::state::{Phase, ProjectState};
 
 use super::require_project;
@@ -18,11 +19,7 @@ pub fn run(cmd: PhaseCommands) -> Result<()> {
         PhaseCommands::Show => {
             let state = ProjectState::load(&state_path)?;
             println!();
-            println!(
-                "  {} Project: {}",
-                "◆".cyan(),
-                project_name.bold()
-            );
+            println!("  {} Project: {}", "◆".cyan(), project_name.bold());
             println!(
                 "  {} Current phase: {}",
                 "◆".cyan(),
@@ -51,24 +48,17 @@ pub fn run(cmd: PhaseCommands) -> Result<()> {
             // Show available transitions
             println!();
             if let Some(next) = state.current.next() {
-                println!(
-                    "  {} wai phase next  → {}",
-                    "→".dimmed(),
-                    next
-                );
+                println!("  {} wai phase next  → {}", "→".dimmed(), next);
             }
             if let Some(prev) = state.current.prev() {
-                println!(
-                    "  {} wai phase back  → {}",
-                    "→".dimmed(),
-                    prev
-                );
+                println!("  {} wai phase back  → {}", "→".dimmed(), prev);
             }
             println!();
 
             Ok(())
         }
         PhaseCommands::Next => {
+            require_safe_mode("advance phase")?;
             let mut state = ProjectState::load(&state_path)?;
             let new_phase = state.advance()?;
             state.save(&state_path)?;
@@ -81,6 +71,7 @@ pub fn run(cmd: PhaseCommands) -> Result<()> {
             Ok(())
         }
         PhaseCommands::Back => {
+            require_safe_mode("move phase back")?;
             let mut state = ProjectState::load(&state_path)?;
             let new_phase = state.go_back()?;
             state.save(&state_path)?;
@@ -93,6 +84,7 @@ pub fn run(cmd: PhaseCommands) -> Result<()> {
             Ok(())
         }
         PhaseCommands::Set { phase } => {
+            require_safe_mode("set phase")?;
             let target = Phase::from_str(&phase).ok_or_else(|| {
                 miette::miette!(
                     "Unknown phase '{}'. Valid phases: {}",
@@ -119,9 +111,7 @@ pub fn run(cmd: PhaseCommands) -> Result<()> {
     }
 }
 
-fn find_active_project(
-    project_root: &std::path::Path,
-) -> Result<(String, std::path::PathBuf)> {
+fn find_active_project(project_root: &std::path::Path) -> Result<(String, std::path::PathBuf)> {
     let proj_dir = projects_dir(project_root);
     if proj_dir.exists() {
         for entry in std::fs::read_dir(&proj_dir).into_diagnostic()? {

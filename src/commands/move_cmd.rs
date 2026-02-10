@@ -2,12 +2,14 @@ use cliclack::log;
 use miette::{IntoDiagnostic, Result};
 
 use crate::cli::MoveArgs;
-use crate::config::{projects_dir, areas_dir, resources_dir, archives_dir};
+use crate::config::{archives_dir, areas_dir, projects_dir, resources_dir};
+use crate::context::require_safe_mode;
 
 use super::require_project;
 
 pub fn run(args: MoveArgs) -> Result<()> {
     let project_root = require_project()?;
+    require_safe_mode("move item")?;
 
     let item_name = &args.item;
     let target = &args.target;
@@ -46,10 +48,7 @@ pub fn run(args: MoveArgs) -> Result<()> {
     Ok(())
 }
 
-fn find_item(
-    project_root: &std::path::Path,
-    name: &str,
-) -> Result<std::path::PathBuf> {
+fn find_item(project_root: &std::path::Path, name: &str) -> Result<std::path::PathBuf> {
     let candidates = [
         projects_dir(project_root).join(name),
         areas_dir(project_root).join(name),

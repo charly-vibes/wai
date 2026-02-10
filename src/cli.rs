@@ -23,6 +23,22 @@ pub struct Cli {
     /// Suppress non-error output
     #[arg(short, long, global = true)]
     pub quiet: bool,
+
+    /// Output machine-readable JSON
+    #[arg(long, global = true)]
+    pub json: bool,
+
+    /// Disable interactive prompts
+    #[arg(long, global = true)]
+    pub no_input: bool,
+
+    /// Auto-confirm actions with defaults
+    #[arg(long, global = true)]
+    pub yes: bool,
+
+    /// Run in read-only safe mode
+    #[arg(long, global = true)]
+    pub safe: bool,
 }
 
 #[derive(Subcommand)]

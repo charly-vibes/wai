@@ -3,7 +3,8 @@ use cliclack::log;
 use miette::{IntoDiagnostic, Result};
 
 use crate::cli::AddCommands;
-use crate::config::{projects_dir, RESEARCH_DIR, PLANS_DIR, DESIGNS_DIR};
+use crate::config::{DESIGNS_DIR, PLANS_DIR, RESEARCH_DIR, projects_dir};
+use crate::context::require_safe_mode;
 use crate::error::WaiError;
 
 use super::require_project;
@@ -18,6 +19,7 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             project,
             tags,
         } => {
+            require_safe_mode("add research")?;
             let target_project = resolve_project(&project_root, project.as_deref())?;
             let dir = projects_dir(&project_root)
                 .join(&target_project)
@@ -55,6 +57,7 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             file,
             project,
         } => {
+            require_safe_mode("add plan")?;
             let target_project = resolve_project(&project_root, project.as_deref())?;
             let dir = projects_dir(&project_root)
                 .join(&target_project)
@@ -78,6 +81,7 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             file,
             project,
         } => {
+            require_safe_mode("add design")?;
             let target_project = resolve_project(&project_root, project.as_deref())?;
             let dir = projects_dir(&project_root)
                 .join(&target_project)
@@ -99,10 +103,7 @@ pub fn run(cmd: AddCommands) -> Result<()> {
     }
 }
 
-fn resolve_project(
-    project_root: &std::path::Path,
-    explicit: Option<&str>,
-) -> Result<String> {
+fn resolve_project(project_root: &std::path::Path, explicit: Option<&str>) -> Result<String> {
     if let Some(name) = explicit {
         let dir = projects_dir(project_root).join(name);
         if !dir.exists() {
@@ -120,9 +121,10 @@ fn resolve_project(
         for entry in std::fs::read_dir(&proj_dir).into_diagnostic()? {
             let entry = entry.into_diagnostic()?;
             if entry.file_type().into_diagnostic()?.is_dir()
-                && let Some(name) = entry.file_name().to_str() {
-                    return Ok(name.to_string());
-                }
+                && let Some(name) = entry.file_name().to_str()
+            {
+                return Ok(name.to_string());
+            }
         }
     }
 
@@ -136,5 +138,7 @@ fn get_content(content: Option<&str>, file: Option<&str>) -> Result<String> {
     if let Some(text) = content {
         return Ok(text.to_string());
     }
-    Err(miette::miette!("Provide content or use --file to import from a file"))
+    Err(miette::miette!(
+        "Provide content or use --file to import from a file"
+    ))
 }

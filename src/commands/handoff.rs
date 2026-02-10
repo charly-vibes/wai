@@ -3,7 +3,8 @@ use cliclack::log;
 use miette::{IntoDiagnostic, Result};
 
 use crate::cli::HandoffCommands;
-use crate::config::{projects_dir, HANDOFFS_DIR, STATE_FILE};
+use crate::config::{HANDOFFS_DIR, STATE_FILE, projects_dir};
+use crate::context::require_safe_mode;
 use crate::error::WaiError;
 use crate::plugin;
 use crate::state::ProjectState;
@@ -15,6 +16,7 @@ pub fn run(cmd: HandoffCommands) -> Result<()> {
 
     match cmd {
         HandoffCommands::Create { project } => {
+            require_safe_mode("create handoff")?;
             let proj_dir = projects_dir(&project_root).join(&project);
 
             if !proj_dir.exists() {
@@ -76,8 +78,7 @@ pub fn run(cmd: HandoffCommands) -> Result<()> {
                 },
             );
 
-            std::fs::write(handoffs_dir.join(&final_filename), &content)
-                .into_diagnostic()?;
+            std::fs::write(handoffs_dir.join(&final_filename), &content).into_diagnostic()?;
 
             log::success(format!(
                 "Created handoff for '{}' at handoffs/{}",

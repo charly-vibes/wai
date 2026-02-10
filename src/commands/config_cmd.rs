@@ -5,6 +5,7 @@ use std::path::Path;
 
 use crate::cli::ConfigCommands;
 use crate::config::agent_config_dir;
+use crate::context::require_safe_mode;
 
 use super::require_project;
 
@@ -14,6 +15,7 @@ pub fn run(cmd: ConfigCommands) -> Result<()> {
 
     match cmd {
         ConfigCommands::Add { config_type, file } => {
+            require_safe_mode("add config")?;
             let subdir = match config_type.as_str() {
                 "skill" | "skills" => "skills",
                 "rule" | "rules" => "rules",

@@ -3,9 +3,9 @@ use miette::{IntoDiagnostic, Result};
 
 use crate::cli::NewCommands;
 use crate::config::{
-    project_path, area_path,
-    RESEARCH_DIR, PLANS_DIR, DESIGNS_DIR, HANDOFFS_DIR, STATE_FILE,
+    DESIGNS_DIR, HANDOFFS_DIR, PLANS_DIR, RESEARCH_DIR, STATE_FILE, area_path, project_path,
 };
+use crate::context::require_safe_mode;
 use crate::error::WaiError;
 use crate::state::ProjectState;
 
@@ -16,6 +16,7 @@ pub fn run(cmd: NewCommands) -> Result<()> {
 
     match cmd {
         NewCommands::Project { name, template: _ } => {
+            require_safe_mode("create project")?;
             let proj_dir = project_path(&project_root, &name);
 
             if proj_dir.exists() {
@@ -41,6 +42,7 @@ pub fn run(cmd: NewCommands) -> Result<()> {
             Ok(())
         }
         NewCommands::Area { name } => {
+            require_safe_mode("create area")?;
             let area_dir = area_path(&project_root, &name);
 
             if area_dir.exists() {
@@ -57,6 +59,7 @@ pub fn run(cmd: NewCommands) -> Result<()> {
             Ok(())
         }
         NewCommands::Resource { name } => {
+            require_safe_mode("create resource")?;
             let res_dir = crate::config::resource_path(&project_root, &name);
 
             if res_dir.exists() {

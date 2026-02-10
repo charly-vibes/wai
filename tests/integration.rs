@@ -30,7 +30,13 @@ fn create_project(dir: &std::path::Path, name: &str) {
 }
 
 /// Helper: write a dated artifact file directly into a project subdirectory.
-fn write_artifact(dir: &std::path::Path, project: &str, subdir: &str, filename: &str, content: &str) {
+fn write_artifact(
+    dir: &std::path::Path,
+    project: &str,
+    subdir: &str,
+    filename: &str,
+    content: &str,
+) {
     let path = dir
         .join(".wai")
         .join("projects")
@@ -55,10 +61,26 @@ fn init_creates_para_structure() {
     assert!(tmp.path().join(".wai/plugins").is_dir());
 
     // Verify agent-config structure
-    assert!(tmp.path().join(".wai/resources/agent-config/skills").is_dir());
-    assert!(tmp.path().join(".wai/resources/agent-config/rules").is_dir());
-    assert!(tmp.path().join(".wai/resources/agent-config/context").is_dir());
-    assert!(tmp.path().join(".wai/resources/agent-config/.projections.yml").is_file());
+    assert!(
+        tmp.path()
+            .join(".wai/resources/agent-config/skills")
+            .is_dir()
+    );
+    assert!(
+        tmp.path()
+            .join(".wai/resources/agent-config/rules")
+            .is_dir()
+    );
+    assert!(
+        tmp.path()
+            .join(".wai/resources/agent-config/context")
+            .is_dir()
+    );
+    assert!(
+        tmp.path()
+            .join(".wai/resources/agent-config/.projections.yml")
+            .is_file()
+    );
 
     // Verify config.toml exists and contains project name
     let config = fs::read_to_string(tmp.path().join(".wai/config.toml")).unwrap();
@@ -123,7 +145,11 @@ fn new_area_creates_directory() {
         .assert()
         .success();
 
-    assert!(tmp.path().join(".wai/areas/dev-standards/research").is_dir());
+    assert!(
+        tmp.path()
+            .join(".wai/areas/dev-standards/research")
+            .is_dir()
+    );
     assert!(tmp.path().join(".wai/areas/dev-standards/plans").is_dir());
 }
 
@@ -168,10 +194,7 @@ fn phase_next_advances_phase() {
         .stderr(predicate::str::contains("design"));
 
     // Verify state persisted
-    let state = fs::read_to_string(
-        tmp.path().join(".wai/projects/my-app/.state"),
-    )
-    .unwrap();
+    let state = fs::read_to_string(tmp.path().join(".wai/projects/my-app/.state")).unwrap();
     assert!(state.contains("current: design"));
 }
 
@@ -220,10 +243,7 @@ fn phase_set_jumps_to_target() {
         .success()
         .stderr(predicate::str::contains("implement"));
 
-    let state = fs::read_to_string(
-        tmp.path().join(".wai/projects/my-app/.state"),
-    )
-    .unwrap();
+    let state = fs::read_to_string(tmp.path().join(".wai/projects/my-app/.state")).unwrap();
     assert!(state.contains("current: implement"));
 }
 
@@ -249,7 +269,13 @@ fn add_research_creates_dated_file() {
     create_project(tmp.path(), "my-app");
 
     wai_cmd(tmp.path())
-        .args(["add", "research", "Initial findings on the topic", "--project", "my-app"])
+        .args([
+            "add",
+            "research",
+            "Initial findings on the topic",
+            "--project",
+            "my-app",
+        ])
         .assert()
         .success();
 
@@ -280,9 +306,13 @@ fn add_research_with_tags_includes_frontmatter() {
 
     wai_cmd(tmp.path())
         .args([
-            "add", "research", "Tagged research",
-            "--project", "my-app",
-            "--tags", "api,design",
+            "add",
+            "research",
+            "Tagged research",
+            "--project",
+            "my-app",
+            "--tags",
+            "api,design",
         ])
         .assert()
         .success();
@@ -400,10 +430,7 @@ fn search_finds_content_in_artifacts() {
         .args(["search", "JSON"])
         .assert()
         .success()
-        .stdout(
-            predicate::str::contains("Search results")
-                .and(predicate::str::contains("JSON")),
-        );
+        .stdout(predicate::str::contains("Search results").and(predicate::str::contains("JSON")));
 }
 
 #[test]
@@ -424,10 +451,7 @@ fn search_case_insensitive() {
         .args(["search", "hello"])
         .assert()
         .success()
-        .stdout(
-            predicate::str::contains("Search results")
-                .and(predicate::str::contains("World")),
-        );
+        .stdout(predicate::str::contains("Search results").and(predicate::str::contains("World")));
 }
 
 #[test]
@@ -441,6 +465,26 @@ fn search_no_results() {
         .assert()
         .success()
         .stdout(predicate::str::contains("No results found"));
+}
+
+#[test]
+fn search_json_outputs_results() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+    write_artifact(
+        tmp.path(),
+        "my-app",
+        "research",
+        "2026-01-15-api-notes.md",
+        "JSON output is required.\n",
+    );
+
+    wai_cmd(tmp.path())
+        .args(["search", "JSON", "--json"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"results\""));
 }
 
 #[test]
@@ -482,8 +526,20 @@ fn search_with_project_filter() {
     init_workspace(tmp.path());
     create_project(tmp.path(), "app-a");
     create_project(tmp.path(), "app-b");
-    write_artifact(tmp.path(), "app-a", "research", "2026-01-15-a.md", "unique_a\n");
-    write_artifact(tmp.path(), "app-b", "research", "2026-01-15-b.md", "unique_b\n");
+    write_artifact(
+        tmp.path(),
+        "app-a",
+        "research",
+        "2026-01-15-a.md",
+        "unique_a\n",
+    );
+    write_artifact(
+        tmp.path(),
+        "app-b",
+        "research",
+        "2026-01-15-b.md",
+        "unique_b\n",
+    );
 
     wai_cmd(tmp.path())
         .args(["search", "unique_a", "--in", "app-a"])
@@ -561,8 +617,20 @@ fn timeline_shows_dated_artifacts() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
-    write_artifact(tmp.path(), "my-app", "research", "2026-01-10-first.md", "First\n");
-    write_artifact(tmp.path(), "my-app", "plans", "2026-01-20-second.md", "Second\n");
+    write_artifact(
+        tmp.path(),
+        "my-app",
+        "research",
+        "2026-01-10-first.md",
+        "First\n",
+    );
+    write_artifact(
+        tmp.path(),
+        "my-app",
+        "plans",
+        "2026-01-20-second.md",
+        "Second\n",
+    );
 
     wai_cmd(tmp.path())
         .args(["timeline", "my-app"])
@@ -605,8 +673,20 @@ fn timeline_from_filter() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
-    write_artifact(tmp.path(), "my-app", "research", "2026-01-05-old.md", "Old\n");
-    write_artifact(tmp.path(), "my-app", "research", "2026-02-15-new.md", "New\n");
+    write_artifact(
+        tmp.path(),
+        "my-app",
+        "research",
+        "2026-01-05-old.md",
+        "Old\n",
+    );
+    write_artifact(
+        tmp.path(),
+        "my-app",
+        "research",
+        "2026-02-15-new.md",
+        "New\n",
+    );
 
     wai_cmd(tmp.path())
         .args(["timeline", "my-app", "--from", "2026-02-01"])
@@ -623,8 +703,20 @@ fn timeline_to_filter() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
-    write_artifact(tmp.path(), "my-app", "research", "2026-01-05-old.md", "Old\n");
-    write_artifact(tmp.path(), "my-app", "research", "2026-02-15-new.md", "New\n");
+    write_artifact(
+        tmp.path(),
+        "my-app",
+        "research",
+        "2026-01-05-old.md",
+        "Old\n",
+    );
+    write_artifact(
+        tmp.path(),
+        "my-app",
+        "research",
+        "2026-02-15-new.md",
+        "New\n",
+    );
 
     wai_cmd(tmp.path())
         .args(["timeline", "my-app", "--to", "2026-01-31"])
@@ -641,12 +733,37 @@ fn timeline_from_to_range() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
-    write_artifact(tmp.path(), "my-app", "research", "2026-01-01-jan.md", "Jan\n");
-    write_artifact(tmp.path(), "my-app", "research", "2026-02-01-feb.md", "Feb\n");
-    write_artifact(tmp.path(), "my-app", "research", "2026-03-01-mar.md", "Mar\n");
+    write_artifact(
+        tmp.path(),
+        "my-app",
+        "research",
+        "2026-01-01-jan.md",
+        "Jan\n",
+    );
+    write_artifact(
+        tmp.path(),
+        "my-app",
+        "research",
+        "2026-02-01-feb.md",
+        "Feb\n",
+    );
+    write_artifact(
+        tmp.path(),
+        "my-app",
+        "research",
+        "2026-03-01-mar.md",
+        "Mar\n",
+    );
 
     wai_cmd(tmp.path())
-        .args(["timeline", "my-app", "--from", "2026-01-15", "--to", "2026-02-15"])
+        .args([
+            "timeline",
+            "my-app",
+            "--from",
+            "2026-01-15",
+            "--to",
+            "2026-02-15",
+        ])
         .assert()
         .success()
         .stdout(
@@ -661,8 +778,20 @@ fn timeline_reverse_shows_oldest_first() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
-    write_artifact(tmp.path(), "my-app", "research", "2026-01-10-first.md", "First\n");
-    write_artifact(tmp.path(), "my-app", "research", "2026-03-20-third.md", "Third\n");
+    write_artifact(
+        tmp.path(),
+        "my-app",
+        "research",
+        "2026-01-10-first.md",
+        "First\n",
+    );
+    write_artifact(
+        tmp.path(),
+        "my-app",
+        "research",
+        "2026-03-20-third.md",
+        "Third\n",
+    );
 
     let output = wai_cmd(tmp.path())
         .args(["timeline", "my-app", "--reverse"])
@@ -672,7 +801,30 @@ fn timeline_reverse_shows_oldest_first() {
 
     let pos_jan = stdout.find("2026-01-10").unwrap();
     let pos_mar = stdout.find("2026-03-20").unwrap();
-    assert!(pos_jan < pos_mar, "In reverse mode, oldest date should appear first");
+    assert!(
+        pos_jan < pos_mar,
+        "In reverse mode, oldest date should appear first"
+    );
+}
+
+#[test]
+fn timeline_json_outputs_entries() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+    write_artifact(
+        tmp.path(),
+        "my-app",
+        "research",
+        "2026-01-10-first.md",
+        "First\n",
+    );
+
+    wai_cmd(tmp.path())
+        .args(["timeline", "my-app", "--json"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"entries\""));
 }
 
 // ─── wai plugin list ────────────────────────────────────────────────────────
@@ -693,6 +845,18 @@ fn plugin_list_shows_builtin_plugins() {
         );
 }
 
+#[test]
+fn plugin_list_json_outputs_plugins() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["plugin", "list", "--json"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"name\""));
+}
+
 // ─── wai status ─────────────────────────────────────────────────────────────
 
 #[test]
@@ -706,6 +870,19 @@ fn status_shows_project_info() {
         .assert()
         .success()
         .stdout(predicate::str::contains("my-app"));
+}
+
+#[test]
+fn status_json_outputs_suggestions() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+
+    wai_cmd(tmp.path())
+        .args(["status", "--json"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"suggestions\""));
 }
 
 // ─── wai (no args) ─────────────────────────────────────────────────────────
