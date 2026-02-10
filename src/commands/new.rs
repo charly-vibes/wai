@@ -7,6 +7,7 @@ use crate::config::{
 };
 use crate::context::require_safe_mode;
 use crate::error::WaiError;
+use crate::plugin;
 use crate::state::ProjectState;
 
 use super::require_project;
@@ -35,6 +36,8 @@ pub fn run(cmd: NewCommands) -> Result<()> {
             // Initialize state file
             let state = ProjectState::default();
             state.save(&proj_dir.join(STATE_FILE))?;
+
+            plugin::run_hooks(&project_root, "on_project_create");
 
             log::success(format!("Created project '{}'", name)).into_diagnostic()?;
             println!("  → wai phase              View current phase");

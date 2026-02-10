@@ -857,6 +857,73 @@ fn plugin_list_json_outputs_plugins() {
         .stdout(predicate::str::contains("\"name\""));
 }
 
+// ─── wai plugin enable / disable ────────────────────────────────────────────
+
+#[test]
+fn plugin_enable_persists_to_config() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["plugin", "enable", "git"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("enabled"));
+
+    let config = fs::read_to_string(tmp.path().join(".wai/config.toml")).unwrap();
+    assert!(config.contains("git"));
+    assert!(config.contains("enabled = true"));
+}
+
+#[test]
+fn plugin_disable_persists_to_config() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    // Enable first, then disable
+    wai_cmd(tmp.path())
+        .args(["plugin", "enable", "git"])
+        .assert()
+        .success();
+
+    wai_cmd(tmp.path())
+        .args(["plugin", "disable", "git"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("disabled"));
+
+    let config = fs::read_to_string(tmp.path().join(".wai/config.toml")).unwrap();
+    assert!(config.contains("git"));
+    assert!(config.contains("enabled = false"));
+}
+
+#[test]
+fn plugin_enable_unknown_plugin_fails() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["plugin", "enable", "nonexistent"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("not found"));
+}
+
+#[test]
+fn plugin_enable_json_outputs_state() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["plugin", "enable", "git", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("\"plugin\"")
+                .and(predicate::str::contains("\"enabled\": true")),
+        );
+}
+
 // ─── wai status ─────────────────────────────────────────────────────────────
 
 #[test]

@@ -110,19 +110,57 @@ pub fn run(cmd: PluginCommands) -> Result<()> {
             Ok(())
         }
         PluginCommands::Enable { name } => {
-            println!("  Enabling plugin '{}'...", name);
-            println!(
-                "  {} Plugin enable/disable is not yet implemented",
-                "○".dimmed()
-            );
+            let plugins = plugin::detect_plugins(&project_root);
+            if !plugins.iter().any(|p| p.def.name == name) {
+                return Err(crate::error::WaiError::PluginNotFound { name }.into());
+            }
+
+            let mut config = crate::config::ProjectConfig::load(&project_root)?;
+            if let Some(entry) = config.plugins.iter_mut().find(|p| p.name == name) {
+                entry.enabled = true;
+            } else {
+                config.plugins.push(crate::config::PluginConfig {
+                    name: name.clone(),
+                    enabled: true,
+                    settings: toml::Table::new(),
+                });
+            }
+            config.save(&project_root)?;
+
+            if context.json {
+                return print_json(&serde_json::json!({
+                    "plugin": name,
+                    "enabled": true,
+                }));
+            }
+            println!("  {} Plugin '{}' enabled", "✓".green(), name);
             Ok(())
         }
         PluginCommands::Disable { name } => {
-            println!("  Disabling plugin '{}'...", name);
-            println!(
-                "  {} Plugin enable/disable is not yet implemented",
-                "○".dimmed()
-            );
+            let plugins = plugin::detect_plugins(&project_root);
+            if !plugins.iter().any(|p| p.def.name == name) {
+                return Err(crate::error::WaiError::PluginNotFound { name }.into());
+            }
+
+            let mut config = crate::config::ProjectConfig::load(&project_root)?;
+            if let Some(entry) = config.plugins.iter_mut().find(|p| p.name == name) {
+                entry.enabled = false;
+            } else {
+                config.plugins.push(crate::config::PluginConfig {
+                    name: name.clone(),
+                    enabled: false,
+                    settings: toml::Table::new(),
+                });
+            }
+            config.save(&project_root)?;
+
+            if context.json {
+                return print_json(&serde_json::json!({
+                    "plugin": name,
+                    "enabled": false,
+                }));
+            }
+            println!("  {} Plugin '{}' disabled", "○".dimmed(), name);
             Ok(())
         }
     }

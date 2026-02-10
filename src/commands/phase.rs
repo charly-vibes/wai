@@ -5,6 +5,7 @@ use owo_colors::OwoColorize;
 use crate::cli::PhaseCommands;
 use crate::config::{STATE_FILE, projects_dir};
 use crate::context::require_safe_mode;
+use crate::plugin;
 use crate::state::{Phase, ProjectState};
 
 use super::require_project;
@@ -63,6 +64,8 @@ pub fn run(cmd: PhaseCommands) -> Result<()> {
             let new_phase = state.advance()?;
             state.save(&state_path)?;
 
+            plugin::run_hooks(&project_root, "on_phase_transition");
+
             log::success(format!(
                 "Project '{}' advanced to phase: {}",
                 project_name, new_phase
@@ -75,6 +78,8 @@ pub fn run(cmd: PhaseCommands) -> Result<()> {
             let mut state = ProjectState::load(&state_path)?;
             let new_phase = state.go_back()?;
             state.save(&state_path)?;
+
+            plugin::run_hooks(&project_root, "on_phase_transition");
 
             log::success(format!(
                 "Project '{}' moved back to phase: {}",
@@ -100,6 +105,8 @@ pub fn run(cmd: PhaseCommands) -> Result<()> {
             let mut state = ProjectState::load(&state_path)?;
             state.transition_to(target)?;
             state.save(&state_path)?;
+
+            plugin::run_hooks(&project_root, "on_phase_transition");
 
             log::success(format!(
                 "Project '{}' set to phase: {}",
