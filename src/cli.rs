@@ -1,5 +1,15 @@
 use clap::{Parser, Subcommand};
 
+const VERSION: &str = concat!(
+    env!("CARGO_PKG_VERSION"),
+    " (",
+    env!("WAI_GIT_COMMIT"),
+    "-",
+    env!("WAI_GIT_BRANCH"),
+    env!("WAI_GIT_DIRTY"),
+    ")"
+);
+
 #[derive(Parser)]
 #[command(
     name = "wai",
@@ -9,7 +19,7 @@ use clap::{Parser, Subcommand};
         preserving the research, reasoning, and decisions that shaped the design.\n\n\
         Organizes artifacts using the PARA method (Projects, Areas, Resources, Archives)\n\
         with project phase tracking, agent config sync, handoff generation, and plugin integration.",
-    version,
+    version = VERSION,
     after_help = "Run 'wai <command> --help' for more information on a command."
 )]
 pub struct Cli {
