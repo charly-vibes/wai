@@ -3,7 +3,7 @@ use std::process::Command;
 fn main() {
     // Get git commit hash
     let commit = Command::new("git")
-        .args(&["rev-parse", "--short", "HEAD"])
+        .args(["rev-parse", "--short", "HEAD"])
         .output()
         .ok()
         .and_then(|output| {
@@ -15,7 +15,7 @@ fn main() {
 
     // Get git branch
     let branch = Command::new("git")
-        .args(&["rev-parse", "--abbrev-ref", "HEAD"])
+        .args(["rev-parse", "--abbrev-ref", "HEAD"])
         .output()
         .ok()
         .and_then(|output| {
@@ -27,7 +27,7 @@ fn main() {
 
     // Check if working directory is dirty
     let status = Command::new("git")
-        .args(&["status", "--porcelain"])
+        .args(["status", "--porcelain"])
         .output()
         .ok()
         .map(|output| !output.stdout.is_empty())

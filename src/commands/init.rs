@@ -74,7 +74,7 @@ pub fn run(name: Option<String>) -> Result<()> {
     let config = ProjectConfig {
         project: ProjectSettings {
             name: project_name.clone(),
-            version: "0.1.0".to_string(),
+            version: env!("CARGO_PKG_VERSION").to_string(),
             description: String::new(),
         },
         plugins: vec![],
