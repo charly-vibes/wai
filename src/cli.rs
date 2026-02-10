@@ -144,6 +144,9 @@ pub enum Commands {
     #[command(subcommand)]
     Plugin(PluginCommands),
 
+    /// Diagnose workspace health
+    Doctor,
+
     /// Import existing tool configurations
     Import {
         /// Path to import from (e.g., .claude/, .cursorrules)

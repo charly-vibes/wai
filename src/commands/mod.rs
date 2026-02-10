@@ -8,6 +8,7 @@ use crate::error::WaiError;
 
 mod add;
 mod config_cmd;
+mod doctor;
 mod handoff;
 mod import;
 mod init;
@@ -47,6 +48,7 @@ pub fn run(cli: Cli) -> Result<()> {
             reverse,
         }) => timeline::run(project, from, to, reverse),
         Some(Commands::Plugin(cmd)) => plugin::run(cmd),
+        Some(Commands::Doctor) => doctor::run(),
         Some(Commands::Import { path }) => import::run(path),
         Some(Commands::External(args)) => run_external(args),
         None => show_welcome(),
