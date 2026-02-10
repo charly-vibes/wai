@@ -219,7 +219,7 @@ pub enum PhaseCommands {
 
     /// Set a specific phase
     Set {
-        /// Target phase (research, plan, design, implement, review, archive)
+        /// Target phase (research, design, plan, implement, review, archive)
         phase: String,
     },
 

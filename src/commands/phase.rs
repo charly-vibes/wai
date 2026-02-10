@@ -141,8 +141,8 @@ fn find_active_project(
 fn format_phase(phase: Phase) -> String {
     match phase {
         Phase::Research => "research".yellow().to_string(),
-        Phase::Plan => "plan".blue().to_string(),
         Phase::Design => "design".magenta().to_string(),
+        Phase::Plan => "plan".blue().to_string(),
         Phase::Implement => "implement".green().to_string(),
         Phase::Review => "review".cyan().to_string(),
         Phase::Archive => "archive".dimmed().to_string(),

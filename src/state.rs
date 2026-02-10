@@ -10,8 +10,8 @@ use crate::error::WaiError;
 #[serde(rename_all = "lowercase")]
 pub enum Phase {
     Research,
-    Plan,
     Design,
+    Plan,
     Implement,
     Review,
     Archive,
@@ -20,8 +20,8 @@ pub enum Phase {
 impl Phase {
     pub const ALL: &[Phase] = &[
         Phase::Research,
-        Phase::Plan,
         Phase::Design,
+        Phase::Plan,
         Phase::Implement,
         Phase::Review,
         Phase::Archive,
@@ -30,8 +30,8 @@ impl Phase {
     pub fn index(self) -> usize {
         match self {
             Phase::Research => 0,
-            Phase::Plan => 1,
-            Phase::Design => 2,
+            Phase::Design => 1,
+            Phase::Plan => 2,
             Phase::Implement => 3,
             Phase::Review => 4,
             Phase::Archive => 5,
@@ -55,8 +55,8 @@ impl Phase {
     pub fn from_str(s: &str) -> Option<Phase> {
         match s.to_lowercase().as_str() {
             "research" => Some(Phase::Research),
-            "plan" => Some(Phase::Plan),
             "design" => Some(Phase::Design),
+            "plan" => Some(Phase::Plan),
             "implement" => Some(Phase::Implement),
             "review" => Some(Phase::Review),
             "archive" => Some(Phase::Archive),
@@ -69,8 +69,8 @@ impl fmt::Display for Phase {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Phase::Research => write!(f, "research"),
-            Phase::Plan => write!(f, "plan"),
             Phase::Design => write!(f, "design"),
+            Phase::Plan => write!(f, "plan"),
             Phase::Implement => write!(f, "implement"),
             Phase::Review => write!(f, "review"),
             Phase::Archive => write!(f, "archive"),

@@ -13,7 +13,7 @@ A status command that only presents data often leaves the user with the question
 The suggestion system is designed to be proactive, integrated, and based on project phase awareness, representing **Type 1 decisions** that establish a core UX pattern.
 
 - **Integrated with `status`:** Placing suggestions directly within the `wai status` output is a deliberate **Type 1 decision**. It establishes a proactive UX pattern where `wai` guides the user immediately after reviewing the project's state, reducing cognitive load and driving workflow.
-- **Phase-Based Priority:** Suggestions are driven by the current project phase (research, plan, design, implement, review, archive) and available plugin data. Each phase has natural next actions that wai can suggest contextually.
+- **Phase-Based Priority:** Suggestions are driven by the current project phase (research, design, plan, implement, review, archive) and available plugin data. Each phase has natural next actions that wai can suggest contextually.
 
 ## Scope, Dependencies, and Requirements
 

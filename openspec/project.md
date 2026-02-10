@@ -49,7 +49,7 @@ Wai is a workflow manager for AI-driven development. It organizes artifacts usin
 - **Area**: An ongoing area of responsibility without an end date
 - **Resource**: Reference material used across projects (agent configs, templates, patterns)
 - **Archive**: Completed or inactive items preserved for reference
-- **Phase**: Project workflow state (research → plan → design → implement → review → archive)
+- **Phase**: Project workflow state (research → design → plan → implement → review → archive)
 - **Handoff**: First-class artifact for session context transfer
 - **Plugin**: Extensions that detect external tools and integrate their data
 - **Agent Config**: Single source of truth for AI assistant configurations, projected to tool-specific formats

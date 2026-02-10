@@ -105,7 +105,7 @@ wai sync
 
 ## Project Phases
 
-Projects progress through six phases: **research** → **plan** → **design** → **implement** → **review** → **archive**
+Projects progress through six phases: **research** → **design** → **plan** → **implement** → **review** → **archive**
 
 Transitions are flexible — skip forward or go back as needed. Phase history is tracked with timestamps.
 

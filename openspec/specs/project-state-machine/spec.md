@@ -12,11 +12,11 @@ Development projects progress through natural phases — from research and plann
 
 ### Six-Phase Model
 
-The six-phase model (research → plan → design → implement → review → archive) is a **Type 1 foundational decision**. Unlike the simpler four-phase bead lifecycle it replaces at the project level, this model captures the full arc of a development effort:
+The six-phase model (research → design → plan → implement → review → archive) is a **Type 1 foundational decision**. Unlike the simpler four-phase bead lifecycle it replaces at the project level, this model captures the full arc of a development effort:
 
 - **Research**: Gathering context, understanding the problem space
-- **Plan**: Defining approach, scope, and success criteria
 - **Design**: Creating technical designs, API contracts, architecture
+- **Plan**: Defining implementation steps, scope, and success criteria after design direction is selected
 - **Implement**: Writing code, building features
 - **Review**: Testing, code review, validation against requirements
 - **Archive**: Completed work preserved for reference
@@ -52,7 +52,7 @@ Projects SHALL progress through defined phases that represent workflow stages.
 #### Scenario: Phase list
 
 - **WHEN** querying available phases
-- **THEN** the system returns: research, plan, design, implement, review, archive
+- **THEN** the system returns: research, design, plan, implement, review, archive
 
 ### Requirement: Phase Transitions
 

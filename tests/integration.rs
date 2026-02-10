@@ -165,14 +165,14 @@ fn phase_next_advances_phase() {
         .args(["phase", "next"])
         .assert()
         .success()
-        .stderr(predicate::str::contains("plan"));
+        .stderr(predicate::str::contains("design"));
 
     // Verify state persisted
     let state = fs::read_to_string(
         tmp.path().join(".wai/projects/my-app/.state"),
     )
     .unwrap();
-    assert!(state.contains("current: plan"));
+    assert!(state.contains("current: design"));
 }
 
 #[test]
@@ -181,7 +181,7 @@ fn phase_back_goes_to_previous() {
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
-    // Advance to plan first
+    // Advance to design first
     wai_cmd(tmp.path())
         .args(["phase", "next"])
         .assert()
