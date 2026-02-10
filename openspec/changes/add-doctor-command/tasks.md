@@ -20,9 +20,9 @@
 
 ## 4. Testing
 
-- [ ] 4.1 Add integration tests for healthy workspace (all checks pass)
-- [ ] 4.2 Add integration tests for missing directories (fail with fix suggestion)
-- [ ] 4.3 Add integration tests for invalid config.toml (fail with suggestion)
-- [ ] 4.4 Add integration tests for missing plugin tools (warn)
-- [ ] 4.5 Add integration tests for invalid state files (fail)
-- [ ] 4.6 Add integration test for uninitialised directory (error with init suggestion)
+- [x] 4.1 Add integration tests for healthy workspace (all checks pass)
+- [x] 4.2 Add integration tests for missing directories (fail with fix suggestion)
+- [x] 4.3 Add integration tests for invalid config.toml (fail with suggestion)
+- [x] 4.4 Add integration tests for missing plugin tools (warn)
+- [x] 4.5 Add integration tests for invalid state files (fail)
+- [x] 4.6 Add integration test for uninitialised directory (error with init suggestion)
