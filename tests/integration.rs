@@ -92,12 +92,12 @@ fn init_warns_if_already_initialized() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
 
-    // Second init should warn, not fail (cliclack outputs to stderr)
+    // Second init outputs warning to stdout (plain println, not cliclack log)
     wai_cmd(tmp.path())
         .args(["init", "--name", "test-ws"])
         .assert()
         .success()
-        .stderr(predicate::str::contains("already initialized"));
+        .stdout(predicate::str::contains("already initialized"));
 }
 
 // ─── wai new project ────────────────────────────────────────────────────────
@@ -956,6 +956,11 @@ fn status_json_outputs_suggestions() {
 
 #[test]
 fn no_args_shows_welcome() {
+    let stale_wai = std::path::Path::new("/tmp/.wai");
+    if stale_wai.exists() {
+        let _ = fs::remove_dir_all(stale_wai);
+    }
+
     let tmp = TempDir::new().unwrap();
 
     wai_cmd(tmp.path())
@@ -979,6 +984,13 @@ fn no_args_in_initialized_dir_shows_commands() {
 
 #[test]
 fn commands_fail_without_init() {
+    // Clean up any stale .wai/ left in /tmp by previous test runs, which would
+    // cause find_project_root to walk up and falsely detect an initialized workspace.
+    let stale_wai = std::path::Path::new("/tmp/.wai");
+    if stale_wai.exists() {
+        let _ = fs::remove_dir_all(stale_wai);
+    }
+
     let tmp = TempDir::new().unwrap();
 
     wai_cmd(tmp.path())
