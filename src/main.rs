@@ -10,6 +10,7 @@ mod context;
 mod error;
 mod json;
 mod output;
+pub mod managed_block;
 pub mod plugin;
 mod state;
 

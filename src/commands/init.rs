@@ -100,6 +100,9 @@ pub fn run(name: Option<String>) -> Result<()> {
         println!("✓ Detected plugins: {}", detected.join(", "));
     }
 
+    // Inject managed block into agent instruction files
+    inject_agent_instructions(&current_dir)?;
+
     println!("●  Next steps:");
     println!("  → wai new project \"my-app\"    Create your first project");
     println!("  → wai status                   Check project status");
@@ -166,6 +169,24 @@ Run `wai plugin list` to see all available plugins.
         readme,
     ).into_diagnostic()?;
 
+    Ok(())
+}
+
+fn inject_agent_instructions(root: &std::path::Path) -> Result<()> {
+    use crate::managed_block::inject_managed_block;
+
+    let agent_files = ["AGENTS.md", "CLAUDE.md"];
+    for filename in &agent_files {
+        let path = root.join(filename);
+        if filename == &"AGENTS.md" || path.exists() {
+            match inject_managed_block(&path) {
+                Ok(result) => println!("✓ {}", result.description(filename)),
+                Err(e) => {
+                    eprintln!("⚠ Failed to update {}: {}", filename, e);
+                }
+            }
+        }
+    }
     Ok(())
 }
 

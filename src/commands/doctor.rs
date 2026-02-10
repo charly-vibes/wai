@@ -55,6 +55,7 @@ pub fn run() -> Result<()> {
     checks.extend(check_agent_config_sync(&project_root));
     checks.extend(check_project_state(&project_root));
     checks.extend(check_custom_plugins(&project_root));
+    checks.push(check_agent_instructions(&project_root));
 
     let summary = Summary {
         pass: checks.iter().filter(|c| c.status == Status::Pass).count(),
@@ -462,4 +463,35 @@ fn check_custom_plugins(project_root: &Path) -> Vec<CheckResult> {
     }
 
     results
+}
+
+fn check_agent_instructions(project_root: &Path) -> CheckResult {
+    use crate::managed_block::has_managed_block;
+
+    let agents_md = project_root.join("AGENTS.md");
+
+    if !agents_md.exists() {
+        return CheckResult {
+            name: "Agent instructions".to_string(),
+            status: Status::Warn,
+            message: "AGENTS.md not found — LLMs won't know to use wai".to_string(),
+            fix: Some("Run: wai init (to create AGENTS.md with wai instructions)".to_string()),
+        };
+    }
+
+    if has_managed_block(&agents_md) {
+        CheckResult {
+            name: "Agent instructions".to_string(),
+            status: Status::Pass,
+            message: "AGENTS.md contains wai managed block".to_string(),
+            fix: None,
+        }
+    } else {
+        CheckResult {
+            name: "Agent instructions".to_string(),
+            status: Status::Warn,
+            message: "AGENTS.md exists but missing wai managed block".to_string(),
+            fix: Some("Run: wai init (to inject wai instructions into AGENTS.md)".to_string()),
+        }
+    }
 }
