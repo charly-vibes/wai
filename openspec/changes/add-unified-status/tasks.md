@@ -1,9 +1,9 @@
 ## 1. OpenSpec Reader Module
 
-- [ ] 1.1 Create `src/openspec.rs` with `OpenSpecStatus` and `ChangeStatus` structs
-- [ ] 1.2 Implement `read_status(project_root: &Path) -> Option<OpenSpecStatus>` to scan `openspec/specs/` for spec names
-- [ ] 1.3 Implement scanning `openspec/changes/` for active changes (excluding `archive/`)
-- [ ] 1.4 Implement `tasks.md` parser counting `- [ ]` vs `- [x]` lines, with per-section breakdown
+- [x] 1.1 Create `src/openspec.rs` with `OpenSpecStatus` and `ChangeStatus` structs
+- [x] 1.2 Implement `read_status(project_root: &Path) -> Option<OpenSpecStatus>` to scan `openspec/specs/` for spec names
+- [x] 1.3 Implement scanning `openspec/changes/` for active changes (excluding `archive/`)
+- [x] 1.4 Implement `tasks.md` parser counting `- [ ]` vs `- [x]` lines, with per-section breakdown
 
 ## 2. Wire Verbosity into Status Command
 
