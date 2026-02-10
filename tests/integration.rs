@@ -980,6 +980,116 @@ fn no_args_in_initialized_dir_shows_commands() {
         .stdout(predicate::str::contains("wai status"));
 }
 
+// ─── wai doctor ─────────────────────────────────────────────────────────────
+
+#[test]
+fn doctor_healthy_workspace_all_pass() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["doctor", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("\"fail\": 0")
+                .and(predicate::str::contains("\"summary\""))
+                .and(predicate::str::contains("\"pass\"")),
+        );
+}
+
+#[test]
+fn doctor_missing_directories_fails_with_fix() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    fs::remove_dir_all(tmp.path().join(".wai/archives")).unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["doctor", "--json"])
+        .assert()
+        .code(1)
+        .stdout(
+            predicate::str::contains("\"status\": \"fail\"")
+                .and(predicate::str::contains("archives"))
+                .and(predicate::str::contains("mkdir")),
+        );
+}
+
+#[test]
+fn doctor_invalid_config_toml_fails() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    fs::write(tmp.path().join(".wai/config.toml"), "{{invalid toml!!!").unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["doctor", "--json"])
+        .assert()
+        .code(1)
+        .stdout(
+            predicate::str::contains("\"status\": \"fail\"")
+                .and(predicate::str::contains("Configuration")),
+        );
+}
+
+#[test]
+fn doctor_missing_plugin_tool_warns() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    // Create .git dir so the git plugin is detected
+    fs::create_dir(tmp.path().join(".git")).unwrap();
+
+    let output = wai_cmd(tmp.path())
+        .args(["doctor", "--json"])
+        .env("PATH", "/nonexistent")
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("\"status\": \"warn\""));
+    assert!(stdout.contains("not found in PATH"));
+}
+
+#[test]
+fn doctor_invalid_state_file_fails() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "broken");
+
+    fs::write(
+        tmp.path().join(".wai/projects/broken/.state"),
+        "{{not valid yaml at all",
+    )
+    .unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["doctor", "--json"])
+        .assert()
+        .code(1)
+        .stdout(
+            predicate::str::contains("\"status\": \"fail\"")
+                .and(predicate::str::contains("broken")),
+        );
+}
+
+#[test]
+fn doctor_uninitialised_directory_errors() {
+    let stale_wai = std::path::Path::new("/tmp/.wai");
+    if stale_wai.exists() {
+        let _ = fs::remove_dir_all(stale_wai);
+    }
+
+    let tmp = TempDir::new().unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["doctor"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("No project initialized"));
+}
+
 // ─── error cases ────────────────────────────────────────────────────────────
 
 #[test]
