@@ -20,7 +20,7 @@ The chosen `verb-noun` pattern (e.g., `wai new project`) is a foundational **Typ
 
 ### Core Verbs
 
-The primary verbs (`new`, `add`, `show`, `move`) provide a minimal, orthogonal set of operations. Additional top-level commands (`phase`, `sync`, `config`, `handoff`, `search`, `timeline`) provide direct access to frequently-used workflows that don't fit the verb-noun pattern naturally.
+The primary verbs (`new`, `add`, `show`, `move`) provide a minimal, orthogonal set of operations. Additional top-level commands (`phase`, `sync`, `config`, `handoff`, `search`, `timeline`, `doctor`) provide direct access to frequently-used workflows that don't fit the verb-noun pattern naturally.
 
 ### PARA-Based Organization
 
@@ -39,7 +39,7 @@ This spec covers the foundational elements of the CLI.
 
 ### Requirement: Command Structure
 
-The CLI SHALL use consistent verb-noun command patterns with primary verbs: `new`, `add`, `show`, `move`, plus dedicated top-level commands for `phase`, `sync`, `config`, `handoff`, `search`, and `timeline`.
+The CLI SHALL use consistent verb-noun command patterns with primary verbs: `new`, `add`, `show`, `move`, plus dedicated top-level commands for `phase`, `sync`, `config`, `handoff`, `search`, `timeline`, and `doctor`.
 
 #### Scenario: Create new items
 
@@ -91,6 +91,13 @@ The CLI SHALL use consistent verb-noun command patterns with primary verbs: `new
 - **WHEN** user runs `wai timeline <project>`
 - **THEN** the system displays a chronological view of the project's artifacts
 
+#### Scenario: Diagnose workspace health
+
+- **WHEN** user runs `wai doctor`
+- **THEN** the system runs diagnostic checks against the workspace
+- **AND** reports pass/warn/fail status for each check with fix suggestions
+- **AND** exits with code 0 when all checks pass, 1 when any check fails
+
 ### Requirement: Global Flags
 
 The CLI SHALL support global verbosity and quiet flags that work with all commands.
@@ -114,6 +121,45 @@ The CLI SHALL support global verbosity and quiet flags that work with all comman
 
 - **WHEN** user passes `-q` or `--quiet`
 - **THEN** only errors are shown
+
+#### Scenario: Non-interactive mode
+
+- **WHEN** user passes `--no-input`
+- **THEN** the system disables interactive prompts and fails with a diagnostic error if input is required
+
+#### Scenario: Auto-confirm
+
+- **WHEN** user passes `--yes`
+- **THEN** the system proceeds with default choices for confirmations
+
+#### Scenario: Safe mode
+
+- **WHEN** user passes `--safe`
+- **THEN** the system runs in read-only mode and refuses operations that mutate state, returning a diagnostic error with a suggested non-safe command
+
+### Requirement: JSON Output
+
+Commands that return multi-line structured information SHALL support `--json` output for machine parsing.
+
+#### Scenario: Status as JSON
+
+- **WHEN** user runs `wai status --json`
+- **THEN** the system outputs JSON containing phase, plugin statuses, and suggestion lists
+
+#### Scenario: Search as JSON
+
+- **WHEN** user runs `wai search <query> --json`
+- **THEN** the system outputs JSON containing matches with file paths, line numbers, and context
+
+#### Scenario: Timeline as JSON
+
+- **WHEN** user runs `wai timeline <project> --json`
+- **THEN** the system outputs JSON containing entries with date, type, title, and path
+
+#### Scenario: Plugin list as JSON
+
+- **WHEN** user runs `wai plugin list --json`
+- **THEN** the system outputs JSON containing plugin name, status, and detector metadata
 
 ### Requirement: Project Initialization
 
@@ -151,3 +197,55 @@ The CLI SHALL provide `wai status` to show project overview and suggest next ste
 #### Scenario: Contextual suggestions
 
 See [context-suggestions](../context-suggestions/spec.md) for the complete suggestion logic.
+
+### Requirement: Doctor Command
+
+The CLI SHALL provide `wai doctor` to diagnose workspace health and report issues with actionable fix suggestions.
+
+#### Scenario: Directory structure check
+
+- **WHEN** `wai doctor` runs
+- **THEN** it verifies that all expected `.wai/` subdirectories exist (projects, areas, resources, archives, plugins)
+- **AND** reports pass if all present, fail with `mkdir` suggestion for each missing directory
+
+#### Scenario: Configuration validation
+
+- **WHEN** `wai doctor` runs
+- **THEN** it attempts to parse `.wai/config.toml`
+- **AND** reports pass if valid, fail with the parse error and suggestion to check the file
+
+#### Scenario: Plugin tool availability
+
+- **WHEN** `wai doctor` runs and plugins are detected
+- **THEN** it checks whether each detected plugin's CLI tool is installed (e.g., `git`, `bd`, `openspec`)
+- **AND** reports pass if reachable, warn if not installed with install guidance
+
+#### Scenario: Agent config sync status
+
+- **WHEN** `wai doctor` runs and `.projections.yml` exists
+- **THEN** it validates the projections file parses correctly
+- **AND** checks whether each projection target exists and is up to date
+- **AND** reports pass if synced, warn if targets are missing with `wai sync` suggestion
+
+#### Scenario: Project state integrity
+
+- **WHEN** `wai doctor` runs and projects exist
+- **THEN** it validates each project's `.state` file parses as valid YAML with a recognized phase
+- **AND** reports pass if valid, fail with the error for each invalid state file
+
+#### Scenario: Custom plugin validation
+
+- **WHEN** `wai doctor` runs and `.wai/plugins/` contains YAML files
+- **THEN** it validates each plugin YAML parses correctly as a PluginDef
+- **AND** reports pass if valid, fail with the parse error for each invalid file
+
+#### Scenario: Summary output
+
+- **WHEN** all diagnostic checks complete
+- **THEN** the system prints a summary line with total pass, warn, and fail counts
+- **AND** exits with code 0 if no failures, code 1 if any failures
+
+#### Scenario: Not initialized
+
+- **WHEN** user runs `wai doctor` outside a wai workspace
+- **THEN** the system reports the standard not-initialized error with `wai init` suggestion

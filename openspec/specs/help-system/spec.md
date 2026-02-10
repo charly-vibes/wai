@@ -38,7 +38,7 @@ All commands SHALL provide `--help` with usage examples.
 - **WHEN** user runs `wai --help` or `wai -h`
 - **THEN** the system shows a brief description of wai
 - **AND** lists all top-level commands with one-line descriptions
-- **AND** shows global flags (`-v`, `-q`, `--help`, `--version`)
+- **AND** shows global flags (`-v`, `-q`, `--help`, `--version`, `--json`, `--no-input`, `--yes`, `--safe`)
 
 #### Scenario: Command help
 
@@ -52,10 +52,10 @@ All commands SHALL provide `--help` with usage examples.
 - **THEN** the system shows subcommand-specific description and options
 - **AND** includes examples relevant to that subcommand
 
-#### Scenario: No arguments shows help
+#### Scenario: No arguments shows contextual help
 
 - **WHEN** user runs `wai` with no arguments
-- **THEN** the system shows the same output as `wai --help`
+- **THEN** the system defers to onboarding behavior for context-aware output
 
 ### Requirement: Usage Examples
 

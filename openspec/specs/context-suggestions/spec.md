@@ -94,3 +94,18 @@ When a project has no artifacts, suggestions SHALL guide initial setup.
 - **WHEN** project has no research, plans, or designs
 - **THEN** suggest starting with research: `wai add research "..."`
 - **AND** suggest checking phase: `wai phase`
+
+### Requirement: Suggestion Output Blocks
+
+Status output SHALL include a clearly labeled suggestion block for human and machine parsing.
+
+#### Scenario: Suggestion block formatting
+
+- **WHEN** status suggestions are shown
+- **THEN** they appear under a `Suggestions:` heading
+- **AND** each suggestion includes a short label and a suggested command
+
+#### Scenario: Suggestions as JSON
+
+- **WHEN** user runs `wai status --json`
+- **THEN** the suggestions are returned as an array with `label` and `command` fields

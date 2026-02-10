@@ -51,6 +51,11 @@ The CLI SHALL provide a chronological view of artifacts within a project.
   - Title or filename
 - **AND** entries are sorted newest-first by default
 
+#### Scenario: Timeline output as JSON
+
+- **WHEN** user runs `wai timeline <project> --json`
+- **THEN** the system outputs JSON entries with `date`, `type`, `title`, and `path`
+
 ### Requirement: Search
 
 The CLI SHALL provide full-text search across all artifacts.
@@ -78,3 +83,8 @@ The CLI SHALL provide full-text search across all artifacts.
   - File path (relative to `.wai/`)
   - Matching line with query highlighted
   - Context (lines before and after the match)
+
+#### Scenario: Search output as JSON
+
+- **WHEN** user runs `wai search <query> --json`
+- **THEN** the system outputs JSON results with `path`, `line_number`, `line`, and `context`
