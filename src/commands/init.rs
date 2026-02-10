@@ -1,4 +1,4 @@
-use cliclack::{input, intro, log, outro};
+use cliclack::input;
 use miette::{IntoDiagnostic, Result};
 
 use crate::config::{
@@ -19,14 +19,15 @@ pub fn run(name: Option<String>) -> Result<()> {
         .into());
     }
 
-    intro("Initialize wai project").into_diagnostic()?;
-
     // Check if already initialized
     if config_dir.exists() {
-        log::warning("Project already initialized in this directory").into_diagnostic()?;
-        outro("Use 'wai status' to see project info").into_diagnostic()?;
+        println!("┌  Initialize wai project");
+        println!("▲  Project already initialized in this directory");
+        println!("└  Use 'wai status' to see project info");
         return Ok(());
     }
+
+    println!("┌  Initialize wai project");
 
     // Get project name
     let project_name = match name {
@@ -48,10 +49,19 @@ pub fn run(name: Option<String>) -> Result<()> {
             if context.yes {
                 default_name
             } else {
-                input("Project name?")
+                // Try to use cliclack, fall back to println if terminal not available
+                match input("Project name?")
                     .default_input(&default_name)
                     .interact()
-                    .into_diagnostic()?
+                    .into_diagnostic()
+                {
+                    Ok(name) => name,
+                    Err(_) => {
+                        // Terminal not available, use default
+                        println!("Using default project name: {}", default_name);
+                        default_name
+                    }
+                }
             }
         }
     };
@@ -81,17 +91,81 @@ pub fn run(name: Option<String>) -> Result<()> {
         detected.push("git");
     }
 
-    log::success("Created .wai/ directory with PARA structure").into_diagnostic()?;
+    println!("◆  Created .wai/ directory with PARA structure");
+
+    // Create plugin configuration files
+    setup_plugins(&current_dir, &detected)?;
 
     if !detected.is_empty() {
-        log::info(format!("Detected plugins: {}", detected.join(", "))).into_diagnostic()?;
+        println!("✓ Detected plugins: {}", detected.join(", "));
     }
 
-    log::info("Next steps:").into_diagnostic()?;
+    println!("●  Next steps:");
     println!("  → wai new project \"my-app\"    Create your first project");
     println!("  → wai status                   Check project status");
+    if !detected.is_empty() {
+        println!("  → wai plugin list              View detected plugins");
+    }
 
-    outro(format!("Workspace '{}' initialized!", project_name)).into_diagnostic()?;
+    println!("└  Workspace '{}' initialized!", project_name);
+    Ok(())
+}
+
+fn setup_plugins(root: &std::path::Path, detected: &[&str]) -> Result<()> {
+    use crate::config::CONFIG_DIR;
+    let config_dir = root.join(CONFIG_DIR);
+    
+    // Create README for plugin system
+    let plugins_info = r#"# Plugins
+
+Wai auto-detects and integrates with external tools:
+
+## Detected in this workspace:
+"#;
+    
+    let mut readme = plugins_info.to_string();
+    
+    if detected.contains(&"git") {
+        readme.push_str("- **git** — Version control (hooks: status, handoff)\n");
+    }
+    if detected.contains(&"beads") {
+        readme.push_str("- **beads** — Issue tracking (commands: list, show, ready)\n");
+    }
+    if detected.contains(&"openspec") {
+        readme.push_str("- **openspec** — Specification management\n");
+    }
+    
+    readme.push_str(r#"
+
+## Custom plugins
+
+Add YAML files to `.wai/plugins/` to register custom plugins:
+
+```yaml
+name: my-tool
+description: Integration with my-tool
+detector:
+  type: directory
+  path: .my-tool
+commands:
+  - name: list
+    description: List my-tool items
+    passthrough: my-tool list
+    read_only: true
+hooks:
+  on_status:
+    command: my-tool status
+    inject_as: tool_status
+```
+
+Run `wai plugin list` to see all available plugins.
+"#);
+
+    std::fs::write(
+        config_dir.join("PLUGINS.md"),
+        readme,
+    ).into_diagnostic()?;
+
     Ok(())
 }
 
