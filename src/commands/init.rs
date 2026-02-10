@@ -23,6 +23,10 @@ pub fn run(name: Option<String>) -> Result<()> {
     if config_dir.exists() {
         println!("┌  Initialize wai project");
         println!("▲  Project already initialized in this directory");
+
+        // Still inject/update managed block in agent instruction files
+        inject_agent_instructions(&current_dir)?;
+
         println!("└  Use 'wai status' to see project info");
         return Ok(());
     }
