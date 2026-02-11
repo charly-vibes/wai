@@ -23,5 +23,8 @@ target
 .DS_Store
 Thumbs.db
 
+# mdBook output
+docs/book/
+
 # Local dev (wai project data)
 .para/

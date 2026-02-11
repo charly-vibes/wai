@@ -1,0 +1,12 @@
+[book]
+title = "wai"
+description = "Workflow manager for AI-driven development"
+authors = ["wai contributors"]
+language = "en"
+src = "src"
+
+[output.html]
+default-theme = "light"
+preferred-dark-theme = "ayu"
+git-repository-url = "https://github.com/charly/wai"
+edit-url-template = "https://github.com/charly/wai/edit/main/docs/src/{path}"

@@ -82,6 +82,16 @@ setup:
     @echo "✅ Development environment ready"
     @echo "Run 'just test' to verify setup"
 
+# === Docs Commands ===
+
+# Build docs locally (requires mdbook)
+docs:
+    mdbook build docs
+
+# Live preview docs at localhost:3000 (requires mdbook)
+docs-serve:
+    mdbook serve docs
+
 # === Utility Commands ===
 
 # Clean build artifacts
