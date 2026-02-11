@@ -1196,6 +1196,112 @@ fn doctor_uninitialised_directory_errors() {
         .stderr(predicate::str::contains("No project initialized"));
 }
 
+// ─── progressive disclosure help ────────────────────────────────────────────
+
+#[test]
+fn help_shows_quick_start_and_commands() {
+    let tmp = TempDir::new().unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["--help"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("QUICK START:")
+                .and(predicate::str::contains("COMMANDS:"))
+                .and(predicate::str::contains("Use -v for advanced options")),
+        );
+}
+
+#[test]
+fn help_default_hides_advanced_options() {
+    let tmp = TempDir::new().unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("ADVANCED OPTIONS:").not());
+}
+
+#[test]
+fn help_v_shows_advanced_options() {
+    let tmp = TempDir::new().unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["--help", "-v"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("ADVANCED OPTIONS:")
+                .and(predicate::str::contains("--json"))
+                .and(predicate::str::contains("--safe")),
+        );
+}
+
+#[test]
+fn help_vv_shows_environment_variables() {
+    let tmp = TempDir::new().unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["--help", "-vv"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("ENVIRONMENT:")
+                .and(predicate::str::contains("NO_COLOR"))
+                .and(predicate::str::contains("WAI_LOG")),
+        );
+}
+
+#[test]
+fn help_vvv_shows_internals() {
+    let tmp = TempDir::new().unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["--help", "-vvv"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("INTERNALS:")
+                .and(predicate::str::contains("config.toml"))
+                .and(predicate::str::contains("PARA")),
+        );
+}
+
+#[test]
+fn command_help_shows_examples_first() {
+    let tmp = TempDir::new().unwrap();
+
+    let output = wai_cmd(tmp.path())
+        .args(["status", "--help"])
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    let examples_pos = stdout.find("EXAMPLES:").expect("should have EXAMPLES");
+    assert!(
+        !stdout[..examples_pos].contains("OPTIONS:"),
+        "EXAMPLES should appear before OPTIONS"
+    );
+}
+
+#[test]
+fn command_help_verbose_shows_all_sections() {
+    let tmp = TempDir::new().unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["search", "--help", "-vvv"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("EXAMPLES:")
+                .and(predicate::str::contains("ADVANCED OPTIONS:"))
+                .and(predicate::str::contains("ENVIRONMENT:"))
+                .and(predicate::str::contains("INTERNALS:")),
+        );
+}
+
 // ─── error cases ────────────────────────────────────────────────────────────
 
 #[test]

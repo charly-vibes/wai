@@ -8,6 +8,7 @@ pub struct CliContext {
     pub no_input: bool,
     pub yes: bool,
     pub safe: bool,
+    pub verbose: u8,
 }
 
 thread_local! {
@@ -27,6 +28,7 @@ pub fn current_context() -> CliContext {
             no_input: false,
             yes: false,
             safe: false,
+            verbose: 0,
         })
     })
 }

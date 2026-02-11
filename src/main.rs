@@ -8,6 +8,7 @@ mod commands;
 mod config;
 mod context;
 mod error;
+mod help;
 mod json;
 mod output;
 pub mod managed_block;
@@ -20,7 +21,6 @@ use context::{CliContext, set_context};
 use output::print_json_line;
 
 fn main() -> Result<()> {
-    // Install miette's fancy error handler
     miette::set_hook(Box::new(|_| {
         Box::new(
             miette::MietteHandlerOpts::new()
@@ -32,12 +32,20 @@ fn main() -> Result<()> {
     }))
     .ok();
 
+    let args: Vec<String> = std::env::args().collect();
+
+    if let Some(output) = help::try_render_help(&args) {
+        print!("{}", output);
+        return Ok(());
+    }
+
     let cli = Cli::parse();
     set_context(CliContext {
         json: cli.json,
         no_input: cli.no_input,
         yes: cli.yes,
         safe: cli.safe,
+        verbose: cli.verbose,
     });
     match commands::run(cli) {
         Ok(_) => Ok(()),
