@@ -90,20 +90,34 @@ status: handoff
    - Some providers require config fetching before use
    - Current implementation in `src/auth/providers.ts:23`
 
+3. **Existing auth system uses context pattern**
+   - Must integrate OAuth without breaking existing email/password
+   - See `src/contexts/AuthContext.tsx` for pattern
+
 ## Open Questions
 
 > Unresolved decisions or uncertainties
 
 - [ ] Should OAuth tokens be stored in httpOnly cookies or localStorage?
 - [ ] Need to verify PKCE flow works with all providers
+- [ ] How to handle provider-specific scopes?
 
 ## Next Steps
 
 > Prioritized actions for next session
 
 1. **Test OAuth flow end-to-end** [Priority: HIGH]
+   - Test with real provider credentials
+   - Verify token refresh works
+   - Check error handling
+
 2. **Add provider configuration UI** [Priority: MEDIUM]
+   - Allow admin to enable/disable providers
+   - Configure client IDs per environment
+
 3. **Document OAuth setup** [Priority: MEDIUM]
+   - Update README with provider setup instructions
+   - Add environment variable documentation
 
 ## Artifacts
 
@@ -112,10 +126,30 @@ status: handoff
 **New files:**
 - `src/auth/oauth.ts`
 - `src/auth/providers.ts`
+- `tests/oauth.test.ts`
 
 **Modified files:**
 - `src/components/LoginForm.tsx`
 - `src/types/auth.ts`
+
+**Not committed:** [if applicable]
+- `config/development.env` (local credentials)
+
+## Related Links
+
+> Links to relevant docs, discussions, or research
+
+- [OAuth 2.0 spec](https://oauth.net/2/)
+- Slack discussion: #auth-redesign (2026-01-10)
+- Design doc: `docs/oauth-integration.md`
+
+## Additional Context
+
+> Any other useful context
+
+- Testing locally requires registered OAuth apps for each provider
+- Google OAuth has strict redirect URI validation
+- GitHub provider works but needs organization scope review
 ```
 
 ### Step 4: Commit the Handoff
@@ -133,6 +167,13 @@ Handoff created at: handoffs/2026-01-12_14-30-00_oauth-integration.md
 To resume in a new session:
 1. Start fresh AI session
 2. Provide the prompt: "Resume work from handoffs/2026-01-12_14-30-00_oauth-integration.md"
+3. Or use: /resume_handoff handoffs/2026-01-12_14-30-00_oauth-integration.md
+
+The handoff captures:
+- Current task status
+- Key learnings and decisions
+- Files to read first
+- Prioritized next steps
 ```
 
 ## Guidelines
@@ -141,3 +182,4 @@ To resume in a new session:
 2. **Capture the "why"** - Future sessions need to understand decisions
 3. **Prioritize learnings** - Mistakes and discoveries are most valuable
 4. **Reference, don't duplicate** - Link to files rather than copy code
+5. **Update issue tracking** - If using issues, link the handoff

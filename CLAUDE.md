@@ -1,3 +1,29 @@
+<!-- WAI:START -->
+# Wai — Workflow Context
+
+This project uses **wai** for workflow management and decision tracking.
+Run `wai status` to see project state, or `wai --help` for all commands.
+
+**Quick reference:**
+```bash
+wai status                    # Project status and next steps
+wai phase show                # Current project phase
+wai new project "name"        # Create a new project
+wai add research "notes"      # Add research notes
+wai add plan "plan"           # Add a plan document
+wai add design "design"       # Add a design document
+wai search "query"            # Search across all artifacts
+wai handoff create <project>  # Generate handoff document
+wai sync                      # Sync agent configs
+```
+
+The `.wai/` directory contains project artifacts organized by the PARA method
+(Projects, Areas, Resources, Archives). Do not edit `.wai/config.toml` directly.
+
+Keep this managed block so `wai init` can refresh the instructions.
+
+<!-- WAI:END -->
+
 <!-- OPENSPEC:START -->
 # OpenSpec Instructions
 

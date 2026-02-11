@@ -105,6 +105,28 @@ Continue with remaining logical groups of changes.
 
 **Types:** add, update, fix, refactor, docs, test, chore
 
+## Good vs Bad Commits
+
+### ❌ Bad Approach
+```bash
+git add -A
+git commit -m "updates"
+```
+
+### ✅ Good Approach
+```bash
+git add src/auth/oauth.ts
+git add src/auth/providers.ts
+git commit -m "add(auth): OAuth provider abstraction
+
+Created provider interface and implementations for Google, GitHub.
+Each provider handles its own authorization URLs and token exchange.
+
+- BaseProvider interface defines contract
+- GoogleProvider and GitHubProvider implementations
+- Provider registry for runtime selection"
+```
+
 ## Verification Checklist
 
 Before each commit:
