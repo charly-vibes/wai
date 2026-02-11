@@ -2,6 +2,7 @@ use cliclack::log;
 use miette::{IntoDiagnostic, Result};
 use owo_colors::OwoColorize;
 use std::path::Path;
+use std::process::Command;
 
 use crate::cli::ConfigCommands;
 use crate::config::agent_config_dir;
@@ -64,6 +65,35 @@ pub fn run(cmd: ConfigCommands) -> Result<()> {
             list_config_dir(&config_dir.join("context"), "Context")?;
 
             println!();
+            Ok(())
+        }
+        ConfigCommands::Edit { path } => {
+            let target = config_dir.join(&path);
+            if !target.exists() {
+                return Err(miette::miette!(
+                    "Config file not found: {}\n  Run 'wai config list' to see available files",
+                    path
+                ));
+            }
+
+            let editor = std::env::var("VISUAL")
+                .or_else(|_| std::env::var("EDITOR"))
+                .unwrap_or_else(|_| "vi".to_string());
+
+            let status = Command::new(&editor)
+                .arg(&target)
+                .status()
+                .into_diagnostic()?;
+
+            if !status.success() {
+                return Err(miette::miette!("Editor '{}' exited with error", editor));
+            }
+
+            log::success(format!("Edited '{}'", path)).into_diagnostic()?;
+            println!(
+                "  {} Run 'wai sync' to project changes to tool-specific locations",
+                "→".dimmed()
+            );
             Ok(())
         }
     }

@@ -272,6 +272,12 @@ pub enum ConfigCommands {
 
     /// List all config files
     List,
+
+    /// Edit a config file in $EDITOR
+    Edit {
+        /// Path to config file (relative to agent-config dir, e.g. skills/my-skill.md)
+        path: String,
+    },
 }
 
 #[derive(Subcommand)]
