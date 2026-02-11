@@ -121,7 +121,7 @@ pub fn run(name: Option<String>) -> Result<()> {
 fn setup_plugins(root: &std::path::Path, detected: &[&str]) -> Result<()> {
     use crate::config::CONFIG_DIR;
     let config_dir = root.join(CONFIG_DIR);
-    
+
     // Create README for plugin system
     let plugins_info = r#"# Plugins
 
@@ -129,9 +129,9 @@ Wai auto-detects and integrates with external tools:
 
 ## Detected in this workspace:
 "#;
-    
+
     let mut readme = plugins_info.to_string();
-    
+
     if detected.contains(&"git") {
         readme.push_str("- **git** — Version control (hooks: status, handoff)\n");
     }
@@ -141,8 +141,9 @@ Wai auto-detects and integrates with external tools:
     if detected.contains(&"openspec") {
         readme.push_str("- **openspec** — Specification management\n");
     }
-    
-    readme.push_str(r#"
+
+    readme.push_str(
+        r#"
 
 ## Custom plugins
 
@@ -166,12 +167,10 @@ hooks:
 ```
 
 Run `wai plugin list` to see all available plugins.
-"#);
+"#,
+    );
 
-    std::fs::write(
-        config_dir.join("PLUGINS.md"),
-        readme,
-    ).into_diagnostic()?;
+    std::fs::write(config_dir.join("PLUGINS.md"), readme).into_diagnostic()?;
 
     Ok(())
 }

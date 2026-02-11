@@ -15,9 +15,7 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 ("wai status -v", "Detailed status with section breakdowns"),
                 ("wai status --json", "Machine-readable status output"),
             ],
-            advanced_options: &[
-                "--json    Output machine-readable JSON for scripting",
-            ],
+            advanced_options: &["--json    Output machine-readable JSON for scripting"],
             env_vars: &[
                 ("NO_COLOR", "Disable colored output"),
                 ("WAI_LOG", "Set log level (trace, debug, info, warn, error)"),
@@ -34,12 +32,8 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 ("wai init", "Initialize with directory name as project"),
                 ("wai init --name my-project", "Initialize with custom name"),
             ],
-            advanced_options: &[
-                "--name <NAME>    Project name (defaults to directory name)",
-            ],
-            env_vars: &[
-                ("NO_COLOR", "Disable colored output"),
-            ],
+            advanced_options: &["--name <NAME>    Project name (defaults to directory name)"],
+            env_vars: &[("NO_COLOR", "Disable colored output")],
             internals: &[
                 "Creates .wai/ PARA directory structure",
                 "Generates config.toml with project metadata",
@@ -53,12 +47,8 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 ("wai new area dev-standards", "Create a new area"),
                 ("wai new resource cheatsheets", "Create a new resource"),
             ],
-            advanced_options: &[
-                "-t, --template <TPL>    Use a project template",
-            ],
-            env_vars: &[
-                ("NO_COLOR", "Disable colored output"),
-            ],
+            advanced_options: &["-t, --template <TPL>    Use a project template"],
+            env_vars: &[("NO_COLOR", "Disable colored output")],
             internals: &[
                 "Creates subdirectories under .wai/projects|areas|resources",
                 "Initializes .state file with research phase for projects",
@@ -67,19 +57,26 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
         "add" => Some(HelpContent {
             about: "Add artifacts (research, plans, designs) to a project",
             examples: &[
-                ("wai add research \"API design notes\"", "Add research notes inline"),
-                ("wai add research --file notes.md", "Import research from file"),
+                (
+                    "wai add research \"API design notes\"",
+                    "Add research notes inline",
+                ),
+                (
+                    "wai add research --file notes.md",
+                    "Import research from file",
+                ),
                 ("wai add plan \"v2 migration plan\"", "Add a plan document"),
-                ("wai add design \"auth system design\"", "Add a design document"),
+                (
+                    "wai add design \"auth system design\"",
+                    "Add a design document",
+                ),
             ],
             advanced_options: &[
                 "-f, --file <PATH>       Import content from a file",
                 "-p, --project <NAME>    Associate with a specific project",
                 "-t, --tags <TAGS>       Add tags (research only)",
             ],
-            env_vars: &[
-                ("NO_COLOR", "Disable colored output"),
-            ],
+            env_vars: &[("NO_COLOR", "Disable colored output")],
             internals: &[
                 "Stores artifacts as timestamped files under project directories",
                 "Tags are stored in YAML frontmatter",
@@ -94,9 +91,7 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 ("wai phase set implement", "Jump to a specific phase"),
             ],
             advanced_options: &[],
-            env_vars: &[
-                ("NO_COLOR", "Disable colored output"),
-            ],
+            env_vars: &[("NO_COLOR", "Disable colored output")],
             internals: &[
                 "Phases: research → design → plan → implement → review → archive",
                 "State persisted in .wai/projects/<name>/.state",
@@ -106,14 +101,13 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
             about: "Sync agent configs to tool-specific locations",
             examples: &[
                 ("wai sync", "Sync all agent configs"),
-                ("wai sync --status", "Check sync status without modifying files"),
+                (
+                    "wai sync --status",
+                    "Check sync status without modifying files",
+                ),
             ],
-            advanced_options: &[
-                "--status    Only show sync status without modifying files",
-            ],
-            env_vars: &[
-                ("NO_COLOR", "Disable colored output"),
-            ],
+            advanced_options: &["--status    Only show sync status without modifying files"],
+            env_vars: &[("NO_COLOR", "Disable colored output")],
             internals: &[
                 "Reads .projections.yml for tool-specific mappings",
                 "Copies/symlinks config files to target locations",
@@ -123,9 +117,15 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
             about: "Search across all artifacts",
             examples: &[
                 ("wai search \"authentication\"", "Search all artifacts"),
-                ("wai search \"auth\" --type research", "Search only research artifacts"),
+                (
+                    "wai search \"auth\" --type research",
+                    "Search only research artifacts",
+                ),
                 ("wai search \"TODO\" --in my-app", "Search within a project"),
-                ("wai search \"api.*v2\" --regex", "Search with regex pattern"),
+                (
+                    "wai search \"api.*v2\" --regex",
+                    "Search with regex pattern",
+                ),
             ],
             advanced_options: &[
                 "--type <TYPE>    Filter by artifact type (research, plan, design, handoff)",
@@ -133,9 +133,7 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 "--regex          Treat query as regular expression",
                 "-n, --limit <N>  Limit number of results",
             ],
-            env_vars: &[
-                ("NO_COLOR", "Disable colored output"),
-            ],
+            env_vars: &[("NO_COLOR", "Disable colored output")],
             internals: &[
                 "Walks .wai/ directory tree recursively",
                 "Uses regex crate for pattern matching",
@@ -148,12 +146,8 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 ("wai show my-app", "Show details for a specific item"),
             ],
             advanced_options: &[],
-            env_vars: &[
-                ("NO_COLOR", "Disable colored output"),
-            ],
-            internals: &[
-                "Aggregates data from projects, areas, and resources",
-            ],
+            env_vars: &[("NO_COLOR", "Disable colored output")],
+            internals: &["Aggregates data from projects, areas, and resources"],
         }),
         "doctor" => Some(HelpContent {
             about: "Diagnose workspace health",
@@ -161,12 +155,8 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 ("wai doctor", "Run all health checks"),
                 ("wai doctor --json", "Machine-readable diagnostics"),
             ],
-            advanced_options: &[
-                "--json    Output results as JSON",
-            ],
-            env_vars: &[
-                ("NO_COLOR", "Disable colored output"),
-            ],
+            advanced_options: &["--json    Output results as JSON"],
+            env_vars: &[("NO_COLOR", "Disable colored output")],
             internals: &[
                 "Checks PARA directory structure integrity",
                 "Validates config.toml syntax",
@@ -176,13 +166,12 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
         }),
         "handoff" => Some(HelpContent {
             about: "Generate handoff documents",
-            examples: &[
-                ("wai handoff create my-app", "Generate handoff for a project"),
-            ],
+            examples: &[(
+                "wai handoff create my-app",
+                "Generate handoff for a project",
+            )],
             advanced_options: &[],
-            env_vars: &[
-                ("NO_COLOR", "Disable colored output"),
-            ],
+            env_vars: &[("NO_COLOR", "Disable colored output")],
             internals: &[
                 "Aggregates research, plans, and designs into a single document",
                 "Includes phase history and timeline",
@@ -196,9 +185,7 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 ("wai plugin disable beads", "Disable a plugin"),
             ],
             advanced_options: &[],
-            env_vars: &[
-                ("NO_COLOR", "Disable colored output"),
-            ],
+            env_vars: &[("NO_COLOR", "Disable colored output")],
             internals: &[
                 "Plugins are defined in .wai/plugins/",
                 "Plugin detection based on marker files",
@@ -212,9 +199,7 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 ("wai config edit skills/my-skill.md", "Edit a config file"),
             ],
             advanced_options: &[],
-            env_vars: &[
-                ("EDITOR", "Editor to use for wai config edit"),
-            ],
+            env_vars: &[("EDITOR", "Editor to use for wai config edit")],
             internals: &[
                 "Configs stored in .wai/resources/agent-config/",
                 "Types: skills, rules, context",
@@ -224,7 +209,10 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
             about: "View chronological timeline of artifacts",
             examples: &[
                 ("wai timeline my-app", "View full project timeline"),
-                ("wai timeline my-app --from 2026-01-01", "Timeline from a date"),
+                (
+                    "wai timeline my-app --from 2026-01-01",
+                    "Timeline from a date",
+                ),
                 ("wai timeline my-app --reverse", "Oldest entries first"),
             ],
             advanced_options: &[
@@ -232,9 +220,7 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 "--to <DATE>      Show entries up to this date (YYYY-MM-DD)",
                 "--reverse        Show oldest entries first",
             ],
-            env_vars: &[
-                ("NO_COLOR", "Disable colored output"),
-            ],
+            env_vars: &[("NO_COLOR", "Disable colored output")],
             internals: &[
                 "Reads artifact timestamps from filenames",
                 "Sorts by date, newest first by default",
@@ -243,16 +229,15 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
         "move" => Some(HelpContent {
             about: "Move items between PARA categories",
             examples: &[
-                ("wai move old-project archives", "Archive a completed project"),
+                (
+                    "wai move old-project archives",
+                    "Archive a completed project",
+                ),
                 ("wai move my-area projects", "Promote an area to a project"),
             ],
             advanced_options: &[],
-            env_vars: &[
-                ("NO_COLOR", "Disable colored output"),
-            ],
-            internals: &[
-                "Moves directory between .wai/projects|areas|resources|archives",
-            ],
+            env_vars: &[("NO_COLOR", "Disable colored output")],
+            internals: &["Moves directory between .wai/projects|areas|resources|archives"],
         }),
         "import" => Some(HelpContent {
             about: "Import existing tool configurations",
@@ -261,9 +246,7 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 ("wai import .cursorrules", "Import Cursor rules"),
             ],
             advanced_options: &[],
-            env_vars: &[
-                ("NO_COLOR", "Disable colored output"),
-            ],
+            env_vars: &[("NO_COLOR", "Disable colored output")],
             internals: &[
                 "Copies files into .wai/resources/agent-config/",
                 "Detects config type from file structure",
@@ -284,7 +267,7 @@ pub fn render_main_help(verbose: u8) -> String {
     out.push_str("  wai status                  Check project status\n");
     out.push_str("  wai add research \"notes\"     Add research artifacts\n");
     out.push_str("  wai phase next              Advance project phase\n");
-    out.push_str("\n");
+    out.push('\n');
 
     out.push_str("COMMANDS:\n");
     out.push_str("  new       Create a new project, area, or resource\n");
@@ -302,7 +285,7 @@ pub fn render_main_help(verbose: u8) -> String {
     out.push_str("  plugin    Manage plugins\n");
     out.push_str("  doctor    Diagnose workspace health\n");
     out.push_str("  import    Import existing tool configurations\n");
-    out.push_str("\n");
+    out.push('\n');
 
     out.push_str("OPTIONS:\n");
     out.push_str("  -v, --verbose...  Increase output verbosity (-v, -vv, -vvv)\n");
@@ -335,7 +318,9 @@ pub fn render_main_help(verbose: u8) -> String {
     }
 
     if verbose == 0 {
-        out.push_str("\nUse -v for advanced options, -vv for environment variables, -vvv for internals.\n");
+        out.push_str(
+            "\nUse -v for advanced options, -vv for environment variables, -vvv for internals.\n",
+        );
     }
 
     out.push_str("Run 'wai <command> --help' for more information on a command.\n");
@@ -355,7 +340,7 @@ pub fn render_command_help(name: &str, verbose: u8) -> Option<String> {
         for (cmd, desc) in help.examples {
             out.push_str(&format!("  {}{}# {}\n", cmd, padding(cmd, 38), desc));
         }
-        out.push_str("\n");
+        out.push('\n');
     }
 
     if verbose >= 1 && !help.advanced_options.is_empty() {
@@ -363,7 +348,7 @@ pub fn render_command_help(name: &str, verbose: u8) -> Option<String> {
         for opt in help.advanced_options {
             out.push_str(&format!("  {}\n", opt));
         }
-        out.push_str("\n");
+        out.push('\n');
     }
 
     if verbose >= 2 && !help.env_vars.is_empty() {
@@ -371,7 +356,7 @@ pub fn render_command_help(name: &str, verbose: u8) -> Option<String> {
         for (var, desc) in help.env_vars {
             out.push_str(&format!("  {}{}  {}\n", var, padding(var, 14), desc));
         }
-        out.push_str("\n");
+        out.push('\n');
     }
 
     if verbose >= 3 && !help.internals.is_empty() {
@@ -379,7 +364,7 @@ pub fn render_command_help(name: &str, verbose: u8) -> Option<String> {
         for detail in help.internals {
             out.push_str(&format!("  {}\n", detail));
         }
-        out.push_str("\n");
+        out.push('\n');
     }
 
     if verbose == 0 {
@@ -413,7 +398,9 @@ pub fn try_render_help(args: &[String]) -> Option<String> {
         }
     }
 
-    let subcommand = args.iter().skip(1)
+    let subcommand = args
+        .iter()
+        .skip(1)
         .find(|a| !a.starts_with('-') && *a != "help");
 
     match subcommand {

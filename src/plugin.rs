@@ -262,21 +262,15 @@ pub fn execute_passthrough(
     }
 
     if context.no_input {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            WaiError::NonInteractive {
-                message: "Plugin passthrough requires interactive input".to_string(),
-            },
-        ));
+        return Err(std::io::Error::other(WaiError::NonInteractive {
+            message: "Plugin passthrough requires interactive input".to_string(),
+        }));
     }
 
     if context.safe {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            WaiError::SafeModeViolation {
-                action: "plugin passthrough".to_string(),
-            },
-        ));
+        return Err(std::io::Error::other(WaiError::SafeModeViolation {
+            action: "plugin passthrough".to_string(),
+        }));
     }
 
     let mut cmd = Command::new(parts[0]);

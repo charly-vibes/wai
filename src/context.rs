@@ -8,6 +8,7 @@ pub struct CliContext {
     pub no_input: bool,
     pub yes: bool,
     pub safe: bool,
+    #[allow(dead_code)]
     pub verbose: u8,
 }
 

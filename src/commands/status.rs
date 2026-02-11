@@ -109,12 +109,7 @@ pub fn run(verbose: u8) -> Result<()> {
                 } else {
                     "no tasks".to_string()
                 };
-                println!(
-                    "    {} {}  [{}]",
-                    "•".dimmed(),
-                    change.name,
-                    ratio.cyan()
-                );
+                println!("    {} {}  [{}]", "•".dimmed(), change.name, ratio.cyan());
                 if verbose > 0 {
                     for section in &change.sections {
                         println!(
@@ -133,7 +128,11 @@ pub fn run(verbose: u8) -> Result<()> {
 
         if verbose > 0 && !spec_status.specs.is_empty() {
             println!();
-            println!("    {} specs: {}", "·".dimmed(), spec_status.specs.join(", "));
+            println!(
+                "    {} specs: {}",
+                "·".dimmed(),
+                spec_status.specs.join(", ")
+            );
         }
     }
 

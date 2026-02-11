@@ -10,9 +10,9 @@ mod context;
 mod error;
 mod help;
 mod json;
-mod output;
 pub mod managed_block;
 pub mod openspec;
+mod output;
 pub mod plugin;
 mod state;
 

@@ -40,10 +40,10 @@ fn scan_specs(specs_dir: &Path) -> Vec<String> {
         Err(_) => return names,
     };
     for entry in entries.filter_map(|e| e.ok()) {
-        if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
-            if let Some(name) = entry.file_name().to_str() {
-                names.push(name.to_string());
-            }
+        if entry.file_type().map(|t| t.is_dir()).unwrap_or(false)
+            && let Some(name) = entry.file_name().to_str()
+        {
+            names.push(name.to_string());
         }
     }
     names.sort();

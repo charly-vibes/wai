@@ -4,8 +4,8 @@ use serde::Serialize;
 use std::path::Path;
 
 use crate::config::{
-    agent_config_dir, plugins_dir, projects_dir, wai_dir, ProjectConfig, ARCHIVES_DIR, AREAS_DIR,
-    CONFIG_FILE, PLUGINS_DIR, PROJECTS_DIR, RESOURCES_DIR, STATE_FILE,
+    ARCHIVES_DIR, AREAS_DIR, CONFIG_FILE, PLUGINS_DIR, PROJECTS_DIR, ProjectConfig, RESOURCES_DIR,
+    STATE_FILE, agent_config_dir, plugins_dir, projects_dir, wai_dir,
 };
 use crate::context::current_context;
 use crate::output::print_json;
@@ -195,13 +195,12 @@ fn check_plugin_tools(project_root: &Path) -> Vec<CheckResult> {
     let tool_checks: Vec<(&str, &str)> = plugins
         .iter()
         .filter(|p| p.detected)
-        .map(|p| match p.def.name.as_str() {
+        .filter_map(|p| match p.def.name.as_str() {
             "git" => Some(("git", "git")),
             "beads" => Some(("beads", "bd")),
             "openspec" => Some(("openspec", "openspec")),
             _ => None,
         })
-        .flatten()
         .collect();
 
     for (plugin_name, cli_name) in &tool_checks {
@@ -252,7 +251,10 @@ fn check_agent_config_sync(project_root: &Path) -> Vec<CheckResult> {
             name: "Agent config sync".to_string(),
             status: Status::Warn,
             message: ".projections.yml not found".to_string(),
-            fix: Some("Run: wai init (or create .wai/resources/agent-config/.projections.yml)".to_string()),
+            fix: Some(
+                "Run: wai init (or create .wai/resources/agent-config/.projections.yml)"
+                    .to_string(),
+            ),
         });
         return results;
     }
@@ -312,7 +314,10 @@ fn check_agent_config_sync(project_root: &Path) -> Vec<CheckResult> {
                 name: "Agent config sync".to_string(),
                 status: Status::Fail,
                 message: format!("Invalid .projections.yml: {}", e),
-                fix: Some("Fix the YAML syntax in .wai/resources/agent-config/.projections.yml".to_string()),
+                fix: Some(
+                    "Fix the YAML syntax in .wai/resources/agent-config/.projections.yml"
+                        .to_string(),
+                ),
             });
         }
     }
@@ -348,10 +353,7 @@ fn check_project_state(project_root: &Path) -> Vec<CheckResult> {
                 name: format!("Project state: {}", name),
                 status: Status::Warn,
                 message: "No .state file found".to_string(),
-                fix: Some(format!(
-                    "Run: wai phase set research (in project {})",
-                    name
-                )),
+                fix: Some(format!("Run: wai phase set research (in project {})", name)),
             });
             continue;
         }
@@ -370,10 +372,7 @@ fn check_project_state(project_root: &Path) -> Vec<CheckResult> {
                     name: format!("Project state: {}", name),
                     status: Status::Fail,
                     message: format!("Invalid .state: {}", e),
-                    fix: Some(format!(
-                        "Fix or recreate .wai/projects/{}/.state",
-                        name
-                    )),
+                    fix: Some(format!("Fix or recreate .wai/projects/{}/.state", name)),
                 });
             }
         }
