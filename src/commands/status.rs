@@ -10,7 +10,8 @@ use crate::output::print_json;
 use crate::plugin;
 use crate::state::{Phase, ProjectState};
 
-pub fn run() -> Result<()> {
+pub fn run(verbose: u8) -> Result<()> {
+    let _ = verbose;
     let project_root = find_project_root().ok_or(WaiError::NotInitialized)?;
     let config = ProjectConfig::load(&project_root)?;
     let context = current_context();

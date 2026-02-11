@@ -25,7 +25,7 @@ mod timeline;
 pub fn run(cli: Cli) -> Result<()> {
     match cli.command {
         Some(Commands::Init { name }) => init::run(name),
-        Some(Commands::Status) => status::run(),
+        Some(Commands::Status) => status::run(cli.verbose),
         Some(Commands::New(cmd)) => new::run(cmd),
         Some(Commands::Add(cmd)) => add::run(cmd),
         Some(Commands::Show { name }) => show::run(name),
