@@ -35,7 +35,30 @@ pub struct StatusPayload {
     pub projects: Vec<StatusProject>,
     pub plugins: Vec<StatusPlugin>,
     pub hook_outputs: Vec<HookOutput>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub openspec: Option<StatusOpenSpec>,
     pub suggestions: Vec<Suggestion>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct StatusOpenSpec {
+    pub specs: Vec<String>,
+    pub changes: Vec<StatusChange>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct StatusChange {
+    pub name: String,
+    pub done: usize,
+    pub total: usize,
+    pub sections: Vec<StatusChangeSection>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct StatusChangeSection {
+    pub name: String,
+    pub done: usize,
+    pub total: usize,
 }
 
 #[derive(Debug, Serialize)]

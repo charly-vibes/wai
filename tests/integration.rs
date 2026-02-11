@@ -952,6 +952,112 @@ fn status_json_outputs_suggestions() {
         .stdout(predicate::str::contains("\"suggestions\""));
 }
 
+#[test]
+fn status_without_openspec_omits_section() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+
+    wai_cmd(tmp.path())
+        .args(["status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("OpenSpec").not());
+}
+
+#[test]
+fn status_with_openspec_shows_change_counts() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+
+    // Set up an openspec directory with a change
+    let changes_dir = tmp.path().join("openspec/changes/add-feature");
+    fs::create_dir_all(&changes_dir).unwrap();
+    fs::write(
+        changes_dir.join("tasks.md"),
+        "## 1. Setup\n\n- [x] done\n- [ ] todo\n",
+    )
+    .unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["status"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("OpenSpec")
+                .and(predicate::str::contains("add-feature"))
+                .and(predicate::str::contains("1/2")),
+        );
+}
+
+#[test]
+fn status_verbose_shows_section_breakdown() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+
+    let changes_dir = tmp.path().join("openspec/changes/add-feature");
+    fs::create_dir_all(&changes_dir).unwrap();
+    fs::write(
+        changes_dir.join("tasks.md"),
+        "## 1. Setup\n\n- [x] done\n- [ ] todo\n\n## 2. Implement\n\n- [ ] a\n- [ ] b\n",
+    )
+    .unwrap();
+
+    // Also add a spec
+    fs::create_dir_all(tmp.path().join("openspec/specs/core")).unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["status", "-v"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Setup")
+                .and(predicate::str::contains("Implement"))
+                .and(predicate::str::contains("core")),
+        );
+}
+
+#[test]
+fn status_json_with_openspec_includes_field() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+
+    let changes_dir = tmp.path().join("openspec/changes/my-change");
+    fs::create_dir_all(&changes_dir).unwrap();
+    fs::write(
+        changes_dir.join("tasks.md"),
+        "## 1. Work\n\n- [x] a\n- [ ] b\n",
+    )
+    .unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["status", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("\"openspec\":") // JSON key, not plugin name
+                .and(predicate::str::contains("\"my-change\""))
+                .and(predicate::str::contains("\"done\": 1")),
+        );
+}
+
+#[test]
+fn status_json_without_openspec_omits_field() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+
+    // The openspec *plugin* name appears in plugins list, so check for the JSON key specifically
+    wai_cmd(tmp.path())
+        .args(["status", "--json"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"openspec\":").not());
+}
+
 // ─── wai (no args) ─────────────────────────────────────────────────────────
 
 #[test]

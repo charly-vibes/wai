@@ -5,13 +5,16 @@ use owo_colors::OwoColorize;
 use crate::config::{ProjectConfig, STATE_FILE, find_project_root, projects_dir};
 use crate::context::current_context;
 use crate::error::WaiError;
-use crate::json::{HookOutput, StatusPayload, StatusPlugin, StatusProject, Suggestion};
+use crate::json::{
+    HookOutput, StatusChange, StatusChangeSection, StatusOpenSpec, StatusPayload, StatusPlugin,
+    StatusProject, Suggestion,
+};
+use crate::openspec;
 use crate::output::print_json;
 use crate::plugin;
 use crate::state::{Phase, ProjectState};
 
 pub fn run(verbose: u8) -> Result<()> {
-    let _ = verbose;
     let project_root = find_project_root().ok_or(WaiError::NotInitialized)?;
     let config = ProjectConfig::load(&project_root)?;
     let context = current_context();
@@ -91,6 +94,46 @@ pub fn run(verbose: u8) -> Result<()> {
             for line in output.content.lines().take(5) {
                 println!("      {}", line.dimmed());
             }
+        }
+    }
+
+    // OpenSpec status
+    if let Some(spec_status) = openspec::read_status(&project_root) {
+        println!();
+        println!("  {} OpenSpec", "◆".cyan());
+
+        if !spec_status.changes.is_empty() {
+            for change in &spec_status.changes {
+                let ratio = if change.total > 0 {
+                    format!("{}/{}", change.done, change.total)
+                } else {
+                    "no tasks".to_string()
+                };
+                println!(
+                    "    {} {}  [{}]",
+                    "•".dimmed(),
+                    change.name,
+                    ratio.cyan()
+                );
+                if verbose > 0 {
+                    for section in &change.sections {
+                        println!(
+                            "      {} {}  {}/{}",
+                            "·".dimmed(),
+                            section.name.dimmed(),
+                            section.done,
+                            section.total
+                        );
+                    }
+                }
+            }
+        } else {
+            println!("    {}", "(no active changes)".dimmed());
+        }
+
+        if verbose > 0 && !spec_status.specs.is_empty() {
+            println!();
+            println!("    {} specs: {}", "·".dimmed(), spec_status.specs.join(", "));
         }
     }
 
@@ -196,11 +239,34 @@ fn render_json(project_root: &std::path::Path, _project_name: &str) -> Result<()
         ]
     };
 
+    let openspec = openspec::read_status(project_root).map(|s| StatusOpenSpec {
+        specs: s.specs,
+        changes: s
+            .changes
+            .into_iter()
+            .map(|c| StatusChange {
+                name: c.name,
+                done: c.done,
+                total: c.total,
+                sections: c
+                    .sections
+                    .into_iter()
+                    .map(|sec| StatusChangeSection {
+                        name: sec.name,
+                        done: sec.done,
+                        total: sec.total,
+                    })
+                    .collect(),
+            })
+            .collect(),
+    });
+
     let payload = StatusPayload {
         project_root: project_root.display().to_string(),
         projects,
         plugins,
         hook_outputs,
+        openspec,
         suggestions,
     };
 
