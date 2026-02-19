@@ -1,11 +1,14 @@
 use miette::{IntoDiagnostic, Result};
 use owo_colors::OwoColorize;
+use serde::Deserialize;
 use serde::Serialize;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::path::Path;
 
 use crate::config::{
-    ARCHIVES_DIR, AREAS_DIR, CONFIG_FILE, PLUGINS_DIR, PROJECTS_DIR, ProjectConfig, RESOURCES_DIR,
-    STATE_FILE, agent_config_dir, plugins_dir, projects_dir, wai_dir,
+    agent_config_dir, plugins_dir, projects_dir, wai_dir, ProjectConfig, ARCHIVES_DIR, AREAS_DIR,
+    CONFIG_FILE, PLUGINS_DIR, PROJECTS_DIR, RESOURCES_DIR, STATE_FILE,
 };
 use crate::context::current_context;
 use crate::output::print_json;
@@ -42,6 +45,20 @@ struct Summary {
     pass: usize,
     warn: usize,
     fail: usize,
+}
+
+#[derive(Deserialize)]
+struct ProjectionsConfig {
+    #[serde(default)]
+    projections: Vec<ProjectionEntry>,
+}
+
+#[derive(Deserialize)]
+struct ProjectionEntry {
+    target: String,
+    strategy: String,
+    #[serde(default)]
+    sources: Vec<String>,
 }
 
 pub fn run() -> Result<()> {
@@ -272,41 +289,19 @@ fn check_agent_config_sync(project_root: &Path) -> Vec<CheckResult> {
         }
     };
 
-    #[derive(serde::Deserialize)]
-    struct ProjectionsConfig {
-        #[serde(default)]
-        projections: Vec<ProjectionEntry>,
-    }
-
-    #[derive(serde::Deserialize)]
-    struct ProjectionEntry {
-        target: String,
-        #[allow(dead_code)]
-        strategy: String,
-    }
-
     match serde_yaml::from_str::<ProjectionsConfig>(&content) {
         Ok(config) => {
-            let mut all_synced = true;
-            for proj in &config.projections {
-                let target_path = project_root.join(&proj.target);
-                if !target_path.exists() {
-                    results.push(CheckResult {
-                        name: format!("Sync target: {}", proj.target),
-                        status: Status::Warn,
-                        message: "Target not synced".to_string(),
-                        fix: Some("Run: wai sync".to_string()),
-                    });
-                    all_synced = false;
-                }
-            }
-            if all_synced {
+            if config.projections.is_empty() {
                 results.push(CheckResult {
                     name: "Agent config sync".to_string(),
                     status: Status::Pass,
-                    message: ".projections.yml is valid".to_string(),
+                    message: "No projections configured".to_string(),
                     fix: None,
                 });
+            } else {
+                for proj in &config.projections {
+                    results.extend(check_projection(project_root, &config_dir, proj));
+                }
             }
         }
         Err(e) => {
@@ -323,6 +318,313 @@ fn check_agent_config_sync(project_root: &Path) -> Vec<CheckResult> {
     }
 
     results
+}
+
+fn check_projection(
+    project_root: &Path,
+    config_dir: &Path,
+    proj: &ProjectionEntry,
+) -> Vec<CheckResult> {
+    let mut results = Vec::new();
+
+    // Check if source directories exist
+    for source in &proj.sources {
+        let source_path = config_dir.join(source);
+        if !source_path.exists() {
+            results.push(CheckResult {
+                name: format!("Projection source: {}", source),
+                status: Status::Warn,
+                message: format!("Source directory '{}' not found", source),
+                fix: Some("Check .projections.yml sources".to_string()),
+            });
+        }
+    }
+
+    let target_path = project_root.join(&proj.target);
+
+    // Check target exists
+    if !target_path.exists() {
+        results.push(CheckResult {
+            name: format!("Projection → {}", proj.target),
+            status: Status::Warn,
+            message: "Target not synced".to_string(),
+            fix: Some("Run: wai sync".to_string()),
+        });
+        return results;
+    }
+
+    // Strategy-specific checks
+    match proj.strategy.as_str() {
+        "symlink" => {
+            results.extend(check_symlink_strategy(
+                project_root,
+                config_dir,
+                proj,
+                &target_path,
+            ));
+        }
+        "inline" => {
+            results.extend(check_inline_strategy(config_dir, proj, &target_path));
+        }
+        "reference" => {
+            results.extend(check_reference_strategy(config_dir, proj, &target_path));
+        }
+        _ => {
+            // Unknown strategy - just check target exists
+            results.push(CheckResult {
+                name: format!("Projection → {}", proj.target),
+                status: Status::Pass,
+                message: format!("Target exists (unknown strategy: {})", proj.strategy),
+                fix: None,
+            });
+        }
+    }
+
+    results
+}
+
+fn check_symlink_strategy(
+    _project_root: &Path,
+    config_dir: &Path,
+    proj: &ProjectionEntry,
+    target_path: &Path,
+) -> Vec<CheckResult> {
+    let mut results = Vec::new();
+    let mut has_issues = false;
+    let mut broken_count = 0;
+
+    // For symlink strategy, verify each entry is a symlink pointing to correct source
+    for source in &proj.sources {
+        let source_path = config_dir.join(source);
+        if !source_path.exists() || !source_path.is_dir() {
+            continue;
+        }
+
+        let entries = match std::fs::read_dir(&source_path) {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+
+        for entry in entries.filter_map(|e| e.ok()) {
+            let entry_name = entry.file_name();
+            let link_path = target_path.join(&entry_name);
+
+            if !link_path.exists() {
+                // Broken or missing symlink
+                broken_count += 1;
+                has_issues = true;
+            } else {
+                #[cfg(unix)]
+                {
+                    if let Ok(metadata) = std::fs::symlink_metadata(&link_path) {
+                        if !metadata.file_type().is_symlink() {
+                            has_issues = true;
+                        } else if let Ok(target) = std::fs::read_link(&link_path) {
+                            let expected = entry.path();
+                            if target != expected {
+                                has_issues = true;
+                            }
+                        } else {
+                            has_issues = true;
+                        }
+                    } else {
+                        has_issues = true;
+                    }
+                }
+                #[cfg(not(unix))]
+                {
+                    // On non-Unix, just check file exists (copy strategy)
+                    let _ = entry; // Silence unused variable warning
+                }
+            }
+        }
+    }
+
+    if broken_count > 0 {
+        results.push(CheckResult {
+            name: format!("Projection → {}", proj.target),
+            status: Status::Warn,
+            message: format!("Has {} broken symlinks", broken_count),
+            fix: Some("Run: wai sync".to_string()),
+        });
+    } else if has_issues {
+        results.push(CheckResult {
+            name: format!("Projection → {}", proj.target),
+            status: Status::Warn,
+            message: "Symlink issues detected".to_string(),
+            fix: Some("Run: wai sync".to_string()),
+        });
+    } else {
+        results.push(CheckResult {
+            name: format!("Projection → {}", proj.target),
+            status: Status::Pass,
+            message: "In sync".to_string(),
+            fix: None,
+        });
+    }
+
+    results
+}
+
+fn check_inline_strategy(
+    config_dir: &Path,
+    proj: &ProjectionEntry,
+    target_path: &Path,
+) -> Vec<CheckResult> {
+    let mut results = Vec::new();
+
+    let expected_content = build_inline_content(config_dir, &proj.sources);
+    let expected_hash = hash_string(&expected_content);
+
+    let actual_content = match std::fs::read_to_string(target_path) {
+        Ok(c) => c,
+        Err(_) => {
+            results.push(CheckResult {
+                name: format!("Projection → {}", proj.target),
+                status: Status::Warn,
+                message: "Cannot read target file".to_string(),
+                fix: Some("Run: wai sync".to_string()),
+            });
+            return results;
+        }
+    };
+    let actual_hash = hash_string(&actual_content);
+
+    if expected_hash != actual_hash {
+        results.push(CheckResult {
+            name: format!("Projection → {}", proj.target),
+            status: Status::Warn,
+            message: "Stale (content changed)".to_string(),
+            fix: Some("Run: wai sync".to_string()),
+        });
+    } else {
+        results.push(CheckResult {
+            name: format!("Projection → {}", proj.target),
+            status: Status::Pass,
+            message: "In sync".to_string(),
+            fix: None,
+        });
+    }
+
+    results
+}
+
+fn check_reference_strategy(
+    config_dir: &Path,
+    proj: &ProjectionEntry,
+    target_path: &Path,
+) -> Vec<CheckResult> {
+    let mut results = Vec::new();
+
+    let expected_content = build_reference_content(config_dir, &proj.sources);
+    let expected_hash = hash_string(&expected_content);
+
+    let actual_content = match std::fs::read_to_string(target_path) {
+        Ok(c) => c,
+        Err(_) => {
+            results.push(CheckResult {
+                name: format!("Projection → {}", proj.target),
+                status: Status::Warn,
+                message: "Cannot read target file".to_string(),
+                fix: Some("Run: wai sync".to_string()),
+            });
+            return results;
+        }
+    };
+    let actual_hash = hash_string(&actual_content);
+
+    if expected_hash != actual_hash {
+        results.push(CheckResult {
+            name: format!("Projection → {}", proj.target),
+            status: Status::Warn,
+            message: "Stale (content changed)".to_string(),
+            fix: Some("Run: wai sync".to_string()),
+        });
+    } else {
+        results.push(CheckResult {
+            name: format!("Projection → {}", proj.target),
+            status: Status::Pass,
+            message: "In sync".to_string(),
+            fix: None,
+        });
+    }
+
+    results
+}
+
+fn build_inline_content(config_dir: &Path, sources: &[String]) -> String {
+    let mut content = String::from("# Auto-generated by wai — do not edit directly\n\n");
+
+    for source in sources {
+        let source_path = config_dir.join(source);
+        if source_path.exists() {
+            if source_path.is_dir() {
+                let mut entries: Vec<_> = std::fs::read_dir(&source_path)
+                    .ok()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|e| e.ok())
+                    .collect();
+                entries.sort_by_key(|e| e.file_name());
+
+                for entry in entries {
+                    if let Ok(file_content) = std::fs::read_to_string(entry.path()) {
+                        content.push_str(&format!(
+                            "# Source: {}/{}\n",
+                            source,
+                            entry.file_name().to_str().unwrap_or("?")
+                        ));
+                        content.push_str(&file_content);
+                        content.push_str("\n\n");
+                    }
+                }
+            } else if let Ok(file_content) = std::fs::read_to_string(&source_path) {
+                content.push_str(&format!("# Source: {}\n", source));
+                content.push_str(&file_content);
+                content.push_str("\n\n");
+            }
+        }
+    }
+
+    content
+}
+
+fn build_reference_content(_config_dir: &Path, sources: &[String]) -> String {
+    let mut content = String::from("# Auto-generated by wai — do not edit directly\n");
+    content.push_str("# References to agent config sources:\n\n");
+
+    for source in sources {
+        // The config_dir is .wai/resources/agent-config, so we need to construct
+        // paths relative to that
+        let source_path = _config_dir.join(source);
+        if source_path.exists() && source_path.is_dir() {
+            let mut entries: Vec<_> = std::fs::read_dir(&source_path)
+                .ok()
+                .into_iter()
+                .flatten()
+                .filter_map(|e| e.ok())
+                .collect();
+            entries.sort_by_key(|e| e.file_name());
+
+            for entry in entries {
+                if let Some(name) = entry.file_name().to_str() {
+                    // Format: .wai/resources/agent-config/{source}/{name}
+                    content.push_str(&format!(
+                        "- .wai/resources/agent-config/{}/{}\n",
+                        source, name
+                    ));
+                }
+            }
+        }
+    }
+
+    content
+}
+
+fn hash_string(s: &str) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    s.hash(&mut hasher);
+    hasher.finish()
 }
 
 fn check_project_state(project_root: &Path) -> Vec<CheckResult> {
