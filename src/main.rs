@@ -16,6 +16,7 @@ pub mod openspec;
 mod output;
 pub mod plugin;
 mod state;
+mod sync_core;
 mod tutorial;
 
 use cli::Cli;
