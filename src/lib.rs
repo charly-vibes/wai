@@ -2,6 +2,7 @@
 
 pub mod config;
 pub mod error;
+pub mod guided_flows;
 pub mod managed_block;
 pub mod openspec;
 pub mod plugin;
@@ -10,3 +11,4 @@ pub mod output;
 pub mod json;
 pub mod state;
 pub mod help;
+pub mod tutorial;

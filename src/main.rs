@@ -8,6 +8,7 @@ mod commands;
 mod config;
 mod context;
 mod error;
+mod guided_flows;
 mod help;
 mod json;
 pub mod managed_block;

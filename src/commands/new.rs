@@ -3,10 +3,11 @@ use miette::{IntoDiagnostic, Result};
 
 use crate::cli::NewCommands;
 use crate::config::{
-    DESIGNS_DIR, HANDOFFS_DIR, PLANS_DIR, RESEARCH_DIR, STATE_FILE, area_path, project_path,
+    area_path, project_path, DESIGNS_DIR, HANDOFFS_DIR, PLANS_DIR, RESEARCH_DIR, STATE_FILE,
 };
 use crate::context::require_safe_mode;
 use crate::error::WaiError;
+use crate::guided_flows;
 use crate::plugin;
 use crate::state::ProjectState;
 
@@ -42,6 +43,12 @@ pub fn run(cmd: NewCommands) -> Result<()> {
             log::success(format!("Created project '{}'", name)).into_diagnostic()?;
             println!("  → wai phase              View current phase");
             println!("  → wai add research ...   Add research notes");
+
+            // Show guided flows for first-time users
+            guided_flows::enhanced_init_guidance(&name)?;
+            let _ = guided_flows::first_research_walkthrough();
+            let _ = guided_flows::first_phase_walkthrough();
+
             Ok(())
         }
         NewCommands::Area { name } => {
