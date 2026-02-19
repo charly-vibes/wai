@@ -16,6 +16,7 @@ mod move_cmd;
 mod new;
 mod phase;
 mod plugin;
+mod resource;
 mod search;
 mod show;
 mod status;
@@ -50,6 +51,11 @@ pub fn run(cli: Cli) -> Result<()> {
         Some(Commands::Plugin(cmd)) => plugin::run(cmd),
         Some(Commands::Doctor) => doctor::run(),
         Some(Commands::Import { path }) => import::run(path),
+        Some(Commands::Resource(cmd)) => match cmd {
+            crate::cli::ResourceCommands::Add(add_cmd) => resource::run_add(add_cmd),
+            crate::cli::ResourceCommands::List(list_cmd) => resource::run_list(list_cmd),
+            crate::cli::ResourceCommands::Import(import_cmd) => resource::run_import(import_cmd),
+        },
         Some(Commands::External(args)) => run_external(args),
         None => show_welcome(),
     }

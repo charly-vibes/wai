@@ -153,6 +153,10 @@ pub enum Commands {
         path: String,
     },
 
+    /// Manage resources (skills, rules, context)
+    #[command(subcommand)]
+    Resource(ResourceCommands),
+
     /// Pass-through to plugin commands (e.g., wai beads list)
     #[command(external_subcommand)]
     External(Vec<String>),
@@ -304,5 +308,49 @@ pub enum PluginCommands {
     Disable {
         /// Plugin name
         name: String,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum ResourceCommands {
+    /// Add a resource (skill, rule, context)
+    #[command(subcommand)]
+    Add(ResourceAddCommands),
+
+    /// List resources
+    #[command(subcommand)]
+    List(ResourceListCommands),
+
+    /// Import resources
+    #[command(subcommand)]
+    Import(ResourceImportCommands),
+}
+
+#[derive(Subcommand)]
+pub enum ResourceAddCommands {
+    /// Add a skill
+    Skill {
+        /// Skill name
+        name: String,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum ResourceListCommands {
+    /// List all skills
+    Skills {
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum ResourceImportCommands {
+    /// Import skills from a directory
+    Skills {
+        /// Path to import skills from
+        #[arg(long)]
+        from: Option<String>,
     },
 }
