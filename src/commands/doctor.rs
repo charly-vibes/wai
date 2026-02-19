@@ -301,6 +301,7 @@ fn check_directories(project_root: &Path) -> Vec<CheckResult> {
             fix_fn: None,
         });
     } else {
+        let missing_clone = missing.clone();
         results.push(CheckResult {
             name: "Directory structure".to_string(),
             status: Status::Fail,
@@ -313,7 +314,13 @@ fn check_directories(project_root: &Path) -> Vec<CheckResult> {
                     .collect::<Vec<_>>()
                     .join(" ")
             )),
-            fix_fn: None,
+            fix_fn: Some(Box::new(move |project_root| {
+                for dir in &missing_clone {
+                    std::fs::create_dir_all(wai_dir(project_root).join(dir))
+                        .into_diagnostic()?;
+                }
+                Ok(())
+            })),
         });
     }
 
@@ -498,12 +505,31 @@ fn check_projection(
 
     // Check target exists
     if !target_path.exists() {
+        let config_dir_clone = config_dir.to_path_buf();
+        let sync_proj = crate::sync_core::Projection {
+            target: proj.target.clone(),
+            strategy: proj.strategy.clone(),
+            sources: proj.sources.clone(),
+        };
         results.push(CheckResult {
             name: format!("Projection → {}", proj.target),
             status: Status::Warn,
             message: "Target not synced".to_string(),
             fix: Some("Run: wai sync".to_string()),
-            fix_fn: None,
+            fix_fn: Some(Box::new(move |project_root| {
+                match sync_proj.strategy.as_str() {
+                    "symlink" => {
+                        crate::sync_core::execute_symlink(project_root, &config_dir_clone, &sync_proj)
+                    }
+                    "inline" => {
+                        crate::sync_core::execute_inline(project_root, &config_dir_clone, &sync_proj)
+                    }
+                    "reference" => {
+                        crate::sync_core::execute_reference(project_root, &config_dir_clone, &sync_proj)
+                    }
+                    _ => Ok(()),
+                }
+            })),
         });
         return results;
     }
@@ -596,21 +622,26 @@ fn check_symlink_strategy(
         }
     }
 
-    if broken_count > 0 {
+    if broken_count > 0 || has_issues {
+        let config_dir_clone = config_dir.to_path_buf();
+        let sync_proj = crate::sync_core::Projection {
+            target: proj.target.clone(),
+            strategy: proj.strategy.clone(),
+            sources: proj.sources.clone(),
+        };
+        let message = if broken_count > 0 {
+            format!("Has {} broken symlinks", broken_count)
+        } else {
+            "Symlink issues detected".to_string()
+        };
         results.push(CheckResult {
             name: format!("Projection → {}", proj.target),
             status: Status::Warn,
-            message: format!("Has {} broken symlinks", broken_count),
+            message,
             fix: Some("Run: wai sync".to_string()),
-            fix_fn: None,
-        });
-    } else if has_issues {
-        results.push(CheckResult {
-            name: format!("Projection → {}", proj.target),
-            status: Status::Warn,
-            message: "Symlink issues detected".to_string(),
-            fix: Some("Run: wai sync".to_string()),
-            fix_fn: None,
+            fix_fn: Some(Box::new(move |project_root| {
+                crate::sync_core::execute_symlink(project_root, &config_dir_clone, &sync_proj)
+            })),
         });
     } else {
         results.push(CheckResult {
@@ -638,12 +669,20 @@ fn check_inline_strategy(
     let actual_content = match std::fs::read_to_string(target_path) {
         Ok(c) => c,
         Err(_) => {
+            let config_dir_clone = config_dir.to_path_buf();
+            let sync_proj = crate::sync_core::Projection {
+                target: proj.target.clone(),
+                strategy: proj.strategy.clone(),
+                sources: proj.sources.clone(),
+            };
             results.push(CheckResult {
                 name: format!("Projection → {}", proj.target),
                 status: Status::Warn,
                 message: "Cannot read target file".to_string(),
                 fix: Some("Run: wai sync".to_string()),
-                fix_fn: None,
+                fix_fn: Some(Box::new(move |project_root| {
+                    crate::sync_core::execute_inline(project_root, &config_dir_clone, &sync_proj)
+                })),
             });
             return results;
         }
@@ -651,12 +690,20 @@ fn check_inline_strategy(
     let actual_hash = hash_string(&actual_content);
 
     if expected_hash != actual_hash {
+        let config_dir_clone = config_dir.to_path_buf();
+        let sync_proj = crate::sync_core::Projection {
+            target: proj.target.clone(),
+            strategy: proj.strategy.clone(),
+            sources: proj.sources.clone(),
+        };
         results.push(CheckResult {
             name: format!("Projection → {}", proj.target),
             status: Status::Warn,
             message: "Stale (content changed)".to_string(),
             fix: Some("Run: wai sync".to_string()),
-            fix_fn: None,
+            fix_fn: Some(Box::new(move |project_root| {
+                crate::sync_core::execute_inline(project_root, &config_dir_clone, &sync_proj)
+            })),
         });
     } else {
         results.push(CheckResult {
@@ -684,12 +731,20 @@ fn check_reference_strategy(
     let actual_content = match std::fs::read_to_string(target_path) {
         Ok(c) => c,
         Err(_) => {
+            let config_dir_clone = config_dir.to_path_buf();
+            let sync_proj = crate::sync_core::Projection {
+                target: proj.target.clone(),
+                strategy: proj.strategy.clone(),
+                sources: proj.sources.clone(),
+            };
             results.push(CheckResult {
                 name: format!("Projection → {}", proj.target),
                 status: Status::Warn,
                 message: "Cannot read target file".to_string(),
                 fix: Some("Run: wai sync".to_string()),
-                fix_fn: None,
+                fix_fn: Some(Box::new(move |project_root| {
+                    crate::sync_core::execute_reference(project_root, &config_dir_clone, &sync_proj)
+                })),
             });
             return results;
         }
@@ -697,12 +752,20 @@ fn check_reference_strategy(
     let actual_hash = hash_string(&actual_content);
 
     if expected_hash != actual_hash {
+        let config_dir_clone = config_dir.to_path_buf();
+        let sync_proj = crate::sync_core::Projection {
+            target: proj.target.clone(),
+            strategy: proj.strategy.clone(),
+            sources: proj.sources.clone(),
+        };
         results.push(CheckResult {
             name: format!("Projection → {}", proj.target),
             status: Status::Warn,
             message: "Stale (content changed)".to_string(),
             fix: Some("Run: wai sync".to_string()),
-            fix_fn: None,
+            fix_fn: Some(Box::new(move |project_root| {
+                crate::sync_core::execute_reference(project_root, &config_dir_clone, &sync_proj)
+            })),
         });
     } else {
         results.push(CheckResult {
@@ -816,12 +879,16 @@ fn check_project_state(project_root: &Path) -> Vec<CheckResult> {
         let state_path = entry.path().join(STATE_FILE);
 
         if !state_path.exists() {
+            let state_path_clone = state_path.clone();
             results.push(CheckResult {
                 name: format!("Project state: {}", name),
                 status: Status::Warn,
                 message: "No .state file found".to_string(),
                 fix: Some(format!("Run: wai phase set research (in project {})", name)),
-                fix_fn: None,
+                fix_fn: Some(Box::new(move |_project_root| {
+                    let state = ProjectState::default();
+                    state.save(&state_path_clone).into_diagnostic()
+                })),
             });
             continue;
         }
@@ -968,7 +1035,18 @@ fn check_agent_instructions(project_root: &Path) -> CheckResult {
             status: Status::Warn,
             message: "AGENTS.md exists but missing wai managed block".to_string(),
             fix: Some("Run: wai init (to inject wai instructions into AGENTS.md)".to_string()),
-            fix_fn: None,
+            fix_fn: Some(Box::new(move |project_root| {
+                use crate::managed_block::inject_managed_block;
+                let agents_md = project_root.join("AGENTS.md");
+                let plugins = plugin::detect_plugins(project_root);
+                let plugin_names: Vec<&str> = plugins
+                    .iter()
+                    .filter(|p| p.detected)
+                    .map(|p| p.def.name.as_str())
+                    .collect();
+                inject_managed_block(&agents_md, &plugin_names).into_diagnostic()?;
+                Ok(())
+            })),
         }
     }
 }
