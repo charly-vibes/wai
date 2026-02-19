@@ -145,7 +145,11 @@ pub enum Commands {
     Plugin(PluginCommands),
 
     /// Diagnose workspace health
-    Doctor,
+    Doctor {
+        /// Automatically fix issues where possible
+        #[arg(long)]
+        fix: bool,
+    },
 
     /// Import existing tool configurations
     Import {

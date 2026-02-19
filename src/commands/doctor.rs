@@ -25,16 +25,18 @@ enum Status {
     Fail,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Serialize)]
 struct CheckResult {
     name: String,
     status: Status,
     message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     fix: Option<String>,
+    #[serde(skip)]
+    fix_fn: Option<Box<dyn FnOnce(&Path) -> Result<()>>>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Serialize)]
 struct DoctorPayload {
     checks: Vec<CheckResult>,
     summary: Summary,
@@ -61,7 +63,7 @@ struct ProjectionEntry {
     sources: Vec<String>,
 }
 
-pub fn run() -> Result<()> {
+pub fn run(fix: bool) -> Result<()> {
     let project_root = require_project()?;
     let context = current_context();
 
@@ -157,6 +159,7 @@ fn check_directories(project_root: &Path) -> Vec<CheckResult> {
             status: Status::Pass,
             message: "All PARA directories present".to_string(),
             fix: None,
+            fix_fn: None,
         });
     } else {
         results.push(CheckResult {
@@ -171,6 +174,7 @@ fn check_directories(project_root: &Path) -> Vec<CheckResult> {
                     .collect::<Vec<_>>()
                     .join(" ")
             )),
+            fix_fn: None,
         });
     }
 
@@ -186,6 +190,7 @@ fn check_config(project_root: &Path) -> CheckResult {
             status: Status::Fail,
             message: "config.toml not found".to_string(),
             fix: Some("Run: wai init".to_string()),
+            fix_fn: None,
         };
     }
 
@@ -195,12 +200,14 @@ fn check_config(project_root: &Path) -> CheckResult {
             status: Status::Pass,
             message: "config.toml is valid".to_string(),
             fix: None,
+            fix_fn: None,
         },
         Err(e) => CheckResult {
             name: "Configuration".to_string(),
             status: Status::Fail,
             message: format!("config.toml parse error: {}", e),
             fix: Some("Fix the syntax in .wai/config.toml".to_string()),
+            fix_fn: None,
         },
     }
 }
@@ -235,6 +242,7 @@ fn check_plugin_tools(project_root: &Path) -> Vec<CheckResult> {
                 status: Status::Pass,
                 message: format!("`{}` is available", cli_name),
                 fix: None,
+                fix_fn: None,
             });
         } else {
             results.push(CheckResult {
@@ -242,6 +250,7 @@ fn check_plugin_tools(project_root: &Path) -> Vec<CheckResult> {
                 status: Status::Warn,
                 message: format!("`{}` not found in PATH", cli_name),
                 fix: Some(format!("Install `{}` or add it to your PATH", cli_name)),
+                fix_fn: None,
             });
         }
     }
@@ -252,6 +261,7 @@ fn check_plugin_tools(project_root: &Path) -> Vec<CheckResult> {
             status: Status::Pass,
             message: "No detected plugins require CLI tools".to_string(),
             fix: None,
+            fix_fn: None,
         });
     }
 
@@ -272,6 +282,7 @@ fn check_agent_config_sync(project_root: &Path) -> Vec<CheckResult> {
                 "Run: wai init (or create .wai/resources/agent-config/.projections.yml)"
                     .to_string(),
             ),
+            fix_fn: None,
         });
         return results;
     }
@@ -284,6 +295,7 @@ fn check_agent_config_sync(project_root: &Path) -> Vec<CheckResult> {
                 status: Status::Fail,
                 message: format!("Cannot read .projections.yml: {}", e),
                 fix: None,
+                fix_fn: None,
             });
             return results;
         }
@@ -297,6 +309,7 @@ fn check_agent_config_sync(project_root: &Path) -> Vec<CheckResult> {
                     status: Status::Pass,
                     message: "No projections configured".to_string(),
                     fix: None,
+                    fix_fn: None,
                 });
             } else {
                 for proj in &config.projections {
@@ -313,6 +326,7 @@ fn check_agent_config_sync(project_root: &Path) -> Vec<CheckResult> {
                     "Fix the YAML syntax in .wai/resources/agent-config/.projections.yml"
                         .to_string(),
                 ),
+                fix_fn: None,
             });
         }
     }
@@ -336,6 +350,7 @@ fn check_projection(
                 status: Status::Warn,
                 message: format!("Source directory '{}' not found", source),
                 fix: Some("Check .projections.yml sources".to_string()),
+                fix_fn: None,
             });
         }
     }
@@ -349,6 +364,7 @@ fn check_projection(
             status: Status::Warn,
             message: "Target not synced".to_string(),
             fix: Some("Run: wai sync".to_string()),
+            fix_fn: None,
         });
         return results;
     }
@@ -376,6 +392,7 @@ fn check_projection(
                 status: Status::Pass,
                 message: format!("Target exists (unknown strategy: {})", proj.strategy),
                 fix: None,
+                fix_fn: None,
             });
         }
     }
@@ -446,6 +463,7 @@ fn check_symlink_strategy(
             status: Status::Warn,
             message: format!("Has {} broken symlinks", broken_count),
             fix: Some("Run: wai sync".to_string()),
+            fix_fn: None,
         });
     } else if has_issues {
         results.push(CheckResult {
@@ -453,6 +471,7 @@ fn check_symlink_strategy(
             status: Status::Warn,
             message: "Symlink issues detected".to_string(),
             fix: Some("Run: wai sync".to_string()),
+            fix_fn: None,
         });
     } else {
         results.push(CheckResult {
@@ -460,6 +479,7 @@ fn check_symlink_strategy(
             status: Status::Pass,
             message: "In sync".to_string(),
             fix: None,
+            fix_fn: None,
         });
     }
 
@@ -484,6 +504,7 @@ fn check_inline_strategy(
                 status: Status::Warn,
                 message: "Cannot read target file".to_string(),
                 fix: Some("Run: wai sync".to_string()),
+                fix_fn: None,
             });
             return results;
         }
@@ -496,6 +517,7 @@ fn check_inline_strategy(
             status: Status::Warn,
             message: "Stale (content changed)".to_string(),
             fix: Some("Run: wai sync".to_string()),
+            fix_fn: None,
         });
     } else {
         results.push(CheckResult {
@@ -503,6 +525,7 @@ fn check_inline_strategy(
             status: Status::Pass,
             message: "In sync".to_string(),
             fix: None,
+            fix_fn: None,
         });
     }
 
@@ -527,6 +550,7 @@ fn check_reference_strategy(
                 status: Status::Warn,
                 message: "Cannot read target file".to_string(),
                 fix: Some("Run: wai sync".to_string()),
+                fix_fn: None,
             });
             return results;
         }
@@ -539,6 +563,7 @@ fn check_reference_strategy(
             status: Status::Warn,
             message: "Stale (content changed)".to_string(),
             fix: Some("Run: wai sync".to_string()),
+            fix_fn: None,
         });
     } else {
         results.push(CheckResult {
@@ -546,6 +571,7 @@ fn check_reference_strategy(
             status: Status::Pass,
             message: "In sync".to_string(),
             fix: None,
+            fix_fn: None,
         });
     }
 
@@ -656,6 +682,7 @@ fn check_project_state(project_root: &Path) -> Vec<CheckResult> {
                 status: Status::Warn,
                 message: "No .state file found".to_string(),
                 fix: Some(format!("Run: wai phase set research (in project {})", name)),
+                fix_fn: None,
             });
             continue;
         }
@@ -667,6 +694,7 @@ fn check_project_state(project_root: &Path) -> Vec<CheckResult> {
                     status: Status::Pass,
                     message: "Valid".to_string(),
                     fix: None,
+                    fix_fn: None,
                 });
             }
             Err(e) => {
@@ -675,6 +703,7 @@ fn check_project_state(project_root: &Path) -> Vec<CheckResult> {
                     status: Status::Fail,
                     message: format!("Invalid .state: {}", e),
                     fix: Some(format!("Fix or recreate .wai/projects/{}/.state", name)),
+                    fix_fn: None,
                 });
             }
         }
@@ -686,6 +715,7 @@ fn check_project_state(project_root: &Path) -> Vec<CheckResult> {
             status: Status::Pass,
             message: "No projects to check".to_string(),
             fix: None,
+            fix_fn: None,
         });
     }
 
@@ -732,6 +762,7 @@ fn check_custom_plugins(project_root: &Path) -> Vec<CheckResult> {
                         status: Status::Pass,
                         message: "Valid YAML".to_string(),
                         fix: None,
+                        fix_fn: None,
                     });
                 }
                 Err(e) => {
@@ -740,6 +771,7 @@ fn check_custom_plugins(project_root: &Path) -> Vec<CheckResult> {
                         status: Status::Fail,
                         message: format!("Invalid plugin config: {}", e),
                         fix: Some(format!("Fix the YAML syntax in .wai/plugins/{}", filename)),
+                        fix_fn: None,
                     });
                 }
             },
@@ -749,6 +781,7 @@ fn check_custom_plugins(project_root: &Path) -> Vec<CheckResult> {
                     status: Status::Fail,
                     message: format!("Cannot read file: {}", e),
                     fix: None,
+                    fix_fn: None,
                 });
             }
         }
@@ -760,6 +793,7 @@ fn check_custom_plugins(project_root: &Path) -> Vec<CheckResult> {
             status: Status::Pass,
             message: "No custom plugin configs found".to_string(),
             fix: None,
+            fix_fn: None,
         });
     }
 
@@ -777,6 +811,7 @@ fn check_agent_instructions(project_root: &Path) -> CheckResult {
             status: Status::Warn,
             message: "AGENTS.md not found — LLMs won't know to use wai".to_string(),
             fix: Some("Run: wai init (to create AGENTS.md with wai instructions)".to_string()),
+            fix_fn: None,
         };
     }
 
@@ -786,6 +821,7 @@ fn check_agent_instructions(project_root: &Path) -> CheckResult {
             status: Status::Pass,
             message: "AGENTS.md contains wai managed block".to_string(),
             fix: None,
+            fix_fn: None,
         }
     } else {
         CheckResult {
@@ -793,6 +829,7 @@ fn check_agent_instructions(project_root: &Path) -> CheckResult {
             status: Status::Warn,
             message: "AGENTS.md exists but missing wai managed block".to_string(),
             fix: Some("Run: wai init (to inject wai instructions into AGENTS.md)".to_string()),
+            fix_fn: None,
         }
     }
 }
