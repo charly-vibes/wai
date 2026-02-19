@@ -1196,6 +1196,122 @@ fn doctor_uninitialised_directory_errors() {
         .stderr(predicate::str::contains("No project initialized"));
 }
 
+#[test]
+fn doctor_fix_repairs_missing_directories() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    // Remove a directory
+    fs::remove_dir_all(tmp.path().join(".wai/archives")).unwrap();
+
+    // Run fix with --yes to skip confirmation
+    wai_cmd(tmp.path())
+        .args(["doctor", "--fix", "--yes"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Fixed"));
+
+    // Verify the directory was recreated
+    assert!(tmp.path().join(".wai/archives").is_dir());
+}
+
+#[test]
+fn doctor_fix_skips_confirmation_with_yes() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    // Create a fixable issue
+    fs::remove_dir_all(tmp.path().join(".wai/archives")).unwrap();
+
+    // Run with --yes - should not prompt and should succeed
+    wai_cmd(tmp.path())
+        .args(["doctor", "--fix", "--yes"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Fixed"));
+}
+
+#[test]
+fn doctor_fix_no_fixable_issues() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    // Healthy workspace - no issues to fix
+    wai_cmd(tmp.path())
+        .args(["doctor", "--fix"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("No fixable issues found"));
+}
+
+#[test]
+fn doctor_fix_repairs_agents_md_block() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    // Create AGENTS.md without managed block
+    fs::write(
+        tmp.path().join("AGENTS.md"),
+        "# Agent Instructions\n\nSome custom content here.\n",
+    )
+    .unwrap();
+
+    // Run fix
+    wai_cmd(tmp.path())
+        .args(["doctor", "--fix", "--yes"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Fixed"));
+
+    // Verify the managed block was added
+    let content = fs::read_to_string(tmp.path().join("AGENTS.md")).unwrap();
+    assert!(content.contains("<!-- WAI:START -->"));
+    assert!(content.contains("<!-- WAI:END -->"));
+}
+
+#[test]
+fn doctor_fix_skips_corrupted_state() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "broken");
+
+    // Corrupt the .state file
+    fs::write(
+        tmp.path().join(".wai/projects/broken/.state"),
+        "{{not valid yaml at all",
+    )
+    .unwrap();
+
+    // Run fix - should not fix corrupted state files (no fix_fn for them)
+    wai_cmd(tmp.path())
+        .args(["doctor", "--fix", "--yes"])
+        .assert()
+        .success();
+
+    // Verify the corrupted state file is still there (not fixed)
+    let content = fs::read_to_string(tmp.path().join(".wai/projects/broken/.state")).unwrap();
+    assert_eq!(content, "{{not valid yaml at all");
+}
+
+#[test]
+fn doctor_fix_blocked_by_safe_mode() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    // Create a fixable issue
+    fs::remove_dir_all(tmp.path().join(".wai/archives")).unwrap();
+
+    // Run with --safe --fix - should refuse
+    wai_cmd(tmp.path())
+        .args(["doctor", "--fix", "--safe"])
+        .assert()
+        .failure()
+        .stderr(
+            predicate::str::contains("apply doctor fixes")
+                .or(predicate::str::contains("--safe")),
+        );
+}
+
 // ─── progressive disclosure help ────────────────────────────────────────────
 
 #[test]
