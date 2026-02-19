@@ -24,8 +24,20 @@ pub fn run(name: Option<String>) -> Result<()> {
         println!("┌  Initialize wai project");
         println!("▲  Project already initialized in this directory");
 
+        // Detect plugins even on re-init so managed block stays current
+        let mut detected = Vec::new();
+        if current_dir.join(".beads").exists() {
+            detected.push("beads");
+        }
+        if current_dir.join("openspec").exists() {
+            detected.push("openspec");
+        }
+        if current_dir.join(".git").exists() {
+            detected.push("git");
+        }
+
         // Still inject/update managed block in agent instruction files
-        inject_agent_instructions(&current_dir)?;
+        inject_agent_instructions(&current_dir, &detected)?;
 
         println!("└  Use 'wai status' to see project info");
         return Ok(());
@@ -105,7 +117,7 @@ pub fn run(name: Option<String>) -> Result<()> {
     }
 
     // Inject managed block into agent instruction files
-    inject_agent_instructions(&current_dir)?;
+    inject_agent_instructions(&current_dir, &detected)?;
 
     println!("●  Next steps:");
     println!("  → wai new project \"my-app\"    Create your first project");
@@ -175,14 +187,14 @@ Run `wai plugin list` to see all available plugins.
     Ok(())
 }
 
-fn inject_agent_instructions(root: &std::path::Path) -> Result<()> {
+fn inject_agent_instructions(root: &std::path::Path, detected: &[&str]) -> Result<()> {
     use crate::managed_block::inject_managed_block;
 
     let agent_files = ["AGENTS.md", "CLAUDE.md"];
     for filename in &agent_files {
         let path = root.join(filename);
         if filename == &"AGENTS.md" || path.exists() {
-            match inject_managed_block(&path) {
+            match inject_managed_block(&path, detected) {
                 Ok(result) => println!("✓ {}", result.description(filename)),
                 Err(e) => {
                     eprintln!("⚠ Failed to update {}: {}", filename, e);

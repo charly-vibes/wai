@@ -3,105 +3,228 @@ use std::path::Path;
 const WAI_START: &str = "<!-- WAI:START -->";
 const WAI_END: &str = "<!-- WAI:END -->";
 
-pub fn wai_block_content() -> String {
-    format!(
-        r#"{start}
-# Wai — Workflow Context
+pub fn wai_block_content(detected_plugins: &[&str]) -> String {
+    let has_beads = detected_plugins.contains(&"beads");
+    let has_openspec = detected_plugins.contains(&"openspec");
+    let has_companions = has_beads || has_openspec;
 
-This project uses **wai** to track the *why* behind decisions — research,
-reasoning, and design choices that shaped the code. Run `wai status` first
-to orient yourself.
+    let mut block = String::new();
+    block.push_str(WAI_START);
+    block.push('\n');
 
-## When Starting a Session
+    // Tool Landscape (always present)
+    block.push_str(
+        "# Workflow Tools\n\
+         \n\
+         This project uses **wai** to track the *why* behind decisions — research,\n\
+         reasoning, and design choices that shaped the code. Run `wai status` first\n\
+         to orient yourself.\n",
+    );
 
-1. Run `wai status` to see active projects, current phase, and suggestions.
-2. Check the phase — it tells you what kind of work is expected right now:
-   - **research** → gather information, explore options, document findings
-   - **design** → make architectural decisions, write design docs
-   - **plan** → break work into tasks, define implementation order
-   - **implement** → write code, guided by existing research/plans/designs
-   - **review** → validate work against plans and designs
-   - **archive** → wrap up, move to archives
-3. Read existing artifacts with `wai search "<topic>"` before starting new work.
+    if has_companions {
+        block.push_str(
+            "\n\
+             Detected workflow tools:\n\
+             - **wai** — research, reasoning, and design decisions\n",
+        );
+        if has_beads {
+            block.push_str("- **beads (bd)** — issue tracking (tasks, bugs, dependencies)\n");
+        }
+        if has_openspec {
+            block.push_str(
+                "- **openspec** — specifications and change proposals (see `openspec/AGENTS.md`)\n",
+            );
+        }
+    }
 
-## Capturing Work
+    // When to Use What (only when companion tools detected)
+    if has_companions {
+        block.push_str(
+            "\n\
+             ## When to Use What\n\
+             \n\
+             | Need | Tool | Example |\n\
+             |------|------|---------|\n\
+             | Record reasoning/research | wai | `wai add research \"findings\"` |\n\
+             | Capture design decisions | wai | `wai add design \"architecture choice\"` |\n\
+             | Session context transfer | wai | `wai handoff create <project>` |\n",
+        );
+        if has_beads {
+            block.push_str(
+                "| Track work items/bugs | beads | `bd create --title=\"...\" --type=task` |\n\
+                 | Find available work | beads | `bd ready` |\n\
+                 | Manage dependencies | beads | `bd dep add <blocked> <blocker>` |\n",
+            );
+        }
+        if has_openspec {
+            block.push_str(
+                "| Propose system changes | openspec | Read `openspec/AGENTS.md` |\n\
+                 | Define requirements | openspec | `openspec validate --strict` |\n",
+            );
+        }
+        block.push_str(
+            "\nKey distinction:\n\
+             - **wai** = *why* decisions were made (reasoning, context, handoffs)\n",
+        );
+        if has_beads {
+            block.push_str(
+                "- **beads** = *what* needs to be done (concrete tasks, status tracking)\n",
+            );
+        }
+        if has_openspec {
+            block.push_str(
+                "- **openspec** = *what the system should look like* (specs, requirements, proposals)\n",
+            );
+        }
+    }
 
-Record the reasoning behind your work, not just the output:
+    // Starting a Session (unified)
+    block.push_str("\n## Starting a Session\n\n");
+    let mut step = 1;
+    block.push_str(&format!(
+        "{}. Run `wai status` to see active projects, current phase, and suggestions.\n",
+        step
+    ));
+    step += 1;
+    if has_beads {
+        block.push_str(&format!(
+            "{}. Run `bd ready` to find available work items.\n",
+            step
+        ));
+        step += 1;
+    }
+    if has_openspec {
+        block.push_str(&format!(
+            "{}. Check `openspec list` for active change proposals.\n",
+            step
+        ));
+        step += 1;
+    }
+    block.push_str(&format!(
+        "{}. Check the phase — it tells you what kind of work is expected:\n\
+         \x20  - **research** → gather information, explore options\n\
+         \x20  - **design** → make architectural decisions\n\
+         \x20  - **plan** → break work into tasks\n\
+         \x20  - **implement** → write code, guided by research/plans\n\
+         \x20  - **review** → validate against plans\n\
+         \x20  - **archive** → wrap up\n",
+        step
+    ));
+    step += 1;
+    block.push_str(&format!(
+        "{}. Read existing artifacts with `wai search \"<topic>\"` before starting new work.\n",
+        step
+    ));
 
-```bash
-wai add research "findings"         # What you learned, options explored, trade-offs
-wai add plan "approach"             # How you'll implement, in what order, why
-wai add design "decisions"          # Architecture choices and rationale
-wai add research --file notes.md    # Import longer content from a file
-```
+    // Capturing Work (condensed wai core)
+    block.push_str(
+        "\n\
+         ## Capturing Work\n\
+         \n\
+         Record the reasoning behind your work, not just the output:\n\
+         \n\
+         ```bash\n\
+         wai add research \"findings\"         # What you learned, trade-offs\n\
+         wai add plan \"approach\"             # How you'll implement, why\n\
+         wai add design \"decisions\"          # Architecture choices, rationale\n\
+         wai add research --file notes.md    # Import longer content\n\
+         ```\n\
+         \n\
+         Use `--project <name>` if multiple projects exist. Otherwise wai picks the first one.\n\
+         \n\
+         Phases are a guide, not a gate. Use `wai phase show` / `wai phase next`.\n",
+    );
 
-**What goes where:**
-- **Research** = facts, explorations, comparisons, prior art, constraints discovered
-- **Plans** = sequenced steps, task breakdowns, implementation strategies
-- **Designs** = architectural decisions, component relationships, API shapes, trade-offs chosen
+    // Ending a Session (unified)
+    block.push_str("\n## Ending a Session\n\n");
+    let mut step = 1;
+    block.push_str(&format!(
+        "{}. Create a handoff: `wai handoff create <project>`\n",
+        step
+    ));
+    step += 1;
+    if has_beads {
+        block.push_str(&format!(
+            "{}. Update issue status: `bd close <id>` for completed work\n",
+            step
+        ));
+        step += 1;
+        block.push_str(&format!(
+            "{}. File new issues for remaining work: `bd create --title=\"...\"`\n",
+            step
+        ));
+        step += 1;
+    }
+    block.push_str(&format!(
+        "{}. Commit your changes (handoff + code)\n",
+        step
+    ));
 
-Use `--project <name>` if multiple projects exist. Otherwise wai picks the first one.
+    // Quick Reference
+    block.push_str(
+        "\n\
+         ## Quick Reference\n\
+         \n\
+         ### wai\n\
+         ```bash\n\
+         wai status                    # Project status and next steps\n\
+         wai add research \"notes\"      # Add research artifact\n\
+         wai add plan \"plan\"           # Add plan artifact\n\
+         wai add design \"design\"       # Add design artifact\n\
+         wai search \"query\"            # Search across artifacts\n\
+         wai handoff create <project>  # Session handoff\n\
+         wai phase show                # Current phase\n\
+         wai doctor                    # Workspace health\n\
+         ```\n",
+    );
+    if has_beads {
+        block.push_str(
+            "\n\
+             ### beads\n\
+             ```bash\n\
+             bd ready                     # Available work\n\
+             bd show <id>                 # Issue details\n\
+             bd create --title=\"...\"      # New issue\n\
+             bd update <id> --status=in_progress\n\
+             bd close <id>                # Complete work\n\
+             ```\n",
+        );
+    }
+    if has_openspec {
+        block.push_str(
+            "\n\
+             ### openspec\n\
+             Read `openspec/AGENTS.md` for full instructions.\n\
+             ```bash\n\
+             openspec list              # Active changes\n\
+             openspec list --specs      # Capabilities\n\
+             ```\n",
+        );
+    }
 
-## Advancing Phases
+    // Structure + footer
+    block.push_str(
+        "\n\
+         ## Structure\n\
+         \n\
+         The `.wai/` directory organizes artifacts using the PARA method:\n\
+         - **projects/** — active work with phase tracking and dated artifacts\n\
+         - **areas/** — ongoing responsibilities (no end date)\n\
+         - **resources/** — reference material, agent configs, templates\n\
+         - **archives/** — completed or inactive items\n\
+         \n\
+         Do not edit `.wai/config.toml` directly. Use `wai` commands instead.\n\
+         \n\
+         Keep this managed block so `wai init` can refresh the instructions.\n\
+         \n",
+    );
 
-Move the project forward when the current phase's work is done:
-
-```bash
-wai phase show          # Where are we now?
-wai phase next          # Advance to next phase
-wai phase set <phase>   # Jump to a specific phase (flexible, not enforced)
-```
-
-Phases are a guide, not a gate. Skip or go back as needed.
-
-## When Ending a Session
-
-Create a handoff so the next session (yours or someone else's) has context:
-
-```bash
-wai handoff create <project>
-```
-
-This generates a template with sections for: what was done, key decisions,
-open questions, and next steps. Fill it in before stopping.
-
-## Quick Reference
-
-```bash
-wai status                    # Project status and next steps
-wai phase show                # Current project phase
-wai new project "name"        # Create a new project
-wai add research "notes"      # Add research notes
-wai add plan "plan"           # Add a plan document
-wai add design "design"       # Add a design document
-wai search "query"            # Search across all artifacts
-wai handoff create <project>  # Generate handoff document
-wai sync                      # Sync agent configs
-wai show                      # Overview of all items
-wai timeline <project>        # Chronological view of artifacts
-wai doctor                    # Check workspace health
-```
-
-## Structure
-
-The `.wai/` directory organizes artifacts using the PARA method:
-- **projects/** — active work with phase tracking and dated artifacts
-- **areas/** — ongoing responsibilities (no end date)
-- **resources/** — reference material, agent configs, templates
-- **archives/** — completed or inactive items
-
-Do not edit `.wai/config.toml` directly. Use `wai` commands instead.
-
-Keep this managed block so `wai init` can refresh the instructions.
-
-{end}"#,
-        start = WAI_START,
-        end = WAI_END
-    )
+    block.push_str(WAI_END);
+    block
 }
 
-pub fn inject_managed_block(path: &Path) -> Result<InjectResult, std::io::Error> {
-    let block = wai_block_content();
+pub fn inject_managed_block(path: &Path, detected_plugins: &[&str]) -> Result<InjectResult, std::io::Error> {
+    let block = wai_block_content(detected_plugins);
 
     if path.exists() {
         let content = std::fs::read_to_string(path)?;
