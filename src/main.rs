@@ -15,6 +15,7 @@ pub mod openspec;
 mod output;
 pub mod plugin;
 mod state;
+mod tutorial;
 
 use cli::Cli;
 use context::{CliContext, set_context};

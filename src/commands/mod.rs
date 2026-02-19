@@ -56,6 +56,7 @@ pub fn run(cli: Cli) -> Result<()> {
             crate::cli::ResourceCommands::List(list_cmd) => resource::run_list(list_cmd),
             crate::cli::ResourceCommands::Import(import_cmd) => resource::run_import(import_cmd),
         },
+        Some(Commands::Tutorial) => crate::tutorial::run(),
         Some(Commands::External(args)) => run_external(args),
         None => show_welcome(),
     }

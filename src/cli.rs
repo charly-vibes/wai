@@ -157,6 +157,9 @@ pub enum Commands {
     #[command(subcommand)]
     Resource(ResourceCommands),
 
+    /// Run the interactive quickstart tutorial
+    Tutorial,
+
     /// Pass-through to plugin commands (e.g., wai beads list)
     #[command(external_subcommand)]
     External(Vec<String>),
