@@ -69,6 +69,7 @@ fn show_welcome() -> Result<()> {
     // If load fails (corrupt config), treat as first-run with default config
     let user_config = UserConfig::load().unwrap_or_default();
     let config_path = crate::config::user_config_path();
+    let is_first_run = !user_config.seen_tutorial;
     if !config_path.exists() {
         // Only save if config doesn't exist to avoid unnecessary I/O
         let _ = user_config.save(); // Best effort - don't fail welcome if save fails
@@ -127,14 +128,32 @@ fn show_welcome() -> Result<()> {
             "  {} No project detected in current directory.",
             "○".dimmed()
         );
+        
+        // Show example workflow for new users
+        if is_first_run {
+            println!();
+            println!("  {} Example workflow:",
+                "○".cyan());
+            println!("     1. wai init                    Set up workspace");
+            println!("     2. wai new project \"mywork\"   Create your first project");
+            println!("     3. wai add research \"notes\"    Capture your research");
+            println!("     4. wai phase next              Advance to next phase");
+            println!("     5. wai handoff create mywork   Save your progress");
+        }
+        
         println!();
         println!(
             "  {} wai init           Initialize in current directory",
             "→".cyan()
         );
-        println!("  {} wai new project    Create a new project", "→".cyan());
+        println!("  {} wai tutorial       Run the quickstart tutorial", "→".cyan());
         println!("  {} wai --help         Show all commands", "→".cyan());
-        println!("  {} Run 'wai --help' for detailed usage", "•".dimmed());
+        
+        if is_first_run {
+            println!("  {} Getting Started: Run 'wai tutorial' to learn wai", "→".cyan());
+        } else {
+            println!("  {} Run 'wai --help' for detailed usage", "•".dimmed());
+        }
     } else {
         println!();
         println!("  {} wai status         Check project status", "→".cyan());
