@@ -2,7 +2,7 @@ use miette::{IntoDiagnostic, Result};
 use owo_colors::OwoColorize;
 
 use crate::cli::{Cli, Commands};
-use crate::config::find_project_root;
+use crate::config::{find_project_root, UserConfig};
 use crate::context::current_context;
 use crate::error::WaiError;
 
@@ -63,6 +63,12 @@ pub fn run(cli: Cli) -> Result<()> {
 
 fn show_welcome() -> Result<()> {
     use cliclack::{intro, outro};
+
+    // Ensure user config exists (creates on first run)
+    let user_config = UserConfig::load()?;
+    // Save to create the config file if it doesn't exist
+    user_config.save()?;
+
     let context = current_context();
 
     if context.json {

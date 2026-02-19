@@ -61,26 +61,22 @@ fn init_creates_para_structure() {
     assert!(tmp.path().join(".wai/plugins").is_dir());
 
     // Verify agent-config structure
-    assert!(
-        tmp.path()
-            .join(".wai/resources/agent-config/skills")
-            .is_dir()
-    );
-    assert!(
-        tmp.path()
-            .join(".wai/resources/agent-config/rules")
-            .is_dir()
-    );
-    assert!(
-        tmp.path()
-            .join(".wai/resources/agent-config/context")
-            .is_dir()
-    );
-    assert!(
-        tmp.path()
-            .join(".wai/resources/agent-config/.projections.yml")
-            .is_file()
-    );
+    assert!(tmp
+        .path()
+        .join(".wai/resources/agent-config/skills")
+        .is_dir());
+    assert!(tmp
+        .path()
+        .join(".wai/resources/agent-config/rules")
+        .is_dir());
+    assert!(tmp
+        .path()
+        .join(".wai/resources/agent-config/context")
+        .is_dir());
+    assert!(tmp
+        .path()
+        .join(".wai/resources/agent-config/.projections.yml")
+        .is_file());
 
     // Verify config.toml exists and contains project name
     let config = fs::read_to_string(tmp.path().join(".wai/config.toml")).unwrap();
@@ -145,11 +141,10 @@ fn new_area_creates_directory() {
         .assert()
         .success();
 
-    assert!(
-        tmp.path()
-            .join(".wai/areas/dev-standards/research")
-            .is_dir()
-    );
+    assert!(tmp
+        .path()
+        .join(".wai/areas/dev-standards/research")
+        .is_dir());
     assert!(tmp.path().join(".wai/areas/dev-standards/plans").is_dir());
 }
 
@@ -1326,4 +1321,63 @@ fn commands_fail_without_init() {
         .assert()
         .failure()
         .stderr(predicate::str::contains("No project initialized"));
+}
+
+// ─── First-Run Detection ────────────────────────────────────────────────────
+
+#[test]
+fn first_run_detects_no_user_config() {
+    // Create a temporary directory for user config
+    let tmp_config = TempDir::new().unwrap();
+    let tmp_project = TempDir::new().unwrap();
+
+    // Set XDG_CONFIG_HOME to use our temp directory
+    wai_cmd(tmp_project.path())
+        .env("XDG_CONFIG_HOME", tmp_config.path())
+        .assert()
+        .success();
+
+    // Verify user config was created
+    assert!(tmp_config.path().join("wai/config.toml").exists());
+}
+
+#[test]
+fn first_run_creates_default_user_config() {
+    let tmp_config = TempDir::new().unwrap();
+    let tmp_project = TempDir::new().unwrap();
+
+    wai_cmd(tmp_project.path())
+        .env("XDG_CONFIG_HOME", tmp_config.path())
+        .assert()
+        .success();
+
+    // Read the created config
+    let config_content = fs::read_to_string(tmp_config.path().join("wai/config.toml")).unwrap();
+    // seen_tutorial should default to false (not present or explicitly false)
+    assert!(!config_content.contains("seen_tutorial = true"));
+}
+
+#[test]
+fn user_config_persists_seen_tutorial_flag() {
+    use std::io::Write;
+
+    let tmp_config = TempDir::new().unwrap();
+    let tmp_project = TempDir::new().unwrap();
+
+    // Pre-create the user config with seen_tutorial = true
+    let wai_config_dir = tmp_config.path().join("wai");
+    fs::create_dir_all(&wai_config_dir).unwrap();
+    let mut config_file = fs::File::create(wai_config_dir.join("config.toml")).unwrap();
+    writeln!(config_file, "seen_tutorial = true").unwrap();
+    drop(config_file);
+
+    // Run wai - it should read the existing config
+    wai_cmd(tmp_project.path())
+        .env("XDG_CONFIG_HOME", tmp_config.path())
+        .assert()
+        .success();
+
+    // Verify the flag is still true
+    let config_content = fs::read_to_string(wai_config_dir.join("config.toml")).unwrap();
+    assert!(config_content.contains("seen_tutorial = true"));
 }

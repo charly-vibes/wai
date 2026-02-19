@@ -6,6 +6,10 @@ use crate::error::WaiError;
 pub const CONFIG_DIR: &str = ".wai";
 pub const CONFIG_FILE: &str = "config.toml";
 
+// User-level config (stored in ~/.config/wai/)
+pub const USER_CONFIG_DIR: &str = "wai";
+pub const USER_CONFIG_FILE: &str = "config.toml";
+
 /// PARA directory names within .wai/
 pub const PROJECTS_DIR: &str = "projects";
 pub const AREAS_DIR: &str = "areas";
@@ -145,4 +149,79 @@ pub fn area_path(project_root: &Path, name: &str) -> PathBuf {
 /// Get a specific resource's directory path.
 pub fn resource_path(project_root: &Path, name: &str) -> PathBuf {
     resources_dir(project_root).join(name)
+}
+
+/// User-level configuration (stored in ~/.config/wai/config.toml)
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct UserConfig {
+    #[serde(default)]
+    pub seen_tutorial: bool,
+    #[serde(default)]
+    pub version: String,
+}
+
+impl UserConfig {
+    /// Load user config from ~/.config/wai/config.toml
+    /// Returns default config if file doesn't exist
+    pub fn load() -> Result<Self, WaiError> {
+        let config_path = user_config_path();
+
+        if !config_path.exists() {
+            return Ok(Self::default());
+        }
+
+        let content = std::fs::read_to_string(&config_path)?;
+        toml::from_str(&content).map_err(|e| WaiError::ConfigError {
+            message: e.to_string(),
+        })
+    }
+
+    /// Save user config to ~/.config/wai/config.toml
+    pub fn save(&self) -> Result<(), WaiError> {
+        let config_dir = user_config_dir();
+        std::fs::create_dir_all(&config_dir)?;
+
+        let config_path = config_dir.join(USER_CONFIG_FILE);
+        let content = toml::to_string_pretty(self).map_err(|e| WaiError::ConfigError {
+            message: e.to_string(),
+        })?;
+
+        std::fs::write(config_path, content)?;
+        Ok(())
+    }
+
+    /// Mark the tutorial as seen
+    pub fn mark_tutorial_seen(&mut self) {
+        self.seen_tutorial = true;
+    }
+}
+
+/// Get the user config directory path (~/.config/wai/)
+pub fn user_config_dir() -> PathBuf {
+    if let Ok(xdg_config) = std::env::var("XDG_CONFIG_HOME") {
+        PathBuf::from(xdg_config).join(USER_CONFIG_DIR)
+    } else if let Some(home) = dirs::home_dir() {
+        home.join(".config").join(USER_CONFIG_DIR)
+    } else {
+        // Fallback to current directory (shouldn't happen in practice)
+        PathBuf::from(".").join(".config").join(USER_CONFIG_DIR)
+    }
+}
+
+/// Get the user config file path (~/.config/wai/config.toml)
+pub fn user_config_path() -> PathBuf {
+    user_config_dir().join(USER_CONFIG_FILE)
+}
+
+/// Check if this is the first time running wai
+pub fn is_first_run() -> Result<bool, WaiError> {
+    let config = UserConfig::load()?;
+    Ok(!config.seen_tutorial)
+}
+
+/// Mark the tutorial as seen for the current user
+pub fn mark_tutorial_seen() -> Result<(), WaiError> {
+    let mut config = UserConfig::load()?;
+    config.mark_tutorial_seen();
+    config.save()
 }

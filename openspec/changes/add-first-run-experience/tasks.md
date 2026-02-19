@@ -1,7 +1,7 @@
 ## 1. First-Run Detection
 
-- [ ] 1.1 Detect if this is first time running wai (check ~/.config/wai or similar)
-- [ ] 1.2 Store "seen tutorial" flag
+- [x] 1.1 Detect if this is first time running wai (check ~/.config/wai or similar)
+- [x] 1.2 Store "seen tutorial" flag
 
 ## 2. Quickstart Tutorial
 

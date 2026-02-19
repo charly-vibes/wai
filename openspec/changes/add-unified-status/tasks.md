@@ -7,19 +7,19 @@
 
 ## 2. Wire Verbosity into Status Command
 
-- [ ] 2.1 Update `status::run()` signature to accept `verbose: u8`
-- [ ] 2.2 Update dispatch in `src/commands/mod.rs` to pass `cli.verbose` to `status::run()`
-- [ ] 2.3 Register `mod openspec` in `src/main.rs`
+- [x] 2.1 Update `status::run()` signature to accept `verbose: u8`
+- [x] 2.2 Update dispatch in `src/commands/mod.rs` to pass `cli.verbose` to `status::run()`
+- [x] 2.3 Register `mod openspec` in `src/main.rs`
 
 ## 3. Status Output
 
-- [ ] 3.1 Add OpenSpec section to `status::run()` default output: summary counts + active changes with completion ratios
-- [ ] 3.2 Add verbose output path (`-v`): list all spec names and per-section task breakdown
-- [ ] 3.3 Ensure graceful skip when `openspec/` directory doesn't exist
+- [x] 3.1 Add OpenSpec section to `status::run()` default output: summary counts + active changes with completion ratios
+- [x] 3.2 Add verbose output path (`-v`): list all spec names and per-section task breakdown
+- [x] 3.3 Ensure graceful skip when `openspec/` directory doesn't exist
 
 ## 4. Testing
 
-- [ ] 4.1 Add unit tests for `tasks.md` parser (empty, all checked, mixed, multi-section)
-- [ ] 4.2 Add integration test: `wai status` with `openspec/` present shows spec counts
-- [ ] 4.3 Add integration test: `wai status` without `openspec/` omits section gracefully
-- [ ] 4.4 Add integration test: `wai status -v` shows detailed breakdown
+- [x] 4.1 Add unit tests for `tasks.md` parser (empty, all checked, mixed, multi-section)
+- [x] 4.2 Add integration test: `wai status` with `openspec/` present shows spec counts
+- [x] 4.3 Add integration test: `wai status` without `openspec/` omits section gracefully
+- [x] 4.4 Add integration test: `wai status -v` shows detailed breakdown
