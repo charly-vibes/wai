@@ -3,7 +3,7 @@ use miette::{IntoDiagnostic, Result};
 
 use crate::cli::NewCommands;
 use crate::config::{
-    area_path, project_path, DESIGNS_DIR, HANDOFFS_DIR, PLANS_DIR, RESEARCH_DIR, STATE_FILE,
+    DESIGNS_DIR, HANDOFFS_DIR, PLANS_DIR, RESEARCH_DIR, STATE_FILE, area_path, project_path,
 };
 use crate::context::require_safe_mode;
 use crate::error::WaiError;

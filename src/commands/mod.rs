@@ -2,7 +2,7 @@ use miette::{IntoDiagnostic, Result};
 use owo_colors::OwoColorize;
 
 use crate::cli::{Cli, Commands};
-use crate::config::{find_project_root, UserConfig};
+use crate::config::{UserConfig, find_project_root};
 use crate::context::current_context;
 use crate::error::WaiError;
 
@@ -128,29 +128,34 @@ fn show_welcome() -> Result<()> {
             "  {} No project detected in current directory.",
             "○".dimmed()
         );
-        
+
         // Show example workflow for new users
         if is_first_run {
             println!();
-            println!("  {} Example workflow:",
-                "○".cyan());
+            println!("  {} Example workflow:", "○".cyan());
             println!("     1. wai init                    Set up workspace");
             println!("     2. wai new project \"mywork\"   Create your first project");
             println!("     3. wai add research \"notes\"    Capture your research");
             println!("     4. wai phase next              Advance to next phase");
             println!("     5. wai handoff create mywork   Save your progress");
         }
-        
+
         println!();
         println!(
             "  {} wai init           Initialize in current directory",
             "→".cyan()
         );
-        println!("  {} wai tutorial       Run the quickstart tutorial", "→".cyan());
+        println!(
+            "  {} wai tutorial       Run the quickstart tutorial",
+            "→".cyan()
+        );
         println!("  {} wai --help         Show all commands", "→".cyan());
-        
+
         if is_first_run {
-            println!("  {} Getting Started: Run 'wai tutorial' to learn wai", "→".cyan());
+            println!(
+                "  {} Getting Started: Run 'wai tutorial' to learn wai",
+                "→".cyan()
+            );
         } else {
             println!("  {} Run 'wai --help' for detailed usage", "•".dimmed());
         }

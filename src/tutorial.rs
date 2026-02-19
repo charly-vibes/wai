@@ -1,4 +1,4 @@
-use crate::config::{mark_tutorial_seen, UserConfig};
+use crate::config::{UserConfig, mark_tutorial_seen};
 use cliclack::{intro, log, outro};
 use miette::{IntoDiagnostic, Result};
 use std::thread;

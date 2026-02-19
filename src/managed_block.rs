@@ -155,10 +155,7 @@ pub fn wai_block_content(detected_plugins: &[&str]) -> String {
         ));
         step += 1;
     }
-    block.push_str(&format!(
-        "{}. Commit your changes (handoff + code)\n",
-        step
-    ));
+    block.push_str(&format!("{}. Commit your changes (handoff + code)\n", step));
 
     // Quick Reference
     block.push_str(
@@ -223,7 +220,10 @@ pub fn wai_block_content(detected_plugins: &[&str]) -> String {
     block
 }
 
-pub fn inject_managed_block(path: &Path, detected_plugins: &[&str]) -> Result<InjectResult, std::io::Error> {
+pub fn inject_managed_block(
+    path: &Path,
+    detected_plugins: &[&str],
+) -> Result<InjectResult, std::io::Error> {
     let block = wai_block_content(detected_plugins);
 
     if path.exists() {

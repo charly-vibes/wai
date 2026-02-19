@@ -2,8 +2,8 @@ use cliclack::input;
 use miette::{IntoDiagnostic, Result};
 
 use crate::config::{
-    ProjectConfig, ProjectSettings, AGENT_CONFIG_DIR, ARCHIVES_DIR, AREAS_DIR, CONFIG_DIR,
-    CONTEXT_DIR, PLUGINS_DIR, PROJECTS_DIR, RESOURCES_DIR, RULES_DIR, SKILLS_DIR,
+    AGENT_CONFIG_DIR, ARCHIVES_DIR, AREAS_DIR, CONFIG_DIR, CONTEXT_DIR, PLUGINS_DIR, PROJECTS_DIR,
+    ProjectConfig, ProjectSettings, RESOURCES_DIR, RULES_DIR, SKILLS_DIR,
 };
 use crate::context::current_context;
 
@@ -241,8 +241,7 @@ fn create_para_structure(root: &std::path::Path, config: &ProjectConfig) -> Resu
     std::fs::create_dir_all(agent_config.join(CONTEXT_DIR)).into_diagnostic()?;
 
     // Create default .projections.yml
-    let projections_content =
-        "# Agent config projections — defines how configs are synced to tool-specific locations\n\
+    let projections_content = "# Agent config projections — defines how configs are synced to tool-specific locations\n\
         # Strategies: symlink, inline, reference\n\
         projections: []\n";
     std::fs::write(agent_config.join(".projections.yml"), projections_content).into_diagnostic()?;

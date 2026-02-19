@@ -7,8 +7,8 @@ use std::hash::{Hash, Hasher};
 use std::path::Path;
 
 use crate::config::{
-    agent_config_dir, plugins_dir, projects_dir, wai_dir, ProjectConfig, ARCHIVES_DIR, AREAS_DIR,
-    CONFIG_FILE, PLUGINS_DIR, PROJECTS_DIR, RESOURCES_DIR, STATE_FILE,
+    ARCHIVES_DIR, AREAS_DIR, CONFIG_FILE, PLUGINS_DIR, PROJECTS_DIR, ProjectConfig, RESOURCES_DIR,
+    STATE_FILE, agent_config_dir, plugins_dir, projects_dir, wai_dir,
 };
 use crate::context::current_context;
 use crate::output::print_json;

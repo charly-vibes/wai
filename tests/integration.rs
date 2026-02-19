@@ -61,22 +61,26 @@ fn init_creates_para_structure() {
     assert!(tmp.path().join(".wai/plugins").is_dir());
 
     // Verify agent-config structure
-    assert!(tmp
-        .path()
-        .join(".wai/resources/agent-config/skills")
-        .is_dir());
-    assert!(tmp
-        .path()
-        .join(".wai/resources/agent-config/rules")
-        .is_dir());
-    assert!(tmp
-        .path()
-        .join(".wai/resources/agent-config/context")
-        .is_dir());
-    assert!(tmp
-        .path()
-        .join(".wai/resources/agent-config/.projections.yml")
-        .is_file());
+    assert!(
+        tmp.path()
+            .join(".wai/resources/agent-config/skills")
+            .is_dir()
+    );
+    assert!(
+        tmp.path()
+            .join(".wai/resources/agent-config/rules")
+            .is_dir()
+    );
+    assert!(
+        tmp.path()
+            .join(".wai/resources/agent-config/context")
+            .is_dir()
+    );
+    assert!(
+        tmp.path()
+            .join(".wai/resources/agent-config/.projections.yml")
+            .is_file()
+    );
 
     // Verify config.toml exists and contains project name
     let config = fs::read_to_string(tmp.path().join(".wai/config.toml")).unwrap();
@@ -141,10 +145,11 @@ fn new_area_creates_directory() {
         .assert()
         .success();
 
-    assert!(tmp
-        .path()
-        .join(".wai/areas/dev-standards/research")
-        .is_dir());
+    assert!(
+        tmp.path()
+            .join(".wai/areas/dev-standards/research")
+            .is_dir()
+    );
     assert!(tmp.path().join(".wai/areas/dev-standards/plans").is_dir());
 }
 
