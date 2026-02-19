@@ -2,8 +2,8 @@ use cliclack::input;
 use miette::{IntoDiagnostic, Result};
 
 use crate::config::{
-    AGENT_CONFIG_DIR, ARCHIVES_DIR, AREAS_DIR, CONFIG_DIR, CONTEXT_DIR, PLUGINS_DIR, PROJECTS_DIR,
-    ProjectConfig, ProjectSettings, RESOURCES_DIR, RULES_DIR, SKILLS_DIR,
+    ProjectConfig, ProjectSettings, AGENT_CONFIG_DIR, ARCHIVES_DIR, AREAS_DIR, CONFIG_DIR,
+    CONTEXT_DIR, PLUGINS_DIR, PROJECTS_DIR, RESOURCES_DIR, RULES_DIR, SKILLS_DIR,
 };
 use crate::context::current_context;
 
@@ -20,21 +20,40 @@ pub fn run(name: Option<String>) -> Result<()> {
     }
 
     // Check if already initialized
-    if config_dir.exists() {
+    let already_initialized = config_dir.exists();
+    if already_initialized {
         println!("┌  Initialize wai project");
         println!("▲  Project already initialized in this directory");
+    } else {
+        println!("┌  Initialize wai project");
+    }
 
-        // Detect plugins even on re-init so managed block stays current
-        let mut detected = Vec::new();
-        if current_dir.join(".beads").exists() {
-            detected.push("beads");
-        }
-        if current_dir.join("openspec").exists() {
-            detected.push("openspec");
-        }
-        if current_dir.join(".git").exists() {
-            detected.push("git");
-        }
+    // Detect plugins even on re-init so managed block stays current
+    let mut detected = Vec::new();
+    if current_dir.join(".beads").exists() {
+        detected.push("beads");
+    }
+    if current_dir.join("openspec").exists() {
+        detected.push("openspec");
+    }
+    if current_dir.join(".git").exists() {
+        detected.push("git");
+    }
+
+    if already_initialized {
+        // For re-init, just update the config file and agent instructions
+        let config = ProjectConfig {
+            project: ProjectSettings {
+                name: std::env::current_dir()
+                    .ok()
+                    .and_then(|d| d.file_name().map(|n| n.to_string_lossy().to_string()))
+                    .unwrap_or_else(|| "my-project".to_string()),
+                version: env!("CARGO_PKG_VERSION").to_string(),
+                description: String::new(),
+            },
+            plugins: vec![],
+        };
+        config.save(&current_dir)?;
 
         // Still inject/update managed block in agent instruction files
         inject_agent_instructions(&current_dir, &detected)?;
@@ -222,7 +241,8 @@ fn create_para_structure(root: &std::path::Path, config: &ProjectConfig) -> Resu
     std::fs::create_dir_all(agent_config.join(CONTEXT_DIR)).into_diagnostic()?;
 
     // Create default .projections.yml
-    let projections_content = "# Agent config projections — defines how configs are synced to tool-specific locations\n\
+    let projections_content =
+        "# Agent config projections — defines how configs are synced to tool-specific locations\n\
         # Strategies: symlink, inline, reference\n\
         projections: []\n";
     std::fs::write(agent_config.join(".projections.yml"), projections_content).into_diagnostic()?;

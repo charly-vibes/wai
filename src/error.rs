@@ -13,6 +13,13 @@ pub enum WaiError {
     )]
     NotInitialized,
 
+    #[error("Project configuration is incomplete or corrupted")]
+    #[diagnostic(
+        code(wai::project::config_missing),
+        help("Run `wai init` to restore configuration, or check .wai/config.toml exists")
+    )]
+    ConfigMissing,
+
     #[error("Project already exists at {path}")]
     #[diagnostic(
         code(wai::project::already_exists),

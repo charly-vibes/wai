@@ -56,6 +56,10 @@ impl ProjectConfig {
         let config_path = project_root.join(CONFIG_DIR).join(CONFIG_FILE);
 
         if !config_path.exists() {
+            // Check if .wai directory exists to provide better error message
+            if project_root.join(CONFIG_DIR).exists() {
+                return Err(WaiError::ConfigMissing);
+            }
             return Err(WaiError::NotInitialized);
         }
 
