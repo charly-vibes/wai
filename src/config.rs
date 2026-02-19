@@ -198,9 +198,14 @@ impl UserConfig {
 
 /// Get the user config directory path (~/.config/wai/)
 pub fn user_config_dir() -> PathBuf {
+    // Check XDG_CONFIG_HOME first, but ensure it's non-empty
     if let Ok(xdg_config) = std::env::var("XDG_CONFIG_HOME") {
-        PathBuf::from(xdg_config).join(USER_CONFIG_DIR)
-    } else if let Some(home) = dirs::home_dir() {
+        if !xdg_config.is_empty() {
+            return PathBuf::from(xdg_config).join(USER_CONFIG_DIR);
+        }
+    }
+
+    if let Some(home) = dirs::home_dir() {
         home.join(".config").join(USER_CONFIG_DIR)
     } else {
         // Fallback to current directory (shouldn't happen in practice)

@@ -65,9 +65,13 @@ fn show_welcome() -> Result<()> {
     use cliclack::{intro, outro};
 
     // Ensure user config exists (creates on first run)
-    let user_config = UserConfig::load()?;
-    // Save to create the config file if it doesn't exist
-    user_config.save()?;
+    // If load fails (corrupt config), treat as first-run with default config
+    let user_config = UserConfig::load().unwrap_or_default();
+    let config_path = crate::config::user_config_path();
+    if !config_path.exists() {
+        // Only save if config doesn't exist to avoid unnecessary I/O
+        let _ = user_config.save(); // Best effort - don't fail welcome if save fails
+    }
 
     let context = current_context();
 
