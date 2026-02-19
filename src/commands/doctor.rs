@@ -82,21 +82,160 @@ pub fn run(fix: bool) -> Result<()> {
         fail: checks.iter().filter(|c| c.status == Status::Fail).count(),
     };
 
+    // Handle fix mode vs diagnostic mode
+    if fix {
+        // In fix mode, show diagnostics first (if human mode), then apply fixes
+        if !context.json {
+            render_human(&checks, &summary)?;
+        }
+        apply_fixes(&project_root, checks, &context)?;
+    } else {
+        // In diagnostic mode, just show results
+        if context.json {
+            let payload = DoctorPayload {
+                checks,
+                summary: summary.clone(),
+            };
+            print_json(&payload)?;
+        } else {
+            render_human(&checks, &summary)?;
+        }
+
+        if summary.fail > 0 {
+            std::process::exit(1);
+        }
+    }
+
+    Ok(())
+}
+
+fn apply_fixes(
+    project_root: &Path,
+    mut checks: Vec<CheckResult>,
+    context: &crate::context::CliContext,
+) -> Result<()> {
+    use crate::error::WaiError;
+
+    // Refuse in safe mode
+    if context.safe {
+        return Err(WaiError::SafeModeViolation {
+            action: "apply doctor fixes".to_string(),
+        }
+        .into());
+    }
+
+    // Filter to fixable checks
+    let fixable_checks: Vec<CheckResult> = checks
+        .drain(..)
+        .filter(|c| c.fix_fn.is_some())
+        .collect();
+
+    if fixable_checks.is_empty() {
+        if !context.json {
+            use cliclack::log;
+            log::info("No fixable issues found").into_diagnostic()?;
+        }
+        return Ok(());
+    }
+
+    // Confirm (unless --yes, --no-input, or --json)
+    let should_apply = if context.json || context.no_input || context.yes {
+        true
+    } else {
+        use cliclack::confirm;
+        confirm(format!("Apply {} fix(es)?", fixable_checks.len()))
+            .interact()
+            .into_diagnostic()?
+    };
+
+    if !should_apply {
+        if !context.json {
+            use cliclack::log;
+            log::warning("Fixes cancelled").into_diagnostic()?;
+        }
+        return Ok(());
+    }
+
+    // Apply fixes
+    let mut fixes_applied = Vec::new();
+    let mut fixes_failed = Vec::new();
+
+    for mut check in fixable_checks {
+        if let Some(fix_fn) = check.fix_fn.take() {
+            match fix_fn(project_root) {
+                Ok(()) => {
+                    fixes_applied.push(FixResult {
+                        name: check.name.clone(),
+                        success: true,
+                        error: None,
+                    });
+                }
+                Err(e) => {
+                    fixes_failed.push(FixResult {
+                        name: check.name.clone(),
+                        success: false,
+                        error: Some(e.to_string()),
+                    });
+                }
+            }
+        }
+    }
+
+    // Check if there were failures (before moving the vectors)
+    let had_failures = !fixes_failed.is_empty();
+
+    // Output results
     if context.json {
-        let payload = DoctorPayload {
-            checks,
-            summary: summary.clone(),
+        #[derive(Serialize)]
+        struct FixPayload {
+            fixes_applied: Vec<FixResult>,
+            fixes_failed: Vec<FixResult>,
+        }
+
+        let payload = FixPayload {
+            fixes_applied,
+            fixes_failed,
         };
         print_json(&payload)?;
     } else {
-        render_human(&checks, &summary)?;
+        use cliclack::log;
+        println!();
+        for fix in &fixes_applied {
+            log::success(format!("Fixed: {}", fix.name)).into_diagnostic()?;
+        }
+        for fix in &fixes_failed {
+            log::error(format!(
+                "Failed to fix {}: {}",
+                fix.name,
+                fix.error.as_ref().unwrap_or(&"unknown error".to_string())
+            ))
+            .into_diagnostic()?;
+        }
+        println!();
+
+        if had_failures {
+            use cliclack::outro;
+            outro("Some fixes failed. Re-run 'wai doctor' to check status.").into_diagnostic()?;
+        } else {
+            use cliclack::outro;
+            outro("All fixes applied. Re-run 'wai doctor' to verify.").into_diagnostic()?;
+        }
     }
 
-    if summary.fail > 0 {
+    // Exit with appropriate code
+    if had_failures {
         std::process::exit(1);
     }
 
     Ok(())
+}
+
+#[derive(Serialize)]
+struct FixResult {
+    name: String,
+    success: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
 }
 
 fn render_human(checks: &[CheckResult], summary: &Summary) -> Result<()> {
