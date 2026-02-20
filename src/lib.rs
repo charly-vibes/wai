@@ -12,3 +12,4 @@ pub mod output;
 pub mod plugin;
 pub mod state;
 pub mod tutorial;
+pub mod workflows;

@@ -62,10 +62,11 @@ The `wai doctor` command provides health checks for wai-specific concerns (direc
   ℹ Git hooks: No hook manager configured
     → Create .prek.toml to automate formatting and linting
   ✓ Editor config: .editorconfig found
+  ✓ GitHub CLI: gh authenticated
   ℹ Documentation: Missing CONTRIBUTING.md, LICENSE
     → Add contribution guidelines and license
 
-  Summary: 5/8 best practices adopted
+  Summary: 6/11 best practices adopted
   Quick start: Focus on .gitignore, README.md, and justfile
 ```
 
@@ -83,6 +84,7 @@ The `wai doctor` command provides health checks for wai-specific concerns (direc
 - Agent skills (universal-rule-of-5-review, deliberate-commit for AI workflows)
 - CI/CD presence (.github/workflows/)
 - Dev container configuration (.devcontainer/)
+- GitHub CLI (`gh` installed and authenticated)
 
 **Priority 2 (future work)**:
 - Conventional commits (check for commit message format in git log)

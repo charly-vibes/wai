@@ -46,7 +46,7 @@ This separation ensures `wai way` output is always informational and never fails
 
 ### Requirement: Task Runner Check
 
-The system SHALL check for a task runner (justfile or Makefile) and recommend adoption if missing.
+The system SHALL check for a task runner (justfile or Makefile) and recommend adoption if missing. When a justfile is found, the system SHALL parse it for useful recipes and display contextual suggestions to help users discover key workflows.
 
 #### Scenario: Task runner present
 
@@ -54,6 +54,33 @@ The system SHALL check for a task runner (justfile or Makefile) and recommend ad
 - **THEN** it checks for `justfile` or `Makefile` in current directory
 - **AND** reports WayStatus::Pass if either exists
 - **AND** includes message "Task runner: {filename} found"
+
+#### Scenario: Justfile with useful recipes
+
+- **WHEN** `wai way` runs and a `justfile` is found
+- **THEN** it parses the justfile for known useful recipe names
+- **AND** displays a "Useful recipes:" line listing matched recipes with short descriptions
+- **AND** the known recipe names and their descriptions are:
+  - `install` → "dogfood locally"
+  - `serve` → "start local server"
+  - `dev` → "start dev server"
+  - `start` → "start application"
+  - `setup` → "bootstrap dev environment"
+  - `docs` → "build documentation"
+  - `docs-serve` → "preview docs locally"
+  - `ci` → "run full CI pipeline"
+  - `test` → "run tests"
+  - `lint` → "run linter"
+  - `fmt` → "format code"
+  - `release` → "create a GitHub release (gh cli)"
+- **AND** only recipes that exist in the justfile are shown
+- **AND** recipes are displayed as `just {name}` with their description (e.g., "just install — dogfood locally")
+
+#### Scenario: Justfile with no recognized recipes
+
+- **WHEN** `wai way` runs and a `justfile` is found but contains none of the known recipe names
+- **THEN** it reports WayStatus::Pass with "Task runner: justfile found"
+- **AND** does not display a "Useful recipes:" line
 
 #### Scenario: No task runner
 
@@ -271,6 +298,32 @@ The system SHALL check for agent skills documentation and recommend best practic
 - **AND** includes message "Agent skills: Not configured"
 - **AND** suggests "Create .wai/resources/skills/ with SKILL.md files for AI development workflows (e.g., universal-rule-of-5-review, deliberate-commit)"
 
+### Requirement: GitHub CLI Check
+
+The system SHALL check for the GitHub CLI (`gh`) and recommend it for streamlined GitHub workflows (PRs, issues, releases, CI status).
+
+#### Scenario: gh CLI available and authenticated
+
+- **WHEN** `wai way` runs and `gh` is found on PATH
+- **AND** `gh auth status` succeeds (exit code 0)
+- **THEN** it reports WayStatus::Pass
+- **AND** includes message "GitHub CLI: gh authenticated"
+
+#### Scenario: gh CLI available but not authenticated
+
+- **WHEN** `wai way` runs and `gh` is found on PATH
+- **AND** `gh auth status` fails (exit code non-zero)
+- **THEN** it reports WayStatus::Info
+- **AND** includes message "GitHub CLI: gh installed but not authenticated"
+- **AND** suggests "Run `gh auth login` to enable PR, issue, and release workflows from the terminal"
+
+#### Scenario: gh CLI not installed
+
+- **WHEN** `wai way` runs and `gh` is not found on PATH
+- **THEN** it reports WayStatus::Info
+- **AND** includes message "GitHub CLI: Not installed"
+- **AND** suggests "Install gh for streamlined GitHub workflows — PRs, issues, releases, CI status (https://cli.github.com)"
+
 ### Requirement: Check Grouping and Output Format
 
 The system SHALL group repository best practice checks under a "Repository Standards" or "The wai way" section in way command output with consistent formatting.
@@ -284,14 +337,14 @@ The system SHALL group repository best practice checks under a "Repository Stand
 
 #### Scenario: All checks pass
 
-- **WHEN** `wai way` runs and all 10 checks return WayStatus::Pass
-- **THEN** output shows 10/10 checkmarks (✓)
-- **AND** summary displays "10/10 best practices adopted - excellent!"
+- **WHEN** `wai way` runs and all 11 checks return WayStatus::Pass
+- **THEN** output shows 11/11 checkmarks (✓)
+- **AND** summary displays "11/11 best practices adopted - excellent!"
 - **AND** no suggestions are shown
 
 #### Scenario: All checks info
 
-- **WHEN** `wai way` runs and all 10 checks return WayStatus::Info (fresh repository)
-- **THEN** output shows 10 info markers (ℹ)
-- **AND** summary displays "0/10 best practices adopted"
+- **WHEN** `wai way` runs and all 11 checks return WayStatus::Info (fresh repository)
+- **THEN** output shows 11 info markers (ℹ)
+- **AND** summary displays "0/11 best practices adopted"
 - **AND** quick-start guidance is shown: "Start with .gitignore, README.md, and justfile"

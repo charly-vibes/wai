@@ -18,6 +18,7 @@ pub mod plugin;
 mod state;
 mod sync_core;
 mod tutorial;
+mod workflows;
 
 use cli::Cli;
 use context::{CliContext, set_context};
