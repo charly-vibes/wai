@@ -1,11 +1,9 @@
 use cliclack::input;
 use miette::{IntoDiagnostic, Result};
 
-use crate::config::{
-    AGENT_CONFIG_DIR, ARCHIVES_DIR, AREAS_DIR, CONFIG_DIR, CONTEXT_DIR, PLUGINS_DIR, PROJECTS_DIR,
-    ProjectConfig, ProjectSettings, RESOURCES_DIR, RULES_DIR, SKILLS_DIR,
-};
+use crate::config::{CONFIG_DIR, ProjectConfig, ProjectSettings};
 use crate::context::current_context;
+use crate::workspace::ensure_workspace_current;
 
 pub fn run(name: Option<String>) -> Result<()> {
     let current_dir = std::env::current_dir().into_diagnostic()?;
@@ -41,22 +39,17 @@ pub fn run(name: Option<String>) -> Result<()> {
     }
 
     if already_initialized {
-        // For re-init, just update the config file and agent instructions
-        let config = ProjectConfig {
-            project: ProjectSettings {
-                name: std::env::current_dir()
-                    .ok()
-                    .and_then(|d| d.file_name().map(|n| n.to_string_lossy().to_string()))
-                    .unwrap_or_else(|| "my-project".to_string()),
-                version: env!("CARGO_PKG_VERSION").to_string(),
-                description: String::new(),
-            },
-            plugins: vec![],
-        };
-        config.save(&current_dir)?;
+        // For re-init, repair/update workspace using shared function
+        let actions = ensure_workspace_current(&current_dir)?;
 
-        // Still inject/update managed block in agent instruction files
-        inject_agent_instructions(&current_dir, &detected)?;
+        // Report actions taken
+        for action in &actions {
+            println!("✓ {}", action.description);
+        }
+
+        if actions.is_empty() {
+            println!("✓ Workspace is up to date");
+        }
 
         println!("└  Use 'wai status' to see project info");
         return Ok(());
@@ -111,32 +104,33 @@ pub fn run(name: Option<String>) -> Result<()> {
         plugins: vec![],
     };
 
-    // Create directory structure
-    create_para_structure(&current_dir, &config)?;
+    // Save config (creates .wai directory)
+    config.save(&current_dir)?;
 
-    // Auto-detect plugins
-    let mut detected = Vec::new();
-    if current_dir.join(".beads").exists() {
-        detected.push("beads");
-    }
-    if current_dir.join("openspec").exists() {
-        detected.push("openspec");
-    }
-    if current_dir.join(".git").exists() {
-        detected.push("git");
-    }
+    // Create/repair all workspace artifacts using shared function
+    let actions = ensure_workspace_current(&current_dir)?;
 
     println!("◆  Created .wai/ directory with PARA structure");
 
-    // Create plugin configuration files
-    setup_plugins(&current_dir, &detected)?;
+    // Report actions taken
+    for action in &actions {
+        if action.description.contains("Created") {
+            // Only print creation actions, not updates
+            println!("✓ {}", action.description);
+        }
+    }
+
+    // Auto-detect plugins for final message
+    let plugins = crate::plugin::detect_plugins(&current_dir);
+    let detected: Vec<&str> = plugins
+        .iter()
+        .filter(|p| p.detected)
+        .map(|p| p.def.name.as_str())
+        .collect();
 
     if !detected.is_empty() {
         println!("✓ Detected plugins: {}", detected.join(", "));
     }
-
-    // Inject managed block into agent instruction files
-    inject_agent_instructions(&current_dir, &detected)?;
 
     println!("●  Next steps:");
     println!("  → wai new project \"my-app\"    Create your first project");
@@ -146,119 +140,5 @@ pub fn run(name: Option<String>) -> Result<()> {
     }
 
     println!("└  Workspace '{}' initialized!", project_name);
-    Ok(())
-}
-
-fn setup_plugins(root: &std::path::Path, detected: &[&str]) -> Result<()> {
-    use crate::config::CONFIG_DIR;
-    let config_dir = root.join(CONFIG_DIR);
-
-    // Create README for plugin system
-    let plugins_info = r#"# Plugins
-
-Wai auto-detects and integrates with external tools:
-
-## Detected in this workspace:
-"#;
-
-    let mut readme = plugins_info.to_string();
-
-    if detected.contains(&"git") {
-        readme.push_str("- **git** — Version control (hooks: status, handoff)\n");
-    }
-    if detected.contains(&"beads") {
-        readme.push_str("- **beads** — Issue tracking (commands: list, show, ready)\n");
-    }
-    if detected.contains(&"openspec") {
-        readme.push_str("- **openspec** — Specification management\n");
-    }
-
-    readme.push_str(
-        r#"
-
-## Custom plugins
-
-Add YAML files to `.wai/plugins/` to register custom plugins:
-
-```yaml
-name: my-tool
-description: Integration with my-tool
-detector:
-  type: directory
-  path: .my-tool
-commands:
-  - name: list
-    description: List my-tool items
-    passthrough: my-tool list
-    read_only: true
-hooks:
-  on_status:
-    command: my-tool status
-    inject_as: tool_status
-```
-
-Run `wai plugin list` to see all available plugins.
-"#,
-    );
-
-    std::fs::write(config_dir.join("PLUGINS.md"), readme).into_diagnostic()?;
-
-    Ok(())
-}
-
-fn inject_agent_instructions(root: &std::path::Path, detected: &[&str]) -> Result<()> {
-    use crate::managed_block::inject_managed_block;
-
-    let agent_files = ["AGENTS.md", "CLAUDE.md"];
-    for filename in &agent_files {
-        let path = root.join(filename);
-        if filename == &"AGENTS.md" || path.exists() {
-            match inject_managed_block(&path, detected) {
-                Ok(result) => println!("✓ {}", result.description(filename)),
-                Err(e) => {
-                    eprintln!("⚠ Failed to update {}: {}", filename, e);
-                }
-            }
-        }
-    }
-    Ok(())
-}
-
-fn create_para_structure(root: &std::path::Path, config: &ProjectConfig) -> Result<()> {
-    let wai_dir = root.join(CONFIG_DIR);
-
-    // Create PARA directories
-    std::fs::create_dir_all(wai_dir.join(PROJECTS_DIR)).into_diagnostic()?;
-    std::fs::create_dir_all(wai_dir.join(AREAS_DIR)).into_diagnostic()?;
-    std::fs::create_dir_all(wai_dir.join(RESOURCES_DIR)).into_diagnostic()?;
-    std::fs::create_dir_all(wai_dir.join(ARCHIVES_DIR)).into_diagnostic()?;
-    std::fs::create_dir_all(wai_dir.join(PLUGINS_DIR)).into_diagnostic()?;
-
-    // Create agent-config structure
-    let agent_config = wai_dir.join(RESOURCES_DIR).join(AGENT_CONFIG_DIR);
-    std::fs::create_dir_all(agent_config.join(SKILLS_DIR)).into_diagnostic()?;
-    std::fs::create_dir_all(agent_config.join(RULES_DIR)).into_diagnostic()?;
-    std::fs::create_dir_all(agent_config.join(CONTEXT_DIR)).into_diagnostic()?;
-
-    // Create default .projections.yml
-    let projections_content = "# Agent config projections — defines how configs are synced to tool-specific locations\n\
-        # Strategies: symlink, inline, reference\n\
-        projections: []\n";
-    std::fs::write(agent_config.join(".projections.yml"), projections_content).into_diagnostic()?;
-
-    // Create resource subdirectories
-    std::fs::create_dir_all(wai_dir.join(RESOURCES_DIR).join("templates")).into_diagnostic()?;
-    std::fs::create_dir_all(wai_dir.join(RESOURCES_DIR).join("patterns")).into_diagnostic()?;
-
-    // Save config
-    config.save(root)?;
-
-    // Create .gitignore for .wai if needed
-    let gitignore_path = wai_dir.join(".gitignore");
-    if !gitignore_path.exists() {
-        std::fs::write(gitignore_path, "# Local-only files\n*.local\n*.cache\n")
-            .into_diagnostic()?;
-    }
-
     Ok(())
 }

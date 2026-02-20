@@ -1118,7 +1118,7 @@ fn doctor_missing_directories_fails_with_fix() {
         .stdout(
             predicate::str::contains("\"status\": \"fail\"")
                 .and(predicate::str::contains("archives"))
-                .and(predicate::str::contains("mkdir")),
+                .and(predicate::str::contains("doctor --fix")),
         );
 }
 

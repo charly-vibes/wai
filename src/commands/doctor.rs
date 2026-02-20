@@ -14,6 +14,7 @@ use crate::context::current_context;
 use crate::output::print_json;
 use crate::plugin;
 use crate::state::ProjectState;
+use crate::workspace::ensure_workspace_current;
 
 use super::require_project;
 
@@ -301,24 +302,13 @@ fn check_directories(project_root: &Path) -> Vec<CheckResult> {
             fix_fn: None,
         });
     } else {
-        let missing_clone = missing.clone();
         results.push(CheckResult {
             name: "Directory structure".to_string(),
             status: Status::Fail,
             message: format!("Missing directories: {}", missing.join(", ")),
-            fix: Some(format!(
-                "Run: mkdir -p {}",
-                missing
-                    .iter()
-                    .map(|d| format!(".wai/{}", d))
-                    .collect::<Vec<_>>()
-                    .join(" ")
-            )),
+            fix: Some("Run: wai doctor --fix (or wai init to repair)".to_string()),
             fix_fn: Some(Box::new(move |project_root| {
-                for dir in &missing_clone {
-                    std::fs::create_dir_all(wai_dir(project_root).join(dir))
-                        .into_diagnostic()?;
-                }
+                ensure_workspace_current(project_root)?;
                 Ok(())
             })),
         });

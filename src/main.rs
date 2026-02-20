@@ -18,7 +18,9 @@ pub mod plugin;
 mod state;
 mod sync_core;
 mod tutorial;
+#[allow(dead_code)]
 mod workflows;
+mod workspace;
 
 use cli::Cli;
 use context::{CliContext, set_context};
