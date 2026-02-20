@@ -1,7 +1,5 @@
-use cliclack::{confirm, input, log, outro};
+use cliclack::{confirm, input, log};
 use miette::{IntoDiagnostic, Result};
-
-use crate::config::mark_tutorial_seen;
 
 /// Show a guided walkthrough for adding the first research artifact
 pub fn first_research_walkthrough() -> Result<()> {
@@ -25,7 +23,7 @@ pub fn first_research_walkthrough() -> Result<()> {
         .interact()
         .into_diagnostic()?;
 
-    let content: String = input("What did you learn?")
+    let _content: String = input("What did you learn?")
         .placeholder("Key findings, options considered, trade-offs...")
         .interact()
         .into_diagnostic()?;

@@ -1,4 +1,6 @@
-#![allow(dead_code)]
+// unused_assignments: thiserror proc macro reads fields via #[error("...{field}")]
+// but the compiler lint fires before macro expansion resolves the read
+#![allow(dead_code, unused_assignments)]
 
 use miette::Diagnostic;
 use serde::Serialize;

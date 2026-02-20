@@ -92,13 +92,6 @@ pub fn run() -> Result<()> {
     Ok(())
 }
 
-/// Run the tutorial in non-interactive mode (for testing)
-pub fn run_non_interactive() -> Result<()> {
-    // Just mark tutorial as seen without interactive prompts
-    mark_tutorial_seen().into_diagnostic()?;
-    Ok(())
-}
-
 /// Display a tutorial step with consistent formatting
 fn tutorial_step(step: &str, title: &str, description: &str, details: &str) -> Result<()> {
     println!();
@@ -113,9 +106,3 @@ fn tutorial_step(step: &str, title: &str, description: &str, details: &str) -> R
     Ok(())
 }
 
-/// Check if user should see the tutorial on first run
-pub fn should_show_tutorial() -> bool {
-    UserConfig::load()
-        .map(|config| !config.seen_tutorial)
-        .unwrap_or(true) // Show tutorial if config fails to load
-}

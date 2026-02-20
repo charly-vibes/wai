@@ -218,12 +218,6 @@ pub fn user_config_path() -> PathBuf {
     user_config_dir().join(USER_CONFIG_FILE)
 }
 
-/// Check if this is the first time running wai
-pub fn is_first_run() -> Result<bool, WaiError> {
-    let config = UserConfig::load()?;
-    Ok(!config.seen_tutorial)
-}
-
 /// Mark the tutorial as seen for the current user
 pub fn mark_tutorial_seen() -> Result<(), WaiError> {
     let mut config = UserConfig::load()?;

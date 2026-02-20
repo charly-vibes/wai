@@ -2,7 +2,6 @@ use cliclack::log;
 use miette::{IntoDiagnostic, Result};
 use owo_colors::OwoColorize;
 use serde::Deserialize;
-use std::path::Path;
 
 use crate::config::agent_config_dir;
 use crate::context::require_safe_mode;
