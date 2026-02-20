@@ -111,8 +111,8 @@ Attach fix_fn to `check_agent_instructions` that calls `inject_managed_block()` 
 
 ### 5. Testing
 
-#### 5.1 Add integration tests for doctor --fix
-**Status**: Pending
+#### 5.1 Add integration tests for doctor --fix ✓
+**Status**: Completed (commit: 5f8ae38)
 
 Add integration tests:
 - `doctor_fix_repairs_missing_directories`
@@ -123,9 +123,9 @@ Add integration tests:
 - `doctor_fix_blocked_by_safe_mode`
 
 **Files**:
-- MODIFIED: `tests/integration.rs` (or new test file)
+- MODIFIED: `tests/integration.rs`
 
-**Beads**: wai-33w (blocked on all 4.x tasks)
+**Beads**: Closes wai-33w
 
 ---
 
@@ -134,8 +134,8 @@ Add integration tests:
 1. `d5350d7` - refactor(sync): extract sync functions to sync_core module
 2. `49fca6d` - feat(doctor): add --fix flag and fix_fn field to CheckResult
 3. `8c8a751` - feat(doctor): implement fix application logic
-4. (pending) - feat(doctor): implement auto-fix for all fixable checks
-5. (pending) - test(doctor): add integration tests for --fix flag
+4. `6d0c6d0` - feat(doctor): implement auto-fix for all fixable checks
+5. `5f8ae38` - test(doctor): add integration tests for --fix flag
 
 ## Dependencies
 
