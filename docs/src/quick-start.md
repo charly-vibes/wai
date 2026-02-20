@@ -166,19 +166,37 @@ wai import .cursorrules
 Check for issues and auto-fix when possible:
 
 ```bash
-# Diagnose issues
+# Diagnose wai workspace issues
 wai doctor
 
-# Auto-repair
+# Auto-repair wai workspace
 wai doctor --fix
+
+# Check repository best practices
+wai way
+
+# Get JSON output for CI integration
+wai way --json
 ```
 
-Doctor checks:
+**Doctor checks (wai-specific):**
 - Directory structure
 - Config file integrity
 - Plugin availability
 - Sync status
 - Project state consistency
+
+**Way checks (general repository - 10 checks):**
+- Task runner (justfile, Makefile)
+- Git hooks (prek, pre-commit)
+- Editor config (.editorconfig)
+- Documentation (README, LICENSE, CONTRIBUTING, .gitignore)
+- AI instructions (CLAUDE.md, AGENTS.md)
+- LLM documentation (llm.txt)
+- Agent skills (.wai/resources/skills/)
+- GitHub CLI (gh installed & authenticated)
+- CI/CD configuration
+- Dev container setup
 
 ## Work with Plugins
 

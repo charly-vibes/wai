@@ -151,6 +151,20 @@ pub enum Commands {
         fix: bool,
     },
 
+    /// Check repository best practices (the wai way)
+    #[command(
+        about = "Check repository best practices (the wai way)",
+        long_about = "Validates your repository against best practices for AI-friendly development.\n\n\
+            Checks 10 areas including task runners (justfile, Makefile), git hooks (prek, pre-commit),\n\
+            editor config, documentation (README, LICENSE, CONTRIBUTING, .gitignore), AI instructions\n\
+            (CLAUDE.md, AGENTS.md), CI/CD configuration, and dev containers.\n\n\
+            These are recommendations, not requirements — the command always exits successfully\n\
+            and suggests improvements without enforcing them. Works in any directory; wai\n\
+            initialization is not required.\n\n\
+            Use --json for machine-readable output suitable for CI integration and automation."
+    )]
+    Way,
+
     /// Import existing tool configurations
     Import {
         /// Path to import from (e.g., .claude/, .cursorrules)

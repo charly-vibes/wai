@@ -127,6 +127,8 @@ Available phases: `research`, `design`, `plan`, `implement`, `review`, `archive`
 |---------|-------------|
 | `wai doctor` | Diagnose workspace health |
 | `wai doctor --fix` | Auto-repair detected issues |
+| `wai way` | Check repository best practices |
+| `wai way --json` | Output best practices check as JSON |
 
 ### Doctor Checks
 
@@ -137,6 +139,25 @@ Available phases: `research`, `design`, `plan`, `implement`, `review`, `archive`
 - Projection validity
 - Project state consistency
 - Agent instruction files (CLAUDE.md, AGENTS.md)
+
+### Way Checks
+
+The `wai way` command validates repository best practices for AI-friendly development (10 checks total):
+
+1. **Task runner** — `justfile` or `Makefile` for standardized commands (build, test, deploy)
+2. **Git hooks** — `.prek.toml` or `.pre-commit-config.yaml` for automated quality checks
+3. **Editor config** — `.editorconfig` for consistent formatting across editors
+4. **Documentation** — `README.md`, `LICENSE`, `CONTRIBUTING.md`, `.gitignore` (checks for all 4 files)
+5. **AI instructions** — `CLAUDE.md` or `AGENTS.md` for providing context to AI assistants
+6. **LLM documentation** — `llm.txt` for AI-friendly project documentation (https://llmstxt.org)
+7. **Agent skills** — `.wai/resources/skills/` directory with `SKILL.md` files for Claude Code
+8. **GitHub CLI** — `gh` CLI installed and authenticated for better GitHub integration
+9. **CI/CD** — GitHub Actions, GitLab CI, or CircleCI configuration for automation
+10. **Dev container** — `.devcontainer/` for reproducible development environments
+
+**Key Differences:**
+- `wai doctor` checks wai-specific workspace health (requires wai initialization)
+- `wai way` checks general repository best practices (works in any directory)
 
 ## Examples
 
@@ -177,6 +198,19 @@ wai sync
 wai doctor
 ```
 
+### Repository Best Practices
+
+```bash
+# Check repository setup
+wai way
+
+# Get JSON output for CI integration
+wai way --json | jq '.summary'
+
+# Track best practice adoption
+wai way --json | jq '.checks[] | select(.status == "info") | .name'
+```
+
 ### JSON Output for Automation
 
 ```bash
@@ -184,4 +218,5 @@ wai doctor
 wai status --json | jq '.projects[] | .name'
 wai search "config" --json | jq '.results[].path'
 wai plugin list --json
+wai way --json | jq '.summary.pass'
 ```

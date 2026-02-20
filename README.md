@@ -133,6 +133,7 @@ wai beads list         # Pass-through to beads plugin
 | `wai show [name]` | Show PARA overview or item details |
 | `wai move <item> <category>` | Move item between categories |
 | `wai status` | Show project status with suggestions |
+| `wai way` | Check repository best practices (AI-friendly setup) |
 | `wai tutorial` | Run interactive quickstart tutorial |
 | `wai doctor [--fix]` | Diagnose workspace health (--fix to auto-repair) |
 
@@ -415,6 +416,94 @@ wai doctor --fix       # Automatically repair detected issues
 ```
 
 Doctor provides actionable error messages with suggestions for manual fixes when auto-repair isn't possible.
+
+### The Wai Way — Repository Best Practices
+
+The `wai way` command checks your repository against best practices for AI-friendly development workflows. It validates whether your project follows conventions that make it easier for AI assistants, collaborators, and automation tools to understand and work with your codebase.
+
+**Philosophy:** These are recommendations, not requirements. The command always exits with success (exit code 0) — it suggests improvements without enforcing them. The checks focus on making repositories more discoverable, self-documenting, and automation-ready.
+
+**Usage:**
+```bash
+wai way              # Human-friendly output with suggestions
+wai way --json       # Machine-readable JSON output
+```
+
+**Checks Performed:**
+
+| Check | What It Validates | Recommendation |
+|-------|------------------|----------------|
+| **Task runner** | Presence of `justfile` or `Makefile` | Standardizes common tasks (build, test, deploy) |
+| **Git hooks** | Presence of `.prek.toml` or `.pre-commit-config.yaml` | Automates quality checks before commits |
+| **Editor config** | Presence of `.editorconfig` | Ensures consistent formatting across editors |
+| **Documentation** | Presence of `README.md`, `LICENSE`, `CONTRIBUTING.md`, `.gitignore` | Documents project and prevents accidental commits |
+| **AI instructions** | Presence of `CLAUDE.md` or `AGENTS.md` | Provides context to AI assistants |
+| **LLM documentation** | Presence of `llm.txt` | AI-friendly project documentation format |
+| **Agent skills** | Presence of `.wai/resources/skills/` directory with `SKILL.md` files | Custom skills for Claude Code |
+| **GitHub CLI** | `gh` CLI installed and authenticated | Better GitHub integration for AI workflows |
+| **CI/CD** | Presence of `.github/workflows/`, `.gitlab-ci.yml`, or `.circleci/config.yml` | Automates testing and deployment |
+| **Dev container** | Presence of `.devcontainer/` or `.devcontainer.json` | Enables reproducible development environments |
+
+**Example Output:**
+```
+  ◆ The Wai Way — Repository Best Practices
+
+  ✓ Task runner: justfile detected (recipes: build, run, test, lint)
+  ℹ Git hooks: No git hook manager detected
+    → Add prek to manage git hooks — https://github.com/chshersh/prek
+  ℹ Editor config: No .editorconfig detected
+    → Add .editorconfig to standardize formatting
+  ✓ Documentation: Partial documentation (2/4 files)
+    → Consider adding LICENSE and CONTRIBUTING.md
+  ✓ AI instructions: CLAUDE.md detected (recommended for Claude Code)
+  ℹ LLM documentation: No llm.txt detected
+    → Add llm.txt for AI-friendly project documentation
+  ℹ Agent skills: No skills directory detected
+    → Add agent skills to .wai/resources/skills/
+  ✓ GitHub CLI: gh installed and authenticated
+  ✓ CI/CD: GitHub Actions configured (3 workflow(s))
+  ℹ Dev container: No dev container configuration detected
+    → Consider adding .devcontainer/
+
+└  5/10 best practices adopted
+```
+
+**JSON Output Format:**
+```json
+{
+  "checks": [
+    {
+      "name": "Task runner",
+      "status": "pass",
+      "message": "justfile detected (recipes: build, run, test)"
+    },
+    {
+      "name": "Git hooks",
+      "status": "info",
+      "message": "No git hook manager detected",
+      "suggestion": "Add prek to manage git hooks — https://github.com/chshersh/prek"
+    },
+    {
+      "name": "Documentation",
+      "status": "pass",
+      "message": "Partial documentation (2/4 files)",
+      "suggestion": "Consider adding LICENSE and CONTRIBUTING.md"
+    }
+  ],
+  "summary": {
+    "pass": 5,
+    "recommendations": 5
+  }
+}
+```
+
+**When to Use:**
+- **Initial setup:** Run `wai way` when starting a new repository to see which conventions to adopt
+- **Onboarding:** Help new team members understand project standards
+- **CI integration:** Add to CI pipelines to track best practice adoption over time
+- **Documentation:** Generate project health reports in JSON format
+
+**Note:** Unlike `wai doctor` which checks wai-specific workspace health, `wai way` checks general repository best practices. It works in any directory — wai initialization is not required.
 
 ## Real-World Workflows
 

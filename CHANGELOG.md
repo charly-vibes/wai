@@ -12,6 +12,7 @@ and this project adheres to [Calendar Versioning](https://calver.org/) (YYYY.M.M
 #### Core Features
 - **Tutorial Mode** - Interactive quickstart guide with `wai tutorial`
 - **Doctor Command** - Comprehensive workspace health checks with auto-fix capability
+- **Way Command** - Repository best practices checker with AI-friendly development recommendations
 - **Resource Management** - Command structure for skills/rules/context (implementation in progress)
 - **External Command Pass-through** - Direct plugin command execution (e.g., `wai beads list`)
 
