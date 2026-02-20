@@ -74,7 +74,7 @@ pub fn run(fix: bool) -> Result<()> {
     checks.extend(check_agent_config_sync(&project_root));
     checks.extend(check_project_state(&project_root));
     checks.extend(check_custom_plugins(&project_root));
-    checks.push(check_agent_instructions(&project_root));
+    checks.extend(check_agent_instructions(&project_root));
 
     let summary = Summary {
         pass: checks.iter().filter(|c| c.status == Status::Pass).count(),
@@ -1006,34 +1006,45 @@ fn check_custom_plugins(project_root: &Path) -> Vec<CheckResult> {
     results
 }
 
-fn check_agent_instructions(project_root: &Path) -> CheckResult {
+fn check_agent_instructions(project_root: &Path) -> Vec<CheckResult> {
     use crate::managed_block::has_managed_block;
 
-    let agents_md = project_root.join("AGENTS.md");
+    let mut results = Vec::new();
 
+    // Check AGENTS.md
+    let agents_md = project_root.join("AGENTS.md");
     if !agents_md.exists() {
-        return CheckResult {
-            name: "Agent instructions".to_string(),
+        results.push(CheckResult {
+            name: "Agent instructions: AGENTS.md".to_string(),
             status: Status::Warn,
             message: "AGENTS.md not found — LLMs won't know to use wai".to_string(),
             fix: Some("Run: wai init (to create AGENTS.md with wai instructions)".to_string()),
-            fix_fn: None,
-        };
-    }
-
-    if has_managed_block(&agents_md) {
-        CheckResult {
-            name: "Agent instructions".to_string(),
+            fix_fn: Some(Box::new(move |project_root| {
+                use crate::managed_block::inject_managed_block;
+                let agents_md = project_root.join("AGENTS.md");
+                let plugins = plugin::detect_plugins(project_root);
+                let plugin_names: Vec<&str> = plugins
+                    .iter()
+                    .filter(|p| p.detected)
+                    .map(|p| p.def.name.as_str())
+                    .collect();
+                inject_managed_block(&agents_md, &plugin_names).into_diagnostic()?;
+                Ok(())
+            })),
+        });
+    } else if has_managed_block(&agents_md) {
+        results.push(CheckResult {
+            name: "Agent instructions: AGENTS.md".to_string(),
             status: Status::Pass,
-            message: "AGENTS.md contains wai managed block".to_string(),
+            message: "Contains wai managed block".to_string(),
             fix: None,
             fix_fn: None,
-        }
+        });
     } else {
-        CheckResult {
-            name: "Agent instructions".to_string(),
+        results.push(CheckResult {
+            name: "Agent instructions: AGENTS.md".to_string(),
             status: Status::Warn,
-            message: "AGENTS.md exists but missing wai managed block".to_string(),
+            message: "Exists but missing wai managed block".to_string(),
             fix: Some("Run: wai init (to inject wai instructions into AGENTS.md)".to_string()),
             fix_fn: Some(Box::new(move |project_root| {
                 use crate::managed_block::inject_managed_block;
@@ -1047,6 +1058,58 @@ fn check_agent_instructions(project_root: &Path) -> CheckResult {
                 inject_managed_block(&agents_md, &plugin_names).into_diagnostic()?;
                 Ok(())
             })),
-        }
+        });
     }
+
+    // Check CLAUDE.md
+    let claude_md = project_root.join("CLAUDE.md");
+    if !claude_md.exists() {
+        results.push(CheckResult {
+            name: "Agent instructions: CLAUDE.md".to_string(),
+            status: Status::Warn,
+            message: "CLAUDE.md not found — Claude Code won't know to use wai".to_string(),
+            fix: Some("Run: wai init (to create CLAUDE.md with wai instructions)".to_string()),
+            fix_fn: Some(Box::new(move |project_root| {
+                use crate::managed_block::inject_managed_block;
+                let claude_md = project_root.join("CLAUDE.md");
+                let plugins = plugin::detect_plugins(project_root);
+                let plugin_names: Vec<&str> = plugins
+                    .iter()
+                    .filter(|p| p.detected)
+                    .map(|p| p.def.name.as_str())
+                    .collect();
+                inject_managed_block(&claude_md, &plugin_names).into_diagnostic()?;
+                Ok(())
+            })),
+        });
+    } else if has_managed_block(&claude_md) {
+        results.push(CheckResult {
+            name: "Agent instructions: CLAUDE.md".to_string(),
+            status: Status::Pass,
+            message: "Contains wai managed block".to_string(),
+            fix: None,
+            fix_fn: None,
+        });
+    } else {
+        results.push(CheckResult {
+            name: "Agent instructions: CLAUDE.md".to_string(),
+            status: Status::Warn,
+            message: "Exists but missing wai managed block".to_string(),
+            fix: Some("Run: wai init (to inject wai instructions into CLAUDE.md)".to_string()),
+            fix_fn: Some(Box::new(move |project_root| {
+                use crate::managed_block::inject_managed_block;
+                let claude_md = project_root.join("CLAUDE.md");
+                let plugins = plugin::detect_plugins(project_root);
+                let plugin_names: Vec<&str> = plugins
+                    .iter()
+                    .filter(|p| p.detected)
+                    .map(|p| p.def.name.as_str())
+                    .collect();
+                inject_managed_block(&claude_md, &plugin_names).into_diagnostic()?;
+                Ok(())
+            })),
+        });
+    }
+
+    results
 }

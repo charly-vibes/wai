@@ -1236,6 +1236,13 @@ fn doctor_fix_no_fixable_issues() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
 
+    // Create CLAUDE.md with managed block to ensure healthy workspace
+    fs::write(
+        tmp.path().join("CLAUDE.md"),
+        "<!-- WAI:START -->\n# Test\n<!-- WAI:END -->\n",
+    )
+    .unwrap();
+
     // Healthy workspace - no issues to fix
     wai_cmd(tmp.path())
         .args(["doctor", "--fix"])
