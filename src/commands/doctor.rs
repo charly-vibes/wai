@@ -128,10 +128,8 @@ fn apply_fixes(
     }
 
     // Filter to fixable checks
-    let fixable_checks: Vec<CheckResult> = checks
-        .drain(..)
-        .filter(|c| c.fix_fn.is_some())
-        .collect();
+    let fixable_checks: Vec<CheckResult> =
+        checks.drain(..).filter(|c| c.fix_fn.is_some()).collect();
 
     if fixable_checks.is_empty() {
         if !context.json {
@@ -590,15 +588,21 @@ fn check_projection(
             fix: Some("Run: wai sync".to_string()),
             fix_fn: Some(Box::new(move |project_root| {
                 match sync_proj.strategy.as_str() {
-                    "symlink" => {
-                        crate::sync_core::execute_symlink(project_root, &config_dir_clone, &sync_proj)
-                    }
-                    "inline" => {
-                        crate::sync_core::execute_inline(project_root, &config_dir_clone, &sync_proj)
-                    }
-                    "reference" => {
-                        crate::sync_core::execute_reference(project_root, &config_dir_clone, &sync_proj)
-                    }
+                    "symlink" => crate::sync_core::execute_symlink(
+                        project_root,
+                        &config_dir_clone,
+                        &sync_proj,
+                    ),
+                    "inline" => crate::sync_core::execute_inline(
+                        project_root,
+                        &config_dir_clone,
+                        &sync_proj,
+                    ),
+                    "reference" => crate::sync_core::execute_reference(
+                        project_root,
+                        &config_dir_clone,
+                        &sync_proj,
+                    ),
                     _ => Ok(()),
                 }
             })),

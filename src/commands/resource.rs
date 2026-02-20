@@ -240,7 +240,10 @@ fn list_skills(json: bool) -> Result<()> {
         } else {
             println!();
             println!("  {} No skills found", "○".dimmed());
-            println!("  {} Run 'wai resource add skill <name>' to create one", "→".cyan());
+            println!(
+                "  {} Run 'wai resource add skill <name>' to create one",
+                "→".cyan()
+            );
             println!();
         }
         return Ok(());
@@ -298,7 +301,10 @@ fn list_skills(json: bool) -> Result<()> {
         if entries.is_empty() {
             println!();
             println!("  {} No skills found", "○".dimmed());
-            println!("  {} Run 'wai resource add skill <name>' to create one", "→".cyan());
+            println!(
+                "  {} Run 'wai resource add skill <name>' to create one",
+                "→".cyan()
+            );
             println!();
         } else {
             println!();
@@ -314,7 +320,12 @@ fn list_skills(json: bool) -> Result<()> {
                 if entry.description == "(no metadata)" {
                     println!("    {} {} {}", "•".dimmed(), entry.name, desc.dimmed());
                 } else {
-                    println!("    {} {} {}", "•".dimmed(), entry.name.bold(), desc.dimmed());
+                    println!(
+                        "    {} {} {}",
+                        "•".dimmed(),
+                        entry.name.bold(),
+                        desc.dimmed()
+                    );
                 }
             }
             println!();
@@ -344,10 +355,7 @@ fn import_skills(from: Option<String>) -> Result<()> {
     }
 
     if !source_path.is_dir() {
-        miette::bail!(
-            "Source path is not a directory: {}",
-            source_path.display()
-        );
+        miette::bail!("Source path is not a directory: {}", source_path.display());
     }
 
     let target_dir = agent_config_dir(&project_root).join(SKILLS_DIR);
@@ -381,8 +389,7 @@ fn import_skills(from: Option<String>) -> Result<()> {
 
         // Skip if target already exists
         if target_skill_dir.exists() {
-            log::warning(format!("Skipped '{}' (already exists)", skill_name))
-                .into_diagnostic()?;
+            log::warning(format!("Skipped '{}' (already exists)", skill_name)).into_diagnostic()?;
             skipped += 1;
             continue;
         }
@@ -395,7 +402,11 @@ fn import_skills(from: Option<String>) -> Result<()> {
     // Report results
     if imported == 0 && skipped == 0 {
         println!();
-        println!("  {} No skills found in {}", "○".dimmed(), source_path.display());
+        println!(
+            "  {} No skills found in {}",
+            "○".dimmed(),
+            source_path.display()
+        );
         println!();
     } else {
         println!();
@@ -461,10 +472,7 @@ mod tests {
     fn test_empty_name() {
         let result = validate_skill_name("");
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("cannot be empty"));
+        assert!(result.unwrap_err().to_string().contains("cannot be empty"));
     }
 
     #[test]
@@ -477,10 +485,12 @@ mod tests {
     fn test_starts_with_dot() {
         let result = validate_skill_name(".hidden");
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("cannot start with '.'"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("cannot start with '.'")
+        );
     }
 
     #[test]
@@ -500,30 +510,36 @@ mod tests {
     fn test_leading_hyphen() {
         let result = validate_skill_name("-skill");
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("cannot start with a hyphen"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("cannot start with a hyphen")
+        );
     }
 
     #[test]
     fn test_trailing_hyphen() {
         let result = validate_skill_name("skill-");
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("cannot end with a hyphen"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("cannot end with a hyphen")
+        );
     }
 
     #[test]
     fn test_consecutive_hyphens() {
         let result = validate_skill_name("my--skill");
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("consecutive hyphens"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("consecutive hyphens")
+        );
     }
 
     #[test]
@@ -531,22 +547,42 @@ mod tests {
         // Uppercase
         let result = validate_skill_name("MySkill");
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Invalid character"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Invalid character")
+        );
 
         // Underscore
         let result = validate_skill_name("my_skill");
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Invalid character"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Invalid character")
+        );
 
         // Space
         let result = validate_skill_name("my skill");
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Invalid character"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Invalid character")
+        );
 
         // Special characters
         let result = validate_skill_name("my@skill");
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Invalid character"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Invalid character")
+        );
     }
 
     // Frontmatter parser tests

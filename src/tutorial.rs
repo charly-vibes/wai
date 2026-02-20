@@ -105,4 +105,3 @@ fn tutorial_step(step: &str, title: &str, description: &str, details: &str) -> R
 
     Ok(())
 }
-

@@ -10,27 +10,45 @@ use std::path::Path;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Suggestion {
     /// Typo suggestion with the corrected command
-    DidYouMean { original: String, suggestion: String },
+    DidYouMean {
+        original: String,
+        suggestion: String,
+    },
 
     /// Wrong order detection (e.g., "project new" -> "new project")
     WrongOrder { original: String, correct: String },
 
     /// Context suggestion (e.g., "try running from project root")
-    ContextHint { message: String, path: Option<String> },
+    ContextHint {
+        message: String,
+        path: Option<String>,
+    },
 
     /// Generic fix suggestion
-    Fix { description: String, command: Option<String> },
+    Fix {
+        description: String,
+        command: Option<String>,
+    },
 }
 
 impl Suggestion {
     /// Format the suggestion as a human-readable message
     pub fn message(&self) -> String {
         match self {
-            Suggestion::DidYouMean { original, suggestion } => {
-                format!("Unknown command '{}'. Did you mean '{}'?", original, suggestion)
+            Suggestion::DidYouMean {
+                original,
+                suggestion,
+            } => {
+                format!(
+                    "Unknown command '{}'. Did you mean '{}'?",
+                    original, suggestion
+                )
             }
             Suggestion::WrongOrder { original, correct } => {
-                format!("Invalid command '{}'. Did you mean '{}'?", original, correct)
+                format!(
+                    "Invalid command '{}'. Did you mean '{}'?",
+                    original, correct
+                )
             }
             Suggestion::ContextHint { message, path } => {
                 if let Some(p) = path {
@@ -39,7 +57,10 @@ impl Suggestion {
                     message.clone()
                 }
             }
-            Suggestion::Fix { description, command } => {
+            Suggestion::Fix {
+                description,
+                command,
+            } => {
                 if let Some(cmd) = command {
                     format!("{}\n  → Run: {}", description, cmd)
                 } else {
@@ -117,7 +138,12 @@ impl SuggestionEngine {
     ///
     /// # Returns
     /// An optional `Suggestion` if wrong order is detected
-    pub fn suggest_order(&self, first: &str, second: &str, valid_patterns: &[(&str, &str)]) -> Option<Suggestion> {
+    pub fn suggest_order(
+        &self,
+        first: &str,
+        second: &str,
+        valid_patterns: &[(&str, &str)],
+    ) -> Option<Suggestion> {
         // Check if (second, first) exists in valid patterns
         for (verb, noun) in valid_patterns {
             if *noun == first && *verb == second {
@@ -180,7 +206,11 @@ mod tests {
         let suggestion = engine.suggest_typo("staus", commands);
         assert!(suggestion.is_some());
 
-        if let Some(Suggestion::DidYouMean { original, suggestion }) = suggestion {
+        if let Some(Suggestion::DidYouMean {
+            original,
+            suggestion,
+        }) = suggestion
+        {
             assert_eq!(original, "staus");
             assert_eq!(suggestion, "status");
         }

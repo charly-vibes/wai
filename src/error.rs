@@ -107,7 +107,9 @@ pub enum WaiError {
     #[error("Invalid skill name: {message}")]
     #[diagnostic(
         code(wai::resource::invalid_skill_name),
-        help("Skill names must be lowercase alphanumeric with hyphens, max 64 chars, no leading/trailing/consecutive hyphens")
+        help(
+            "Skill names must be lowercase alphanumeric with hyphens, max 64 chars, no leading/trailing/consecutive hyphens"
+        )
     )]
     InvalidSkillName { message: String },
 

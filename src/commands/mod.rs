@@ -22,6 +22,7 @@ mod show;
 mod status;
 mod sync;
 mod timeline;
+mod way;
 
 pub fn run(cli: Cli) -> Result<()> {
     match cli.command {
@@ -50,6 +51,7 @@ pub fn run(cli: Cli) -> Result<()> {
         }) => timeline::run(project, from, to, reverse),
         Some(Commands::Plugin(cmd)) => plugin::run(cmd),
         Some(Commands::Doctor { fix }) => doctor::run(fix),
+        Some(Commands::Way) => way::run(),
         Some(Commands::Import { path }) => import::run(path),
         Some(Commands::Resource(cmd)) => match cmd {
             crate::cli::ResourceCommands::Add(add_cmd) => resource::run_add(add_cmd),

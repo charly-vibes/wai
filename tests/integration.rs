@@ -1314,8 +1314,7 @@ fn doctor_fix_blocked_by_safe_mode() {
         .assert()
         .failure()
         .stderr(
-            predicate::str::contains("apply doctor fixes")
-                .or(predicate::str::contains("--safe")),
+            predicate::str::contains("apply doctor fixes").or(predicate::str::contains("--safe")),
         );
 }
 
@@ -1508,4 +1507,669 @@ fn user_config_persists_seen_tutorial_flag() {
     // Verify the flag is still true
     let config_content = fs::read_to_string(wai_config_dir.join("config.toml")).unwrap();
     assert!(config_content.contains("seen_tutorial = true"));
+}
+
+// ─── wai way ────────────────────────────────────────────────────────────────
+
+#[test]
+fn way_works_without_wai_init() {
+    let tmp = TempDir::new().unwrap();
+
+    // Don't init workspace - way should still work
+    wai_cmd(tmp.path()).args(["way"]).assert().success().stdout(
+        predicate::str::contains("The Wai Way")
+            .and(predicate::str::contains("Repository Best Practices")),
+    );
+}
+
+#[test]
+fn way_always_exits_zero_empty_repo() {
+    let tmp = TempDir::new().unwrap();
+
+    // Empty repo with no files
+    let output = wai_cmd(tmp.path()).args(["way"]).output().unwrap();
+
+    assert_eq!(output.status.code().unwrap(), 0);
+}
+
+#[test]
+fn way_always_exits_zero_partial_adoption() {
+    let tmp = TempDir::new().unwrap();
+
+    // Partial adoption - just README
+    fs::write(tmp.path().join("README.md"), "# Test").unwrap();
+
+    let output = wai_cmd(tmp.path()).args(["way"]).output().unwrap();
+
+    assert_eq!(output.status.code().unwrap(), 0);
+}
+
+#[test]
+fn way_always_exits_zero_all_passing() {
+    let tmp = TempDir::new().unwrap();
+
+    // All checks passing
+    fs::write(tmp.path().join("justfile"), "test:\n\techo test").unwrap();
+    fs::write(tmp.path().join(".prek.toml"), "[hooks]").unwrap();
+    fs::write(tmp.path().join(".editorconfig"), "root = true").unwrap();
+    fs::write(tmp.path().join("README.md"), "# Test").unwrap();
+    fs::write(tmp.path().join("LICENSE"), "MIT").unwrap();
+    fs::write(tmp.path().join("CONTRIBUTING.md"), "# Contributing").unwrap();
+    fs::write(tmp.path().join(".gitignore"), "*.tmp").unwrap();
+    fs::write(tmp.path().join("CLAUDE.md"), "# Instructions").unwrap();
+    fs::create_dir_all(tmp.path().join(".github/workflows")).unwrap();
+    fs::write(tmp.path().join(".github/workflows/ci.yml"), "name: CI").unwrap();
+    fs::create_dir_all(tmp.path().join(".devcontainer")).unwrap();
+
+    let output = wai_cmd(tmp.path()).args(["way"]).output().unwrap();
+
+    assert_eq!(output.status.code().unwrap(), 0);
+}
+
+#[test]
+fn way_json_output_valid() {
+    let tmp = TempDir::new().unwrap();
+    fs::write(tmp.path().join("README.md"), "# Test").unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("\"checks\"")
+                .and(predicate::str::contains("\"summary\""))
+                .and(predicate::str::contains("\"pass\""))
+                .and(predicate::str::contains("\"recommendations\"")),
+        );
+}
+
+#[test]
+fn way_json_includes_check_fields() {
+    let tmp = TempDir::new().unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("\"name\"")
+                .and(predicate::str::contains("\"status\""))
+                .and(predicate::str::contains("\"message\"")),
+        );
+}
+
+#[test]
+fn way_json_exits_zero() {
+    let tmp = TempDir::new().unwrap();
+
+    let output = wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code().unwrap(), 0);
+}
+
+#[test]
+fn way_minimal_repository_shows_info() {
+    let tmp = TempDir::new().unwrap();
+
+    // Only README.md
+    fs::write(tmp.path().join("README.md"), "# Test Project").unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("ℹ"))
+        .stderr(predicate::str::contains("best practices adopted"));
+}
+
+#[test]
+fn way_minimal_repository_has_suggestions() {
+    let tmp = TempDir::new().unwrap();
+    fs::write(tmp.path().join("README.md"), "# Test").unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("→").and(predicate::str::contains("https://")));
+}
+
+#[test]
+fn way_complete_repository_all_pass() {
+    let tmp = TempDir::new().unwrap();
+
+    // Set up all best practices
+    fs::write(tmp.path().join("justfile"), "test:\n\techo test").unwrap();
+    fs::write(tmp.path().join(".prek.toml"), "[hooks]").unwrap();
+    fs::write(tmp.path().join(".editorconfig"), "root = true").unwrap();
+    fs::write(tmp.path().join("README.md"), "# Test").unwrap();
+    fs::write(tmp.path().join("LICENSE"), "MIT").unwrap();
+    fs::write(tmp.path().join("CONTRIBUTING.md"), "# Contributing").unwrap();
+    fs::write(tmp.path().join(".gitignore"), "*.tmp").unwrap();
+    fs::write(tmp.path().join("CLAUDE.md"), "# Instructions").unwrap();
+    fs::create_dir_all(tmp.path().join(".github/workflows")).unwrap();
+    fs::write(tmp.path().join(".github/workflows/ci.yml"), "name: CI").unwrap();
+    fs::create_dir_all(tmp.path().join(".devcontainer")).unwrap();
+
+    let output = wai_cmd(tmp.path()).args(["way"]).output().unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Should have many/all Pass statuses
+    assert!(stdout.contains("✓"));
+    // Summary should show high adoption
+    assert!(stdout.contains("configured"));
+}
+
+#[test]
+fn way_complete_repository_minimal_suggestions() {
+    let tmp = TempDir::new().unwrap();
+
+    // Set up all best practices
+    fs::write(tmp.path().join("justfile"), "test:\n\techo test").unwrap();
+    fs::write(tmp.path().join(".prek.toml"), "[hooks]").unwrap();
+    fs::write(tmp.path().join(".editorconfig"), "root = true").unwrap();
+    fs::write(tmp.path().join("README.md"), "# Test").unwrap();
+    fs::write(tmp.path().join("LICENSE"), "MIT").unwrap();
+    fs::write(tmp.path().join("CONTRIBUTING.md"), "# Contributing").unwrap();
+    fs::write(tmp.path().join(".gitignore"), "*.tmp").unwrap();
+    fs::write(tmp.path().join("CLAUDE.md"), "# Instructions").unwrap();
+    fs::create_dir_all(tmp.path().join(".github/workflows")).unwrap();
+    fs::write(tmp.path().join(".github/workflows/ci.yml"), "name: CI").unwrap();
+    fs::create_dir_all(tmp.path().join(".devcontainer")).unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("✓"));
+}
+
+// ─── wai way: unit tests for individual checks ─────────────────────────────
+
+#[test]
+fn way_check_task_runner_justfile() {
+    let tmp = TempDir::new().unwrap();
+    fs::write(tmp.path().join("justfile"), "test:\n\techo test").unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Task runner")
+                .and(predicate::str::contains("justfile detected"))
+                .and(predicate::str::contains("\"pass\"")),
+        );
+}
+
+#[test]
+fn way_check_task_runner_makefile() {
+    let tmp = TempDir::new().unwrap();
+    fs::write(tmp.path().join("Makefile"), "test:\n\techo test").unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Task runner")
+                .and(predicate::str::contains("Makefile detected"))
+                .and(predicate::str::contains("\"pass\"")),
+        );
+}
+
+#[test]
+fn way_check_task_runner_missing() {
+    let tmp = TempDir::new().unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Task runner")
+                .and(predicate::str::contains("No task runner detected"))
+                .and(predicate::str::contains("\"info\"")),
+        );
+}
+
+#[test]
+fn way_check_git_hooks_prek() {
+    let tmp = TempDir::new().unwrap();
+    fs::write(tmp.path().join(".prek.toml"), "[hooks]").unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Git hooks")
+                .and(predicate::str::contains("prek detected"))
+                .and(predicate::str::contains("\"pass\"")),
+        );
+}
+
+#[test]
+fn way_check_git_hooks_precommit() {
+    let tmp = TempDir::new().unwrap();
+    fs::write(tmp.path().join(".pre-commit-config.yaml"), "repos: []").unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Git hooks")
+                .and(predicate::str::contains("pre-commit detected"))
+                .and(predicate::str::contains("\"pass\"")),
+        );
+}
+
+#[test]
+fn way_check_git_hooks_missing() {
+    let tmp = TempDir::new().unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Git hooks")
+                .and(predicate::str::contains("No git hook manager detected"))
+                .and(predicate::str::contains("\"info\"")),
+        );
+}
+
+#[test]
+fn way_check_editorconfig_present() {
+    let tmp = TempDir::new().unwrap();
+    fs::write(tmp.path().join(".editorconfig"), "root = true").unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Editor config")
+                .and(predicate::str::contains(".editorconfig detected"))
+                .and(predicate::str::contains("\"pass\"")),
+        );
+}
+
+#[test]
+fn way_check_editorconfig_missing() {
+    let tmp = TempDir::new().unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Editor config")
+                .and(predicate::str::contains("No .editorconfig detected"))
+                .and(predicate::str::contains("\"info\"")),
+        );
+}
+
+#[test]
+fn way_check_documentation_complete() {
+    let tmp = TempDir::new().unwrap();
+    fs::write(tmp.path().join("README.md"), "# Test").unwrap();
+    fs::write(tmp.path().join("LICENSE"), "MIT").unwrap();
+    fs::write(tmp.path().join("CONTRIBUTING.md"), "# Contributing").unwrap();
+    fs::write(tmp.path().join(".gitignore"), "*.tmp").unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Documentation")
+                .and(predicate::str::contains("Complete"))
+                .and(predicate::str::contains("\"pass\"")),
+        );
+}
+
+#[test]
+fn way_check_documentation_not_configured() {
+    let tmp = TempDir::new().unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Documentation")
+                .and(predicate::str::contains("Not configured"))
+                .and(predicate::str::contains("\"info\"")),
+        );
+}
+
+#[test]
+fn way_check_documentation_missing_critical() {
+    let tmp = TempDir::new().unwrap();
+    // Only LICENSE and CONTRIBUTING (missing critical README and .gitignore)
+    fs::write(tmp.path().join("LICENSE"), "MIT").unwrap();
+    fs::write(tmp.path().join("CONTRIBUTING.md"), "# Contributing").unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Documentation")
+                .and(predicate::str::contains("Missing critical files"))
+                .and(predicate::str::contains("\"info\"")),
+        );
+}
+
+#[test]
+fn way_check_documentation_partial() {
+    let tmp = TempDir::new().unwrap();
+    // Has critical files but missing LICENSE and CONTRIBUTING
+    fs::write(tmp.path().join("README.md"), "# Test").unwrap();
+    fs::write(tmp.path().join(".gitignore"), "*.tmp").unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Documentation")
+                .and(predicate::str::contains("Partial documentation"))
+                .and(predicate::str::contains("\"pass\"")),
+        );
+}
+
+#[test]
+fn way_check_documentation_license_md_variant() {
+    let tmp = TempDir::new().unwrap();
+    fs::write(tmp.path().join("README.md"), "# Test").unwrap();
+    fs::write(tmp.path().join("LICENSE.md"), "MIT").unwrap();
+    fs::write(tmp.path().join("CONTRIBUTING.md"), "# Contributing").unwrap();
+    fs::write(tmp.path().join(".gitignore"), "*.tmp").unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Documentation")
+                .and(predicate::str::contains("Complete"))
+                .and(predicate::str::contains("\"pass\"")),
+        );
+}
+
+#[test]
+fn way_check_ai_instructions_claude_md() {
+    let tmp = TempDir::new().unwrap();
+    fs::write(tmp.path().join("CLAUDE.md"), "# Instructions").unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("AI instructions")
+                .and(predicate::str::contains("CLAUDE.md detected"))
+                .and(predicate::str::contains("\"pass\"")),
+        );
+}
+
+#[test]
+fn way_check_ai_instructions_agents_md() {
+    let tmp = TempDir::new().unwrap();
+    fs::write(tmp.path().join("AGENTS.md"), "# Instructions").unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("AI instructions")
+                .and(predicate::str::contains("AGENTS.md detected"))
+                .and(predicate::str::contains("\"pass\"")),
+        );
+}
+
+#[test]
+fn way_check_ai_instructions_missing() {
+    let tmp = TempDir::new().unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("AI instructions")
+                .and(predicate::str::contains("No AI instruction files detected"))
+                .and(predicate::str::contains("\"info\"")),
+        );
+}
+
+#[test]
+fn way_check_cicd_github_actions() {
+    let tmp = TempDir::new().unwrap();
+    fs::create_dir_all(tmp.path().join(".github/workflows")).unwrap();
+    fs::write(tmp.path().join(".github/workflows/ci.yml"), "name: CI").unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("CI/CD")
+                .and(predicate::str::contains("GitHub Actions configured"))
+                .and(predicate::str::contains("\"pass\"")),
+        );
+}
+
+#[test]
+fn way_check_cicd_gitlab() {
+    let tmp = TempDir::new().unwrap();
+    fs::write(tmp.path().join(".gitlab-ci.yml"), "stages: [test]").unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("CI/CD")
+                .and(predicate::str::contains("GitLab CI configured"))
+                .and(predicate::str::contains("\"pass\"")),
+        );
+}
+
+#[test]
+fn way_check_cicd_circleci() {
+    let tmp = TempDir::new().unwrap();
+    fs::create_dir_all(tmp.path().join(".circleci")).unwrap();
+    fs::write(tmp.path().join(".circleci/config.yml"), "version: 2.1").unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("CI/CD")
+                .and(predicate::str::contains("CircleCI configured"))
+                .and(predicate::str::contains("\"pass\"")),
+        );
+}
+
+#[test]
+fn way_check_cicd_missing() {
+    let tmp = TempDir::new().unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("CI/CD")
+                .and(predicate::str::contains("No CI/CD configuration detected"))
+                .and(predicate::str::contains("\"info\"")),
+        );
+}
+
+#[test]
+fn way_check_devcontainer_dir() {
+    let tmp = TempDir::new().unwrap();
+    fs::create_dir_all(tmp.path().join(".devcontainer")).unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Dev container")
+                .and(predicate::str::contains(
+                    ".devcontainer/ directory detected",
+                ))
+                .and(predicate::str::contains("\"pass\"")),
+        );
+}
+
+#[test]
+fn way_check_devcontainer_json() {
+    let tmp = TempDir::new().unwrap();
+    fs::write(tmp.path().join(".devcontainer.json"), "{}").unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Dev container")
+                .and(predicate::str::contains(".devcontainer.json detected"))
+                .and(predicate::str::contains("\"pass\"")),
+        );
+}
+
+#[test]
+fn way_check_devcontainer_missing() {
+    let tmp = TempDir::new().unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Dev container")
+                .and(predicate::str::contains(
+                    "No dev container configuration detected",
+                ))
+                .and(predicate::str::contains("\"info\"")),
+        );
+}
+
+// ─── wai way: new feature checks ────────────────────────────────────────────
+
+#[test]
+fn way_check_llm_txt_present() {
+    let tmp = TempDir::new().unwrap();
+    fs::write(tmp.path().join("llm.txt"), "# Project docs").unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("LLM documentation")
+                .and(predicate::str::contains("llm.txt detected"))
+                .and(predicate::str::contains("\"pass\"")),
+        );
+}
+
+#[test]
+fn way_check_llm_txt_missing() {
+    let tmp = TempDir::new().unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("LLM documentation")
+                .and(predicate::str::contains("No llm.txt detected"))
+                .and(predicate::str::contains("llmstxt.org"))
+                .and(predicate::str::contains("\"info\"")),
+        );
+}
+
+#[test]
+fn way_check_agent_skills_present() {
+    let tmp = TempDir::new().unwrap();
+    fs::create_dir_all(tmp.path().join(".wai/resources/skills")).unwrap();
+    fs::write(
+        tmp.path().join(".wai/resources/skills/test-SKILL.md"),
+        "# Test Skill",
+    )
+    .unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Agent skills")
+                .and(predicate::str::contains("1 skill(s) configured"))
+                .and(predicate::str::contains("\"pass\"")),
+        );
+}
+
+#[test]
+fn way_check_agent_skills_empty_dir() {
+    let tmp = TempDir::new().unwrap();
+    fs::create_dir_all(tmp.path().join(".wai/resources/skills")).unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Agent skills")
+                .and(predicate::str::contains(
+                    "Skills directory present but empty",
+                ))
+                .and(predicate::str::contains("\"info\"")),
+        );
+}
+
+#[test]
+fn way_check_agent_skills_missing() {
+    let tmp = TempDir::new().unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Agent skills")
+                .and(predicate::str::contains("No skills directory detected"))
+                .and(predicate::str::contains("\"info\"")),
+        );
+}
+
+#[test]
+fn way_check_justfile_recipes() {
+    let tmp = TempDir::new().unwrap();
+    fs::write(
+        tmp.path().join("justfile"),
+        "test:\n\techo test\n\ninstall:\n\techo install\n",
+    )
+    .unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Task runner")
+                .and(predicate::str::contains("recipes:"))
+                .and(predicate::str::contains("\"pass\"")),
+        );
 }
