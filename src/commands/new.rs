@@ -8,10 +8,11 @@ use crate::config::{
 use crate::context::require_safe_mode;
 use crate::error::WaiError;
 use crate::guided_flows;
+use crate::json::Suggestion;
 use crate::plugin;
 use crate::state::ProjectState;
 
-use super::require_project;
+use super::{print_suggestions, require_project};
 
 pub fn run(cmd: NewCommands) -> Result<()> {
     let project_root = require_project()?;
@@ -41,8 +42,23 @@ pub fn run(cmd: NewCommands) -> Result<()> {
             plugin::run_hooks(&project_root, "on_project_create");
 
             log::success(format!("Created project '{}'", name)).into_diagnostic()?;
-            println!("  → wai phase              View current phase");
-            println!("  → wai add research ...   Add research notes");
+
+            // Post-command suggestions for new project
+            let suggestions = vec![
+                Suggestion {
+                    label: "Add research".to_string(),
+                    command: "wai add research \"...\"".to_string(),
+                },
+                Suggestion {
+                    label: "Check project phase".to_string(),
+                    command: "wai phase".to_string(),
+                },
+                Suggestion {
+                    label: "Check status".to_string(),
+                    command: "wai status".to_string(),
+                },
+            ];
+            print_suggestions(&suggestions);
 
             // Show guided flows for first-time users
             guided_flows::enhanced_init_guidance(&name)?;

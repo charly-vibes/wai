@@ -2173,3 +2173,85 @@ fn way_check_justfile_recipes() {
                 .and(predicate::str::contains("\"pass\"")),
         );
 }
+
+// ─── Post-Command Suggestions ────────────────────────────────────────────────
+
+#[test]
+fn new_project_shows_suggestions() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["new", "project", "test-proj"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Add research: wai add research")
+                .and(predicate::str::contains("Check project phase: wai phase"))
+                .and(predicate::str::contains("Check status: wai status")),
+        );
+}
+
+#[test]
+fn add_research_shows_context_aware_suggestions() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "test-proj");
+
+    // First research artifact - should suggest adding more research
+    wai_cmd(tmp.path())
+        .args(["add", "research", "Initial research"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Add more research: wai add research")
+                .and(predicate::str::contains("Check phase: wai phase")),
+        );
+
+    // Second research artifact - should suggest moving to design phase
+    wai_cmd(tmp.path())
+        .args(["add", "research", "More detailed findings"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Add more research: wai add research")
+                .and(predicate::str::contains("Move to design phase: wai phase set design"))
+                .and(predicate::str::contains("Review research: wai search")),
+        );
+}
+
+#[test]
+fn phase_next_shows_phase_specific_suggestions() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "test-proj");
+
+    // Advance from research to design - should show design suggestions
+    wai_cmd(tmp.path())
+        .args(["phase", "next"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Add design: wai add design")
+                .and(predicate::str::contains("Review research: wai search"))
+                .and(predicate::str::contains("Show project details: wai show")),
+        );
+}
+
+#[test]
+fn phase_set_shows_phase_specific_suggestions() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "test-proj");
+
+    // Set to implement phase - should show implement suggestions
+    wai_cmd(tmp.path())
+        .args(["phase", "set", "implement"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Show project details: wai show")
+                .and(predicate::str::contains("Add implementation notes: wai add plan"))
+                .and(predicate::str::contains("Check status: wai status")),
+        );
+}

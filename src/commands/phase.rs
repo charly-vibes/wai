@@ -5,10 +5,11 @@ use owo_colors::OwoColorize;
 use crate::cli::PhaseCommands;
 use crate::config::{STATE_FILE, projects_dir};
 use crate::context::require_safe_mode;
+use crate::json::Suggestion;
 use crate::plugin;
 use crate::state::{Phase, ProjectState};
 
-use super::require_project;
+use super::{print_suggestions, require_project};
 
 pub fn run(cmd: PhaseCommands) -> Result<()> {
     let project_root = require_project()?;
@@ -71,6 +72,11 @@ pub fn run(cmd: PhaseCommands) -> Result<()> {
                 project_name, new_phase
             ))
             .into_diagnostic()?;
+
+            // Phase-specific suggestions after advancing
+            let suggestions = get_phase_suggestions(new_phase);
+            print_suggestions(&suggestions);
+
             Ok(())
         }
         PhaseCommands::Back => {
@@ -86,6 +92,11 @@ pub fn run(cmd: PhaseCommands) -> Result<()> {
                 project_name, new_phase
             ))
             .into_diagnostic()?;
+
+            // Phase-specific suggestions after going back
+            let suggestions = get_phase_suggestions(new_phase);
+            print_suggestions(&suggestions);
+
             Ok(())
         }
         PhaseCommands::Set { phase } => {
@@ -113,6 +124,11 @@ pub fn run(cmd: PhaseCommands) -> Result<()> {
                 project_name, target
             ))
             .into_diagnostic()?;
+
+            // Phase-specific suggestions after setting phase
+            let suggestions = get_phase_suggestions(target);
+            print_suggestions(&suggestions);
+
             Ok(())
         }
     }
@@ -133,6 +149,96 @@ fn find_active_project(project_root: &std::path::Path) -> Result<(String, std::p
     }
 
     Err(crate::error::WaiError::NoProjectContext.into())
+}
+
+/// Generate phase-specific suggestions based on the current phase
+fn get_phase_suggestions(phase: Phase) -> Vec<Suggestion> {
+    match phase {
+        Phase::Research => vec![
+            Suggestion {
+                label: "Add research".to_string(),
+                command: "wai add research \"...\"".to_string(),
+            },
+            Suggestion {
+                label: "Search existing research".to_string(),
+                command: "wai search \"...\"".to_string(),
+            },
+            Suggestion {
+                label: "Check status".to_string(),
+                command: "wai status".to_string(),
+            },
+        ],
+        Phase::Design => vec![
+            Suggestion {
+                label: "Add design".to_string(),
+                command: "wai add design \"...\"".to_string(),
+            },
+            Suggestion {
+                label: "Review research".to_string(),
+                command: "wai search \"research\"".to_string(),
+            },
+            Suggestion {
+                label: "Show project details".to_string(),
+                command: "wai show".to_string(),
+            },
+        ],
+        Phase::Plan => vec![
+            Suggestion {
+                label: "Add plan".to_string(),
+                command: "wai add plan \"...\"".to_string(),
+            },
+            Suggestion {
+                label: "Review designs".to_string(),
+                command: "wai search \"design\"".to_string(),
+            },
+            Suggestion {
+                label: "Show project timeline".to_string(),
+                command: "wai timeline".to_string(),
+            },
+        ],
+        Phase::Implement => vec![
+            Suggestion {
+                label: "Show project details".to_string(),
+                command: "wai show".to_string(),
+            },
+            Suggestion {
+                label: "Add implementation notes".to_string(),
+                command: "wai add plan \"...\"".to_string(),
+            },
+            Suggestion {
+                label: "Check status".to_string(),
+                command: "wai status".to_string(),
+            },
+        ],
+        Phase::Review => vec![
+            Suggestion {
+                label: "Review project timeline".to_string(),
+                command: "wai timeline".to_string(),
+            },
+            Suggestion {
+                label: "Search artifacts".to_string(),
+                command: "wai search \"...\"".to_string(),
+            },
+            Suggestion {
+                label: "Create handoff".to_string(),
+                command: "wai handoff create".to_string(),
+            },
+        ],
+        Phase::Archive => vec![
+            Suggestion {
+                label: "Create handoff".to_string(),
+                command: "wai handoff create".to_string(),
+            },
+            Suggestion {
+                label: "Review project timeline".to_string(),
+                command: "wai timeline".to_string(),
+            },
+            Suggestion {
+                label: "Show project details".to_string(),
+                command: "wai show".to_string(),
+            },
+        ],
+    }
 }
 
 fn format_phase(phase: Phase) -> String {

@@ -239,3 +239,24 @@ fn run_external(args: Vec<String>) -> Result<()> {
 pub fn require_project() -> Result<std::path::PathBuf> {
     find_project_root().ok_or_else(|| WaiError::NotInitialized.into())
 }
+
+/// Print workflow suggestions after a command completes.
+///
+/// Displays suggestions with the format:
+/// ```
+/// → suggestion.label: suggestion.command
+/// ```
+pub fn print_suggestions(suggestions: &[crate::json::Suggestion]) {
+    if suggestions.is_empty() {
+        return;
+    }
+
+    for suggestion in suggestions {
+        println!(
+            "  {} {}: {}",
+            "→".dimmed(),
+            suggestion.label,
+            suggestion.command
+        );
+    }
+}
