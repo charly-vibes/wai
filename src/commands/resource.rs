@@ -1,10 +1,15 @@
-use miette::Result;
+use cliclack::log;
+use miette::{IntoDiagnostic, Result};
 use serde::Deserialize;
 use std::fs;
 use std::path::Path;
 
 use crate::cli::{ResourceAddCommands, ResourceImportCommands, ResourceListCommands};
+use crate::config::{SKILLS_DIR, agent_config_dir};
+use crate::context::require_safe_mode;
 use crate::error::WaiError;
+
+use super::require_project;
 
 /// Validates a skill name according to the following rules:
 /// - Only lowercase a-z, digits 0-9, and hyphens allowed
@@ -151,7 +156,61 @@ pub fn run_import(cmd: ResourceImportCommands) -> Result<()> {
 }
 
 fn add_skill(name: &str) -> Result<()> {
-    miette::bail!("Add skill '{}' not yet implemented", name);
+    let project_root = require_project()?;
+    require_safe_mode("add skill")?;
+
+    // Validate skill name
+    validate_skill_name(name)?;
+
+    // Build path to skills directory
+    let skills_dir = agent_config_dir(&project_root).join(SKILLS_DIR);
+    let skill_dir = skills_dir.join(name);
+
+    // Check if skill already exists
+    if skill_dir.exists() {
+        miette::bail!("Skill '{}' already exists at {}", name, skill_dir.display());
+    }
+
+    // Create skill directory
+    fs::create_dir_all(&skill_dir).into_diagnostic()?;
+
+    // Create SKILL.md with template
+    let skill_file = skill_dir.join("SKILL.md");
+    let title = kebab_to_title_case(name);
+    let template = format!(
+        r#"---
+name: {}
+description: ""
+---
+
+# {}
+
+Instructions go here.
+"#,
+        name, title
+    );
+
+    fs::write(&skill_file, template).into_diagnostic()?;
+
+    log::success(format!("Created skill '{}'", name)).into_diagnostic()?;
+    log::info("Remember to run `wai sync` to update agent config").into_diagnostic()?;
+
+    Ok(())
+}
+
+/// Converts kebab-case to Title Case
+/// Example: "my-cool-skill" -> "My Cool Skill"
+fn kebab_to_title_case(s: &str) -> String {
+    s.split('-')
+        .map(|word| {
+            let mut chars = word.chars();
+            match chars.next() {
+                None => String::new(),
+                Some(first) => first.to_uppercase().chain(chars).collect(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn list_skills(json: bool) -> Result<()> {
@@ -429,5 +488,15 @@ description: "  "
         let result = parse_skill_frontmatter(file.path());
 
         assert!(result.is_none());
+    }
+
+    // Title case conversion tests
+    #[test]
+    fn test_kebab_to_title_case() {
+        assert_eq!(kebab_to_title_case("my-skill"), "My Skill");
+        assert_eq!(kebab_to_title_case("single"), "Single");
+        assert_eq!(kebab_to_title_case("a-b-c"), "A B C");
+        assert_eq!(kebab_to_title_case("my-cool-skill-2"), "My Cool Skill 2");
+        assert_eq!(kebab_to_title_case(""), "");
     }
 }
