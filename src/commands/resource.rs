@@ -325,8 +325,120 @@ fn list_skills(json: bool) -> Result<()> {
 }
 
 fn import_skills(from: Option<String>) -> Result<()> {
-    let path = from.unwrap_or_else(|| ".".to_string());
-    miette::bail!("Import skills from '{}' not yet implemented", path);
+    let project_root = require_project()?;
+    require_safe_mode("import skills")?;
+
+    // Determine source path
+    let source_path = if let Some(path) = from {
+        Path::new(&path).to_path_buf()
+    } else {
+        project_root.join(".agents").join("skills")
+    };
+
+    // Check if source exists
+    if !source_path.exists() {
+        miette::bail!(
+            "Source path not found: {}\n  Specify a different path with --from <path>",
+            source_path.display()
+        );
+    }
+
+    if !source_path.is_dir() {
+        miette::bail!(
+            "Source path is not a directory: {}",
+            source_path.display()
+        );
+    }
+
+    let target_dir = agent_config_dir(&project_root).join(SKILLS_DIR);
+    fs::create_dir_all(&target_dir).into_diagnostic()?;
+
+    let mut imported = 0;
+    let mut skipped = 0;
+
+    // Scan source directory
+    for entry in fs::read_dir(&source_path).into_diagnostic()? {
+        let entry = entry.into_diagnostic()?;
+        let source_skill_dir = entry.path();
+
+        // Only process directories
+        if !source_skill_dir.is_dir() {
+            continue;
+        }
+
+        // Check if SKILL.md exists
+        let skill_md = source_skill_dir.join("SKILL.md");
+        if !skill_md.exists() {
+            continue;
+        }
+
+        let skill_name = source_skill_dir
+            .file_name()
+            .and_then(|n| n.to_str())
+            .ok_or_else(|| miette::miette!("Invalid skill directory name"))?;
+
+        let target_skill_dir = target_dir.join(skill_name);
+
+        // Skip if target already exists
+        if target_skill_dir.exists() {
+            log::warning(format!("Skipped '{}' (already exists)", skill_name))
+                .into_diagnostic()?;
+            skipped += 1;
+            continue;
+        }
+
+        // Copy entire directory tree
+        copy_dir_all(&source_skill_dir, &target_skill_dir).into_diagnostic()?;
+        imported += 1;
+    }
+
+    // Report results
+    if imported == 0 && skipped == 0 {
+        println!();
+        println!("  {} No skills found in {}", "○".dimmed(), source_path.display());
+        println!();
+    } else {
+        println!();
+        if imported > 0 {
+            log::success(format!(
+                "Imported {} skill{}",
+                imported,
+                if imported == 1 { "" } else { "s" }
+            ))
+            .into_diagnostic()?;
+        }
+        if skipped > 0 {
+            log::info(format!(
+                "Skipped {} skill{} (already exist{})",
+                skipped,
+                if skipped == 1 { "" } else { "s" },
+                if skipped == 1 { "s" } else { "" }
+            ))
+            .into_diagnostic()?;
+        }
+        log::info("Remember to run `wai sync` to update agent config").into_diagnostic()?;
+        println!();
+    }
+
+    Ok(())
+}
+
+/// Recursively copy a directory and all its contents
+fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
+    fs::create_dir_all(dst)?;
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+
+        if ty.is_dir() {
+            copy_dir_all(&src_path, &dst_path)?;
+        } else {
+            fs::copy(&src_path, &dst_path)?;
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
