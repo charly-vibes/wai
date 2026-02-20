@@ -40,6 +40,9 @@ walkdir = "2"
 # Regex support for search
 regex = "1"
 
+# String similarity for typo detection
+strsim = "0.11"
+
 # Async runtime (optional, for future use)
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs"], optional = true }
 

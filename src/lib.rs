@@ -11,6 +11,7 @@ pub mod openspec;
 pub mod output;
 pub mod plugin;
 pub mod state;
+pub mod suggestions;
 pub mod tutorial;
 pub mod workflows;
 pub mod workspace;
