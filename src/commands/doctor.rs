@@ -7,8 +7,9 @@ use std::hash::{Hash, Hasher};
 use std::path::Path;
 
 use crate::config::{
-    ARCHIVES_DIR, AREAS_DIR, CONFIG_FILE, PLUGINS_DIR, PROJECTS_DIR, ProjectConfig, RESOURCES_DIR,
-    STATE_FILE, agent_config_dir, plugins_dir, projects_dir, wai_dir,
+    AGENT_CONFIG_DIR, ARCHIVES_DIR, AREAS_DIR, CONFIG_FILE, CONTEXT_DIR, PLUGINS_DIR, PROJECTS_DIR,
+    ProjectConfig, RESOURCES_DIR, RULES_DIR, SKILLS_DIR, STATE_FILE, agent_config_dir, plugins_dir,
+    projects_dir, wai_dir,
 };
 use crate::context::current_context;
 use crate::output::print_json;
@@ -71,6 +72,7 @@ pub fn run(fix: bool) -> Result<()> {
     let mut checks = Vec::new();
     checks.extend(check_directories(&project_root));
     checks.push(check_config(&project_root));
+    checks.push(check_version(&project_root));
     checks.extend(check_plugin_tools(&project_root));
     checks.extend(check_agent_config_sync(&project_root));
     checks.extend(check_project_state(&project_root));
@@ -276,7 +278,11 @@ fn render_human(checks: &[CheckResult], summary: &Summary) -> Result<()> {
 
 fn check_directories(project_root: &Path) -> Vec<CheckResult> {
     let wai = wai_dir(project_root);
-    let expected = [
+    let mut results = Vec::new();
+    let mut missing = Vec::new();
+
+    // Check top-level PARA directories
+    let para_dirs = [
         PROJECTS_DIR,
         AREAS_DIR,
         RESOURCES_DIR,
@@ -284,20 +290,46 @@ fn check_directories(project_root: &Path) -> Vec<CheckResult> {
         PLUGINS_DIR,
     ];
 
-    let mut results = Vec::new();
-    let mut missing = Vec::new();
-
-    for dir in &expected {
+    for dir in &para_dirs {
         if !wai.join(dir).is_dir() {
-            missing.push(*dir);
+            missing.push(format!(".wai/{}", dir));
         }
+    }
+
+    // Check agent-config subdirectories
+    let agent_config = wai.join(RESOURCES_DIR).join(AGENT_CONFIG_DIR);
+    let agent_subdirs = [SKILLS_DIR, RULES_DIR, CONTEXT_DIR];
+
+    for subdir in &agent_subdirs {
+        if !agent_config.join(subdir).is_dir() {
+            missing.push(format!(".wai/resources/agent-config/{}", subdir));
+        }
+    }
+
+    // Check resource subdirectories
+    let resources = wai.join(RESOURCES_DIR);
+    let resource_subdirs = ["templates", "patterns"];
+
+    for subdir in &resource_subdirs {
+        if !resources.join(subdir).is_dir() {
+            missing.push(format!(".wai/resources/{}", subdir));
+        }
+    }
+
+    // Check default files
+    if !wai.join(".gitignore").exists() {
+        missing.push(".wai/.gitignore".to_string());
+    }
+
+    if !agent_config.join(".projections.yml").exists() {
+        missing.push(".wai/resources/agent-config/.projections.yml".to_string());
     }
 
     if missing.is_empty() {
         results.push(CheckResult {
             name: "Directory structure".to_string(),
             status: Status::Pass,
-            message: "All PARA directories present".to_string(),
+            message: "All directories and default files present".to_string(),
             fix: None,
             fix_fn: None,
         });
@@ -305,7 +337,7 @@ fn check_directories(project_root: &Path) -> Vec<CheckResult> {
         results.push(CheckResult {
             name: "Directory structure".to_string(),
             status: Status::Fail,
-            message: format!("Missing directories: {}", missing.join(", ")),
+            message: format!("Missing: {}", missing.join(", ")),
             fix: Some("Run: wai doctor --fix (or wai init to repair)".to_string()),
             fix_fn: Some(Box::new(move |project_root| {
                 ensure_workspace_current(project_root)?;
@@ -343,6 +375,56 @@ fn check_config(project_root: &Path) -> CheckResult {
             status: Status::Fail,
             message: format!("config.toml parse error: {}", e),
             fix: Some("Fix the syntax in .wai/config.toml".to_string()),
+            fix_fn: None,
+        },
+    }
+}
+
+fn check_version(project_root: &Path) -> CheckResult {
+    let config_path = wai_dir(project_root).join(CONFIG_FILE);
+
+    if !config_path.exists() {
+        return CheckResult {
+            name: "Version".to_string(),
+            status: Status::Pass,
+            message: "Skipped (no config.toml)".to_string(),
+            fix: None,
+            fix_fn: None,
+        };
+    }
+
+    match ProjectConfig::load(project_root) {
+        Ok(config) => {
+            let current_version = env!("CARGO_PKG_VERSION");
+            if config.project.version == current_version {
+                CheckResult {
+                    name: "Version".to_string(),
+                    status: Status::Pass,
+                    message: format!("Up to date ({})", current_version),
+                    fix: None,
+                    fix_fn: None,
+                }
+            } else {
+                CheckResult {
+                    name: "Version".to_string(),
+                    status: Status::Warn,
+                    message: format!(
+                        "Config version ({}) differs from binary ({})",
+                        config.project.version, current_version
+                    ),
+                    fix: Some("Run: wai doctor --fix (to update config.toml version)".to_string()),
+                    fix_fn: Some(Box::new(move |project_root| {
+                        ensure_workspace_current(project_root)?;
+                        Ok(())
+                    })),
+                }
+            }
+        }
+        Err(_) => CheckResult {
+            name: "Version".to_string(),
+            status: Status::Pass,
+            message: "Skipped (invalid config.toml)".to_string(),
+            fix: None,
             fix_fn: None,
         },
     }
