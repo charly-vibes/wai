@@ -1,6 +1,7 @@
 use cliclack::log;
 use miette::{IntoDiagnostic, Result};
-use serde::Deserialize;
+use owo_colors::OwoColorize;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 
@@ -86,6 +87,20 @@ pub fn validate_skill_name(name: &str) -> Result<(), WaiError> {
 pub struct SkillMetadata {
     pub name: String,
     pub description: String,
+}
+
+/// Skill entry for listing
+#[derive(Debug, Clone, Serialize)]
+struct SkillEntry {
+    name: String,
+    description: String,
+    path: String,
+}
+
+/// JSON payload for skill list
+#[derive(Debug, Serialize)]
+struct SkillListPayload {
+    skills: Vec<SkillEntry>,
 }
 
 /// Parses YAML frontmatter from a SKILL.md file.
@@ -214,11 +229,99 @@ fn kebab_to_title_case(s: &str) -> String {
 }
 
 fn list_skills(json: bool) -> Result<()> {
-    if json {
-        miette::bail!("List skills (JSON) not yet implemented");
-    } else {
-        miette::bail!("List skills not yet implemented");
+    let project_root = require_project()?;
+    let skills_dir = agent_config_dir(&project_root).join(SKILLS_DIR);
+
+    // Check if skills directory exists
+    if !skills_dir.exists() {
+        if json {
+            let payload = SkillListPayload { skills: vec![] };
+            crate::output::print_json(&payload)?;
+        } else {
+            println!();
+            println!("  {} No skills found", "○".dimmed());
+            println!("  {} Run 'wai resource add skill <name>' to create one", "→".cyan());
+            println!();
+        }
+        return Ok(());
     }
+
+    // Scan skills directory
+    let mut entries = Vec::new();
+    for entry in fs::read_dir(&skills_dir).into_diagnostic()? {
+        let entry = entry.into_diagnostic()?;
+        let path = entry.path();
+
+        // Only process directories
+        if !path.is_dir() {
+            continue;
+        }
+
+        let skill_name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("unknown")
+            .to_string();
+
+        let skill_file = path.join("SKILL.md");
+        let relative_path = path
+            .strip_prefix(&project_root)
+            .unwrap_or(&path)
+            .display()
+            .to_string();
+
+        // Try to parse metadata
+        if let Some(metadata) = parse_skill_frontmatter(&skill_file) {
+            entries.push(SkillEntry {
+                name: metadata.name,
+                description: metadata.description,
+                path: relative_path,
+            });
+        } else {
+            // No metadata or bad frontmatter
+            entries.push(SkillEntry {
+                name: skill_name,
+                description: "(no metadata)".to_string(),
+                path: relative_path,
+            });
+        }
+    }
+
+    // Sort alphabetically by name
+    entries.sort_by(|a, b| a.name.cmp(&b.name));
+
+    // Output
+    if json {
+        let payload = SkillListPayload { skills: entries };
+        crate::output::print_json(&payload)?;
+    } else {
+        if entries.is_empty() {
+            println!();
+            println!("  {} No skills found", "○".dimmed());
+            println!("  {} Run 'wai resource add skill <name>' to create one", "→".cyan());
+            println!();
+        } else {
+            println!();
+            println!("  {} Skills", "◆".cyan());
+            println!();
+            for entry in entries {
+                let desc = if entry.description.len() > 60 {
+                    format!("{}...", &entry.description[..57])
+                } else {
+                    entry.description.clone()
+                };
+
+                if entry.description == "(no metadata)" {
+                    println!("    {} {} {}", "•".dimmed(), entry.name, desc.dimmed());
+                } else {
+                    println!("    {} {} {}", "•".dimmed(), entry.name.bold(), desc.dimmed());
+                }
+            }
+            println!();
+        }
+    }
+
+    Ok(())
 }
 
 fn import_skills(from: Option<String>) -> Result<()> {
