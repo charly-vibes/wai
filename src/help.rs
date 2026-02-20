@@ -153,9 +153,13 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
             about: "Diagnose workspace health",
             examples: &[
                 ("wai doctor", "Run all health checks"),
+                ("wai doctor --fix", "Automatically fix issues"),
                 ("wai doctor --json", "Machine-readable diagnostics"),
             ],
-            advanced_options: &["--json    Output results as JSON"],
+            advanced_options: &[
+                "--fix     Automatically fix issues where possible",
+                "--json    Output results as JSON",
+            ],
             env_vars: &[("NO_COLOR", "Disable colored output")],
             internals: &[
                 "Checks PARA directory structure integrity",
