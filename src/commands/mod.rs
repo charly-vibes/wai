@@ -5,6 +5,7 @@ use crate::cli::{Cli, Commands};
 use crate::config::{UserConfig, find_project_root};
 use crate::context::current_context;
 use crate::error::WaiError;
+use crate::suggestions::SuggestionEngine;
 
 mod add;
 mod config_cmd;
@@ -229,10 +230,24 @@ fn run_external(args: Vec<String>) -> Result<()> {
             );
         }
     } else {
-        miette::bail!(
-            "Unknown command '{}'. Run 'wai --help' to see available commands or 'wai plugin list' to see plugins.",
-            plugin_name
-        );
+        let valid_commands = &[
+            "new", "add", "show", "move", "init", "status", "phase", "sync", "config",
+            "handoff", "search", "timeline", "plugin", "doctor", "way", "import", "resource",
+            "tutorial",
+        ];
+        let engine = SuggestionEngine::new();
+        if let Some(suggestion) = engine.suggest_typo(plugin_name, valid_commands) {
+            miette::bail!(
+                "{}. {}",
+                suggestion.message(),
+                "Run 'wai --help' to see available commands."
+            );
+        } else {
+            miette::bail!(
+                "Unknown command '{}'. Run 'wai --help' to see available commands or 'wai plugin list' to see plugins.",
+                plugin_name
+            );
+        }
     }
 }
 

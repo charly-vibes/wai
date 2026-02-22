@@ -2255,3 +2255,49 @@ fn phase_set_shows_phase_specific_suggestions() {
                 .and(predicate::str::contains("Check status: wai status")),
         );
 }
+
+// ─── Typo Detection ───────────────────────────────────────────────────────────
+
+#[test]
+fn typo_suggests_closest_command() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    // "statu" is a typo of "status"
+    wai_cmd(tmp.path())
+        .args(["statu"])
+        .assert()
+        .failure()
+        .stderr(
+            predicate::str::contains("Did you mean 'status'")
+                .or(predicate::str::contains("did you mean 'status'")),
+        );
+}
+
+#[test]
+fn typo_suggests_doctor_for_doctr() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["doctr"])
+        .assert()
+        .failure()
+        .stderr(
+            predicate::str::contains("Did you mean 'doctor'")
+                .or(predicate::str::contains("did you mean 'doctor'")),
+        );
+}
+
+#[test]
+fn completely_unknown_command_shows_help_hint() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    // "xyz" is not similar to any command
+    wai_cmd(tmp.path())
+        .args(["xyz"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("wai --help"));
+}
