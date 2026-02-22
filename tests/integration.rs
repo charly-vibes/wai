@@ -2256,6 +2256,40 @@ fn phase_set_shows_phase_specific_suggestions() {
         );
 }
 
+// ─── Wrong Order Detection ────────────────────────────────────────────────────
+
+#[test]
+fn wrong_order_project_new_suggests_correction() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    // "wai project new" should suggest "wai new project"
+    wai_cmd(tmp.path())
+        .args(["project", "new"])
+        .assert()
+        .failure()
+        .stderr(
+            predicate::str::contains("new project")
+                .and(predicate::str::contains("Did you mean")),
+        );
+}
+
+#[test]
+fn wrong_order_research_add_suggests_correction() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    // "wai research add" should suggest "wai add research"
+    wai_cmd(tmp.path())
+        .args(["research", "add"])
+        .assert()
+        .failure()
+        .stderr(
+            predicate::str::contains("add research")
+                .and(predicate::str::contains("Did you mean")),
+        );
+}
+
 // ─── Typo Detection ───────────────────────────────────────────────────────────
 
 #[test]

@@ -235,7 +235,42 @@ fn run_external(args: Vec<String>) -> Result<()> {
             "handoff", "search", "timeline", "plugin", "doctor", "way", "import", "resource",
             "tutorial",
         ];
+        // Valid (verb, noun) subcommand patterns for wrong-order detection
+        let valid_patterns = &[
+            ("new", "project"),
+            ("new", "area"),
+            ("new", "resource"),
+            ("add", "research"),
+            ("add", "plan"),
+            ("add", "design"),
+            ("phase", "next"),
+            ("phase", "set"),
+            ("phase", "back"),
+            ("phase", "show"),
+            ("handoff", "create"),
+            ("plugin", "list"),
+            ("plugin", "enable"),
+            ("plugin", "disable"),
+            ("resource", "add"),
+            ("resource", "list"),
+            ("resource", "import"),
+            ("config", "add"),
+            ("config", "list"),
+            ("config", "edit"),
+        ];
         let engine = SuggestionEngine::new();
+
+        // Check for reversed command order before typo detection
+        if let Some(second) = args.get(1) {
+            if let Some(suggestion) = engine.suggest_order(plugin_name, second, valid_patterns) {
+                miette::bail!(
+                    "{}. {}",
+                    suggestion.message(),
+                    "Run 'wai --help' to see available commands."
+                );
+            }
+        }
+
         if let Some(suggestion) = engine.suggest_typo(plugin_name, valid_commands) {
             miette::bail!(
                 "{}. {}",
