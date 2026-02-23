@@ -199,6 +199,10 @@ pub enum Commands {
         /// Skip the LLM and fall back to `wai search` (useful for testing or offline use)
         #[arg(long)]
         no_llm: bool,
+
+        /// Output machine-readable JSON instead of formatted text
+        #[arg(long)]
+        json: bool,
     },
 
     /// Pass-through to plugin commands (e.g., wai beads list)

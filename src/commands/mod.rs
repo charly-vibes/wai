@@ -61,7 +61,11 @@ pub fn run(cli: Cli) -> Result<()> {
             crate::cli::ResourceCommands::Import(import_cmd) => resource::run_import(import_cmd),
         },
         Some(Commands::Tutorial) => crate::tutorial::run(),
-        Some(Commands::Why { query, no_llm }) => why::run(query, no_llm),
+        Some(Commands::Why {
+            query,
+            no_llm,
+            json,
+        }) => why::run(query, no_llm, json),
         Some(Commands::External(args)) => run_external(args),
         None => show_welcome(),
     }

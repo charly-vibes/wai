@@ -10,6 +10,326 @@ use crate::llm::detect_backend;
 
 use super::require_project;
 
+// ── Response parsing ───────────────────────────────────────────────────────────
+
+/// Relevance level extracted from the LLM's artifact references.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Relevance {
+    High,
+    Medium,
+    Low,
+}
+
+impl Relevance {
+    fn from_str(s: &str) -> Option<Self> {
+        match s.trim().to_lowercase().as_str() {
+            "high" => Some(Relevance::High),
+            "medium" | "med" => Some(Relevance::Medium),
+            "low" => Some(Relevance::Low),
+            _ => None,
+        }
+    }
+
+    fn as_str(&self) -> &str {
+        match self {
+            Relevance::High => "High",
+            Relevance::Medium => "Medium",
+            Relevance::Low => "Low",
+        }
+    }
+
+    fn icon(&self) -> &str {
+        match self {
+            Relevance::High => "●",
+            Relevance::Medium => "◐",
+            Relevance::Low => "○",
+        }
+    }
+}
+
+/// A single artifact reference extracted from the LLM response.
+#[derive(Debug, Clone)]
+pub struct ArtifactRef {
+    pub path: String,
+    pub description: String,
+    pub relevance: Option<Relevance>,
+}
+
+/// LLM response parsed into structured sections.
+#[derive(Debug)]
+pub struct ParsedResponse {
+    pub answer: String,
+    pub relevant_artifacts: Vec<ArtifactRef>,
+    pub decision_chain: String,
+    pub suggestions: Vec<String>,
+    /// Original raw text from the LLM.
+    pub raw: String,
+}
+
+/// Parse a raw LLM markdown response into structured sections.
+///
+/// Handles malformed output gracefully: if no `## ` headers are found, the
+/// entire response is treated as the answer.
+pub fn parse_response(raw: &str) -> ParsedResponse {
+    let sections = split_sections(raw);
+
+    let answer = if sections.is_empty() {
+        // Completely malformed — treat whole text as answer
+        raw.trim().to_string()
+    } else {
+        sections.get("Answer").cloned().unwrap_or_default()
+    };
+
+    let artifacts_text = sections
+        .get("Relevant Artifacts")
+        .cloned()
+        .unwrap_or_default();
+    let relevant_artifacts = parse_artifact_refs(&artifacts_text);
+
+    let decision_chain = sections.get("Decision Chain").cloned().unwrap_or_default();
+
+    let suggestions_text = sections.get("Suggestions").cloned().unwrap_or_default();
+    let suggestions = parse_suggestions(&suggestions_text);
+
+    ParsedResponse {
+        answer,
+        relevant_artifacts,
+        decision_chain,
+        suggestions,
+        raw: raw.to_string(),
+    }
+}
+
+/// Split markdown text into a map of `section_name → content` by `## ` headers.
+fn split_sections(text: &str) -> std::collections::HashMap<String, String> {
+    let mut sections = std::collections::HashMap::new();
+    let mut current_name: Option<String> = None;
+    let mut current_content = String::new();
+
+    for line in text.lines() {
+        if let Some(heading) = line.strip_prefix("## ") {
+            if let Some(name) = current_name.take() {
+                sections.insert(name, current_content.trim().to_string());
+            }
+            current_name = Some(heading.trim().to_string());
+            current_content = String::new();
+        } else {
+            current_content.push_str(line);
+            current_content.push('\n');
+        }
+    }
+    if let Some(name) = current_name {
+        sections.insert(name, current_content.trim().to_string());
+    }
+    sections
+}
+
+/// Parse artifact references from the `## Relevant Artifacts` section.
+///
+/// Recognises lines like:
+/// - `- `.wai/projects/…/file.md` (High) — description`
+/// - `- .wai/projects/…/file.md [Medium]: description`
+/// - Lines without a recognisable path are skipped.
+fn parse_artifact_refs(text: &str) -> Vec<ArtifactRef> {
+    let mut refs = Vec::new();
+    for line in text.lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        // Strip leading list markers
+        let content = line.trim_start_matches(['-', '*', '+']).trim();
+
+        // Extract backtick-quoted path or plain path-like token
+        let (path, rest) = if let Some(after_open) = content.strip_prefix('`') {
+            if let Some(close) = after_open.find('`') {
+                (
+                    after_open[..close].to_string(),
+                    after_open[close + 1..].trim(),
+                )
+            } else {
+                extract_bare_path(content)
+            }
+        } else {
+            extract_bare_path(content)
+        };
+
+        if path.is_empty() || !path.contains('/') {
+            continue;
+        }
+
+        let relevance = extract_relevance(rest);
+        let description = clean_description(rest);
+
+        refs.push(ArtifactRef {
+            path,
+            description,
+            relevance,
+        });
+    }
+    refs
+}
+
+/// Extract the first whitespace-delimited token that looks like a path
+/// (contains `/`) and return `(path, rest)`.
+fn extract_bare_path(content: &str) -> (String, &str) {
+    let trimmed = content.trim_start_matches('#').trim();
+    if let Some(space) = trimmed.find(char::is_whitespace) {
+        let token = &trimmed[..space];
+        if token.contains('/') {
+            return (token.to_string(), trimmed[space..].trim());
+        }
+    } else if trimmed.contains('/') {
+        return (trimmed.to_string(), "");
+    }
+    (String::new(), content)
+}
+
+/// Look for `(High)`, `[High]`, `(Medium)`, etc. in a string.
+fn extract_relevance(text: &str) -> Option<Relevance> {
+    for word in text.split_whitespace() {
+        let stripped =
+            word.trim_matches(|c: char| c == '(' || c == ')' || c == '[' || c == ']' || c == ':');
+        if let Some(r) = Relevance::from_str(stripped) {
+            return Some(r);
+        }
+    }
+    None
+}
+
+/// Remove relevance markers and leading punctuation to get a clean description.
+fn clean_description(text: &str) -> String {
+    // Strip leading brackets/parens relevance tokens then em-dash or colon separators
+    let mut s = text.to_string();
+    // Remove parenthesised or bracketed relevance markers
+    for marker in &["(High)", "(Medium)", "(Low)", "[High]", "[Medium]", "[Low]"] {
+        s = s.replace(marker, "");
+    }
+    // Strip leading —, -, :
+    let trimmed = s.trim().trim_start_matches(['—', '-', ':']).trim();
+    trimmed.to_string()
+}
+
+/// Parse bullet/numbered points from the `## Suggestions` section.
+fn parse_suggestions(text: &str) -> Vec<String> {
+    text.lines()
+        .filter_map(|line| {
+            let stripped = line
+                .trim()
+                .trim_start_matches(|c: char| {
+                    c.is_ascii_digit() || c == '.' || c == '-' || c == '*' || c == '+'
+                })
+                .trim();
+            if stripped.is_empty() {
+                None
+            } else {
+                Some(stripped.to_string())
+            }
+        })
+        .collect()
+}
+
+// ── Terminal formatter ─────────────────────────────────────────────────────────
+
+fn separator() {
+    println!("  {}", "─".repeat(58).dimmed());
+}
+
+fn section_header(title: &str) {
+    separator();
+    println!("  {}", title.bold());
+    separator();
+}
+
+/// Pretty-print the parsed response to stdout with colors and icons.
+pub fn format_terminal(response: &ParsedResponse, query: &str) {
+    println!();
+    println!("  {} {}", "◆".cyan(), query.bold());
+    println!();
+
+    // Answer
+    section_header("Answer");
+    println!();
+    for line in response.answer.lines() {
+        println!("  {}", line);
+    }
+    println!();
+
+    // Relevant Artifacts
+    if !response.relevant_artifacts.is_empty() {
+        section_header("Relevant Artifacts");
+        println!();
+        for artifact in &response.relevant_artifacts {
+            let relevance_display = match &artifact.relevance {
+                Some(r) => format!("{} [{}]", r.icon(), r.as_str()),
+                None => "○".to_string(),
+            };
+            let colored = match &artifact.relevance {
+                Some(Relevance::High) => relevance_display.red().to_string(),
+                Some(Relevance::Medium) => relevance_display.yellow().to_string(),
+                Some(Relevance::Low) => relevance_display.green().to_string(),
+                None => relevance_display.dimmed().to_string(),
+            };
+            // file:line format makes paths clickable in supporting terminals
+            let clickable_path = format!("{}:1", artifact.path);
+            println!("  {}  {}", colored, clickable_path.cyan());
+            if !artifact.description.is_empty() {
+                println!("     {}", artifact.description.dimmed());
+            }
+            println!();
+        }
+    }
+
+    // Decision Chain
+    if !response.decision_chain.is_empty() {
+        section_header("Decision Chain");
+        println!();
+        for line in response.decision_chain.lines() {
+            println!("  {}", line);
+        }
+        println!();
+    }
+
+    // Suggestions
+    if !response.suggestions.is_empty() {
+        section_header("Suggestions");
+        println!();
+        for suggestion in &response.suggestions {
+            println!("  {} {}", "→".cyan(), suggestion);
+        }
+        println!();
+    }
+}
+
+// ── JSON formatter ─────────────────────────────────────────────────────────────
+
+/// Serialize the parsed response as JSON for machine-readable output.
+pub fn format_json(response: &ParsedResponse, query: &str) -> String {
+    use serde_json::{Value, json};
+
+    let artifacts: Vec<Value> = response
+        .relevant_artifacts
+        .iter()
+        .map(|a| {
+            json!({
+                "path": a.path,
+                "relevance": a.relevance.as_ref().map(|r| r.as_str()),
+                "description": a.description,
+            })
+        })
+        .collect();
+
+    let v = json!({
+        "query": query,
+        "answer": response.answer,
+        "relevant_artifacts": artifacts,
+        "decision_chain": response.decision_chain,
+        "suggestions": response.suggestions,
+    });
+
+    serde_json::to_string_pretty(&v).unwrap_or_else(|_| response.raw.clone())
+}
+
 // Approximate character budget: 100K tokens × 4 chars/token
 const MAX_CONTEXT_CHARS: usize = 400_000;
 const MAX_ARTIFACTS_WHEN_TRUNCATING: usize = 50;
@@ -411,7 +731,7 @@ fn escape_artifact(content: &str) -> String {
 
 // ── Command entry point ───────────────────────────────────────────────────────
 
-pub fn run(query: String, no_llm: bool) -> Result<()> {
+pub fn run(query: String, no_llm: bool, json: bool) -> Result<()> {
     let project_root = require_project()?;
 
     if no_llm {
@@ -466,11 +786,13 @@ pub fn run(query: String, no_llm: bool) -> Result<()> {
     // Build prompt and call the LLM
     let prompt = build_prompt(&ctx);
 
-    println!();
-    println!("  {} {}", "◆".cyan(), query.bold());
-    println!("  {} Querying {} …", "○".dimmed(), backend.name());
+    if !json {
+        println!();
+        println!("  {} {}", "◆".cyan(), query.bold());
+        println!("  {} Querying {} …", "○".dimmed(), backend.name());
+    }
 
-    let response = match backend.complete(&prompt) {
+    let raw_response = match backend.complete(&prompt) {
         Ok(r) => r,
         Err(e) => {
             eprintln!(
@@ -482,11 +804,13 @@ pub fn run(query: String, no_llm: bool) -> Result<()> {
         }
     };
 
-    // Output will be formatted in Phase 4 (wai-qrg).
-    // For now, print the raw response.
-    println!();
-    println!("{}", response);
-    println!();
+    let parsed = parse_response(&raw_response);
+
+    if json {
+        println!("{}", format_json(&parsed, &query));
+    } else {
+        format_terminal(&parsed, &query);
+    }
 
     Ok(())
 }
@@ -739,5 +1063,211 @@ mod tests {
             truncated: false,
         };
         assert!(!ctx.is_empty());
+    }
+
+    // ── parse_response ──
+
+    #[test]
+    fn parse_well_formed_response_extracts_all_sections() {
+        let raw = "## Answer\nTOML is simple.\n## Relevant Artifacts\n- `.wai/a.md` (High) — key doc\n## Decision Chain\nResearch → Design\n## Suggestions\n- Use TOML everywhere";
+        let p = parse_response(raw);
+        assert_eq!(p.answer, "TOML is simple.");
+        assert_eq!(p.decision_chain, "Research → Design");
+        assert_eq!(p.suggestions, vec!["Use TOML everywhere"]);
+    }
+
+    #[test]
+    fn parse_malformed_response_uses_raw_as_answer() {
+        let raw = "No headers here, just plain text.";
+        let p = parse_response(raw);
+        assert_eq!(p.answer, raw);
+        assert!(p.relevant_artifacts.is_empty());
+        assert!(p.suggestions.is_empty());
+    }
+
+    #[test]
+    fn parse_missing_section_is_empty() {
+        let raw = "## Answer\nSome answer.\n## Suggestions\n- Do this";
+        let p = parse_response(raw);
+        assert!(p.relevant_artifacts.is_empty());
+        assert_eq!(p.decision_chain, "");
+        assert_eq!(p.suggestions, vec!["Do this"]);
+    }
+
+    // ── split_sections ──
+
+    #[test]
+    fn split_sections_handles_multiple_sections() {
+        let text = "## Foo\nfoo content\n## Bar\nbar content";
+        let sections = split_sections(text);
+        assert_eq!(sections.get("Foo").map(|s| s.as_str()), Some("foo content"));
+        assert_eq!(sections.get("Bar").map(|s| s.as_str()), Some("bar content"));
+    }
+
+    #[test]
+    fn split_sections_empty_text_returns_empty_map() {
+        let sections = split_sections("");
+        assert!(sections.is_empty());
+    }
+
+    #[test]
+    fn split_sections_text_without_headers_returns_empty_map() {
+        let sections = split_sections("just plain text, no headers");
+        assert!(sections.is_empty());
+    }
+
+    // ── extract_relevance ──
+
+    #[test]
+    fn extract_relevance_parses_parenthesised_high() {
+        assert_eq!(
+            extract_relevance("(High) — important"),
+            Some(Relevance::High)
+        );
+    }
+
+    #[test]
+    fn extract_relevance_parses_bracketed_medium() {
+        assert_eq!(
+            extract_relevance("[Medium]: explanation"),
+            Some(Relevance::Medium)
+        );
+    }
+
+    #[test]
+    fn extract_relevance_parses_low() {
+        assert_eq!(
+            extract_relevance("(Low) — less important"),
+            Some(Relevance::Low)
+        );
+    }
+
+    #[test]
+    fn extract_relevance_returns_none_when_absent() {
+        assert_eq!(extract_relevance("no relevance marker here"), None);
+    }
+
+    #[test]
+    fn extract_relevance_case_insensitive() {
+        assert_eq!(extract_relevance("(high)"), Some(Relevance::High));
+        assert_eq!(extract_relevance("(MEDIUM)"), Some(Relevance::Medium));
+    }
+
+    // ── parse_artifact_refs ──
+
+    #[test]
+    fn parse_artifact_refs_extracts_backtick_path_and_relevance() {
+        let text = "- `.wai/projects/why/research/2024-01-01.md` (High) — explains rationale";
+        let refs = parse_artifact_refs(text);
+        assert_eq!(refs.len(), 1);
+        assert_eq!(refs[0].path, ".wai/projects/why/research/2024-01-01.md");
+        assert_eq!(refs[0].relevance, Some(Relevance::High));
+        assert!(refs[0].description.contains("explains rationale"));
+    }
+
+    #[test]
+    fn parse_artifact_refs_extracts_bare_path() {
+        let text = "- .wai/projects/why/design/arch.md [Medium]: architecture doc";
+        let refs = parse_artifact_refs(text);
+        assert_eq!(refs.len(), 1);
+        assert_eq!(refs[0].path, ".wai/projects/why/design/arch.md");
+        assert_eq!(refs[0].relevance, Some(Relevance::Medium));
+    }
+
+    #[test]
+    fn parse_artifact_refs_skips_lines_without_paths() {
+        let text = "- No path here\n- also no path\n- `.wai/foo/bar.md` (Low) — desc";
+        let refs = parse_artifact_refs(text);
+        assert_eq!(refs.len(), 1);
+    }
+
+    #[test]
+    fn parse_artifact_refs_empty_text_returns_empty() {
+        let refs = parse_artifact_refs("");
+        assert!(refs.is_empty());
+    }
+
+    // ── parse_suggestions ──
+
+    #[test]
+    fn parse_suggestions_extracts_bullet_points() {
+        let text = "- Update docs\n- Add tests\n- Refactor config";
+        let suggestions = parse_suggestions(text);
+        assert_eq!(
+            suggestions,
+            vec!["Update docs", "Add tests", "Refactor config"]
+        );
+    }
+
+    #[test]
+    fn parse_suggestions_strips_numbering() {
+        let text = "1. First suggestion\n2. Second suggestion";
+        let suggestions = parse_suggestions(text);
+        assert_eq!(suggestions, vec!["First suggestion", "Second suggestion"]);
+    }
+
+    #[test]
+    fn parse_suggestions_skips_blank_lines() {
+        let text = "- A\n\n- B";
+        let suggestions = parse_suggestions(text);
+        assert_eq!(suggestions, vec!["A", "B"]);
+    }
+
+    // ── format_json ──
+
+    #[test]
+    fn format_json_contains_required_fields() {
+        let response = ParsedResponse {
+            answer: "Because TOML is simpler.".to_string(),
+            relevant_artifacts: vec![ArtifactRef {
+                path: ".wai/projects/p/research/r.md".to_string(),
+                description: "key doc".to_string(),
+                relevance: Some(Relevance::High),
+            }],
+            decision_chain: "Research → Design".to_string(),
+            suggestions: vec!["Use TOML everywhere".to_string()],
+            raw: String::new(),
+        };
+        let json = format_json(&response, "why TOML?");
+        assert!(json.contains("\"query\""));
+        assert!(json.contains("why TOML?"));
+        assert!(json.contains("\"answer\""));
+        assert!(json.contains("Because TOML is simpler."));
+        assert!(json.contains("\"relevant_artifacts\""));
+        assert!(json.contains("\"High\""));
+        assert!(json.contains("\"decision_chain\""));
+        assert!(json.contains("\"suggestions\""));
+        assert!(json.contains("Use TOML everywhere"));
+    }
+
+    #[test]
+    fn format_json_null_relevance_when_none() {
+        let response = ParsedResponse {
+            answer: String::new(),
+            relevant_artifacts: vec![ArtifactRef {
+                path: ".wai/projects/p/research/r.md".to_string(),
+                description: String::new(),
+                relevance: None,
+            }],
+            decision_chain: String::new(),
+            suggestions: vec![],
+            raw: String::new(),
+        };
+        let json = format_json(&response, "q");
+        assert!(json.contains("\"relevance\": null"));
+    }
+
+    // ── Relevance ──
+
+    #[test]
+    fn relevance_as_str_roundtrips() {
+        assert_eq!(Relevance::High.as_str(), "High");
+        assert_eq!(Relevance::Medium.as_str(), "Medium");
+        assert_eq!(Relevance::Low.as_str(), "Low");
+    }
+
+    #[test]
+    fn relevance_from_str_accepts_med_alias() {
+        assert_eq!(Relevance::from_str("med"), Some(Relevance::Medium));
     }
 }
