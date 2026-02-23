@@ -100,6 +100,154 @@ fn init_warns_if_already_initialized() {
         .stdout(predicate::str::contains("already initialized"));
 }
 
+// ─── Robust Reinit (wai-exc) ─────────────────────────────────────────────────
+
+#[test]
+fn doctor_detects_version_mismatch_and_fix_repairs_it() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    // Write a config.toml with a stale version to simulate version mismatch
+    let config_path = tmp.path().join(".wai/config.toml");
+    let config = fs::read_to_string(&config_path).unwrap();
+    let stale_config = config.replace(env!("CARGO_PKG_VERSION"), "0.0.0-stale");
+    fs::write(&config_path, stale_config).unwrap();
+
+    // Doctor should detect the mismatch (Warn status) — exits 0 with warnings
+    wai_cmd(tmp.path())
+        .args(["doctor"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("0.0.0-stale").or(predicate::str::contains("differs")));
+
+    // Fix should update the version
+    wai_cmd(tmp.path())
+        .args(["doctor", "--fix", "--yes"])
+        .assert()
+        .success();
+
+    // Config should now have the current version
+    let repaired = fs::read_to_string(&config_path).unwrap();
+    assert!(
+        repaired.contains(env!("CARGO_PKG_VERSION")),
+        "config.toml should have current version after fix"
+    );
+}
+
+#[test]
+fn doctor_detects_missing_agent_config_subdirs_and_fix_creates_them() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    // Remove agent-config subdirectories
+    fs::remove_dir_all(tmp.path().join(".wai/resources/agent-config/skills")).unwrap();
+    fs::remove_dir_all(tmp.path().join(".wai/resources/agent-config/rules")).unwrap();
+
+    // Doctor should detect them as missing — exits 1 on failures
+    wai_cmd(tmp.path())
+        .args(["doctor"])
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("skills").or(predicate::str::contains("Missing")));
+
+    // Fix should recreate the directories
+    wai_cmd(tmp.path())
+        .args(["doctor", "--fix", "--yes"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Fixed"));
+
+    assert!(
+        tmp.path()
+            .join(".wai/resources/agent-config/skills")
+            .is_dir(),
+        "skills dir should be recreated"
+    );
+    assert!(
+        tmp.path()
+            .join(".wai/resources/agent-config/rules")
+            .is_dir(),
+        "rules dir should be recreated"
+    );
+}
+
+#[test]
+fn reinit_creates_missing_directories_and_updates_version() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    // Simulate damage: remove directories and stale version
+    fs::remove_dir_all(tmp.path().join(".wai/archives")).unwrap();
+    fs::remove_dir_all(tmp.path().join(".wai/resources/agent-config/context")).unwrap();
+
+    let config_path = tmp.path().join(".wai/config.toml");
+    let config = fs::read_to_string(&config_path).unwrap();
+    let stale_config = config.replace(env!("CARGO_PKG_VERSION"), "0.0.0-stale");
+    fs::write(&config_path, stale_config).unwrap();
+
+    // Re-init should repair without prompting (--name reuses existing workspace)
+    wai_cmd(tmp.path())
+        .args(["init", "--name", "test-ws"])
+        .assert()
+        .success();
+
+    // Missing directories should be restored
+    assert!(
+        tmp.path().join(".wai/archives").is_dir(),
+        "archives dir should be restored by reinit"
+    );
+    assert!(
+        tmp.path()
+            .join(".wai/resources/agent-config/context")
+            .is_dir(),
+        "agent-config/context should be restored by reinit"
+    );
+
+    // Version should be updated
+    let repaired = fs::read_to_string(&config_path).unwrap();
+    assert!(
+        repaired.contains(env!("CARGO_PKG_VERSION")),
+        "config.toml should have current version after reinit"
+    );
+}
+
+#[test]
+fn reinit_is_idempotent() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    // Capture state after first init
+    let config_before = fs::read_to_string(tmp.path().join(".wai/config.toml")).unwrap();
+
+    // Re-init twice
+    wai_cmd(tmp.path())
+        .args(["init", "--name", "test-ws"])
+        .assert()
+        .success();
+
+    wai_cmd(tmp.path())
+        .args(["init", "--name", "test-ws"])
+        .assert()
+        .success();
+
+    // Config content should be stable (no duplicates, no corruption)
+    let config_after = fs::read_to_string(tmp.path().join(".wai/config.toml")).unwrap();
+    assert_eq!(
+        config_before.trim(),
+        config_after.trim(),
+        "config.toml should be identical after idempotent reinit"
+    );
+
+    // All expected directories still exist
+    assert!(tmp.path().join(".wai/projects").is_dir());
+    assert!(tmp.path().join(".wai/areas").is_dir());
+    assert!(tmp.path().join(".wai/resources").is_dir());
+    assert!(tmp.path().join(".wai/archives").is_dir());
+    assert!(tmp.path().join(".wai/resources/agent-config/skills").is_dir());
+    assert!(tmp.path().join(".wai/resources/agent-config/rules").is_dir());
+    assert!(tmp.path().join(".wai/resources/agent-config/context").is_dir());
+}
+
 // ─── wai new project ────────────────────────────────────────────────────────
 
 #[test]
