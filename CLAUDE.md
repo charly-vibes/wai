@@ -73,6 +73,8 @@ wai add research "notes"      # Add research artifact
 wai add plan "plan"           # Add plan artifact
 wai add design "design"       # Add design artifact
 wai search "query"            # Search across artifacts
+wai why "why use TOML?"       # Ask why (LLM-powered oracle)
+wai why src/config.rs         # Explain a file's history
 wai handoff create <project>  # Session handoff
 wai phase show                # Current phase
 wai doctor                    # Workspace health

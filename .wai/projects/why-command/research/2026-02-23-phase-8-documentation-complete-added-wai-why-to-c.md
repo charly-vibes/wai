@@ -1,0 +1,1 @@
+Phase 8 documentation complete. Added wai why to CLAUDE.md managed block template, expanded CLI --help with query types/config/error codes, updated tutorial step 4, added wai doctor README badge check (warn if missing), and badge footer in wai why terminal output. All 8 badge tests pass.

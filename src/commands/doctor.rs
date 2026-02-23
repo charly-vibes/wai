@@ -79,6 +79,7 @@ pub fn run(fix: bool) -> Result<()> {
     checks.extend(check_project_state(&project_root));
     checks.extend(check_custom_plugins(&project_root));
     checks.extend(check_agent_instructions(&project_root));
+    checks.extend(check_readme_badge(&project_root));
 
     let summary = Summary {
         pass: checks.iter().filter(|c| c.status == Status::Pass).count(),
@@ -1081,6 +1082,47 @@ fn check_custom_plugins(project_root: &Path) -> Vec<CheckResult> {
     }
 
     results
+}
+
+fn check_readme_badge(project_root: &Path) -> Vec<CheckResult> {
+    use super::why::{WAI_BADGE_MARKDOWN, content_has_wai_badge};
+
+    let candidates = ["README.md", "README.rst", "README.txt", "README"];
+    let readme_path = candidates
+        .iter()
+        .map(|n| project_root.join(n))
+        .find(|p| p.exists());
+
+    let Some(path) = readme_path else {
+        // No README — skip this check entirely
+        return vec![];
+    };
+
+    let content = match std::fs::read_to_string(&path) {
+        Ok(c) => c,
+        Err(_) => return vec![],
+    };
+
+    if content_has_wai_badge(&content) {
+        vec![CheckResult {
+            name: "README badge".to_string(),
+            status: Status::Pass,
+            message: "wai badge present in README".to_string(),
+            fix: None,
+            fix_fn: None,
+        }]
+    } else {
+        vec![CheckResult {
+            name: "README badge".to_string(),
+            status: Status::Warn,
+            message: "No wai badge in README — add one to show the project uses wai".to_string(),
+            fix: Some(format!(
+                "Add to README: {}",
+                WAI_BADGE_MARKDOWN
+            )),
+            fix_fn: None,
+        }]
+    }
 }
 
 fn check_agent_instructions(project_root: &Path) -> Vec<CheckResult> {

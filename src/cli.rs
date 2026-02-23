@@ -183,12 +183,29 @@ pub enum Commands {
         about = "Ask why a decision was made (LLM-powered reasoning oracle)",
         long_about = "Queries your wai artifacts using an LLM to synthesize a coherent\n\
             narrative explaining why decisions were made.\n\n\
-            QUERY can be a natural language question or a file path:\n\
-              wai why \"why use TOML for config?\"\n\
-              wai why src/config.rs\n\n\
-            Requires an LLM backend. Supported backends (auto-detected if not configured):\n\
+            QUERY TYPES\n\
+              Natural language question:\n\
+                wai why \"why use TOML for config?\"\n\
+                wai why \"what drove the microservices decision?\"\n\
+                wai why \"why was error handling designed this way?\"\n\n\
+              File path (explains a specific file's history):\n\
+                wai why src/config.rs\n\
+                wai why ./src/commands/why.rs\n\n\
+            CONFIGURATION (.wai/config.toml)\n\
+              [why]\n\
+              llm     = \"claude\"       # Backend: \"claude\" or \"ollama\" (auto-detected if omitted)\n\
+              model   = \"haiku\"        # Claude: \"haiku\"/\"sonnet\"; Ollama: \"llama3.1:8b\"\n\
+              api_key = \"sk-ant-...\"   # Claude API key (or use ANTHROPIC_API_KEY env var)\n\
+              fallback = \"search\"      # On LLM unavailable: \"search\" (default) or \"error\"\n\n\
+            LLM BACKENDS\n\
               Claude  — set ANTHROPIC_API_KEY or add api_key to [why] in .wai/config.toml\n\
               Ollama  — install from https://ollama.com and run a local model\n\n\
+            ERROR CODES\n\
+              wai::llm::invalid_api_key  — API key missing or rejected\n\
+              wai::llm::rate_limit       — Rate limit hit; wait 60s or use Ollama\n\
+              wai::llm::network_error    — Network unreachable\n\
+              wai::llm::model_not_found  — Ollama model not pulled; run `ollama pull <model>`\n\
+              wai::llm::not_available    — No LLM configured and fallback = \"error\"\n\n\
             Falls back to `wai search` if no LLM is available. Use --no-llm to force\n\
             the fallback without an error."
     )]

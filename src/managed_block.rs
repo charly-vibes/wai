@@ -169,6 +169,8 @@ pub fn wai_block_content(detected_plugins: &[&str]) -> String {
          wai add plan \"plan\"           # Add plan artifact\n\
          wai add design \"design\"       # Add design artifact\n\
          wai search \"query\"            # Search across artifacts\n\
+         wai why \"why use TOML?\"       # Ask why (LLM-powered oracle)\n\
+         wai why src/config.rs         # Explain a file's history\n\
          wai handoff create <project>  # Session handoff\n\
          wai phase show                # Current phase\n\
          wai doctor                    # Workspace health\n\

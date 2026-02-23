@@ -57,7 +57,11 @@ pub fn run() -> Result<()> {
          • wai new project       Create a new project\n\
          • wai status            Check project status\n\
          • wai add research      Capture research notes\n\
-         • wai phase next        Advance to next phase",
+         • wai phase next        Advance to next phase\n\
+         • wai why \"<question>\"  Ask why a decision was made (LLM oracle)\n\
+           Examples:\n\
+             wai why \"why use TOML for config?\"\n\
+             wai why src/config.rs",
     )?;
 
     // Step 5: Handoffs

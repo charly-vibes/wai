@@ -825,6 +825,60 @@ pub fn mark_privacy_notice_shown(project_root: &std::path::Path) {
     }
 }
 
+// ── README badge detection (8.7) ─────────────────────────────────────────────
+
+/// Badge markdown snippet to recommend when a project has no wai badge.
+pub const WAI_BADGE_MARKDOWN: &str =
+    "[![tracked with wai](https://img.shields.io/badge/tracked%20with-wai-blue)](https://github.com/charly-vibes/wai)";
+
+/// Return `true` if `content` appears to contain a wai badge.
+///
+/// Matches:
+/// - Any line containing `![` (image/badge markdown) AND `wai` (case-insensitive)
+/// - Any line containing `img.shields.io` AND `wai` (case-insensitive)
+pub fn content_has_wai_badge(content: &str) -> bool {
+    let lower = content.to_lowercase();
+    for line in lower.lines() {
+        let has_badge_syntax =
+            line.contains("![") || line.contains("img.shields.io");
+        if has_badge_syntax && line.contains("wai") {
+            return true;
+        }
+    }
+    false
+}
+
+/// Return `true` when the project's README already has a wai badge, OR when
+/// there is no README (so we don't nag users without one).
+pub fn readme_has_wai_badge(project_root: &std::path::Path) -> bool {
+    let candidates = ["README.md", "README.rst", "README.txt", "README"];
+    for name in &candidates {
+        let path = project_root.join(name);
+        if path.exists() {
+            return match std::fs::read_to_string(&path) {
+                Ok(content) => content_has_wai_badge(&content),
+                Err(_) => true, // can't read → don't nag
+            };
+        }
+    }
+    // No README found — don't suggest adding a badge
+    true
+}
+
+/// Print a badge recommendation footer to stdout.
+fn print_badge_footer() {
+    println!();
+    separator();
+    println!();
+    println!(
+        "  {} No wai badge in README — add one to let others know:",
+        "○".dimmed()
+    );
+    println!();
+    println!("  {}", WAI_BADGE_MARKDOWN.dimmed());
+    println!();
+}
+
 // ── Command entry point ───────────────────────────────────────────────────────
 
 pub fn run(query: String, no_llm: bool, json: bool) -> Result<()> {
@@ -944,6 +998,10 @@ pub fn run(query: String, no_llm: bool, json: bool) -> Result<()> {
         println!("{}", format_json(&parsed, &query));
     } else {
         format_terminal(&parsed, &query);
+        // 8.7: Suggest adding a badge if README has none
+        if !readme_has_wai_badge(&project_root) {
+            print_badge_footer();
+        }
     }
 
     Ok(())
@@ -1627,5 +1685,63 @@ Research → Design → Implementation\n\
         let tmp = TempDir::new().unwrap();
         // No config file — should not panic
         mark_privacy_notice_shown(tmp.path());
+    }
+
+    // ── content_has_wai_badge / readme_has_wai_badge (8.7) ──
+
+    #[test]
+    fn badge_markdown_detected_in_content() {
+        let content =
+            "# My Project\n[![tracked with wai](https://img.shields.io/badge/tracked%20with-wai-blue)](https://github.com/charly-vibes/wai)\n";
+        assert!(content_has_wai_badge(content));
+    }
+
+    #[test]
+    fn shields_io_url_with_wai_detected() {
+        let content = "![wai badge](https://img.shields.io/badge/wai-tracked-blue)\n";
+        assert!(content_has_wai_badge(content));
+    }
+
+    #[test]
+    fn content_without_wai_badge_returns_false() {
+        let content = "# My Project\n\nSome description without any badge.\n";
+        assert!(!content_has_wai_badge(content));
+    }
+
+    #[test]
+    fn badge_detection_case_insensitive() {
+        let content = "[![WAI](https://img.shields.io/badge/WAI-blue)](https://example.com)\n";
+        assert!(content_has_wai_badge(content));
+    }
+
+    #[test]
+    fn shields_io_without_wai_not_detected() {
+        let content = "![ci](https://img.shields.io/badge/build-passing-green)\n";
+        assert!(!content_has_wai_badge(content));
+    }
+
+    #[test]
+    fn readme_has_wai_badge_returns_true_when_no_readme() {
+        let tmp = TempDir::new().unwrap();
+        // No README — should not nag
+        assert!(readme_has_wai_badge(tmp.path()));
+    }
+
+    #[test]
+    fn readme_has_wai_badge_detects_badge_in_readme() {
+        let tmp = TempDir::new().unwrap();
+        fs::write(
+            tmp.path().join("README.md"),
+            "# Proj\n[![tracked with wai](https://img.shields.io/badge/tracked%20with-wai-blue)](https://github.com/charly-vibes/wai)\n",
+        )
+        .unwrap();
+        assert!(readme_has_wai_badge(tmp.path()));
+    }
+
+    #[test]
+    fn readme_has_wai_badge_returns_false_when_badge_missing() {
+        let tmp = TempDir::new().unwrap();
+        fs::write(tmp.path().join("README.md"), "# My Project\n\nNo badge here.\n").unwrap();
+        assert!(!readme_has_wai_badge(tmp.path()));
     }
 }

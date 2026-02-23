@@ -62,13 +62,13 @@
 - [ ] 7.8 Manual test with local Ollama
 
 ## Production Ready - Phase 8: Documentation
-- [ ] 8.1 Update `CLAUDE.md` with `wai why` usage examples (all query types)
-- [ ] 8.2 Add help text to command (`--help`) with example queries
-- [ ] 8.3 Document configuration options in help output
-- [ ] 8.4 Document error codes in help text
-- [ ] 8.5 Add example queries to onboarding flow (if applicable)
-- [ ] 8.6 Add suggestion in `wai doctor` to add wai badge to README if missing (check for wai badge patterns)
-- [ ] 8.7 Include badge recommendation footer in `wai why` output when README has no badge (suggest markdown badge code)
+- [x] 8.1 Update `CLAUDE.md` with `wai why` usage examples (all query types)
+- [x] 8.2 Add help text to command (`--help`) with example queries
+- [x] 8.3 Document configuration options in help output
+- [x] 8.4 Document error codes in help text
+- [x] 8.5 Add example queries to onboarding flow (if applicable)
+- [x] 8.6 Add suggestion in `wai doctor` to add wai badge to README if missing (check for wai badge patterns)
+- [x] 8.7 Include badge recommendation footer in `wai why` output when README has no badge (suggest markdown badge code)
 
 ## Polish - Phase 9: Advanced Features
 - [ ] 9.1 Integrate `wai why` with global verbosity levels (`-v`/`-vv`/`-vvv`) for prompt, cost, and timing output
