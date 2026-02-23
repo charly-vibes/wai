@@ -19,6 +19,9 @@ pub trait LlmClient: Send + Sync {
 
     /// Human-readable name for display and diagnostics (e.g. "Claude (haiku)").
     fn name(&self) -> &str;
+
+    /// The underlying model identifier used for cost estimation (e.g. "claude-haiku-3-5-20251001").
+    fn model_id(&self) -> &str;
 }
 
 // ── Errors ────────────────────────────────────────────────────────────────────
@@ -180,6 +183,10 @@ impl LlmClient for ClaudeClient {
     fn name(&self) -> &str {
         "Claude"
     }
+
+    fn model_id(&self) -> &str {
+        &self.model
+    }
 }
 
 // ── Ollama client ─────────────────────────────────────────────────────────────
@@ -277,6 +284,10 @@ impl LlmClient for OllamaClient {
     fn name(&self) -> &str {
         "Ollama"
     }
+
+    fn model_id(&self) -> &str {
+        &self.model
+    }
 }
 
 // ── Backend selection ─────────────────────────────────────────────────────────
@@ -315,6 +326,28 @@ pub fn detect_backend(cfg: &WhyConfig) -> Option<Box<dyn LlmClient>> {
             None
         }
     }
+}
+
+// ── Cost estimation ───────────────────────────────────────────────────────────
+
+/// Estimate the USD cost of a Claude API call from raw character counts.
+///
+/// Uses ~4 chars per token as a rough heuristic.
+/// Returns `None` for unrecognised models (e.g. Ollama local models).
+pub fn estimate_cost(model: &str, input_chars: usize, output_chars: usize) -> Option<f64> {
+    let (input_per_m, output_per_m) = if model.contains("haiku") {
+        (0.80, 4.00)
+    } else if model.contains("sonnet") {
+        (3.00, 15.00)
+    } else if model.contains("opus") {
+        (15.00, 75.00)
+    } else {
+        return None;
+    };
+
+    let input_tokens = input_chars as f64 / 4.0;
+    let output_tokens = output_chars as f64 / 4.0;
+    Some((input_tokens * input_per_m + output_tokens * output_per_m) / 1_000_000.0)
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -406,7 +439,51 @@ mod tests {
         fn name(&self) -> &str {
             "mock"
         }
+
+        fn model_id(&self) -> &str {
+            "mock-model"
+        }
     }
+
+    // ── estimate_cost ──
+
+    #[test]
+    fn haiku_model_cost_is_estimated() {
+        let cost = estimate_cost("claude-haiku-3-5-20251001", 4000, 400).unwrap();
+        // 4000 chars / 4 = 1000 input tokens @ $0.80/M → $0.0008
+        // 400 chars / 4 = 100 output tokens @ $4.00/M → $0.0004
+        assert!((cost - 0.0012).abs() < 1e-10);
+    }
+
+    #[test]
+    fn sonnet_model_cost_is_estimated() {
+        let cost = estimate_cost("claude-sonnet-4-5", 4000, 400).unwrap();
+        // 1000 input tokens @ $3.00/M → $0.003
+        // 100 output tokens @ $15.00/M → $0.0015
+        assert!((cost - 0.0045).abs() < 1e-10);
+    }
+
+    #[test]
+    fn opus_model_cost_is_estimated() {
+        let cost = estimate_cost("claude-opus-4-5", 4000, 400).unwrap();
+        // 1000 input tokens @ $15.00/M → $0.015
+        // 100 output tokens @ $75.00/M → $0.0075
+        assert!((cost - 0.0225).abs() < 1e-10);
+    }
+
+    #[test]
+    fn unknown_model_returns_none() {
+        assert!(estimate_cost("llama3.1:8b", 4000, 400).is_none());
+        assert!(estimate_cost("gpt-4", 4000, 400).is_none());
+    }
+
+    #[test]
+    fn zero_chars_returns_zero_cost() {
+        let cost = estimate_cost("claude-haiku-3-5-20251001", 0, 0).unwrap();
+        assert_eq!(cost, 0.0);
+    }
+
+    // ── MockLlm ──
 
     #[test]
     fn available_client_returns_response() {

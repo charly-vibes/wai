@@ -71,7 +71,7 @@
 - [x] 8.7 Include badge recommendation footer in `wai why` output when README has no badge (suggest markdown badge code)
 
 ## Polish - Phase 9: Advanced Features
-- [ ] 9.1 Integrate `wai why` with global verbosity levels (`-v`/`-vv`/`-vvv`) for prompt, cost, and timing output
+- [x] 9.1 Integrate `wai why` with global verbosity levels (`-v`/`-vv`/`-vvv`) for prompt, cost, and timing output
 - [ ] 9.2 Add streaming response support (display as tokens arrive) - optional
 - [ ] 9.3 Add usage stats tracking (opt-in telemetry) - optional
 - [ ] 9.4 Consider caching recent queries (15min TTL) - only if latency becomes issue

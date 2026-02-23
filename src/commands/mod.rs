@@ -65,7 +65,7 @@ pub fn run(cli: Cli) -> Result<()> {
             query,
             no_llm,
             json,
-        }) => why::run(query, no_llm, json),
+        }) => why::run(query, no_llm, json, cli.verbose),
         Some(Commands::External(args)) => run_external(args),
         None => show_welcome(),
     }

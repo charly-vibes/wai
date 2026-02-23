@@ -879,9 +879,77 @@ fn print_badge_footer() {
     println!();
 }
 
+// ── Verbose diagnostics ───────────────────────────────────────────────────────
+
+/// Build the verbose diagnostic lines shown after an LLM call.
+///
+/// `-v`   → elapsed time
+/// `-vv`  → + prompt/response char counts, estimated tokens, estimated cost
+/// `-vvv` → + full prompt text
+pub fn verbose_stats_lines(
+    verbose: u8,
+    elapsed_ms: u128,
+    prompt: &str,
+    response: &str,
+    model_id: &str,
+) -> Vec<String> {
+    if verbose == 0 {
+        return vec![];
+    }
+
+    let elapsed_s = elapsed_ms as f64 / 1000.0;
+    let mut lines = vec![format!("  {} {:.2}s", "○".dimmed(), elapsed_s)];
+
+    if verbose >= 2 {
+        let input_chars = prompt.len();
+        let output_chars = response.len();
+        let input_tokens = input_chars / 4;
+        let output_tokens = output_chars / 4;
+        lines.push(format!(
+            "  {} prompt {} chars (~{} tokens), response {} chars (~{} tokens)",
+            "◇".dimmed(),
+            input_chars,
+            input_tokens,
+            output_chars,
+            output_tokens,
+        ));
+        if let Some(cost) = crate::llm::estimate_cost(model_id, input_chars, output_chars) {
+            lines.push(format!("  {} ~${:.4} estimated", "◇".dimmed(), cost));
+        }
+    }
+
+    if verbose >= 3 {
+        lines.push(String::new());
+        lines.push(format!("  {} Full prompt:", "◇".dimmed()));
+        lines.push("  ─────────────────────────────────────────".to_string());
+        for line in prompt.lines() {
+            lines.push(format!("  {}", line));
+        }
+        lines.push("  ─────────────────────────────────────────".to_string());
+    }
+
+    lines
+}
+
+fn print_verbose_stats(
+    verbose: u8,
+    elapsed_ms: u128,
+    prompt: &str,
+    response: &str,
+    model_id: &str,
+) {
+    let lines = verbose_stats_lines(verbose, elapsed_ms, prompt, response, model_id);
+    if !lines.is_empty() {
+        println!();
+        for line in lines {
+            println!("{}", line);
+        }
+    }
+}
+
 // ── Command entry point ───────────────────────────────────────────────────────
 
-pub fn run(query: String, no_llm: bool, json: bool) -> Result<()> {
+pub fn run(query: String, no_llm: bool, json: bool, verbose: u8) -> Result<()> {
     let project_root = require_project()?;
 
     if no_llm {
@@ -968,6 +1036,7 @@ pub fn run(query: String, no_llm: bool, json: bool) -> Result<()> {
         println!("  {} Querying {} …", "○".dimmed(), backend.name());
     }
 
+    let start = std::time::Instant::now();
     let raw_response = match backend.complete(&prompt) {
         Ok(r) => r,
         Err(e) => {
@@ -991,6 +1060,7 @@ pub fn run(query: String, no_llm: bool, json: bool) -> Result<()> {
             return super::search::run(query, None, None, false, None);
         }
     };
+    let elapsed_ms = start.elapsed().as_millis();
 
     let parsed = parse_response(&raw_response);
 
@@ -998,6 +1068,10 @@ pub fn run(query: String, no_llm: bool, json: bool) -> Result<()> {
         println!("{}", format_json(&parsed, &query));
     } else {
         format_terminal(&parsed, &query);
+        // 9.1: Show verbose diagnostics (timing, token estimates, cost, full prompt)
+        if verbose > 0 {
+            print_verbose_stats(verbose, elapsed_ms, &prompt, &raw_response, backend.model_id());
+        }
         // 8.7: Suggest adding a badge if README has none
         if !readme_has_wai_badge(&project_root) {
             print_badge_footer();
@@ -1743,5 +1817,55 @@ Research → Design → Implementation\n\
         let tmp = TempDir::new().unwrap();
         fs::write(tmp.path().join("README.md"), "# My Project\n\nNo badge here.\n").unwrap();
         assert!(!readme_has_wai_badge(tmp.path()));
+    }
+
+    // ── verbose_stats_lines ──
+
+    #[test]
+    fn verbose_zero_returns_empty() {
+        let lines = verbose_stats_lines(0, 1500, "prompt text", "response text", "mock");
+        assert!(lines.is_empty());
+    }
+
+    #[test]
+    fn verbose_one_returns_timing_only() {
+        let lines = verbose_stats_lines(1, 2500, "prompt", "response", "mock");
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].contains("2.50s"), "expected timing, got: {}", lines[0]);
+    }
+
+    #[test]
+    fn verbose_two_returns_timing_and_token_counts() {
+        let prompt = "a".repeat(400);
+        let response = "b".repeat(100);
+        let lines = verbose_stats_lines(2, 1000, &prompt, &response, "mock");
+        // line 0: timing
+        assert!(lines[0].contains("1.00s"));
+        // line 1: char/token counts (no cost for "mock" model)
+        assert!(lines[1].contains("400 chars"));
+        assert!(lines[1].contains("100 chars"));
+        assert!(lines[1].contains("100 tokens")); // 400/4=100 input tokens
+        assert!(lines[1].contains("25 tokens")); // 100/4=25 output tokens
+        // no cost line for unknown model
+        assert!(!lines.iter().any(|l| l.contains("estimated")));
+    }
+
+    #[test]
+    fn verbose_two_includes_cost_for_claude_model() {
+        let prompt = "a".repeat(4000);
+        let response = "b".repeat(400);
+        let lines =
+            verbose_stats_lines(2, 1000, &prompt, &response, "claude-haiku-3-5-20251001");
+        assert!(lines.iter().any(|l| l.contains("estimated")));
+    }
+
+    #[test]
+    fn verbose_three_includes_full_prompt() {
+        let prompt = "line one\nline two";
+        let lines = verbose_stats_lines(3, 500, prompt, "resp", "mock");
+        let joined = lines.join("\n");
+        assert!(joined.contains("Full prompt"));
+        assert!(joined.contains("line one"));
+        assert!(joined.contains("line two"));
     }
 }
