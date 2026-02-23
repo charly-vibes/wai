@@ -30,34 +30,34 @@
 - [x] 3.7 Support model aliases ("haiku" → "claude-haiku-3-5")
 
 ## MVP - Phase 4: Output Formatting
-- [ ] 4.1 Parse LLM markdown response with graceful handling of malformed output
-- [ ] 4.2 Pretty-print with colors and icons (owo_colors) with terminal fallbacks
-- [ ] 4.3 Show artifact references as `file:line` format (clickable in some terminals)
-- [ ] 4.4 Add `--json` flag support for machine-readable output
-- [ ] 4.5 Parse relevance indicators from LLM (High/Medium/Low) for JSON output
+- [x] 4.1 Parse LLM markdown response with graceful handling of malformed output
+- [x] 4.2 Pretty-print with colors and icons (owo_colors) with terminal fallbacks
+- [x] 4.3 Show artifact references as `file:line` format (clickable in some terminals)
+- [x] 4.4 Add `--json` flag support for machine-readable output
+- [x] 4.5 Parse relevance indicators from LLM (High/Medium/Low) for JSON output
 
 ## MVP - Phase 5: Error Handling & Fallback
-- [ ] 5.1 Graceful degradation to `wai search` if no LLM available
-- [ ] 5.2 Handle LLM API errors with miette diagnostics (invalid_api_key, rate_limit, network_error, model_not_found)
-- [ ] 5.3 Detect Ollama model not downloaded and suggest `ollama pull`
-- [ ] 5.4 Handle rate limits with clear message (wait 60s or use Ollama)
-- [ ] 5.5 Add `--no-llm` flag to force fallback for testing
+- [x] 5.1 Graceful degradation to `wai search` if no LLM available
+- [x] 5.2 Handle LLM API errors with miette diagnostics (invalid_api_key, rate_limit, network_error, model_not_found)
+- [x] 5.3 Detect Ollama model not downloaded and suggest `ollama pull`
+- [x] 5.4 Handle rate limits with clear message (wait 60s or use Ollama)
+- [x] 5.5 Add `--no-llm` flag to force fallback for testing
 
 ## Production Ready - Phase 6: Configuration
-- [ ] 6.1 Support explicit config priority over auto-detection
-- [ ] 6.2 Support `llm = "claude"` with `model = "haiku"` or `model = "sonnet"`
-- [ ] 6.3 Support `llm = "ollama"` with `model = "llama3.1:8b"` or custom
-- [ ] 6.4 Support `fallback = "search"` or `fallback = "error"`
-- [ ] 6.5 Implement privacy notice tracking (`privacy_notice_shown = true` in config)
-- [ ] 6.6 Display one-time privacy notice for external APIs
+- [x] 6.1 Support explicit config priority over auto-detection
+- [x] 6.2 Support `llm = "claude"` with `model = "haiku"` or `model = "sonnet"`
+- [x] 6.3 Support `llm = "ollama"` with `model = "llama3.1:8b"` or custom
+- [x] 6.4 Support `fallback = "search"` or `fallback = "error"`
+- [x] 6.5 Implement privacy notice tracking (`privacy_notice_shown = true` in config)
+- [x] 6.6 Display one-time privacy notice for external APIs
 
 ## Production Ready - Phase 7: Testing
-- [ ] 7.1 Unit tests for context gathering logic (empty artifacts, size limits)
-- [ ] 7.2 Unit tests for file path detection (spaces, dots, slashes)
-- [ ] 7.3 Unit tests for prompt building (escaping, injection prevention)
-- [ ] 7.4 Integration test with mock LLM (returns fixed response)
-- [ ] 7.5 Integration test for fallback behavior (no LLM)
-- [ ] 7.6 Integration test for git failure handling (non-git repo)
+- [x] 7.1 Unit tests for context gathering logic (empty artifacts, size limits)
+- [x] 7.2 Unit tests for file path detection (spaces, dots, slashes)
+- [x] 7.3 Unit tests for prompt building (escaping, injection prevention)
+- [x] 7.4 Integration test with mock LLM (returns fixed response)
+- [x] 7.5 Integration test for fallback behavior (no LLM)
+- [x] 7.6 Integration test for git failure handling (non-git repo)
 - [ ] 7.7 Manual test with real Claude API
 - [ ] 7.8 Manual test with local Ollama
 

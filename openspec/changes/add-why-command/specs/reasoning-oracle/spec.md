@@ -282,3 +282,60 @@ The system SHALL inform users when sending artifacts to external APIs and provid
 - **WHEN** configured to use Ollama
 - **THEN** the system processes all queries locally without network calls
 - **AND** indicates local-only operation at verbosity level 1 or higher
+
+### Requirement: Badge Recommendation
+
+The system SHALL nudge project maintainers to add a wai badge to their README, improving discoverability.
+
+#### Scenario: Badge footer in wai why output
+
+- **WHEN** user runs `wai why <query>` (terminal mode, not `--json`)
+- **AND** the project root contains a README file (README.md, README.rst, README.txt)
+- **AND** that README does not contain a wai badge (detected by `![` markdown containing "wai" or `img.shields.io` URL containing "wai")
+- **THEN** the system appends a one-line footer after the main output suggesting the badge markdown
+
+#### Scenario: No README present
+
+- **WHEN** user runs `wai why <query>`
+- **AND** no README file exists at the project root
+- **THEN** the system does NOT show a badge suggestion (no README → no context to add a badge)
+
+#### Scenario: Badge already present
+
+- **WHEN** user runs `wai why <query>`
+- **AND** the README already contains a wai badge
+- **THEN** the system does NOT show a badge suggestion
+
+#### Scenario: Badge check in wai doctor
+
+- **WHEN** user runs `wai doctor`
+- **AND** a README exists but has no wai badge
+- **THEN** the system reports a "README badge" check with `warn` status
+- **AND** includes the badge markdown in the fix suggestion
+- **WHEN** the README already has a wai badge
+- **THEN** the "README badge" check reports `pass`
+- **WHEN** no README exists
+- **THEN** the "README badge" check is skipped entirely
+
+### Requirement: Documentation
+
+The `wai why` command SHALL be self-documenting through help text, onboarding, and agent instructions.
+
+#### Scenario: Help text
+
+- **WHEN** user runs `wai why --help`
+- **THEN** the output includes:
+  - Three query type categories with examples (natural language, file path)
+  - Full `[why]` config section template showing all options
+  - All LLM error codes with remediation hints
+  - Reference to `--no-llm` fallback flag
+
+#### Scenario: Tutorial integration
+
+- **WHEN** user runs `wai tutorial`
+- **THEN** the Core Commands step lists `wai why "<question>"` with usage examples
+
+#### Scenario: Agent instruction blocks
+
+- **WHEN** `wai init` creates or updates `CLAUDE.md` / `AGENTS.md`
+- **THEN** the wai managed block Quick Reference section includes `wai why` examples
