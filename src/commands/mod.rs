@@ -184,11 +184,63 @@ fn run_external(args: Vec<String>) -> Result<()> {
         }
         .into());
     }
-    let project_root = require_project()?;
 
     let plugin_name = &args[0];
     let command_name = args.get(1).map(|s| s.as_str());
 
+    let valid_commands = &[
+        "new", "add", "show", "move", "init", "status", "phase", "sync", "config", "handoff",
+        "search", "timeline", "plugin", "doctor", "way", "import", "resource", "tutorial",
+    ];
+    // Valid (verb, noun) subcommand patterns for wrong-order detection
+    let valid_patterns = &[
+        ("new", "project"),
+        ("new", "area"),
+        ("new", "resource"),
+        ("add", "research"),
+        ("add", "plan"),
+        ("add", "design"),
+        ("phase", "next"),
+        ("phase", "set"),
+        ("phase", "back"),
+        ("phase", "show"),
+        ("handoff", "create"),
+        ("plugin", "list"),
+        ("plugin", "enable"),
+        ("plugin", "disable"),
+        ("resource", "add"),
+        ("resource", "list"),
+        ("resource", "import"),
+        ("config", "add"),
+        ("config", "list"),
+        ("config", "edit"),
+    ];
+    let engine = SuggestionEngine::new();
+
+    // Check for typos and wrong-order BEFORE requiring the workspace.
+    // This ensures "Did you mean?" hints are shown even outside a workspace,
+    // giving better context rather than just "NotInitialized".
+    if let Some(second) = args.get(1) {
+        if let Some(suggestion) = engine.suggest_order(plugin_name, second, valid_patterns) {
+            miette::bail!(
+                "{}. {}",
+                suggestion.message(),
+                "Run 'wai --help' to see available commands."
+            );
+        }
+    }
+
+    if let Some(suggestion) = engine.suggest_typo(plugin_name, valid_commands) {
+        miette::bail!(
+            "{}. {}",
+            suggestion.message(),
+            "Run 'wai --help' to see available commands."
+        );
+    }
+
+    // Typo/order checks passed — this looks like a genuine plugin or unknown command.
+    // Now require the workspace so we can look up plugin definitions.
+    let project_root = require_project()?;
     let plugins = crate::plugin::detect_plugins(&project_root);
 
     if let Some(cmd_name) = command_name
@@ -230,59 +282,10 @@ fn run_external(args: Vec<String>) -> Result<()> {
             );
         }
     } else {
-        let valid_commands = &[
-            "new", "add", "show", "move", "init", "status", "phase", "sync", "config",
-            "handoff", "search", "timeline", "plugin", "doctor", "way", "import", "resource",
-            "tutorial",
-        ];
-        // Valid (verb, noun) subcommand patterns for wrong-order detection
-        let valid_patterns = &[
-            ("new", "project"),
-            ("new", "area"),
-            ("new", "resource"),
-            ("add", "research"),
-            ("add", "plan"),
-            ("add", "design"),
-            ("phase", "next"),
-            ("phase", "set"),
-            ("phase", "back"),
-            ("phase", "show"),
-            ("handoff", "create"),
-            ("plugin", "list"),
-            ("plugin", "enable"),
-            ("plugin", "disable"),
-            ("resource", "add"),
-            ("resource", "list"),
-            ("resource", "import"),
-            ("config", "add"),
-            ("config", "list"),
-            ("config", "edit"),
-        ];
-        let engine = SuggestionEngine::new();
-
-        // Check for reversed command order before typo detection
-        if let Some(second) = args.get(1) {
-            if let Some(suggestion) = engine.suggest_order(plugin_name, second, valid_patterns) {
-                miette::bail!(
-                    "{}. {}",
-                    suggestion.message(),
-                    "Run 'wai --help' to see available commands."
-                );
-            }
-        }
-
-        if let Some(suggestion) = engine.suggest_typo(plugin_name, valid_commands) {
-            miette::bail!(
-                "{}. {}",
-                suggestion.message(),
-                "Run 'wai --help' to see available commands."
-            );
-        } else {
-            miette::bail!(
-                "Unknown command '{}'. Run 'wai --help' to see available commands or 'wai plugin list' to see plugins.",
-                plugin_name
-            );
-        }
+        miette::bail!(
+            "Unknown command '{}'. Run 'wai --help' to see available commands or 'wai plugin list' to see plugins.",
+            plugin_name
+        );
     }
 }
 

@@ -2256,6 +2256,39 @@ fn phase_set_shows_phase_specific_suggestions() {
         );
 }
 
+// ─── Context Inference ───────────────────────────────────────────────────────
+
+#[test]
+fn typo_suggestion_shown_outside_workspace() {
+    // Outside any workspace, a typo should still show "Did you mean?" rather
+    // than just "No project initialized".
+    let tmp = TempDir::new().unwrap();
+    // NOT calling init_workspace — this dir has no .wai/
+
+    wai_cmd(tmp.path())
+        .args(["statu"])
+        .assert()
+        .failure()
+        .stderr(
+            predicate::str::contains("Did you mean 'status'")
+                .or(predicate::str::contains("did you mean 'status'")),
+        );
+}
+
+#[test]
+fn wrong_order_shown_outside_workspace() {
+    let tmp = TempDir::new().unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["project", "new"])
+        .assert()
+        .failure()
+        .stderr(
+            predicate::str::contains("new project")
+                .and(predicate::str::contains("Did you mean")),
+        );
+}
+
 // ─── Wrong Order Detection ────────────────────────────────────────────────────
 
 #[test]
