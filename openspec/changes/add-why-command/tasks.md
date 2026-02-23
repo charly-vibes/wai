@@ -12,22 +12,22 @@
 - [x] 1.5 Add error codes to `src/error.rs` (wai::llm::*)
 
 ## MVP - Phase 2: Context Gathering
-- [ ] 2.1 Implement context gatherer in `src/commands/why.rs`
-- [ ] 2.2 Read all artifacts from `.wai/` (research, design, plan, handoff)
-- [ ] 2.3 Implement robust file path detection (exists, starts with ./, src/, contains / without spaces)
-- [ ] 2.4 Gather git blame/log with graceful failure handling (check git available, file tracked)
-- [ ] 2.5 Collect project metadata (current phase, recent commits)
-- [ ] 2.6 Implement empty artifact warning (zero artifacts → show message)
-- [ ] 2.7 Implement context size management (>100K tokens → truncate to 50 most recent)
+- [x] 2.1 Implement context gatherer in `src/commands/why.rs`
+- [x] 2.2 Read all artifacts from `.wai/` (research, design, plan, handoff)
+- [x] 2.3 Implement robust file path detection (exists, starts with ./, src/, contains / without spaces)
+- [x] 2.4 Gather git blame/log with graceful failure handling (check git available, file tracked)
+- [x] 2.5 Collect project metadata (current phase, recent commits)
+- [x] 2.6 Implement empty artifact warning (zero artifacts → show message)
+- [x] 2.7 Implement context size management (>100K tokens → truncate to 50 most recent)
 
 ## MVP - Phase 3: LLM Integration
-- [ ] 3.1 Implement Claude API client (reqwest-based, optional)
-- [ ] 3.2 Support API key from config `api_key` field OR `ANTHROPIC_API_KEY` env var
-- [ ] 3.3 Implement Ollama local model client (process spawn, optional)
-- [ ] 3.4 Implement backend selection priority (explicit config > auto-detect)
-- [ ] 3.5 Auto-detect available LLM backend (Claude API responds, ollama model available)
-- [ ] 3.6 Build prompt template with gathered context and artifact escaping
-- [ ] 3.7 Support model aliases ("haiku" → "claude-haiku-3-5")
+- [x] 3.1 Implement Claude API client (reqwest-based, optional)
+- [x] 3.2 Support API key from config `api_key` field OR `ANTHROPIC_API_KEY` env var
+- [x] 3.3 Implement Ollama local model client (process spawn, optional)
+- [x] 3.4 Implement backend selection priority (explicit config > auto-detect)
+- [x] 3.5 Auto-detect available LLM backend (Claude API responds, ollama model available)
+- [x] 3.6 Build prompt template with gathered context and artifact escaping
+- [x] 3.7 Support model aliases ("haiku" → "claude-haiku-3-5")
 
 ## MVP - Phase 4: Output Formatting
 - [ ] 4.1 Parse LLM markdown response with graceful handling of malformed output

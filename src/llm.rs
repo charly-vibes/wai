@@ -1,7 +1,15 @@
+use serde::Deserialize;
+
+use crate::config::WhyConfig;
+
+#[cfg(test)]
+use serial_test::serial;
+
+// ── Trait ─────────────────────────────────────────────────────────────────────
+
 /// LLM backend abstraction for the `wai why` reasoning oracle.
 ///
-/// Implementations are optional at compile-time. The command degrades gracefully
-/// to `wai search` when no backend is available.
+/// The command degrades gracefully to `wai search` when no backend is available.
 pub trait LlmClient: Send + Sync {
     /// Send a prompt and return the LLM's response text.
     fn complete(&self, prompt: &str) -> Result<String, LlmError>;
@@ -13,10 +21,11 @@ pub trait LlmClient: Send + Sync {
     fn name(&self) -> &str;
 }
 
+// ── Errors ────────────────────────────────────────────────────────────────────
+
 /// Errors specific to LLM backend operations.
 ///
-/// These are mapped to `WaiError::Llm*` variants for miette diagnostics at the
-/// call site in `src/commands/why.rs`.
+/// Mapped to `WaiError::Llm*` variants for miette diagnostics at the call site.
 #[derive(Debug, thiserror::Error)]
 pub enum LlmError {
     #[error("API key is invalid or missing")]
@@ -35,10 +44,11 @@ pub enum LlmError {
     Other(String),
 }
 
+// ── Model aliases ─────────────────────────────────────────────────────────────
+
 /// Resolve a short model alias to the canonical model ID.
 ///
-/// Aliases let users write `model = "haiku"` in config instead of
-/// `model = "claude-haiku-3-5-20251001"`.
+/// Allows `model = "haiku"` in config instead of the full versioned string.
 pub fn resolve_model_alias(alias: &str) -> &str {
     match alias {
         "haiku" => "claude-haiku-3-5-20251001",
@@ -47,11 +57,272 @@ pub fn resolve_model_alias(alias: &str) -> &str {
     }
 }
 
+// ── Claude client ─────────────────────────────────────────────────────────────
+
+const CLAUDE_API_URL: &str = "https://api.anthropic.com/v1/messages";
+const CLAUDE_API_VERSION: &str = "2023-06-01";
+const CLAUDE_DEFAULT_MODEL: &str = "claude-haiku-3-5-20251001";
+const CLAUDE_MAX_TOKENS: u32 = 2048;
+
+pub struct ClaudeClient {
+    api_key: String,
+    model: String,
+}
+
+impl ClaudeClient {
+    /// Create a new Claude client.
+    ///
+    /// `api_key` must be set; `model` is the resolved canonical model ID.
+    pub fn new(api_key: String, model: String) -> Self {
+        ClaudeClient { api_key, model }
+    }
+
+    /// Build from `WhyConfig`, falling back to `ANTHROPIC_API_KEY` env var.
+    ///
+    /// Returns `None` if no API key is available.
+    pub fn from_config(cfg: &WhyConfig) -> Option<Self> {
+        let api_key = cfg
+            .api_key
+            .clone()
+            .or_else(|| std::env::var("ANTHROPIC_API_KEY").ok())?;
+
+        let model = cfg
+            .model
+            .as_deref()
+            .map(resolve_model_alias)
+            .unwrap_or(CLAUDE_DEFAULT_MODEL)
+            .to_string();
+
+        Some(ClaudeClient::new(api_key, model))
+    }
+}
+
+/// Minimal deserialisation of the Claude Messages API response.
+#[derive(Deserialize)]
+struct ClaudeResponse {
+    content: Vec<ClaudeContentBlock>,
+    #[serde(default)]
+    error: Option<ClaudeApiError>,
+}
+
+#[derive(Deserialize)]
+struct ClaudeContentBlock {
+    #[serde(rename = "type")]
+    block_type: String,
+    text: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct ClaudeApiError {
+    #[serde(rename = "type")]
+    error_type: String,
+    message: String,
+}
+
+impl LlmClient for ClaudeClient {
+    fn complete(&self, prompt: &str) -> Result<String, LlmError> {
+        let body = serde_json::json!({
+            "model": self.model,
+            "max_tokens": CLAUDE_MAX_TOKENS,
+            "messages": [{"role": "user", "content": prompt}]
+        });
+
+        let client = reqwest::blocking::Client::new();
+        let resp = client
+            .post(CLAUDE_API_URL)
+            .header("x-api-key", &self.api_key)
+            .header("anthropic-version", CLAUDE_API_VERSION)
+            .header("content-type", "application/json")
+            .json(&body)
+            .send()
+            .map_err(|e| LlmError::NetworkError(e.to_string()))?;
+
+        let status = resp.status();
+        let text = resp
+            .text()
+            .map_err(|e| LlmError::NetworkError(e.to_string()))?;
+
+        match status.as_u16() {
+            200 => {}
+            401 => return Err(LlmError::InvalidApiKey),
+            429 => return Err(LlmError::RateLimit),
+            404 => {
+                return Err(LlmError::ModelNotFound(self.model.clone()));
+            }
+            other => {
+                return Err(LlmError::Other(format!("HTTP {}: {}", other, text)));
+            }
+        }
+
+        let parsed: ClaudeResponse = serde_json::from_str(&text)
+            .map_err(|e| LlmError::Other(format!("Failed to parse response: {}", e)))?;
+
+        if let Some(err) = parsed.error {
+            return Err(match err.error_type.as_str() {
+                "authentication_error" => LlmError::InvalidApiKey,
+                "rate_limit_error" => LlmError::RateLimit,
+                _ => LlmError::Other(err.message),
+            });
+        }
+
+        parsed
+            .content
+            .into_iter()
+            .find(|b| b.block_type == "text")
+            .and_then(|b| b.text)
+            .ok_or_else(|| LlmError::Other("Empty response from Claude".to_string()))
+    }
+
+    fn is_available(&self) -> bool {
+        !self.api_key.is_empty()
+    }
+
+    fn name(&self) -> &str {
+        "Claude"
+    }
+}
+
+// ── Ollama client ─────────────────────────────────────────────────────────────
+
+const OLLAMA_DEFAULT_MODEL: &str = "llama3.1:8b";
+
+pub struct OllamaClient {
+    model: String,
+}
+
+impl OllamaClient {
+    pub fn new(model: String) -> Self {
+        OllamaClient { model }
+    }
+
+    /// Build from `WhyConfig`.
+    pub fn from_config(cfg: &WhyConfig) -> Self {
+        let model = cfg
+            .model
+            .clone()
+            .unwrap_or_else(|| OLLAMA_DEFAULT_MODEL.to_string());
+        OllamaClient::new(model)
+    }
+
+    /// Return true if `ollama` binary is on PATH.
+    fn ollama_binary_exists() -> bool {
+        which_ollama().is_some()
+    }
+
+    /// Return true if the configured model is available locally.
+    fn model_available(&self) -> bool {
+        let output = std::process::Command::new("ollama")
+            .args(["list"])
+            .output()
+            .ok();
+
+        match output {
+            Some(o) if o.status.success() => {
+                let text = String::from_utf8_lossy(&o.stdout).to_lowercase();
+                text.contains(&self.model.to_lowercase())
+            }
+            _ => false,
+        }
+    }
+}
+
+fn which_ollama() -> Option<()> {
+    std::process::Command::new("ollama")
+        .arg("--version")
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|_| ())
+}
+
+impl LlmClient for OllamaClient {
+    fn complete(&self, prompt: &str) -> Result<String, LlmError> {
+        // Use `ollama run <model>` via stdin
+        let mut child = std::process::Command::new("ollama")
+            .args(["run", &self.model])
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .map_err(|e| LlmError::NetworkError(format!("Failed to spawn ollama: {}", e)))?;
+
+        use std::io::Write;
+        if let Some(stdin) = child.stdin.take() {
+            let mut stdin = stdin;
+            stdin
+                .write_all(prompt.as_bytes())
+                .map_err(|e| LlmError::Other(e.to_string()))?;
+        }
+
+        let out = child
+            .wait_with_output()
+            .map_err(|e| LlmError::Other(e.to_string()))?;
+
+        if !out.status.success() {
+            let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+            if stderr.contains("not found") || stderr.contains("pull") {
+                return Err(LlmError::ModelNotFound(self.model.clone()));
+            }
+            return Err(LlmError::Other(stderr));
+        }
+
+        Ok(String::from_utf8_lossy(&out.stdout).to_string())
+    }
+
+    fn is_available(&self) -> bool {
+        Self::ollama_binary_exists() && self.model_available()
+    }
+
+    fn name(&self) -> &str {
+        "Ollama"
+    }
+}
+
+// ── Backend selection ─────────────────────────────────────────────────────────
+
+/// Select the best available LLM backend given `WhyConfig`.
+///
+/// Priority:
+/// 1. Explicit `llm = "claude"` or `llm = "ollama"` in config
+/// 2. Auto-detect: Claude (if ANTHROPIC_API_KEY set) then Ollama (if binary + model found)
+/// 3. `None` → caller should fall back to `wai search`
+pub fn detect_backend(cfg: &WhyConfig) -> Option<Box<dyn LlmClient>> {
+    match cfg.llm.as_deref() {
+        Some("claude") => {
+            let client = ClaudeClient::from_config(cfg)?;
+            Some(Box::new(client))
+        }
+        Some("ollama") => {
+            let client = OllamaClient::from_config(cfg);
+            if client.is_available() {
+                Some(Box::new(client))
+            } else {
+                None
+            }
+        }
+        // Auto-detect
+        _ => {
+            // Try Claude first
+            if let Some(client) = ClaudeClient::from_config(cfg) {
+                return Some(Box::new(client));
+            }
+            // Try Ollama
+            let ollama = OllamaClient::from_config(cfg);
+            if ollama.is_available() {
+                return Some(Box::new(ollama));
+            }
+            None
+        }
+    }
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    // --- resolve_model_alias ---
+    // ── resolve_model_alias ──
 
     #[test]
     fn alias_haiku_resolves_to_canonical_id() {
@@ -66,13 +337,10 @@ mod tests {
     #[test]
     fn unknown_alias_passes_through_unchanged() {
         assert_eq!(resolve_model_alias("llama3.1:8b"), "llama3.1:8b");
-        assert_eq!(
-            resolve_model_alias("claude-opus-4-5"),
-            "claude-opus-4-5"
-        );
+        assert_eq!(resolve_model_alias("claude-opus-4-5"), "claude-opus-4-5");
     }
 
-    // --- LlmError display ---
+    // ── LlmError display ──
 
     #[test]
     fn llm_error_display_is_human_readable() {
@@ -89,13 +357,10 @@ mod tests {
             LlmError::ModelNotFound("llama99".into()).to_string(),
             "Model not found: llama99"
         );
-        assert_eq!(
-            LlmError::Other("unexpected".into()).to_string(),
-            "unexpected"
-        );
+        assert_eq!(LlmError::Other("unexpected".into()).to_string(), "unexpected");
     }
 
-    // --- LlmClient trait: mock implementation ---
+    // ── MockLlm ──
 
     struct MockLlm {
         available: bool,
@@ -150,5 +415,103 @@ mod tests {
     fn unavailable_client_reports_not_available() {
         let llm = MockLlm::unavailable();
         assert!(!llm.is_available());
+    }
+
+    // ── detect_backend ──
+
+    #[test]
+    #[serial]
+    fn no_config_no_env_returns_none() {
+        unsafe { std::env::remove_var("ANTHROPIC_API_KEY") };
+        let cfg = WhyConfig::default();
+        let _ = detect_backend(&cfg); // must not panic
+    }
+
+    #[test]
+    fn explicit_claude_with_key_returns_claude_client() {
+        let cfg = WhyConfig {
+            llm: Some("claude".to_string()),
+            api_key: Some("sk-test-key".to_string()),
+            ..Default::default()
+        };
+        let backend = detect_backend(&cfg);
+        assert!(backend.is_some());
+        assert_eq!(backend.unwrap().name(), "Claude");
+    }
+
+    #[test]
+    #[serial]
+    fn explicit_claude_without_key_returns_none() {
+        unsafe { std::env::remove_var("ANTHROPIC_API_KEY") };
+        let cfg = WhyConfig {
+            llm: Some("claude".to_string()),
+            api_key: None,
+            ..Default::default()
+        };
+        assert!(detect_backend(&cfg).is_none());
+    }
+
+    #[test]
+    #[serial]
+    fn env_var_api_key_enables_claude() {
+        unsafe { std::env::set_var("ANTHROPIC_API_KEY", "sk-env-key") };
+        let cfg = WhyConfig::default();
+        let backend = detect_backend(&cfg);
+        assert!(backend.is_some());
+        assert_eq!(backend.unwrap().name(), "Claude");
+        unsafe { std::env::remove_var("ANTHROPIC_API_KEY") };
+    }
+
+    // ── ClaudeClient ──
+
+    #[test]
+    fn claude_client_is_available_when_key_non_empty() {
+        let c = ClaudeClient::new("sk-test".to_string(), "haiku".to_string());
+        assert!(c.is_available());
+    }
+
+    #[test]
+    fn claude_client_not_available_when_key_empty() {
+        let c = ClaudeClient::new(String::new(), "haiku".to_string());
+        assert!(!c.is_available());
+    }
+
+    #[test]
+    fn claude_from_config_uses_api_key_field() {
+        let cfg = WhyConfig {
+            api_key: Some("sk-cfg".to_string()),
+            ..Default::default()
+        };
+        let client = ClaudeClient::from_config(&cfg).unwrap();
+        assert!(client.is_available());
+    }
+
+    #[test]
+    #[serial]
+    fn claude_from_config_falls_back_to_env_var() {
+        unsafe { std::env::set_var("ANTHROPIC_API_KEY", "sk-env") };
+        let cfg = WhyConfig::default();
+        let client = ClaudeClient::from_config(&cfg).unwrap();
+        assert!(client.is_available());
+        unsafe { std::env::remove_var("ANTHROPIC_API_KEY") };
+    }
+
+    #[test]
+    #[serial]
+    fn claude_from_config_returns_none_without_key() {
+        unsafe { std::env::remove_var("ANTHROPIC_API_KEY") };
+        let cfg = WhyConfig::default();
+        assert!(ClaudeClient::from_config(&cfg).is_none());
+    }
+
+    #[test]
+    fn claude_model_alias_resolved_in_from_config() {
+        let cfg = WhyConfig {
+            api_key: Some("key".to_string()),
+            model: Some("haiku".to_string()),
+            ..Default::default()
+        };
+        let client = ClaudeClient::from_config(&cfg).unwrap();
+        assert_eq!(client.model, "claude-haiku-3-5-20251001");
     }
 }

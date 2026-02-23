@@ -43,6 +43,9 @@ regex = "1"
 # String similarity for typo detection
 strsim = "0.11"
 
+# HTTP client for Claude API (blocking, JSON)
+reqwest = { version = "0.12", features = ["blocking", "json"] }
+
 # Async runtime (optional, for future use)
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs"], optional = true }
 
@@ -60,6 +63,7 @@ async = ["tokio"]
 assert_cmd = "2"
 predicates = "3"
 tempfile = "3"
+serial_test = "3"
 
 [[bin]]
 name = "wai"

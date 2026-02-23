@@ -10,6 +10,7 @@ mod context;
 mod error;
 mod guided_flows;
 mod help;
+mod llm;
 mod json;
 pub mod managed_block;
 pub mod openspec;
