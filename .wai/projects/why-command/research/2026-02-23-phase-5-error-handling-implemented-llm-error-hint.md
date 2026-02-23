@@ -1,0 +1,1 @@
+Phase 5 error handling implemented. llm_error_hint() maps LlmError variants to specific user-visible messages + remediation hints matching WaiError diagnostic help text. No-backend fallback now detects 'ollama binary present but model not pulled' and suggests ollama pull <model>. All 5 sub-tasks done (5.1 and 5.5 were pre-existing).

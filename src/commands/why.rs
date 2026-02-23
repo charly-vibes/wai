@@ -6,7 +6,7 @@ use owo_colors::OwoColorize;
 use walkdir::WalkDir;
 
 use crate::config::{ProjectConfig, STATE_FILE, wai_dir};
-use crate::llm::detect_backend;
+use crate::llm::{LlmError, detect_backend, ollama_binary_exists};
 
 use super::require_project;
 
@@ -729,6 +729,39 @@ fn escape_artifact(content: &str) -> String {
     content.replace("```", "~~~")
 }
 
+// ── Error messaging ───────────────────────────────────────────────────────────
+
+/// Map an `LlmError` to a user-visible message and an optional remediation hint.
+///
+/// The hint text mirrors the `help(...)` strings on the `WaiError::Llm*` miette
+/// diagnostic variants so the two stay consistent.
+pub fn llm_error_hint(err: &LlmError) -> (String, Option<String>) {
+    match err {
+        LlmError::InvalidApiKey => (
+            "API key is invalid or missing".to_string(),
+            Some(
+                "Set ANTHROPIC_API_KEY or add `api_key` to [why] in .wai/config.toml".to_string(),
+            ),
+        ),
+        LlmError::RateLimit => (
+            "Rate limit exceeded".to_string(),
+            Some(
+                "Wait 60 seconds and retry, or use Ollama for unlimited local queries"
+                    .to_string(),
+            ),
+        ),
+        LlmError::NetworkError(msg) => (
+            format!("Network error: {}", msg),
+            Some("Check your internet connection and retry".to_string()),
+        ),
+        LlmError::ModelNotFound(model) => (
+            format!("Model '{}' not found", model),
+            Some(format!("Run `ollama pull {}` to download the model", model)),
+        ),
+        LlmError::Other(msg) => (msg.clone(), None),
+    }
+}
+
 // ── Command entry point ───────────────────────────────────────────────────────
 
 pub fn run(query: String, no_llm: bool, json: bool) -> Result<()> {
@@ -771,14 +804,29 @@ pub fn run(query: String, no_llm: bool, json: bool) -> Result<()> {
     let backend: Box<dyn crate::llm::LlmClient> = match detect_backend(&why_cfg) {
         Some(b) => b,
         None => {
-            eprintln!(
-                "  {} No LLM available. Falling back to `wai search`.",
-                "⚠".yellow()
-            );
-            eprintln!(
-                "  {} Set ANTHROPIC_API_KEY or install Ollama for synthesized answers.",
-                "○".dimmed()
-            );
+            if ollama_binary_exists() {
+                // Ollama is installed but the model hasn't been pulled yet
+                let model = why_cfg.model.as_deref().unwrap_or("llama3.1:8b");
+                eprintln!(
+                    "  {} Ollama is installed but model '{}' is not available. Falling back to search.",
+                    "⚠".yellow(),
+                    model
+                );
+                eprintln!(
+                    "  {} Run: {}",
+                    "○".dimmed(),
+                    format!("ollama pull {}", model).bold()
+                );
+            } else {
+                eprintln!(
+                    "  {} No LLM available. Falling back to `wai search`.",
+                    "⚠".yellow()
+                );
+                eprintln!(
+                    "  {} Set ANTHROPIC_API_KEY or install Ollama for synthesized answers.",
+                    "○".dimmed()
+                );
+            }
             return super::search::run(query, None, None, false, None);
         }
     };
@@ -795,11 +843,11 @@ pub fn run(query: String, no_llm: bool, json: bool) -> Result<()> {
     let raw_response = match backend.complete(&prompt) {
         Ok(r) => r,
         Err(e) => {
-            eprintln!(
-                "  {} LLM error: {}. Falling back to search.",
-                "⚠".yellow(),
-                e
-            );
+            let (msg, hint) = llm_error_hint(&e);
+            eprintln!("  {} {}. Falling back to search.", "⚠".yellow(), msg);
+            if let Some(h) = hint {
+                eprintln!("  {} {}", "○".dimmed(), h);
+            }
             return super::search::run(query, None, None, false, None);
         }
     };
@@ -1269,5 +1317,47 @@ mod tests {
     #[test]
     fn relevance_from_str_accepts_med_alias() {
         assert_eq!(Relevance::from_str("med"), Some(Relevance::Medium));
+    }
+
+    // ── llm_error_hint ──
+
+    #[test]
+    fn llm_error_hint_rate_limit_mentions_wait_and_ollama() {
+        let (msg, hint) = llm_error_hint(&LlmError::RateLimit);
+        assert!(msg.to_lowercase().contains("rate"));
+        let h = hint.expect("hint should be present");
+        assert!(h.contains("60") || h.to_lowercase().contains("ollama"));
+    }
+
+    #[test]
+    fn llm_error_hint_model_not_found_includes_pull_command() {
+        let (msg, hint) = llm_error_hint(&LlmError::ModelNotFound("llama3.1:8b".to_string()));
+        assert!(msg.contains("llama3.1:8b"));
+        let h = hint.expect("hint should be present");
+        assert!(h.contains("ollama pull"));
+        assert!(h.contains("llama3.1:8b"));
+    }
+
+    #[test]
+    fn llm_error_hint_invalid_api_key_mentions_api_key() {
+        let (msg, hint) = llm_error_hint(&LlmError::InvalidApiKey);
+        assert!(!msg.is_empty());
+        let h = hint.expect("hint should be present");
+        // Help text should mention how to configure the key
+        assert!(h.to_uppercase().contains("ANTHROPIC_API_KEY") || h.contains("api_key"));
+    }
+
+    #[test]
+    fn llm_error_hint_network_error_preserves_inner_message() {
+        let (msg, hint) = llm_error_hint(&LlmError::NetworkError("timeout".to_string()));
+        assert!(msg.contains("timeout"));
+        assert!(hint.is_some());
+    }
+
+    #[test]
+    fn llm_error_hint_other_returns_message_and_no_hint() {
+        let (msg, hint) = llm_error_hint(&LlmError::Other("unexpected thing".to_string()));
+        assert_eq!(msg, "unexpected thing");
+        assert!(hint.is_none());
     }
 }

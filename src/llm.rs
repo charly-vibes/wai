@@ -206,7 +206,7 @@ impl OllamaClient {
 
     /// Return true if `ollama` binary is on PATH.
     fn ollama_binary_exists() -> bool {
-        which_ollama().is_some()
+        crate::llm::ollama_binary_exists()
     }
 
     /// Return true if the configured model is available locally.
@@ -226,13 +226,14 @@ impl OllamaClient {
     }
 }
 
-fn which_ollama() -> Option<()> {
+/// Return `true` if the `ollama` binary is on PATH.
+pub fn ollama_binary_exists() -> bool {
     std::process::Command::new("ollama")
         .arg("--version")
         .output()
         .ok()
         .filter(|o| o.status.success())
-        .map(|_| ())
+        .is_some()
 }
 
 impl LlmClient for OllamaClient {
