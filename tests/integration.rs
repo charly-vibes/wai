@@ -2600,3 +2600,97 @@ fn completely_unknown_command_shows_help_hint() {
         .failure()
         .stderr(predicate::str::contains("wai --help"));
 }
+
+// ─── wai why ─────────────────────────────────────────────────────────────────
+
+/// Helper: add a [why] section to .wai/config.toml forcing a specific backend.
+///
+/// Setting `llm = "claude"` without an API key guarantees detect_backend()
+/// returns None regardless of whether Ollama is installed, so fallback tests
+/// are deterministic on any machine.
+fn force_why_llm(dir: &std::path::Path, llm: &str) {
+    let config_path = dir.join(".wai").join("config.toml");
+    let existing = fs::read_to_string(&config_path).unwrap_or_default();
+    let updated = format!(
+        "{}\n[why]\nllm = \"{}\"\nprivacy_notice_shown = true\n",
+        existing, llm
+    );
+    fs::write(&config_path, updated).unwrap();
+}
+
+/// 7.5 — `--no-llm` flag bypasses LLM and falls back to `wai search` output.
+#[test]
+fn why_no_llm_flag_falls_back_to_search() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproj");
+    write_artifact(
+        tmp.path(),
+        "myproj",
+        "research",
+        "2024-01-01-notes.md",
+        "TOML was chosen because it is human-readable and well-supported.",
+    );
+
+    // --no-llm must succeed and produce search-style output
+    wai_cmd(tmp.path())
+        .args(["why", "--no-llm", "TOML"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("TOML"));
+}
+
+/// 7.5 — When no LLM backend is configured or available, the command warns
+/// and automatically falls back to `wai search`.
+#[test]
+fn why_auto_fallback_to_search_when_no_llm_available() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproj");
+    write_artifact(
+        tmp.path(),
+        "myproj",
+        "research",
+        "2024-01-01-notes.md",
+        "TOML was chosen because it is human-readable.",
+    );
+
+    // Force claude backend (no key) so Ollama auto-detection is skipped
+    force_why_llm(tmp.path(), "claude");
+
+    wai_cmd(tmp.path())
+        .args(["why", "TOML"])
+        .env_remove("ANTHROPIC_API_KEY")
+        .assert()
+        .success()
+        // warning goes to stderr; fallback search results go to stdout
+        .stderr(predicate::str::contains("No LLM available"));
+}
+
+/// 7.6 — A file-path query in a non-git repository does not crash.
+///
+/// The temp directory is not a git repo, so gather_git_file_context() must
+/// return None gracefully. The command falls back to `wai search`.
+#[test]
+fn why_file_query_in_non_git_repo_does_not_crash() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproj");
+    write_artifact(
+        tmp.path(),
+        "myproj",
+        "research",
+        "2024-01-01-notes.md",
+        "Architecture decision: use Rust for performance.",
+    );
+
+    // Force claude backend (no key) → deterministic fallback to search
+    force_why_llm(tmp.path(), "claude");
+
+    // Use a path-like query; the temp dir is not a git repo
+    wai_cmd(tmp.path())
+        .args(["why", "src/main.rs"])
+        .env_remove("ANTHROPIC_API_KEY")
+        .assert()
+        .success(); // must not crash due to missing git
+}

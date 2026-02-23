@@ -1529,6 +1529,82 @@ mod tests {
         assert!(!privacy_notice_needed(&cfg, "Ollama"));
     }
 
+    // ── gather_context end-to-end (7.1 extended) ──
+
+    #[test]
+    fn gather_context_populates_artifacts_from_tmpdir() {
+        let tmp = TempDir::new().unwrap();
+        setup_wai_project(&tmp);
+        let ctx = gather_context(tmp.path(), "why was this designed this way?");
+        assert!(!ctx.artifacts.is_empty(), "should find artifacts in tmpdir");
+        assert!(!ctx.is_file_query, "natural language query is not a file query");
+        assert!(ctx.git_context.is_none(), "no git context for NL queries");
+        assert!(!ctx.is_empty());
+    }
+
+    #[test]
+    fn gather_context_marks_file_query_for_existing_path() {
+        let tmp = TempDir::new().unwrap();
+        setup_wai_project(&tmp);
+        // Create a real file so Path::exists() returns true
+        let src_file = tmp.path().join("src").join("main.rs");
+        fs::create_dir_all(src_file.parent().unwrap()).unwrap();
+        fs::write(&src_file, "fn main() {}").unwrap();
+        let ctx = gather_context(tmp.path(), src_file.to_str().unwrap());
+        assert!(ctx.is_file_query, "absolute path to existing file is a file query");
+    }
+
+    // ── full pipeline integration test (7.4) ──
+
+    #[test]
+    fn full_pipeline_gather_prompt_parse_and_format_json() {
+        let tmp = TempDir::new().unwrap();
+        setup_wai_project(&tmp);
+
+        // Gather context — should find the 3 artifacts from setup_wai_project
+        let ctx = gather_context(tmp.path(), "why was this designed this way?");
+        assert!(!ctx.artifacts.is_empty());
+
+        // Build prompt — must contain the query and artifact content
+        let prompt = build_prompt(&ctx);
+        assert!(prompt.contains("why was this designed this way?"));
+        assert!(prompt.contains("research content"));
+
+        // Simulate a fixed LLM response (no real LLM call)
+        let mock_response = "## Answer\n\
+The design was chosen for simplicity and maintainability.\n\
+## Relevant Artifacts\n\
+- `.wai/projects/myproj/research/2024-01-01-notes.md` (High) — core rationale\n\
+## Decision Chain\n\
+Research → Design → Implementation\n\
+## Suggestions\n\
+- Review the research artifact for full context\n\
+- Consider adding more design notes\n";
+
+        // Parse the mock response
+        let parsed = parse_response(mock_response);
+        assert_eq!(
+            parsed.answer,
+            "The design was chosen for simplicity and maintainability."
+        );
+        assert_eq!(parsed.relevant_artifacts.len(), 1);
+        assert_eq!(parsed.relevant_artifacts[0].relevance, Some(Relevance::High));
+        assert_eq!(parsed.decision_chain, "Research → Design → Implementation");
+        assert_eq!(parsed.suggestions.len(), 2);
+
+        // Format as JSON — verify all required fields are present and correct
+        let json = format_json(&parsed, "why was this designed this way?");
+        let v: serde_json::Value = serde_json::from_str(&json).expect("output must be valid JSON");
+        assert_eq!(v["query"], "why was this designed this way?");
+        assert!(v["answer"].as_str().unwrap().contains("simplicity"));
+        assert_eq!(v["relevant_artifacts"].as_array().unwrap().len(), 1);
+        assert_eq!(
+            v["relevant_artifacts"][0]["relevance"].as_str().unwrap(),
+            "High"
+        );
+        assert_eq!(v["suggestions"].as_array().unwrap().len(), 2);
+    }
+
     // ── mark_privacy_notice_shown ──
 
     #[test]
