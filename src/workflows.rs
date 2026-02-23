@@ -11,6 +11,10 @@ pub enum WorkflowPattern {
     NewProject,
     /// In research phase with few or no research artifacts.
     ResearchPhaseMinimal,
+    /// In research phase with enough research to advance to design/plan.
+    ResearchReadyToAdvance,
+    /// In plan/design/implement phase with no research artifacts — context may be missing.
+    NeedsResearch,
     /// In plan/design phase with designs ready — can move to implement.
     ReadyToImplement,
     /// Actively in implement phase.
@@ -93,6 +97,44 @@ pub fn detect_patterns(ctx: &ProjectContext) -> Vec<WorkflowDetection> {
         detections.push(WorkflowDetection {
             pattern: WorkflowPattern::ResearchPhaseMinimal,
             message: "Research phase — add more research before advancing".to_string(),
+            suggestions: vec![
+                Suggestion {
+                    label: "Add research".to_string(),
+                    command: "wai add research \"...\"".to_string(),
+                },
+                Suggestion {
+                    label: "Search existing artifacts".to_string(),
+                    command: "wai search \"...\"".to_string(),
+                },
+            ],
+        });
+    }
+
+    // Research phase with enough research to advance
+    if ctx.phase == Phase::Research && ctx.research_count >= 3 {
+        detections.push(WorkflowDetection {
+            pattern: WorkflowPattern::ResearchReadyToAdvance,
+            message: "Enough research collected — consider advancing to design".to_string(),
+            suggestions: vec![
+                Suggestion {
+                    label: "Advance to design phase".to_string(),
+                    command: "wai phase set design".to_string(),
+                },
+                Suggestion {
+                    label: "Add a design artifact".to_string(),
+                    command: "wai add design \"...\"".to_string(),
+                },
+            ],
+        });
+    }
+
+    // Non-research phase with no research artifacts — context may be thin
+    if matches!(ctx.phase, Phase::Design | Phase::Plan | Phase::Implement)
+        && ctx.research_count == 0
+    {
+        detections.push(WorkflowDetection {
+            pattern: WorkflowPattern::NeedsResearch,
+            message: "No research found — consider adding context before continuing".to_string(),
             suggestions: vec![
                 Suggestion {
                     label: "Add research".to_string(),
@@ -258,7 +300,7 @@ mod tests {
     }
 
     #[test]
-    fn research_phase_with_plenty_of_research() {
+    fn research_phase_with_plenty_of_research_suggests_advance() {
         let ctx = ProjectContext {
             name: "test".to_string(),
             phase: Phase::Research,
@@ -268,6 +310,85 @@ mod tests {
             handoff_count: 0,
         };
         let detections = detect_patterns(&ctx);
+        assert_eq!(detections.len(), 1);
+        assert_eq!(detections[0].pattern, WorkflowPattern::ResearchReadyToAdvance);
+    }
+
+    #[test]
+    fn research_ready_to_advance_at_threshold() {
+        let ctx = ProjectContext {
+            name: "test".to_string(),
+            phase: Phase::Research,
+            research_count: 3,
+            plan_count: 0,
+            design_count: 0,
+            handoff_count: 0,
+        };
+        let detections = detect_patterns(&ctx);
+        assert_eq!(detections.len(), 1);
+        assert_eq!(detections[0].pattern, WorkflowPattern::ResearchReadyToAdvance);
+        assert!(detections[0].suggestions.iter().any(|s| s.command.contains("design")));
+    }
+
+    #[test]
+    fn research_below_threshold_does_not_trigger_advance() {
+        let ctx = ProjectContext {
+            name: "test".to_string(),
+            phase: Phase::Research,
+            research_count: 2,
+            plan_count: 0,
+            design_count: 0,
+            handoff_count: 0,
+        };
+        let detections = detect_patterns(&ctx);
+        // 2 research artifacts — not minimal (>1) and not enough to advance (<3)
         assert!(detections.is_empty());
+    }
+
+    #[test]
+    fn needs_research_in_design_phase_without_research() {
+        let ctx = ProjectContext {
+            name: "test".to_string(),
+            phase: Phase::Design,
+            research_count: 0,
+            plan_count: 0,
+            design_count: 1,
+            handoff_count: 0,
+        };
+        let detections = detect_patterns(&ctx);
+        assert_eq!(detections.len(), 2); // ReadyToImplement + NeedsResearch
+        assert!(detections.iter().any(|d| d.pattern == WorkflowPattern::NeedsResearch));
+        assert!(detections.iter().any(|d| d.pattern == WorkflowPattern::ReadyToImplement));
+    }
+
+    #[test]
+    fn needs_research_in_implement_phase_without_research() {
+        let ctx = ProjectContext {
+            name: "test".to_string(),
+            phase: Phase::Implement,
+            research_count: 0,
+            plan_count: 1,
+            design_count: 1,
+            handoff_count: 0,
+        };
+        let detections = detect_patterns(&ctx);
+        assert_eq!(detections.len(), 2); // ImplementPhaseActive + NeedsResearch
+        assert!(detections.iter().any(|d| d.pattern == WorkflowPattern::NeedsResearch));
+        assert!(detections.iter().any(|d| d.pattern == WorkflowPattern::ImplementPhaseActive));
+    }
+
+    #[test]
+    fn no_needs_research_when_research_present_in_implement_phase() {
+        let ctx = ProjectContext {
+            name: "test".to_string(),
+            phase: Phase::Implement,
+            research_count: 1,
+            plan_count: 2,
+            design_count: 1,
+            handoff_count: 0,
+        };
+        let detections = detect_patterns(&ctx);
+        assert_eq!(detections.len(), 1);
+        assert_eq!(detections[0].pattern, WorkflowPattern::ImplementPhaseActive);
     }
 }

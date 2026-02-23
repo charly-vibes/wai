@@ -1218,6 +1218,62 @@ fn status_json_without_openspec_omits_field() {
         .stdout(predicate::str::contains("\"openspec\":").not());
 }
 
+// ─── wai status: phase-aware suggestions ─────────────────────────────────────
+
+#[test]
+fn status_suggests_advance_when_enough_research() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+
+    // Write 3 research artifacts to cross the readiness threshold
+    write_artifact(tmp.path(), "my-app", "research", "2026-01-01-first.md", "First finding");
+    write_artifact(tmp.path(), "my-app", "research", "2026-01-02-second.md", "Second finding");
+    write_artifact(tmp.path(), "my-app", "research", "2026-01-03-third.md", "Third finding");
+
+    wai_cmd(tmp.path())
+        .args(["status"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("design")
+                .and(predicate::str::contains("Advance")),
+        );
+}
+
+#[test]
+fn status_suggests_research_needed_when_in_implement_phase_without_research() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+
+    // Jump to implement phase without adding any research
+    wai_cmd(tmp.path())
+        .args(["phase", "set", "implement"])
+        .assert()
+        .success();
+
+    wai_cmd(tmp.path())
+        .args(["status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("research"));
+}
+
+#[test]
+fn status_shows_minimal_research_suggestion_for_new_project() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+
+    // New project with no artifacts → NewProject pattern → suggest adding research
+    wai_cmd(tmp.path())
+        .args(["status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("research"));
+}
+
 // ─── wai (no args) ─────────────────────────────────────────────────────────
 
 #[test]

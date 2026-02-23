@@ -13,6 +13,7 @@ use crate::openspec;
 use crate::output::print_json;
 use crate::plugin;
 use crate::state::{Phase, ProjectState};
+use crate::workflows;
 
 pub fn run(verbose: u8) -> Result<()> {
     let project_root = find_project_root().ok_or(WaiError::NotInitialized)?;
@@ -136,7 +137,7 @@ pub fn run(verbose: u8) -> Result<()> {
         }
     }
 
-    // Suggestions
+    // Suggestions — phase-aware when projects exist
     println!();
     println!("  {} Suggestions", "◆".cyan());
 
@@ -150,19 +151,47 @@ pub fn run(verbose: u8) -> Result<()> {
             "→".dimmed()
         );
     } else {
-        suggestions.push(Suggestion {
-            label: "View project phase".to_string(),
-            command: "wai phase".to_string(),
-        });
-        suggestions.push(Suggestion {
-            label: "Add artifacts".to_string(),
-            command: "wai add research \"...\"".to_string(),
-        });
-        println!("    {} View project phase: wai phase", "→".dimmed());
-        println!(
-            "    {} Add artifacts: wai add research \"...\"",
-            "→".dimmed()
-        );
+        // Gather phase-aware suggestions from workflow detection across all projects
+        let proj_dir = projects_dir(&project_root);
+        if proj_dir.exists() {
+            let mut entries: Vec<_> = std::fs::read_dir(&proj_dir)
+                .into_diagnostic()?
+                .filter_map(|e| e.ok())
+                .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
+                .collect();
+            entries.sort_by_key(|e| e.file_name());
+
+            for entry in &entries {
+                if let Some(name) = entry.file_name().to_str() {
+                    if let Some(ctx) = workflows::scan_project(&project_root, name) {
+                        let detections = workflows::detect_patterns(&ctx);
+                        for detection in detections {
+                            for s in detection.suggestions {
+                                println!("    {} {}: {}", "→".dimmed(), s.label, s.command);
+                                suggestions.push(s);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Fallback suggestions if workflow detection produced nothing
+        if suggestions.is_empty() {
+            suggestions.push(Suggestion {
+                label: "View project phase".to_string(),
+                command: "wai phase".to_string(),
+            });
+            suggestions.push(Suggestion {
+                label: "Add artifacts".to_string(),
+                command: "wai add research \"...\"".to_string(),
+            });
+            println!("    {} View project phase: wai phase", "→".dimmed());
+            println!(
+                "    {} Add artifacts: wai add research \"...\"",
+                "→".dimmed()
+            );
+        }
     }
 
     outro("Run 'wai show' for full overview").into_diagnostic()?;
