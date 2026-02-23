@@ -124,14 +124,18 @@ pub enum WaiError {
     #[error("LLM API key is invalid or missing")]
     #[diagnostic(
         code(wai::llm::invalid_api_key),
-        help("Set ANTHROPIC_API_KEY environment variable or add `api_key` to the [why] section in .wai/config.toml")
+        help(
+            "Set ANTHROPIC_API_KEY environment variable or add `api_key` to the [why] section in .wai/config.toml"
+        )
     )]
     LlmInvalidApiKey,
 
     #[error("LLM rate limit exceeded")]
     #[diagnostic(
         code(wai::llm::rate_limit),
-        help("Wait 60 seconds and retry, or use Ollama for unlimited local queries: https://ollama.com")
+        help(
+            "Wait 60 seconds and retry, or use Ollama for unlimited local queries: https://ollama.com"
+        )
     )]
     LlmRateLimit,
 

@@ -3,10 +3,10 @@
 pub mod config;
 pub mod context;
 pub mod error;
-pub mod llm;
 pub mod guided_flows;
 pub mod help;
 pub mod json;
+pub mod llm;
 pub mod managed_block;
 pub mod openspec;
 pub mod output;

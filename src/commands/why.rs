@@ -5,7 +5,7 @@ use miette::Result;
 use owo_colors::OwoColorize;
 use walkdir::WalkDir;
 
-use crate::config::{wai_dir, ProjectConfig, STATE_FILE};
+use crate::config::{ProjectConfig, STATE_FILE, wai_dir};
 use crate::llm::detect_backend;
 
 use super::require_project;
@@ -71,6 +71,8 @@ pub struct ProjectMeta {
 #[derive(Debug)]
 pub struct GatheredContext {
     pub query: String,
+    // Read in Phase 4 output formatter
+    #[allow(dead_code)]
     pub is_file_query: bool,
     pub artifacts: Vec<Artifact>,
     /// Git log for file queries; `None` for natural-language queries.
@@ -387,9 +389,7 @@ pub fn build_prompt(ctx: &GatheredContext) -> String {
     }
 
     if ctx.truncated {
-        parts.push(
-            "*Note: Context was truncated to fit within token limits.*\n".to_string(),
-        );
+        parts.push("*Note: Context was truncated to fit within token limits.*\n".to_string());
     }
 
     parts.push(
@@ -468,16 +468,16 @@ pub fn run(query: String, no_llm: bool) -> Result<()> {
 
     println!();
     println!("  {} {}", "◆".cyan(), query.bold());
-    println!(
-        "  {} Querying {} …",
-        "○".dimmed(),
-        backend.name()
-    );
+    println!("  {} Querying {} …", "○".dimmed(), backend.name());
 
     let response = match backend.complete(&prompt) {
         Ok(r) => r,
         Err(e) => {
-            eprintln!("  {} LLM error: {}. Falling back to search.", "⚠".yellow(), e);
+            eprintln!(
+                "  {} LLM error: {}. Falling back to search.",
+                "⚠".yellow(),
+                e
+            );
             return super::search::run(query, None, None, false, None);
         }
     };

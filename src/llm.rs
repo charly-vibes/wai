@@ -357,7 +357,10 @@ mod tests {
             LlmError::ModelNotFound("llama99".into()).to_string(),
             "Model not found: llama99"
         );
-        assert_eq!(LlmError::Other("unexpected".into()).to_string(), "unexpected");
+        assert_eq!(
+            LlmError::Other("unexpected".into()).to_string(),
+            "unexpected"
+        );
     }
 
     // ── MockLlm ──
