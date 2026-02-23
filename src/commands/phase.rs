@@ -101,7 +101,7 @@ pub fn run(cmd: PhaseCommands) -> Result<()> {
         }
         PhaseCommands::Set { phase } => {
             require_safe_mode("set phase")?;
-            let target = Phase::from_str(&phase).ok_or_else(|| {
+            let target = Phase::parse(&phase).ok_or_else(|| {
                 miette::miette!(
                     "Unknown phase '{}'. Valid phases: {}",
                     phase,

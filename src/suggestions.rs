@@ -8,6 +8,7 @@ use std::path::Path;
 
 /// Suggestion types that can be generated
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum Suggestion {
     /// Typo suggestion with the corrected command
     DidYouMean {
@@ -92,6 +93,7 @@ impl SuggestionEngine {
     }
 
     /// Create a new suggestion engine with custom similarity threshold
+    #[allow(dead_code)]
     pub fn with_threshold(threshold: f64) -> Self {
         Self {
             similarity_threshold: threshold.clamp(0.0, 1.0),
@@ -164,6 +166,7 @@ impl SuggestionEngine {
     ///
     /// # Returns
     /// An optional `Suggestion` with context information
+    #[allow(dead_code)]
     pub fn suggest_context(&self, current_dir: &Path, marker: &str) -> Option<Suggestion> {
         let mut search_dir = current_dir;
 

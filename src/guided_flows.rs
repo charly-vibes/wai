@@ -30,7 +30,7 @@ pub fn first_research_walkthrough() -> Result<()> {
 
     println!();
     log::success("Research note captured!").into_diagnostic()?;
-    log::info(&format!(
+    log::info(format!(
         "Research saved. Next steps:\n  • wai search \"{}\" - Find your notes\n  • wai add plan - Break into a plan",
         topic
     ))
@@ -70,7 +70,7 @@ pub fn first_phase_walkthrough() -> Result<()> {
 /// Show enhanced guidance text during init
 pub fn enhanced_init_guidance(project_name: &str) -> Result<()> {
     println!();
-    log::success(&format!("Initialized project: {}", project_name)).into_diagnostic()?;
+    log::success(format!("Initialized project: {}", project_name)).into_diagnostic()?;
     println!();
     log::info("You're all set! Here's what you can do next:").into_diagnostic()?;
     println!();

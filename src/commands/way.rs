@@ -41,17 +41,18 @@ pub fn run() -> Result<()> {
 
     let context = current_context();
 
-    let mut checks = Vec::new();
-    checks.push(check_task_runner(&repo_root));
-    checks.push(check_git_hooks(&repo_root));
-    checks.push(check_editorconfig(&repo_root));
-    checks.push(check_documentation(&repo_root));
-    checks.push(check_ai_instructions(&repo_root));
-    checks.push(check_llm_txt(&repo_root));
-    checks.push(check_agent_skills(&repo_root));
-    checks.push(check_gh_cli());
-    checks.push(check_ci_cd(&repo_root));
-    checks.push(check_devcontainer(&repo_root));
+    let checks = vec![
+        check_task_runner(&repo_root),
+        check_git_hooks(&repo_root),
+        check_editorconfig(&repo_root),
+        check_documentation(&repo_root),
+        check_ai_instructions(&repo_root),
+        check_llm_txt(&repo_root),
+        check_agent_skills(&repo_root),
+        check_gh_cli(),
+        check_ci_cd(&repo_root),
+        check_devcontainer(&repo_root),
+    ];
 
     let summary = Summary {
         pass: checks.iter().filter(|c| c.status == Status::Pass).count(),
@@ -242,8 +243,7 @@ fn check_editorconfig(repo_root: &Path) -> CheckResult {
 
 fn check_documentation(repo_root: &Path) -> CheckResult {
     let readme = repo_root.join("README.md").exists();
-    let license =
-        repo_root.join("LICENSE").exists() || repo_root.join("LICENSE.md").exists();
+    let license = repo_root.join("LICENSE").exists() || repo_root.join("LICENSE.md").exists();
     let contributing = repo_root.join("CONTRIBUTING.md").exists();
     let gitignore = repo_root.join(".gitignore").exists();
 

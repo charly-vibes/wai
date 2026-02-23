@@ -220,14 +220,14 @@ fn run_external(args: Vec<String>) -> Result<()> {
     // Check for typos and wrong-order BEFORE requiring the workspace.
     // This ensures "Did you mean?" hints are shown even outside a workspace,
     // giving better context rather than just "NotInitialized".
-    if let Some(second) = args.get(1) {
-        if let Some(suggestion) = engine.suggest_order(plugin_name, second, valid_patterns) {
-            miette::bail!(
-                "{}. {}",
-                suggestion.message(),
-                "Run 'wai --help' to see available commands."
-            );
-        }
+    if let Some(second) = args.get(1)
+        && let Some(suggestion) = engine.suggest_order(plugin_name, second, valid_patterns)
+    {
+        miette::bail!(
+            "{}. {}",
+            suggestion.message(),
+            "Run 'wai --help' to see available commands."
+        );
     }
 
     if let Some(suggestion) = engine.suggest_typo(plugin_name, valid_commands) {

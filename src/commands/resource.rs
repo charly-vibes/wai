@@ -297,39 +297,37 @@ fn list_skills(json: bool) -> Result<()> {
     if json {
         let payload = SkillListPayload { skills: entries };
         crate::output::print_json(&payload)?;
+    } else if entries.is_empty() {
+        println!();
+        println!("  {} No skills found", "○".dimmed());
+        println!(
+            "  {} Run 'wai resource add skill <name>' to create one",
+            "→".cyan()
+        );
+        println!();
     } else {
-        if entries.is_empty() {
-            println!();
-            println!("  {} No skills found", "○".dimmed());
-            println!(
-                "  {} Run 'wai resource add skill <name>' to create one",
-                "→".cyan()
-            );
-            println!();
-        } else {
-            println!();
-            println!("  {} Skills", "◆".cyan());
-            println!();
-            for entry in entries {
-                let desc = if entry.description.len() > 60 {
-                    format!("{}...", &entry.description[..57])
-                } else {
-                    entry.description.clone()
-                };
+        println!();
+        println!("  {} Skills", "◆".cyan());
+        println!();
+        for entry in entries {
+            let desc = if entry.description.len() > 60 {
+                format!("{}...", &entry.description[..57])
+            } else {
+                entry.description.clone()
+            };
 
-                if entry.description == "(no metadata)" {
-                    println!("    {} {} {}", "•".dimmed(), entry.name, desc.dimmed());
-                } else {
-                    println!(
-                        "    {} {} {}",
-                        "•".dimmed(),
-                        entry.name.bold(),
-                        desc.dimmed()
-                    );
-                }
+            if entry.description == "(no metadata)" {
+                println!("    {} {} {}", "•".dimmed(), entry.name, desc.dimmed());
+            } else {
+                println!(
+                    "    {} {} {}",
+                    "•".dimmed(),
+                    entry.name.bold(),
+                    desc.dimmed()
+                );
             }
-            println!();
         }
+        println!();
     }
 
     Ok(())

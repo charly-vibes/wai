@@ -35,6 +35,7 @@ struct CheckResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     fix: Option<String>,
     #[serde(skip)]
+    #[allow(clippy::type_complexity)]
     fix_fn: Option<Box<dyn FnOnce(&Path) -> Result<()>>>,
 }
 

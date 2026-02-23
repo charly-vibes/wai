@@ -52,7 +52,7 @@ impl Phase {
         }
     }
 
-    pub fn from_str(s: &str) -> Option<Phase> {
+    pub fn parse(s: &str) -> Option<Phase> {
         match s.to_lowercase().as_str() {
             "research" => Some(Phase::Research),
             "design" => Some(Phase::Design),
