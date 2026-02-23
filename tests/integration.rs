@@ -243,9 +243,21 @@ fn reinit_is_idempotent() {
     assert!(tmp.path().join(".wai/areas").is_dir());
     assert!(tmp.path().join(".wai/resources").is_dir());
     assert!(tmp.path().join(".wai/archives").is_dir());
-    assert!(tmp.path().join(".wai/resources/agent-config/skills").is_dir());
-    assert!(tmp.path().join(".wai/resources/agent-config/rules").is_dir());
-    assert!(tmp.path().join(".wai/resources/agent-config/context").is_dir());
+    assert!(
+        tmp.path()
+            .join(".wai/resources/agent-config/skills")
+            .is_dir()
+    );
+    assert!(
+        tmp.path()
+            .join(".wai/resources/agent-config/rules")
+            .is_dir()
+    );
+    assert!(
+        tmp.path()
+            .join(".wai/resources/agent-config/context")
+            .is_dir()
+    );
 }
 
 // ─── wai new project ────────────────────────────────────────────────────────
@@ -2363,7 +2375,9 @@ fn add_research_shows_context_aware_suggestions() {
         .success()
         .stdout(
             predicate::str::contains("Add more research: wai add research")
-                .and(predicate::str::contains("Move to design phase: wai phase set design"))
+                .and(predicate::str::contains(
+                    "Move to design phase: wai phase set design",
+                ))
                 .and(predicate::str::contains("Review research: wai search")),
         );
 }
@@ -2399,7 +2413,9 @@ fn phase_set_shows_phase_specific_suggestions() {
         .success()
         .stdout(
             predicate::str::contains("Show project details: wai show")
-                .and(predicate::str::contains("Add implementation notes: wai add plan"))
+                .and(predicate::str::contains(
+                    "Add implementation notes: wai add plan",
+                ))
                 .and(predicate::str::contains("Check status: wai status")),
         );
 }
@@ -2432,8 +2448,7 @@ fn wrong_order_shown_outside_workspace() {
         .assert()
         .failure()
         .stderr(
-            predicate::str::contains("new project")
-                .and(predicate::str::contains("Did you mean")),
+            predicate::str::contains("new project").and(predicate::str::contains("Did you mean")),
         );
 }
 
@@ -2450,8 +2465,7 @@ fn wrong_order_project_new_suggests_correction() {
         .assert()
         .failure()
         .stderr(
-            predicate::str::contains("new project")
-                .and(predicate::str::contains("Did you mean")),
+            predicate::str::contains("new project").and(predicate::str::contains("Did you mean")),
         );
 }
 
@@ -2466,8 +2480,7 @@ fn wrong_order_research_add_suggests_correction() {
         .assert()
         .failure()
         .stderr(
-            predicate::str::contains("add research")
-                .and(predicate::str::contains("Did you mean")),
+            predicate::str::contains("add research").and(predicate::str::contains("Did you mean")),
         );
 }
 

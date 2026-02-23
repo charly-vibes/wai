@@ -5,8 +5,8 @@ use wai::suggestions::{Suggestion, SuggestionEngine};
 // ─── Typo Detection ───────────────────────────────────────────────────────────
 
 const WAI_COMMANDS: &[&str] = &[
-    "new", "add", "show", "move", "init", "status", "phase", "sync", "config", "handoff",
-    "search", "timeline", "plugin", "doctor", "way", "import", "resource", "tutorial",
+    "new", "add", "show", "move", "init", "status", "phase", "sync", "config", "handoff", "search",
+    "timeline", "plugin", "doctor", "way", "import", "resource", "tutorial",
 ];
 
 #[test]
@@ -77,8 +77,16 @@ fn typo_message_contains_original_and_suggestion() {
     let engine = SuggestionEngine::new();
     let suggestion = engine.suggest_typo("statu", WAI_COMMANDS).unwrap();
     let msg = suggestion.message();
-    assert!(msg.contains("statu"), "message should contain original: {}", msg);
-    assert!(msg.contains("status"), "message should contain suggestion: {}", msg);
+    assert!(
+        msg.contains("statu"),
+        "message should contain original: {}",
+        msg
+    );
+    assert!(
+        msg.contains("status"),
+        "message should contain suggestion: {}",
+        msg
+    );
     assert!(
         msg.contains("Did you mean"),
         "message should contain hint phrase: {}",
@@ -141,8 +149,16 @@ fn wrong_order_plan_add() {
 fn wrong_order_no_match_for_valid_pattern() {
     let engine = SuggestionEngine::new();
     // "new project" is already correct, no suggestion
-    assert!(engine.suggest_order("new", "project", WAI_PATTERNS).is_none());
-    assert!(engine.suggest_order("add", "research", WAI_PATTERNS).is_none());
+    assert!(
+        engine
+            .suggest_order("new", "project", WAI_PATTERNS)
+            .is_none()
+    );
+    assert!(
+        engine
+            .suggest_order("add", "research", WAI_PATTERNS)
+            .is_none()
+    );
 }
 
 #[test]
@@ -155,10 +171,20 @@ fn wrong_order_no_match_for_unknown_pair() {
 #[test]
 fn wrong_order_message_format() {
     let engine = SuggestionEngine::new();
-    let suggestion = engine.suggest_order("project", "new", WAI_PATTERNS).unwrap();
+    let suggestion = engine
+        .suggest_order("project", "new", WAI_PATTERNS)
+        .unwrap();
     let msg = suggestion.message();
-    assert!(msg.contains("project new"), "message should contain original: {}", msg);
-    assert!(msg.contains("new project"), "message should contain correction: {}", msg);
+    assert!(
+        msg.contains("project new"),
+        "message should contain original: {}",
+        msg
+    );
+    assert!(
+        msg.contains("new project"),
+        "message should contain correction: {}",
+        msg
+    );
     assert!(
         msg.contains("Did you mean"),
         "message should contain hint phrase: {}",
@@ -176,7 +202,10 @@ fn context_no_hint_when_wai_in_current_dir() {
     let engine = SuggestionEngine::new();
     // .wai is in current dir → no hint needed
     let hint = engine.suggest_context(tmp.path(), ".wai");
-    assert!(hint.is_none(), "no hint expected when .wai is in current dir");
+    assert!(
+        hint.is_none(),
+        "no hint expected when .wai is in current dir"
+    );
 }
 
 #[test]
@@ -189,7 +218,10 @@ fn context_hint_when_wai_in_parent() {
     let engine = SuggestionEngine::new();
     // .wai is in parent (tmp), user is in subdir
     let hint = engine.suggest_context(&subdir, ".wai");
-    assert!(hint.is_some(), "expected hint when .wai is in parent directory");
+    assert!(
+        hint.is_some(),
+        "expected hint when .wai is in parent directory"
+    );
     match hint.unwrap() {
         Suggestion::ContextHint { message, path } => {
             assert!(
@@ -198,7 +230,9 @@ fn context_hint_when_wai_in_parent() {
                 message
             );
             assert!(
-                path.as_deref().unwrap_or("").contains(tmp.path().to_str().unwrap()),
+                path.as_deref()
+                    .unwrap_or("")
+                    .contains(tmp.path().to_str().unwrap()),
                 "path should point to workspace root"
             );
         }
