@@ -5,7 +5,8 @@ use miette::Result;
 use owo_colors::OwoColorize;
 use walkdir::WalkDir;
 
-use crate::config::{ProjectConfig, STATE_FILE, wai_dir};
+use crate::config::{ProjectConfig, STATE_FILE, WhyConfig, wai_dir};
+use crate::error::WaiError;
 use crate::llm::{LlmError, detect_backend, ollama_binary_exists};
 
 use super::require_project;
@@ -762,6 +763,68 @@ pub fn llm_error_hint(err: &LlmError) -> (String, Option<String>) {
     }
 }
 
+// ── Fallback mode (6.4) ───────────────────────────────────────────────────────
+
+/// Controls behavior when no LLM is available or an LLM call fails.
+#[derive(Debug, PartialEq)]
+pub enum FallbackMode {
+    /// Gracefully degrade to `wai search` (default).
+    Search,
+    /// Return an error; do not fall back.
+    Error,
+}
+
+/// Determine fallback behavior from config.
+///
+/// `fallback = "error"` → propagate errors; anything else → fall back to search.
+pub fn fallback_mode(cfg: &WhyConfig) -> FallbackMode {
+    match cfg.fallback.as_deref() {
+        Some("error") => FallbackMode::Error,
+        _ => FallbackMode::Search,
+    }
+}
+
+// ── Privacy notice (6.5 / 6.6) ───────────────────────────────────────────────
+
+/// Return `true` if the backend sends data to an external API (e.g. Claude).
+pub fn is_external_backend(backend_name: &str) -> bool {
+    backend_name == "Claude"
+}
+
+/// Return `true` if the one-time privacy notice must be shown before this query.
+pub fn privacy_notice_needed(why_cfg: &WhyConfig, backend_name: &str) -> bool {
+    is_external_backend(backend_name) && why_cfg.privacy_notice_shown != Some(true)
+}
+
+/// Display the one-time privacy notice to stderr.
+fn show_privacy_notice() {
+    eprintln!();
+    eprintln!("  {} Privacy Notice", "◆".cyan().bold());
+    eprintln!("  Your query and project artifacts will be sent to the Claude API (Anthropic).");
+    eprintln!(
+        "  {} Anthropic privacy policy: https://www.anthropic.com/privacy",
+        "→".cyan()
+    );
+    eprintln!(
+        "  {} Set privacy_notice_shown = true in the [why] section of",
+        "○".dimmed()
+    );
+    eprintln!("     .wai/config.toml to suppress this notice in future.");
+    eprintln!();
+}
+
+/// Persist `privacy_notice_shown = true` to the project config.
+///
+/// Best-effort: silently ignores I/O errors so a missing or broken config never
+/// blocks the query from proceeding.
+pub fn mark_privacy_notice_shown(project_root: &std::path::Path) {
+    if let Ok(mut config) = ProjectConfig::load(project_root) {
+        let why_cfg = config.why.get_or_insert_with(WhyConfig::default);
+        why_cfg.privacy_notice_shown = Some(true);
+        let _ = config.save(project_root);
+    }
+}
+
 // ── Command entry point ───────────────────────────────────────────────────────
 
 pub fn run(query: String, no_llm: bool, json: bool) -> Result<()> {
@@ -800,10 +863,15 @@ pub fn run(query: String, no_llm: bool, json: bool) -> Result<()> {
         .and_then(|c| c.why)
         .unwrap_or_default();
 
-    // Detect backend; fall back to search if none available
+    let mode = fallback_mode(&why_cfg);
+
+    // Detect backend; fall back to search (or error) if none available
     let backend: Box<dyn crate::llm::LlmClient> = match detect_backend(&why_cfg) {
         Some(b) => b,
         None => {
+            if mode == FallbackMode::Error {
+                return Err(WaiError::LlmNotAvailable.into());
+            }
             if ollama_binary_exists() {
                 // Ollama is installed but the model hasn't been pulled yet
                 let model = why_cfg.model.as_deref().unwrap_or("llama3.1:8b");
@@ -831,6 +899,12 @@ pub fn run(query: String, no_llm: bool, json: bool) -> Result<()> {
         }
     };
 
+    // 6.6: Show one-time privacy notice for external APIs (e.g. Claude)
+    if privacy_notice_needed(&why_cfg, backend.name()) {
+        show_privacy_notice();
+        mark_privacy_notice_shown(&project_root);
+    }
+
     // Build prompt and call the LLM
     let prompt = build_prompt(&ctx);
 
@@ -843,6 +917,18 @@ pub fn run(query: String, no_llm: bool, json: bool) -> Result<()> {
     let raw_response = match backend.complete(&prompt) {
         Ok(r) => r,
         Err(e) => {
+            if mode == FallbackMode::Error {
+                let wai_err = match &e {
+                    LlmError::InvalidApiKey => WaiError::LlmInvalidApiKey,
+                    LlmError::RateLimit => WaiError::LlmRateLimit,
+                    LlmError::NetworkError(m) => WaiError::LlmNetworkError { message: m.clone() },
+                    LlmError::ModelNotFound(m) => {
+                        WaiError::LlmModelNotFound { model: m.clone() }
+                    }
+                    LlmError::Other(m) => WaiError::LlmNetworkError { message: m.clone() },
+                };
+                return Err(wai_err.into());
+            }
             let (msg, hint) = llm_error_hint(&e);
             eprintln!("  {} {}. Falling back to search.", "⚠".yellow(), msg);
             if let Some(h) = hint {
@@ -1359,5 +1445,111 @@ mod tests {
         let (msg, hint) = llm_error_hint(&LlmError::Other("unexpected thing".to_string()));
         assert_eq!(msg, "unexpected thing");
         assert!(hint.is_none());
+    }
+
+    // ── fallback_mode (6.4) ──
+
+    #[test]
+    fn fallback_mode_default_is_search() {
+        let cfg = WhyConfig::default();
+        assert_eq!(fallback_mode(&cfg), FallbackMode::Search);
+    }
+
+    #[test]
+    fn fallback_mode_explicit_search() {
+        let cfg = WhyConfig {
+            fallback: Some("search".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(fallback_mode(&cfg), FallbackMode::Search);
+    }
+
+    #[test]
+    fn fallback_mode_explicit_error() {
+        let cfg = WhyConfig {
+            fallback: Some("error".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(fallback_mode(&cfg), FallbackMode::Error);
+    }
+
+    #[test]
+    fn fallback_mode_unknown_value_defaults_to_search() {
+        let cfg = WhyConfig {
+            fallback: Some("unknown".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(fallback_mode(&cfg), FallbackMode::Search);
+    }
+
+    // ── is_external_backend / privacy_notice_needed (6.5 / 6.6) ──
+
+    #[test]
+    fn claude_backend_is_external() {
+        assert!(is_external_backend("Claude"));
+    }
+
+    #[test]
+    fn ollama_backend_is_not_external() {
+        assert!(!is_external_backend("Ollama"));
+    }
+
+    #[test]
+    fn unknown_backend_is_not_external() {
+        assert!(!is_external_backend("mock"));
+    }
+
+    #[test]
+    fn privacy_notice_needed_when_not_shown_and_claude() {
+        let cfg = WhyConfig::default();
+        assert!(privacy_notice_needed(&cfg, "Claude"));
+    }
+
+    #[test]
+    fn privacy_notice_not_needed_when_shown_true() {
+        let cfg = WhyConfig {
+            privacy_notice_shown: Some(true),
+            ..Default::default()
+        };
+        assert!(!privacy_notice_needed(&cfg, "Claude"));
+    }
+
+    #[test]
+    fn privacy_notice_still_needed_when_shown_false() {
+        let cfg = WhyConfig {
+            privacy_notice_shown: Some(false),
+            ..Default::default()
+        };
+        assert!(privacy_notice_needed(&cfg, "Claude"));
+    }
+
+    #[test]
+    fn privacy_notice_not_needed_for_ollama() {
+        let cfg = WhyConfig::default();
+        assert!(!privacy_notice_needed(&cfg, "Ollama"));
+    }
+
+    // ── mark_privacy_notice_shown ──
+
+    #[test]
+    fn mark_privacy_notice_shown_updates_config() {
+        let tmp = TempDir::new().unwrap();
+        let wai_dir_path = tmp.path().join(".wai");
+        fs::create_dir_all(&wai_dir_path).unwrap();
+        let config_content =
+            "[project]\nname = \"test\"\nversion = \"\"\ndescription = \"\"\n";
+        fs::write(wai_dir_path.join("config.toml"), config_content).unwrap();
+
+        mark_privacy_notice_shown(tmp.path());
+
+        let config = crate::config::ProjectConfig::load(tmp.path()).unwrap();
+        assert_eq!(config.why.and_then(|w| w.privacy_notice_shown), Some(true));
+    }
+
+    #[test]
+    fn mark_privacy_notice_shown_no_panic_without_config() {
+        let tmp = TempDir::new().unwrap();
+        // No config file — should not panic
+        mark_privacy_notice_shown(tmp.path());
     }
 }

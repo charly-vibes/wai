@@ -152,6 +152,15 @@ pub enum WaiError {
         help("Run `ollama pull {model}` to download the model")
     )]
     LlmModelNotFound { model: String },
+
+    #[error("No LLM backend available")]
+    #[diagnostic(
+        code(wai::llm::not_available),
+        help(
+            "Set ANTHROPIC_API_KEY environment variable or install Ollama (https://ollama.com)"
+        )
+    )]
+    LlmNotAvailable,
 }
 
 #[derive(Debug, Serialize)]
