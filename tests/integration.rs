@@ -1227,18 +1227,33 @@ fn status_suggests_advance_when_enough_research() {
     create_project(tmp.path(), "my-app");
 
     // Write 3 research artifacts to cross the readiness threshold
-    write_artifact(tmp.path(), "my-app", "research", "2026-01-01-first.md", "First finding");
-    write_artifact(tmp.path(), "my-app", "research", "2026-01-02-second.md", "Second finding");
-    write_artifact(tmp.path(), "my-app", "research", "2026-01-03-third.md", "Third finding");
+    write_artifact(
+        tmp.path(),
+        "my-app",
+        "research",
+        "2026-01-01-first.md",
+        "First finding",
+    );
+    write_artifact(
+        tmp.path(),
+        "my-app",
+        "research",
+        "2026-01-02-second.md",
+        "Second finding",
+    );
+    write_artifact(
+        tmp.path(),
+        "my-app",
+        "research",
+        "2026-01-03-third.md",
+        "Third finding",
+    );
 
     wai_cmd(tmp.path())
         .args(["status"])
         .assert()
         .success()
-        .stdout(
-            predicate::str::contains("design")
-                .and(predicate::str::contains("Advance")),
-        );
+        .stdout(predicate::str::contains("design").and(predicate::str::contains("Advance")));
 }
 
 #[test]

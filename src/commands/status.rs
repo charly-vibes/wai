@@ -162,14 +162,14 @@ pub fn run(verbose: u8) -> Result<()> {
             entries.sort_by_key(|e| e.file_name());
 
             for entry in &entries {
-                if let Some(name) = entry.file_name().to_str() {
-                    if let Some(ctx) = workflows::scan_project(&project_root, name) {
-                        let detections = workflows::detect_patterns(&ctx);
-                        for detection in detections {
-                            for s in detection.suggestions {
-                                println!("    {} {}: {}", "→".dimmed(), s.label, s.command);
-                                suggestions.push(s);
-                            }
+                if let Some(name) = entry.file_name().to_str()
+                    && let Some(ctx) = workflows::scan_project(&project_root, name)
+                {
+                    let detections = workflows::detect_patterns(&ctx);
+                    for detection in detections {
+                        for s in detection.suggestions {
+                            println!("    {} {}: {}", "→".dimmed(), s.label, s.command);
+                            suggestions.push(s);
                         }
                     }
                 }

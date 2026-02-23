@@ -311,7 +311,10 @@ mod tests {
         };
         let detections = detect_patterns(&ctx);
         assert_eq!(detections.len(), 1);
-        assert_eq!(detections[0].pattern, WorkflowPattern::ResearchReadyToAdvance);
+        assert_eq!(
+            detections[0].pattern,
+            WorkflowPattern::ResearchReadyToAdvance
+        );
     }
 
     #[test]
@@ -326,8 +329,16 @@ mod tests {
         };
         let detections = detect_patterns(&ctx);
         assert_eq!(detections.len(), 1);
-        assert_eq!(detections[0].pattern, WorkflowPattern::ResearchReadyToAdvance);
-        assert!(detections[0].suggestions.iter().any(|s| s.command.contains("design")));
+        assert_eq!(
+            detections[0].pattern,
+            WorkflowPattern::ResearchReadyToAdvance
+        );
+        assert!(
+            detections[0]
+                .suggestions
+                .iter()
+                .any(|s| s.command.contains("design"))
+        );
     }
 
     #[test]
@@ -357,8 +368,16 @@ mod tests {
         };
         let detections = detect_patterns(&ctx);
         assert_eq!(detections.len(), 2); // ReadyToImplement + NeedsResearch
-        assert!(detections.iter().any(|d| d.pattern == WorkflowPattern::NeedsResearch));
-        assert!(detections.iter().any(|d| d.pattern == WorkflowPattern::ReadyToImplement));
+        assert!(
+            detections
+                .iter()
+                .any(|d| d.pattern == WorkflowPattern::NeedsResearch)
+        );
+        assert!(
+            detections
+                .iter()
+                .any(|d| d.pattern == WorkflowPattern::ReadyToImplement)
+        );
     }
 
     #[test]
@@ -373,8 +392,16 @@ mod tests {
         };
         let detections = detect_patterns(&ctx);
         assert_eq!(detections.len(), 2); // ImplementPhaseActive + NeedsResearch
-        assert!(detections.iter().any(|d| d.pattern == WorkflowPattern::NeedsResearch));
-        assert!(detections.iter().any(|d| d.pattern == WorkflowPattern::ImplementPhaseActive));
+        assert!(
+            detections
+                .iter()
+                .any(|d| d.pattern == WorkflowPattern::NeedsResearch)
+        );
+        assert!(
+            detections
+                .iter()
+                .any(|d| d.pattern == WorkflowPattern::ImplementPhaseActive)
+        );
     }
 
     #[test]
