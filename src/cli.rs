@@ -178,6 +178,29 @@ pub enum Commands {
     /// Run the interactive quickstart tutorial
     Tutorial,
 
+    /// Ask why a decision was made (LLM-powered reasoning oracle)
+    #[command(
+        about = "Ask why a decision was made (LLM-powered reasoning oracle)",
+        long_about = "Queries your wai artifacts using an LLM to synthesize a coherent\n\
+            narrative explaining why decisions were made.\n\n\
+            QUERY can be a natural language question or a file path:\n\
+              wai why \"why use TOML for config?\"\n\
+              wai why src/config.rs\n\n\
+            Requires an LLM backend. Supported backends (auto-detected if not configured):\n\
+              Claude  — set ANTHROPIC_API_KEY or add api_key to [why] in .wai/config.toml\n\
+              Ollama  — install from https://ollama.com and run a local model\n\n\
+            Falls back to `wai search` if no LLM is available. Use --no-llm to force\n\
+            the fallback without an error."
+    )]
+    Why {
+        /// Natural language question or file path to explain
+        query: String,
+
+        /// Skip the LLM and fall back to `wai search` (useful for testing or offline use)
+        #[arg(long)]
+        no_llm: bool,
+    },
+
     /// Pass-through to plugin commands (e.g., wai beads list)
     #[command(external_subcommand)]
     External(Vec<String>),

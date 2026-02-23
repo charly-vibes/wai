@@ -5,11 +5,11 @@
 **Note**: When creating beads tickets from these tasks, add "CRITICAL: Use TDD and Tidy First" at the bottom of each development ticket.
 
 ## MVP - Phase 1: Foundation
-- [ ] 1.1 Add `Why` command variant to `src/cli.rs`
-- [ ] 1.2 Create `src/llm.rs` module with LLM abstraction trait
-- [ ] 1.3 Add `WhyConfig` to `src/config.rs` for LLM backend configuration
-- [ ] 1.4 Add `[why]` section to default config in init command
-- [ ] 1.5 Add error codes to `src/error.rs` (wai::llm::*)
+- [x] 1.1 Add `Why` command variant to `src/cli.rs`
+- [x] 1.2 Create `src/llm.rs` module with LLM abstraction trait
+- [x] 1.3 Add `WhyConfig` to `src/config.rs` for LLM backend configuration
+- [x] 1.4 Add `[why]` section to default config in init command
+- [x] 1.5 Add error codes to `src/error.rs` (wai::llm::*)
 
 ## MVP - Phase 2: Context Gathering
 - [ ] 2.1 Implement context gatherer in `src/commands/why.rs`

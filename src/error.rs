@@ -120,6 +120,34 @@ pub enum WaiError {
     #[error("YAML error: {0}")]
     #[diagnostic(code(wai::yaml::error))]
     Yaml(#[from] serde_yaml::Error),
+
+    #[error("LLM API key is invalid or missing")]
+    #[diagnostic(
+        code(wai::llm::invalid_api_key),
+        help("Set ANTHROPIC_API_KEY environment variable or add `api_key` to the [why] section in .wai/config.toml")
+    )]
+    LlmInvalidApiKey,
+
+    #[error("LLM rate limit exceeded")]
+    #[diagnostic(
+        code(wai::llm::rate_limit),
+        help("Wait 60 seconds and retry, or use Ollama for unlimited local queries: https://ollama.com")
+    )]
+    LlmRateLimit,
+
+    #[error("LLM network error: {message}")]
+    #[diagnostic(
+        code(wai::llm::network_error),
+        help("Check your internet connection and retry")
+    )]
+    LlmNetworkError { message: String },
+
+    #[error("LLM model not found: {model}")]
+    #[diagnostic(
+        code(wai::llm::model_not_found),
+        help("Run `ollama pull {model}` to download the model")
+    )]
+    LlmModelNotFound { model: String },
 }
 
 #[derive(Debug, Serialize)]

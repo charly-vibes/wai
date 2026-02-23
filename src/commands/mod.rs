@@ -24,6 +24,7 @@ mod status;
 mod sync;
 mod timeline;
 mod way;
+mod why;
 
 pub fn run(cli: Cli) -> Result<()> {
     match cli.command {
@@ -60,6 +61,7 @@ pub fn run(cli: Cli) -> Result<()> {
             crate::cli::ResourceCommands::Import(import_cmd) => resource::run_import(import_cmd),
         },
         Some(Commands::Tutorial) => crate::tutorial::run(),
+        Some(Commands::Why { query, no_llm }) => why::run(query, no_llm),
         Some(Commands::External(args)) => run_external(args),
         None => show_welcome(),
     }
@@ -190,7 +192,7 @@ fn run_external(args: Vec<String>) -> Result<()> {
 
     let valid_commands = &[
         "new", "add", "show", "move", "init", "status", "phase", "sync", "config", "handoff",
-        "search", "timeline", "plugin", "doctor", "way", "import", "resource", "tutorial",
+        "search", "timeline", "plugin", "doctor", "way", "why", "import", "resource", "tutorial",
     ];
     // Valid (verb, noun) subcommand patterns for wrong-order detection
     let valid_patterns = &[

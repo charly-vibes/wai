@@ -1,7 +1,7 @@
 use cliclack::input;
 use miette::{IntoDiagnostic, Result};
 
-use crate::config::{CONFIG_DIR, ProjectConfig, ProjectSettings};
+use crate::config::{CONFIG_DIR, ProjectConfig, ProjectSettings, WhyConfig};
 use crate::context::current_context;
 use crate::workspace::ensure_workspace_current;
 
@@ -102,6 +102,7 @@ pub fn run(name: Option<String>) -> Result<()> {
             description: String::new(),
         },
         plugins: vec![],
+        why: Some(WhyConfig::default()),
     };
 
     // Save config (creates .wai directory)

@@ -35,6 +35,32 @@ pub struct ProjectConfig {
     pub project: ProjectSettings,
     #[serde(default)]
     pub plugins: Vec<PluginConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub why: Option<WhyConfig>,
+}
+
+/// Configuration for the `wai why` LLM reasoning oracle.
+#[derive(Debug, Serialize, Deserialize, Default, Clone)]
+pub struct WhyConfig {
+    /// LLM backend to use: "claude" or "ollama". Omit for auto-detection.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub llm: Option<String>,
+
+    /// Model alias. For Claude: "haiku" or "sonnet". For Ollama: e.g. "llama3.1:8b".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+
+    /// API key for Claude (also reads ANTHROPIC_API_KEY env var).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub api_key: Option<String>,
+
+    /// Fallback when no LLM is available: "search" (default) or "error".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fallback: Option<String>,
+
+    /// Whether the one-time privacy notice has been shown to the user.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub privacy_notice_shown: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
