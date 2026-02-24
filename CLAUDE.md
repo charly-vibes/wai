@@ -59,10 +59,14 @@ Phases are a guide, not a gate. Use `wai phase show` / `wai phase next`.
 
 ## Ending a Session
 
-1. Create a handoff: `wai handoff create <project>`
-2. Update issue status: `bd close <id>` for completed work
-3. File new issues for remaining work: `bd create --title="..."`
-4. Commit your changes (handoff + code)
+Before saying "done", run this checklist:
+
+```
+[ ] wai handoff create <project>   # capture context for next session
+[ ] bd close <id>                  # mark completed issues
+[ ] bd sync --from-main            # pull beads updates
+[ ] git add <files> && git commit  # commit code + handoff
+```
 
 ## Quick Reference
 

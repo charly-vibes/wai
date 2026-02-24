@@ -136,26 +136,22 @@ pub fn wai_block_content(detected_plugins: &[&str]) -> String {
     );
 
     // Ending a Session (unified)
-    block.push_str("\n## Ending a Session\n\n");
-    let mut step = 1;
-    block.push_str(&format!(
-        "{}. Create a handoff: `wai handoff create <project>`\n",
-        step
-    ));
-    step += 1;
+    block.push_str(
+        "\n## Ending a Session\n\n\
+         Before saying \"done\", run this checklist:\n\n\
+         ```\n\
+         [ ] wai handoff create <project>   # capture context for next session\n",
+    );
     if has_beads {
-        block.push_str(&format!(
-            "{}. Update issue status: `bd close <id>` for completed work\n",
-            step
-        ));
-        step += 1;
-        block.push_str(&format!(
-            "{}. File new issues for remaining work: `bd create --title=\"...\"`\n",
-            step
-        ));
-        step += 1;
+        block.push_str(
+            "[ ] bd close <id>                  # mark completed issues\n\
+             [ ] bd sync --from-main            # pull beads updates\n",
+        );
     }
-    block.push_str(&format!("{}. Commit your changes (handoff + code)\n", step));
+    block.push_str(
+        "[ ] git add <files> && git commit  # commit code + handoff\n\
+         ```\n",
+    );
 
     // Quick Reference
     block.push_str(
