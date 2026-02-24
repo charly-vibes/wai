@@ -8,6 +8,7 @@ use crate::error::WaiError;
 use crate::suggestions::SuggestionEngine;
 
 mod add;
+mod close;
 mod config_cmd;
 mod doctor;
 mod handoff;
@@ -60,6 +61,7 @@ pub fn run(cli: Cli) -> Result<()> {
             crate::cli::ResourceCommands::List(list_cmd) => resource::run_list(list_cmd),
             crate::cli::ResourceCommands::Import(import_cmd) => resource::run_import(import_cmd),
         },
+        Some(Commands::Close { project }) => close::run(project),
         Some(Commands::Tutorial) => crate::tutorial::run(),
         Some(Commands::Why {
             query,
@@ -197,6 +199,7 @@ fn run_external(args: Vec<String>) -> Result<()> {
     let valid_commands = &[
         "new", "add", "show", "move", "init", "status", "phase", "sync", "config", "handoff",
         "search", "timeline", "plugin", "doctor", "way", "why", "import", "resource", "tutorial",
+        "close",
     ];
     // Valid (verb, noun) subcommand patterns for wrong-order detection
     let valid_patterns = &[

@@ -3291,3 +3291,138 @@ fn add_research_in_non_research_phase_shows_suggestions() {
                 .or(predicate::str::contains("wai search")),
         );
 }
+
+// ─── wai close ───────────────────────────────────────────────────────────────
+
+#[test]
+fn close_single_project_creates_handoff() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproject");
+
+    // Create .beads dir so the beads plugin is detected
+    fs::create_dir(tmp.path().join(".beads")).unwrap();
+
+    let output = wai_cmd(tmp.path())
+        .args(["close"])
+        .assert()
+        .success();
+
+    let stdout = String::from_utf8(output.get_output().stdout.clone()).unwrap();
+
+    // Handoff file should have been created
+    let handoffs_dir = tmp.path().join(".wai/projects/myproject/handoffs");
+    let files: Vec<_> = fs::read_dir(&handoffs_dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .collect();
+    assert_eq!(files.len(), 1);
+
+    // Output should contain the handoff path line
+    assert!(
+        stdout.contains("Handoff created:"),
+        "expected 'Handoff created:' in stdout, got: {stdout}"
+    );
+    // Output should contain next-steps with bd sync (beads detected)
+    assert!(
+        stdout.contains("bd sync --from-main"),
+        "expected 'bd sync --from-main' in stdout, got: {stdout}"
+    );
+    assert!(
+        stdout.contains("→ Next:"),
+        "expected '→ Next:' in stdout, got: {stdout}"
+    );
+}
+
+#[test]
+fn close_with_project_flag_skips_prompt() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "alpha");
+    create_project(tmp.path(), "beta");
+
+    wai_cmd(tmp.path())
+        .args(["close", "--project", "alpha"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Handoff created:"));
+
+    // Only alpha should have a handoff
+    let alpha_handoffs = tmp.path().join(".wai/projects/alpha/handoffs");
+    let beta_handoffs = tmp.path().join(".wai/projects/beta/handoffs");
+    let alpha_files: Vec<_> = fs::read_dir(&alpha_handoffs)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .collect();
+    let beta_files: Vec<_> = fs::read_dir(&beta_handoffs)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .collect();
+    assert_eq!(alpha_files.len(), 1);
+    assert_eq!(beta_files.len(), 0);
+}
+
+#[test]
+fn close_unknown_project_shows_diagnostic() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproject");
+
+    wai_cmd(tmp.path())
+        .args(["close", "--project", "nonexistent"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("nonexistent"));
+}
+
+#[test]
+fn close_zero_projects_shows_diagnostic() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["close", "--no-input"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("No projects found"));
+}
+
+#[test]
+fn close_repeated_same_day_increments_suffix() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproject");
+
+    // First invocation
+    wai_cmd(tmp.path())
+        .args(["close", "--project", "myproject"])
+        .assert()
+        .success();
+
+    // Second invocation on same day
+    wai_cmd(tmp.path())
+        .args(["close", "--project", "myproject"])
+        .assert()
+        .success();
+
+    let handoffs_dir = tmp.path().join(".wai/projects/myproject/handoffs");
+    let mut files: Vec<_> = fs::read_dir(&handoffs_dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .map(|e| e.file_name().to_string_lossy().to_string())
+        .collect();
+    files.sort();
+
+    assert_eq!(files.len(), 2, "expected 2 handoff files, got: {:?}", files);
+    // One file should have no numeric suffix and one should have the -1 suffix
+    assert!(
+        files.iter().any(|f| f.ends_with("session-end.md")),
+        "expected a session-end.md file, got: {:?}",
+        files
+    );
+    assert!(
+        files.iter().any(|f| f.ends_with("session-end-1.md")),
+        "expected a session-end-1.md file, got: {:?}",
+        files
+    );
+}

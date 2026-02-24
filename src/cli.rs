@@ -178,6 +178,13 @@ pub enum Commands {
     /// Run the interactive quickstart tutorial
     Tutorial,
 
+    /// Wrap up a session: create a handoff and show next steps
+    Close {
+        /// Project name (auto-detected when only one project exists)
+        #[arg(short, long)]
+        project: Option<String>,
+    },
+
     /// Ask why a decision was made (LLM-powered reasoning oracle)
     #[command(
         about = "Ask why a decision was made (LLM-powered reasoning oracle)",
