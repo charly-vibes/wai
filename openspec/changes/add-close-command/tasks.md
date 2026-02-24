@@ -7,7 +7,7 @@
 - [ ] 2.3 Extract `create_handoff(project_root: &Path, project: &str) -> Result<PathBuf>` from `src/commands/handoff.rs`; both `wai handoff create` and `wai close` call it
 - [ ] 2.4 Read git status: shell out to `git status --porcelain`; treat non-zero exit (git not installed, not a git repo) as "no git" and skip the git section silently
 - [ ] 2.5 Render uncommitted files as a single `!`-prefixed line; cap at 10 files and append `… and N more` when exceeded
-- [ ] 2.6 Print plugin-aware next-steps: include `bd sync --from-main &&` prefix only when beads plugin is detected; include the uncommitted filenames in the `git add` suggestion
+- [ ] 2.6 Print plugin-aware next-steps: include `bd sync --from-main &&` prefix only when beads plugin is detected; include the uncommitted filenames in the `git add` suggestion, each wrapped in double-quotes to handle paths with spaces
 
 ## 3. Wire up
 - [ ] 3.1 Dispatch `Commands::Close` in `src/commands/mod.rs`

@@ -14,11 +14,14 @@ rizomas       [implement] 1 open, 1 ready
 ```
 
 Columns are left-aligned and padded to the longest project name in the result set. The
-counts column is shown only when at least one workspace has beads detected; it is omitted
-entirely otherwise. When no workspaces are found, the system prints a single message
-indicating the root that was scanned.
+counts column is a **global toggle**: it appears for ALL rows when at least one workspace
+has beads data (rows without beads show a blank cell), and is omitted entirely when no
+workspace has beads. When no workspaces are found, the system prints a single message
+indicating the root that was scanned. When two projects in different workspaces share the
+same name, a short path suffix disambiguates each: `name (~/path/to/repo)`.
 
 The default root is `$HOME`; the default depth is 3. Both are overridable via flags.
+The filesystem walker never follows symlinks.
 
 #### Scenario: Workspaces found — table rendered
 
@@ -41,17 +44,29 @@ The default root is `$HOME`; the default depth is 3. Both are overridable via fl
 - **WHEN** user runs `wai ls --depth <n>`
 - **THEN** the system limits filesystem traversal to `<n>` levels below the root
 
-#### Scenario: Beads detected — counts shown
+#### Scenario: At least one workspace has beads — counts column shown globally
 
-- **WHEN** a discovered workspace has `.beads/` present and `bd` is installed
-- **THEN** the line for each project in that workspace shows `N open, M ready`
+- **WHEN** at least one discovered workspace has `.beads/` present and `bd` is installed
+- **THEN** the counts column appears for all rows in the output
+- **AND** rows for projects in beads-enabled workspaces show `N open, M ready`
+- **AND** rows for projects in workspaces without beads show a blank counts cell
 
-#### Scenario: Beads not detected — counts omitted
+#### Scenario: No workspace has beads — counts column omitted
 
-- **WHEN** a discovered workspace does not have `.beads/` or `bd` is not installed
-- **THEN** the counts portion of the line is omitted for projects in that workspace
+- **WHEN** no discovered workspace has `.beads/` present or `bd` is not installed anywhere
+- **THEN** the counts column is omitted entirely from the output
 
 #### Scenario: Multiple projects in one workspace
 
 - **WHEN** a discovered workspace contains more than one project
 - **THEN** each project appears as a separate line in the output
+
+#### Scenario: Duplicate project names across workspaces
+
+- **WHEN** two projects from different workspaces share the same name
+- **THEN** each line appends a short path suffix to disambiguate: `name (~/path/to/repo)`
+
+#### Scenario: Invalid root path
+
+- **WHEN** user runs `wai ls --root <path>` and `<path>` does not exist
+- **THEN** the system fails with a diagnostic error naming the invalid path

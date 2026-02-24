@@ -12,7 +12,7 @@ right thing happens by default.
 - Adds a new `wai close` top-level command
 - Auto-detects the active project (single project: uses it; multiple: prompts or respects `--project`)
 - Delegates handoff creation to the existing `wai handoff create` logic
-- Reads `git status --porcelain` and lists uncommitted files (skipped gracefully when git unavailable)
+- Reads git status and lists uncommitted files (skipped gracefully when git unavailable)
 - Prints a next-steps reminder that includes `bd sync --from-main` only when the beads plugin is detected
 
 ## Impact

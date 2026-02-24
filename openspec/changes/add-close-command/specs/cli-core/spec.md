@@ -52,7 +52,7 @@ The uncommitted-changes line is omitted when there are no changes. The `bd sync 
 
 - **WHEN** user runs `wai close` and the git plugin is detected and the workspace has uncommitted changes
 - **THEN** the system lists the uncommitted files on a single line prefixed with `!`
-- **AND** includes those filenames in the next-steps `git add` suggestion
+- **AND** includes those filenames in the next-steps `git add` suggestion, each wrapped in double-quotes to handle filenames with spaces
 
 #### Scenario: No uncommitted changes
 

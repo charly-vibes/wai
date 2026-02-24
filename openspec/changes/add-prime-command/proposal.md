@@ -13,11 +13,12 @@ all orientation data into one view.
 - Adds a new `wai prime` top-level command
 - Auto-detects the active project (same logic as `wai close`)
 - Reads the most recent handoff file, extracts date and a one-line summary snippet
-- Calls the plugin status hook to collect per-plugin one-line summaries (same mechanism as `wai status`)
-- Invokes `bd ready` to surface the highest-priority ready issue as a suggested next action
+- Calls `plugin::run_hooks(project_root, "on_status")` and `openspec::read_status(project_root)` — the same hooks used by `wai status` — to collect per-plugin one-line summaries; no new plugin plumbing required
+- Invokes `bd ready --json` and uses the first result's `id` as the suggested next action
 - Formats everything into a single oriented view
 
-Expected output:
+The phase is shown inline in the Project bullet as `[phase]`. There is no separate Phase
+bullet. Expected output:
 
 ```
 ◆ wai prime — 2026-02-24
@@ -28,9 +29,9 @@ Expected output:
 → Suggested next: bd show wai-abc
 ```
 
-The handoff line is omitted when no handoff exists. Plugin lines appear only for detected
-plugins. The suggested-next line is omitted when beads is not detected or there are no
-ready issues.
+Plugin summary lines (Beads, Spec, etc.) are produced by the plugin status hooks; their
+format is determined by each plugin. The handoff line is omitted when no handoff exists.
+The suggested-next line is omitted when beads is not detected or there are no ready issues.
 
 ## Impact
 

@@ -17,14 +17,17 @@ The expected terminal output shape is:
 → Suggested next: bd show wai-abc
 ```
 
-The handoff line is omitted when no handoff exists for the project. Plugin summary lines
-appear in plugin-detection order, one per detected plugin. The suggested-next line is
-omitted when beads is not detected or when there are no ready issues.
+The phase is shown inline in the Project bullet as `[phase]`; there is no separate Phase
+line. The handoff line is omitted when no handoff exists for the project. Plugin summary
+lines appear in plugin-detection order, one per detected plugin; their format is determined
+by each plugin's on_status hook. The suggested-next line is omitted when beads is not
+detected or when there are no ready issues.
 
 #### Scenario: Single project — prime renders full view
 
 - **WHEN** user runs `wai prime` in a workspace with exactly one project
-- **THEN** the system displays the project name, current phase, and plugin summaries
+- **THEN** the system displays the project name and current phase inline as `[phase]`
+- **AND** shows plugin status summaries from each detected plugin's on_status hook
 - **AND** includes the most recent handoff date and one-line snippet
 
 #### Scenario: No handoff exists — handoff line omitted
@@ -36,12 +39,18 @@ omitted when beads is not detected or when there are no ready issues.
 #### Scenario: Beads detected — suggested next shown
 
 - **WHEN** user runs `wai prime` and the beads plugin is detected and at least one ready issue exists
-- **THEN** the suggested-next line shows `bd show <id>` for the highest-priority ready issue
+- **THEN** the suggested-next line shows `bd show <id>` using the first result returned by `bd ready --json`
 
 #### Scenario: No ready issues — suggested next omitted
 
 - **WHEN** user runs `wai prime` and there are no ready beads issues (or beads not detected)
 - **THEN** the suggested-next line is omitted from the output
+
+#### Scenario: Not initialized — fails with diagnostic
+
+- **WHEN** user runs `wai prime` outside a wai workspace (no `.wai/` directory)
+- **THEN** the system fails with the standard not-initialized diagnostic error
+- **AND** suggests `wai init` to initialize the workspace
 
 #### Scenario: Multiple projects — prompts for selection
 
