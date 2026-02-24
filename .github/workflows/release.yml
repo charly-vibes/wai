@@ -1,11 +1,12 @@
 # Release workflow - build cross-platform binaries and publish a GitHub release
 #
 # Triggered by pushing a version tag (e.g., `git tag v0.1.0 && git push --tags`).
-# Creates a GitHub Release with pre-built binaries for Linux, macOS, and Windows.
+# Creates a GitHub Release with pre-built binaries for Linux, macOS, and Windows,
+# then auto-updates the homebrew-charly tap formula and scoop-charly bucket manifest.
 #
-# Install from repo:
-#   cargo install --git https://github.com/charly-vibes/wai
-# Or download a binary from the Releases page.
+# Required secrets:
+#   GITHUB_TOKEN       - automatically provided by GitHub Actions
+#   TAP_GITHUB_TOKEN   - PAT with repo write access to homebrew-charly and scoop-charly
 
 name: Release
 
@@ -21,88 +22,120 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-    name: Build ${{ matrix.target }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
-            archive: tar.gz
-          - target: aarch64-unknown-linux-gnu
-            os: ubuntu-latest
-            archive: tar.gz
-          - target: x86_64-apple-darwin
-            os: macos-latest
-            archive: tar.gz
-          - target: aarch64-apple-darwin
-            os: macos-latest
-            archive: tar.gz
-          - target: x86_64-pc-windows-msvc
-            os: windows-latest
-            archive: zip
-
+  goreleaser-linux:
+    name: Build Linux
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v4
         with:
-          targets: ${{ matrix.target }}
+          fetch-depth: 0
 
-      - name: Install cross-compilation tools
-        if: matrix.target == 'aarch64-unknown-linux-gnu'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu,aarch64-unknown-linux-gnu
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: linux
+
+      - name: Install aarch64 cross-compile toolchain
         run: |
           sudo apt-get update
           sudo apt-get install -y gcc-aarch64-linux-gnu
-          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
 
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
+      - uses: goreleaser/goreleaser-action@v6
         with:
-          key: ${{ matrix.target }}
+          version: "~> v2"
+          args: release --split --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GGOOS: linux
 
-      - name: Build release binary
-        run: cargo build --release --target ${{ matrix.target }}
-
-      - name: Package (unix)
-        if: matrix.archive == 'tar.gz'
-        run: |
-          cd target/${{ matrix.target }}/release
-          tar czf ../../../wai-${{ matrix.target }}.tar.gz wai
-          cd ../../..
-
-      - name: Package (windows)
-        if: matrix.archive == 'zip'
-        shell: pwsh
-        run: Compress-Archive -Path target/${{ matrix.target }}/release/wai.exe -DestinationPath wai-${{ matrix.target }}.zip
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: wai-${{ matrix.target }}
-          path: wai-${{ matrix.target }}.${{ matrix.archive }}
+          name: dist-linux
+          path: dist/
+          retention-days: 1
 
-  release:
-    name: Publish Release
-    needs: build
-    runs-on: ubuntu-latest
-
+  goreleaser-darwin:
+    name: Build macOS
+    runs-on: macos-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
         with:
-          path: artifacts
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-apple-darwin,aarch64-apple-darwin
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: darwin
+
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --split --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GGOOS: darwin
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-darwin
+          path: dist/
+          retention-days: 1
+
+  goreleaser-windows:
+    name: Build Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: windows
+
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --split --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GGOOS: windows
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-windows
+          path: dist/
+          retention-days: 1
+
+  goreleaser-merge:
+    name: Merge & Publish
+    needs: [goreleaser-linux, goreleaser-darwin, goreleaser-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          path: dist/
           merge-multiple: true
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+      - uses: goreleaser/goreleaser-action@v6
         with:
-          generate_release_notes: true
-          files: artifacts/*
+          version: "~> v2"
+          args: continue --merge
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}

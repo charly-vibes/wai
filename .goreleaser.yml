@@ -1,0 +1,77 @@
+version: 2
+project_name: wai
+
+builds:
+  - builder: rust
+    binary: wai
+    # Each platform builds its own targets via goreleaser split jobs in CI.
+    # Linux (ubuntu): x86_64-unknown-linux-gnu + aarch64-unknown-linux-gnu (cross via gcc-aarch64-linux-gnu)
+    # macOS (macos-latest): x86_64-apple-darwin + aarch64-apple-darwin
+    # Windows (windows-latest): x86_64-pc-windows-msvc
+    targets:
+      - x86_64-unknown-linux-gnu
+      - aarch64-unknown-linux-gnu
+      - x86_64-apple-darwin
+      - aarch64-apple-darwin
+      - x86_64-pc-windows-msvc
+    flags:
+      - --release
+      - --locked
+    env:
+      - CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
+
+archives:
+  - format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        format: zip
+
+checksum:
+  name_template: checksums.txt
+
+brews:
+  - name: wai
+    repository:
+      owner: charly-vibes
+      name: homebrew-charly
+      branch: main
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    folder: Formula
+    homepage: "https://github.com/charly-vibes/wai"
+    description: "Workflow manager for AI-driven development"
+    license: "MIT"
+    test: |
+      system "#{bin}/wai", "--version"
+
+scoops:
+  - name: wai
+    repository:
+      owner: charly-vibes
+      name: scoop-charly
+      branch: main
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    folder: bucket
+    homepage: "https://github.com/charly-vibes/wai"
+    description: "Workflow manager for AI-driven development"
+    license: "MIT"
+
+release:
+  github:
+    owner: charly-vibes
+    name: wai
+  prerelease: auto
+  name_template: "{{ .Tag }}"
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude: ['^docs:', '^chore:', '^style:', '^test:', '^refactor:']
+  groups:
+    - title: Features
+      regexp: '^feat'
+      order: 0
+    - title: Bug Fixes
+      regexp: '^fix'
+      order: 1
