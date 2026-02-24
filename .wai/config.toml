@@ -4,3 +4,6 @@ plugins = []
 name = "wai"
 version = "2026.2.0"
 description = ""
+
+[why]
+privacy_notice_shown = true

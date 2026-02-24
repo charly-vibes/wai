@@ -451,7 +451,7 @@ pub fn gather_context(project_root: &Path, query: &str) -> GatheredContext {
     let (artifacts, truncated) = truncate_context(artifacts, query, MAX_CONTEXT_CHARS);
 
     let git_context = if is_file_query {
-        gather_git_file_context(query)
+        gather_git_file_context(query, project_root)
     } else {
         None
     };
@@ -592,10 +592,14 @@ fn score_relevance(content: &str, terms: &[String]) -> usize {
 
 /// Gather git log for a specific file. Returns `None` if git is unavailable,
 /// the directory isn't a repo, or the file isn't tracked.
-fn gather_git_file_context(file_path: &str) -> Option<String> {
-    // Verify we're in a git repo
+///
+/// All git commands run with `project_root` as the working directory so that
+/// relative paths are resolved correctly regardless of where wai was invoked.
+fn gather_git_file_context(file_path: &str, project_root: &Path) -> Option<String> {
+    // Verify project_root is inside a git repo.
     let in_repo = std::process::Command::new("git")
         .args(["rev-parse", "--git-dir"])
+        .current_dir(project_root)
         .output()
         .ok()
         .map(|o| o.status.success())
@@ -605,8 +609,20 @@ fn gather_git_file_context(file_path: &str) -> Option<String> {
         return None;
     }
 
+    // Resolve the path so it works when git runs from project_root.
+    // If the path can be canonicalized (file exists), make it relative to
+    // project_root so git can match it against its index. If it can't be
+    // canonicalized (e.g. non-existent path given as hint), use as-is.
+    let resolved: String = Path::new(file_path)
+        .canonicalize()
+        .ok()
+        .and_then(|abs| abs.strip_prefix(project_root).ok().map(|r| r.to_path_buf()))
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_else(|| file_path.to_string());
+
     let log = std::process::Command::new("git")
-        .args(["log", "--oneline", "-10", "--", file_path])
+        .args(["log", "--oneline", "-10", "--", &resolved])
+        .current_dir(project_root)
         .output()
         .ok()?;
 
@@ -627,7 +643,7 @@ fn gather_git_file_context(file_path: &str) -> Option<String> {
 fn gather_meta(project_root: &Path) -> ProjectMeta {
     ProjectMeta {
         current_phase: read_first_project_phase(project_root),
-        recent_commits: gather_recent_commits(),
+        recent_commits: gather_recent_commits(project_root),
     }
 }
 
@@ -643,9 +659,10 @@ fn read_first_project_phase(project_root: &Path) -> Option<String> {
     None
 }
 
-fn gather_recent_commits() -> Vec<String> {
+fn gather_recent_commits(project_root: &Path) -> Vec<String> {
     std::process::Command::new("git")
         .args(["log", "--oneline", "-5"])
+        .current_dir(project_root)
         .output()
         .ok()
         .filter(|o| o.status.success())
