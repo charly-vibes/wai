@@ -160,20 +160,44 @@ fn resolve_project(project_root: &std::path::Path, explicit: Option<&str>) -> Re
         return Ok(name.to_string());
     }
 
-    // Find the first project (or error if none)
+    // Collect all project directories
     let proj_dir = projects_dir(project_root);
+    let mut projects: Vec<String> = Vec::new();
     if proj_dir.exists() {
         for entry in std::fs::read_dir(&proj_dir).into_diagnostic()? {
             let entry = entry.into_diagnostic()?;
-            if entry.file_type().into_diagnostic()?.is_dir()
-                && let Some(name) = entry.file_name().to_str()
-            {
-                return Ok(name.to_string());
+            if entry.file_type().into_diagnostic()?.is_dir() {
+                if let Some(name) = entry.file_name().to_str() {
+                    projects.push(name.to_string());
+                }
             }
         }
     }
+    projects.sort();
 
-    Err(WaiError::NoProjectContext.into())
+    match projects.len() {
+        0 => Err(WaiError::NoProjectContext.into()),
+        1 => Ok(projects.remove(0)),
+        _ => {
+            let ctx = crate::context::current_context();
+            if ctx.no_input {
+                return Err(WaiError::NonInteractive {
+                    message: format!(
+                        "Multiple projects found ({}). Use --project <name> to specify one.",
+                        projects.join(", ")
+                    ),
+                }
+                .into());
+            }
+            // Interactive selection via cliclack
+            let mut sel = cliclack::select("Multiple projects found — which one?");
+            for name in &projects {
+                sel = sel.item(name.clone(), name.as_str(), "");
+            }
+            let selected: String = sel.interact().into_diagnostic()?;
+            Ok(selected)
+        }
+    }
 }
 
 fn get_content(content: Option<&str>, file: Option<&str>) -> Result<String> {

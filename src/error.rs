@@ -8,7 +8,7 @@ use thiserror::Error;
 
 #[derive(Error, Diagnostic, Debug)]
 pub enum WaiError {
-    #[error("No project initialized in current directory")]
+    #[error("Hmm, no project initialized in this directory")]
     #[diagnostic(
         code(wai::project::not_initialized),
         help("Run `wai init` or `wai new project <name>` first")
@@ -29,21 +29,21 @@ pub enum WaiError {
     )]
     ProjectExists { path: String },
 
-    #[error("Project '{name}' not found")]
+    #[error("Hmm, project '{name}' not found")]
     #[diagnostic(
         code(wai::project::not_found),
         help("Run `wai show` to see available projects")
     )]
     ProjectNotFound { name: String },
 
-    #[error("Area '{name}' not found")]
+    #[error("Hmm, area '{name}' not found")]
     #[diagnostic(
         code(wai::area::not_found),
         help("Run `wai show` to see available areas")
     )]
     AreaNotFound { name: String },
 
-    #[error("Resource '{name}' not found")]
+    #[error("Hmm, resource '{name}' not found")]
     #[diagnostic(
         code(wai::resource::not_found),
         help("Run `wai show` to see available resources")
@@ -61,7 +61,7 @@ pub enum WaiError {
         valid_targets: String,
     },
 
-    #[error("No active project context")]
+    #[error("Hmm, not sure which project to use")]
     #[diagnostic(
         code(wai::project::no_context),
         help("Run a command within a project directory or specify --project <name>")
@@ -93,7 +93,7 @@ pub enum WaiError {
     )]
     NonInteractive { message: String },
 
-    #[error("Safe mode prevented action: {action}")]
+    #[error("Safe mode blocked: {action}")]
     #[diagnostic(
         code(wai::cli::safe_mode),
         help("Re-run without --safe to allow this action")
@@ -121,7 +121,7 @@ pub enum WaiError {
     #[diagnostic(code(wai::yaml::error))]
     Yaml(#[from] serde_yaml::Error),
 
-    #[error("LLM API key is invalid or missing")]
+    #[error("Hmm, the LLM API key is missing or invalid")]
     #[diagnostic(
         code(wai::llm::invalid_api_key),
         help(
@@ -130,7 +130,7 @@ pub enum WaiError {
     )]
     LlmInvalidApiKey,
 
-    #[error("LLM rate limit exceeded")]
+    #[error("Hit the LLM rate limit — try again in 60 seconds")]
     #[diagnostic(
         code(wai::llm::rate_limit),
         help(
@@ -139,21 +139,21 @@ pub enum WaiError {
     )]
     LlmRateLimit,
 
-    #[error("LLM network error: {message}")]
+    #[error("Ran into a network issue with the LLM: {message}")]
     #[diagnostic(
         code(wai::llm::network_error),
         help("Check your internet connection and retry")
     )]
     LlmNetworkError { message: String },
 
-    #[error("LLM model not found: {model}")]
+    #[error("Hmm, LLM model '{model}' not found")]
     #[diagnostic(
         code(wai::llm::model_not_found),
         help("Run `ollama pull {model}` to download the model")
     )]
     LlmModelNotFound { model: String },
 
-    #[error("No LLM backend available")]
+    #[error("Hmm, no LLM backend found")]
     #[diagnostic(
         code(wai::llm::not_available),
         help(

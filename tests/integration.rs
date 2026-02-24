@@ -1424,7 +1424,7 @@ fn doctor_uninitialised_directory_errors() {
         .args(["doctor"])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("No project initialized"));
+        .stderr(predicate::str::contains("no project initialized"));
 }
 
 #[test]
@@ -1672,13 +1672,13 @@ fn commands_fail_without_init() {
         .args(["status"])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("No project initialized"));
+        .stderr(predicate::str::contains("no project initialized"));
 
     wai_cmd(tmp.path())
         .args(["show"])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("No project initialized"));
+        .stderr(predicate::str::contains("no project initialized"));
 }
 
 // ─── First-Run Detection ────────────────────────────────────────────────────
@@ -2693,4 +2693,601 @@ fn why_file_query_in_non_git_repo_does_not_crash() {
         .env_remove("ANTHROPIC_API_KEY")
         .assert()
         .success(); // must not crash due to missing git
+}
+
+// ─── wai-44b: Conversational Error Tone ─────────────────────────────────────
+
+#[test]
+fn error_not_initialized_is_conversational() {
+    let stale_wai = std::path::Path::new("/tmp/.wai");
+    if stale_wai.exists() {
+        let _ = fs::remove_dir_all(stale_wai);
+    }
+
+    let tmp = TempDir::new().unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["status"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Hmm,").or(predicate::str::contains("no project initialized")));
+}
+
+#[test]
+fn error_project_not_found_is_conversational() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["add", "research", "--project", "nonexistent", "notes"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Hmm,").and(predicate::str::contains("not found")));
+}
+
+// ─── wai-933: Integration tests for resource management ──────────────────────
+
+// Helper: write a projections.yml into an initialized workspace
+fn write_projections_yml(dir: &std::path::Path, content: &str) {
+    let path = dir.join(".wai/resources/agent-config/.projections.yml");
+    fs::write(path, content).unwrap();
+}
+
+// ── wai resource add skill ───────────────────────────────────────────────────
+
+#[test]
+fn resource_add_skill_creates_directory_and_skill_md() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["resource", "add", "skill", "my-skill"])
+        .assert()
+        .success();
+
+    let skill_dir = tmp
+        .path()
+        .join(".wai/resources/agent-config/skills/my-skill");
+    assert!(skill_dir.is_dir(), "skill directory should be created");
+
+    let skill_md = skill_dir.join("SKILL.md");
+    assert!(skill_md.is_file(), "SKILL.md should be created");
+
+    let content = fs::read_to_string(&skill_md).unwrap();
+    assert!(content.contains("---"), "SKILL.md should have frontmatter delimiters");
+    assert!(content.contains("name: my-skill"), "SKILL.md should include skill name");
+    assert!(content.contains("description:"), "SKILL.md should include description field");
+}
+
+#[test]
+fn resource_add_skill_fails_on_duplicate() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["resource", "add", "skill", "dup-skill"])
+        .assert()
+        .success();
+
+    wai_cmd(tmp.path())
+        .args(["resource", "add", "skill", "dup-skill"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("already exists"));
+}
+
+#[test]
+fn resource_add_skill_fails_on_uppercase_name() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["resource", "add", "skill", "MySkill"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Invalid character").or(predicate::str::contains("Invalid skill")));
+}
+
+#[test]
+fn resource_add_skill_fails_on_consecutive_hyphens() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["resource", "add", "skill", "my--skill"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("consecutive hyphens"));
+}
+
+#[test]
+fn resource_add_skill_fails_on_too_long_name() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    let long_name = "a".repeat(65);
+    wai_cmd(tmp.path())
+        .args(["resource", "add", "skill", &long_name])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("too long"));
+}
+
+#[test]
+fn resource_add_skill_fails_on_dot_prefix() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["resource", "add", "skill", ".hidden"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("cannot start with '.'").or(predicate::str::contains("Invalid skill")));
+}
+
+#[test]
+fn resource_add_skill_refuses_in_safe_mode() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["--safe", "resource", "add", "skill", "my-skill"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("add skill").or(predicate::str::contains("Safe mode")));
+}
+
+// ── wai resource list skills ─────────────────────────────────────────────────
+
+#[test]
+fn resource_list_skills_shows_skill_name() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    // Add a skill then update SKILL.md with a real description
+    wai_cmd(tmp.path())
+        .args(["resource", "add", "skill", "list-skill"])
+        .assert()
+        .success();
+
+    let skill_md = tmp
+        .path()
+        .join(".wai/resources/agent-config/skills/list-skill/SKILL.md");
+    fs::write(
+        &skill_md,
+        "---\nname: list-skill\ndescription: A skill for listing tests\n---\n\n# List Skill\n",
+    )
+    .unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["resource", "list", "skills"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("list-skill"));
+}
+
+#[test]
+fn resource_list_skills_empty_shows_hint() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    // No skills added — directory is empty after init
+    wai_cmd(tmp.path())
+        .args(["resource", "list", "skills"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("No skills found")
+                .or(predicate::str::contains("resource add skill")),
+        );
+}
+
+#[test]
+fn resource_list_skills_bad_frontmatter_shows_no_metadata() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    // Create a skill directory with a SKILL.md that has no valid frontmatter
+    let skill_dir = tmp
+        .path()
+        .join(".wai/resources/agent-config/skills/broken-skill");
+    fs::create_dir_all(&skill_dir).unwrap();
+    fs::write(
+        skill_dir.join("SKILL.md"),
+        "# Just a heading, no frontmatter",
+    )
+    .unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["resource", "list", "skills"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("no metadata"));
+}
+
+#[test]
+fn resource_list_skills_json_has_skills_key() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["resource", "list", "skills", "--json"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"skills\""));
+}
+
+// ── wai resource import skills ───────────────────────────────────────────────
+
+#[test]
+fn resource_import_skills_from_custom_path() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    // Create a skill in a custom source directory
+    let source = tmp.path().join("ext-skills/cool-skill");
+    fs::create_dir_all(&source).unwrap();
+    fs::write(
+        source.join("SKILL.md"),
+        "---\nname: cool-skill\ndescription: An imported skill\n---\n\n# Cool Skill\n",
+    )
+    .unwrap();
+
+    wai_cmd(tmp.path())
+        .args([
+            "resource",
+            "import",
+            "skills",
+            "--from",
+            tmp.path().join("ext-skills").to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    assert!(
+        tmp.path()
+            .join(".wai/resources/agent-config/skills/cool-skill")
+            .is_dir(),
+        "imported skill directory should exist"
+    );
+}
+
+#[test]
+fn resource_import_skills_from_default_agents_path() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    // Create a skill in the default .agents/skills/ location
+    let source = tmp.path().join(".agents/skills/default-skill");
+    fs::create_dir_all(&source).unwrap();
+    fs::write(
+        source.join("SKILL.md"),
+        "---\nname: default-skill\ndescription: From default path\n---\n",
+    )
+    .unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["resource", "import", "skills"])
+        .assert()
+        .success();
+
+    assert!(
+        tmp.path()
+            .join(".wai/resources/agent-config/skills/default-skill")
+            .is_dir()
+    );
+}
+
+#[test]
+fn resource_import_skills_skips_existing_with_warning() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    // Add a skill that already exists in the workspace
+    wai_cmd(tmp.path())
+        .args(["resource", "add", "skill", "existing-skill"])
+        .assert()
+        .success();
+
+    // Create source with the same skill name
+    let source = tmp.path().join("source/existing-skill");
+    fs::create_dir_all(&source).unwrap();
+    fs::write(
+        source.join("SKILL.md"),
+        "---\nname: existing-skill\ndescription: Would conflict\n---\n",
+    )
+    .unwrap();
+
+    wai_cmd(tmp.path())
+        .args([
+            "resource",
+            "import",
+            "skills",
+            "--from",
+            tmp.path().join("source").to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stderr(
+            predicate::str::contains("Skipped")
+                .or(predicate::str::contains("already exists")),
+        );
+}
+
+#[test]
+fn resource_import_skills_copies_full_directory_tree() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    // Create a skill with nested files (not just SKILL.md)
+    let source = tmp.path().join("source/rich-skill");
+    fs::create_dir_all(&source).unwrap();
+    fs::write(
+        source.join("SKILL.md"),
+        "---\nname: rich-skill\ndescription: A rich skill\n---\n",
+    )
+    .unwrap();
+    fs::write(source.join("examples.md"), "# Examples").unwrap();
+    fs::create_dir_all(source.join("templates")).unwrap();
+    fs::write(source.join("templates/base.md"), "# Base Template").unwrap();
+
+    wai_cmd(tmp.path())
+        .args([
+            "resource",
+            "import",
+            "skills",
+            "--from",
+            tmp.path().join("source").to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    let target = tmp
+        .path()
+        .join(".wai/resources/agent-config/skills/rich-skill");
+    assert!(target.join("SKILL.md").is_file());
+    assert!(target.join("examples.md").is_file(), "extra files should be copied");
+    assert!(
+        target.join("templates/base.md").is_file(),
+        "subdirectory contents should be copied"
+    );
+}
+
+// ── Doctor projection consistency ────────────────────────────────────────────
+
+#[test]
+fn doctor_warns_on_missing_projection_source_directory() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    // Configure a projection referencing a source that doesn't exist
+    write_projections_yml(
+        tmp.path(),
+        "projections:\n  - target: AGENTS.md\n    strategy: inline\n    sources: [nonexistent-dir]\n",
+    );
+
+    let output = wai_cmd(tmp.path())
+        .args(["doctor", "--json"])
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(
+        stdout.contains("\"status\": \"warn\""),
+        "doctor should warn about missing source, got: {}",
+        stdout
+    );
+}
+
+#[test]
+fn doctor_detects_stale_inline_projection() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    // Create a source directory with a file
+    let source_dir = tmp.path().join(".wai/resources/agent-config/my-docs");
+    fs::create_dir_all(&source_dir).unwrap();
+    fs::write(source_dir.join("intro.md"), "# Original").unwrap();
+
+    // Configure and sync an inline projection
+    write_projections_yml(
+        tmp.path(),
+        "projections:\n  - target: AGENTS.md\n    strategy: inline\n    sources: [my-docs]\n",
+    );
+    wai_cmd(tmp.path())
+        .args(["sync"])
+        .assert()
+        .success();
+
+    // Modify the source to make the projection stale
+    fs::write(source_dir.join("intro.md"), "# Modified content").unwrap();
+
+    let output = wai_cmd(tmp.path())
+        .args(["doctor", "--json"])
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(
+        stdout.contains("Stale") || stdout.contains("\"status\": \"warn\""),
+        "doctor should detect stale inline projection, got: {}",
+        stdout
+    );
+}
+
+#[test]
+#[cfg(unix)]
+fn doctor_detects_stale_symlink_projection() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    // Create a source directory with a file
+    let source_dir = tmp.path().join(".wai/resources/agent-config/link-source");
+    fs::create_dir_all(&source_dir).unwrap();
+    fs::write(source_dir.join("rule.md"), "# A rule").unwrap();
+
+    // Configure and sync a symlink projection
+    write_projections_yml(
+        tmp.path(),
+        "projections:\n  - target: .agents/rules\n    strategy: symlink\n    sources: [link-source]\n",
+    );
+    wai_cmd(tmp.path())
+        .args(["sync"])
+        .assert()
+        .success();
+
+    // Remove the source file to create a broken symlink
+    fs::remove_file(source_dir.join("rule.md")).unwrap();
+
+    let output = wai_cmd(tmp.path())
+        .args(["doctor", "--json"])
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(
+        stdout.contains("broken") || stdout.contains("\"status\": \"warn\""),
+        "doctor should detect broken symlink, got: {}",
+        stdout
+    );
+}
+
+#[test]
+fn doctor_passes_for_in_sync_inline_projection() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    // Create source and sync
+    let source_dir = tmp.path().join(".wai/resources/agent-config/sync-docs");
+    fs::create_dir_all(&source_dir).unwrap();
+    fs::write(source_dir.join("notes.md"), "# Notes").unwrap();
+
+    write_projections_yml(
+        tmp.path(),
+        "projections:\n  - target: AGENTS.md\n    strategy: inline\n    sources: [sync-docs]\n",
+    );
+    wai_cmd(tmp.path())
+        .args(["sync"])
+        .assert()
+        .success();
+
+    // Doctor should see the projection as in-sync
+    let output = wai_cmd(tmp.path())
+        .args(["doctor", "--json"])
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // The projection check should pass (or at least not add a new warn/fail)
+    assert!(
+        stdout.contains("In sync") || !stdout.contains("Stale"),
+        "doctor should see synced projection as passing, got: {}",
+        stdout
+    );
+}
+
+// ─── wai-7gk: Interactive Ambiguity Resolution ───────────────────────────────
+
+#[test]
+fn add_research_no_input_fails_when_multiple_projects() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "alpha");
+    create_project(tmp.path(), "beta");
+
+    wai_cmd(tmp.path())
+        .args(["--no-input", "add", "research", "some notes"])
+        .assert()
+        .failure()
+        .stderr(
+            predicate::str::contains("Multiple projects")
+                .or(predicate::str::contains("--project")),
+        );
+}
+
+#[test]
+fn add_research_explicit_project_works_with_multiple() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "alpha");
+    create_project(tmp.path(), "beta");
+
+    wai_cmd(tmp.path())
+        .args(["add", "research", "--project", "alpha", "targeting alpha"])
+        .assert()
+        .success();
+
+    // Verify the artifact landed in the right project
+    let research_dir = tmp.path().join(".wai/projects/alpha/research");
+    let entries: Vec<_> = fs::read_dir(research_dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .collect();
+    assert!(!entries.is_empty(), "research artifact should be in alpha project");
+}
+
+#[test]
+fn add_research_single_project_still_works_without_flag() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "solo");
+
+    wai_cmd(tmp.path())
+        .args(["add", "research", "just one project"])
+        .assert()
+        .success();
+}
+
+// ─── wai-rsp: Context Suggestions Testing ────────────────────────────────────
+
+#[test]
+fn add_research_shows_phase_appropriate_suggestions() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "suggest-proj");
+
+    // Add enough research to trigger the "advance to design" suggestion (≥2 artifacts)
+    wai_cmd(tmp.path())
+        .args(["add", "research", "--project", "suggest-proj", "first finding"])
+        .assert()
+        .success();
+
+    wai_cmd(tmp.path())
+        .args([
+            "add",
+            "research",
+            "--project",
+            "suggest-proj",
+            "second finding",
+        ])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Add more research")
+                .or(predicate::str::contains("Move to design"))
+                .or(predicate::str::contains("wai phase")),
+        );
+}
+
+#[test]
+fn add_research_in_non_research_phase_shows_suggestions() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "impl-proj");
+
+    // Advance to implement phase (phase command picks the only project automatically)
+    wai_cmd(tmp.path())
+        .args(["phase", "set", "implement"])
+        .assert()
+        .success();
+
+    // In non-research phases, adding research still shows next-step suggestions
+    wai_cmd(tmp.path())
+        .args(["add", "research", "--project", "impl-proj", "context note"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("wai add research")
+                .or(predicate::str::contains("wai search")),
+        );
 }
