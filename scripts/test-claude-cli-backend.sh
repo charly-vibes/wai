@@ -5,7 +5,8 @@
 
 set -euo pipefail
 
-WAI="${WAI:-./target/debug/wai}"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+WAI="${WAI:-$REPO_ROOT/target/debug/wai}"
 
 if ! command -v claude &>/dev/null; then
   echo "SKIP: claude binary not found on PATH"
@@ -13,13 +14,10 @@ if ! command -v claude &>/dev/null; then
 fi
 
 echo "=== Building wai ==="
-cargo build -q
+cargo build -q --manifest-path "$REPO_ROOT/Cargo.toml"
 
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
-
-echo "=== Setting up workspace ==="
-"$WAI" --help >/dev/null  # sanity check
 
 cd "$TMP"
 "$WAI" init --name test-ws >/dev/null
@@ -28,12 +26,13 @@ cd "$TMP"
   --project myproj >/dev/null
 
 echo "=== Configuring claude-cli backend ==="
-# Write [why] config with claude-cli
-cat >> .wai/config.toml << 'EOF'
-[why]
-llm = "claude-cli"
-privacy_notice_shown = true
-EOF
+# Replace the [why] section wai init writes (strip it and append a fresh one)
+python3 -c "
+import sys
+content = open('.wai/config.toml').read()
+base = content.split('[why]')[0].rstrip()
+print(base + '\n[why]\nllm = \"claude-cli\"\nprivacy_notice_shown = true\n')
+" > .wai/config.toml.tmp && mv .wai/config.toml.tmp .wai/config.toml
 
 echo "=== Running: wai why 'why TOML' ==="
 echo ""

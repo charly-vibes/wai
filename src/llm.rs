@@ -198,10 +198,6 @@ impl LlmClient for ClaudeClient {
 pub struct ClaudeCliClient;
 
 impl ClaudeCliClient {
-    pub fn new() -> Self {
-        ClaudeCliClient
-    }
-
     pub fn from_config(_cfg: &WhyConfig) -> Self {
         ClaudeCliClient
     }
