@@ -185,6 +185,13 @@ pub enum Commands {
         project: Option<String>,
     },
 
+    /// Orient yourself at session start: project, phase, last handoff, and suggested next step
+    Prime {
+        /// Project name (auto-detected when only one project exists)
+        #[arg(short, long)]
+        project: Option<String>,
+    },
+
     /// Ask why a decision was made (LLM-powered reasoning oracle)
     #[command(
         about = "Ask why a decision was made (LLM-powered reasoning oracle)",

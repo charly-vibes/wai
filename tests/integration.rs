@@ -3426,3 +3426,138 @@ fn close_repeated_same_day_increments_suffix() {
         files
     );
 }
+
+// ─── wai prime ───────────────────────────────────────────────────────────────
+
+/// Helper: write a handoff file directly into a project's handoffs directory.
+fn write_handoff(dir: &std::path::Path, project: &str, filename: &str, content: &str) {
+    let handoffs = dir
+        .join(".wai")
+        .join("projects")
+        .join(project)
+        .join("handoffs");
+    fs::create_dir_all(&handoffs).unwrap();
+    fs::write(handoffs.join(filename), content).unwrap();
+}
+
+#[test]
+fn prime_single_project_with_handoff() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproject");
+    write_handoff(
+        tmp.path(),
+        "myproject",
+        "2026-02-23-session-end.md",
+        "---\ndate: 2026-02-23\nproject: myproject\nphase: research\n---\n\n# Session Handoff\n\nCompleted the initial research phase.\n",
+    );
+
+    wai_cmd(tmp.path())
+        .args(["prime", "--project", "myproject", "--no-input"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("wai prime"))
+        .stdout(predicate::str::contains("Project: myproject"))
+        .stdout(predicate::str::contains("Handoff: 2026-02-23"))
+        .stdout(predicate::str::contains("Completed the initial research phase."));
+}
+
+#[test]
+fn prime_no_handoff_omits_handoff_line() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproject");
+
+    let out = wai_cmd(tmp.path())
+        .args(["prime", "--project", "myproject", "--no-input"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Project: myproject"));
+
+    out.stdout(predicate::str::contains("Handoff:").not());
+}
+
+#[test]
+fn prime_project_flag_selects_correct_project() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "alpha");
+    create_project(tmp.path(), "beta");
+
+    wai_cmd(tmp.path())
+        .args(["prime", "--project", "alpha", "--no-input"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Project: alpha"));
+}
+
+#[test]
+fn prime_zero_projects_fails_with_suggestion() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["prime", "--no-input"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("wai new project"));
+}
+
+#[test]
+fn prime_multiple_projects_no_input_fails() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "alpha");
+    create_project(tmp.path(), "beta");
+
+    wai_cmd(tmp.path())
+        .args(["prime", "--no-input"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("prime --project"));
+}
+
+#[test]
+fn prime_unknown_project_fails_with_available() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproject");
+
+    wai_cmd(tmp.path())
+        .args(["prime", "--project", "doesnotexist", "--no-input"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("doesnotexist"))
+        .stderr(predicate::str::contains("myproject"));
+}
+
+#[test]
+fn prime_all_headings_handoff_shows_no_summary_yet() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproject");
+    write_handoff(
+        tmp.path(),
+        "myproject",
+        "2026-02-23-session-end.md",
+        "---\ndate: 2026-02-23\nproject: myproject\nphase: research\n---\n\n# Heading One\n\n## Heading Two\n",
+    );
+
+    wai_cmd(tmp.path())
+        .args(["prime", "--project", "myproject", "--no-input"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("no summary yet"));
+}
+
+#[test]
+fn prime_outside_workspace_fails() {
+    let tmp = TempDir::new().unwrap();
+    // No wai init — no .wai/ directory
+
+    wai_cmd(tmp.path())
+        .args(["prime", "--no-input"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("wai init"));
+}
