@@ -80,6 +80,7 @@ pub fn run(fix: bool) -> Result<()> {
     checks.extend(check_custom_plugins(&project_root));
     checks.extend(check_agent_instructions(&project_root));
     checks.extend(check_readme_badge(&project_root));
+    checks.extend(check_claude_session_hook());
 
     let summary = Summary {
         pass: checks.iter().filter(|c| c.status == Status::Pass).count(),
@@ -1121,6 +1122,144 @@ fn check_readme_badge(project_root: &Path) -> Vec<CheckResult> {
                 WAI_BADGE_MARKDOWN
             )),
             fix_fn: None,
+        }]
+    }
+}
+
+fn check_claude_session_hook() -> Vec<CheckResult> {
+    let settings_path = match dirs::home_dir() {
+        Some(home) => home.join(".claude").join("settings.json"),
+        None => {
+            return vec![CheckResult {
+                name: "Claude Code session hook".to_string(),
+                status: Status::Warn,
+                message: "Could not determine home directory".to_string(),
+                fix: None,
+                fix_fn: None,
+            }];
+        }
+    };
+
+    if !settings_path.exists() {
+        return vec![CheckResult {
+            name: "Claude Code session hook".to_string(),
+            status: Status::Warn,
+            message: "~/.claude/settings.json not found — Claude Code may not be installed"
+                .to_string(),
+            fix: None,
+            fix_fn: None,
+        }];
+    }
+
+    let content = match std::fs::read_to_string(&settings_path) {
+        Ok(c) => c,
+        Err(e) => {
+            return vec![CheckResult {
+                name: "Claude Code session hook".to_string(),
+                status: Status::Warn,
+                message: format!("Cannot read ~/.claude/settings.json: {}", e),
+                fix: None,
+                fix_fn: None,
+            }];
+        }
+    };
+
+    let json: serde_json::Value = match serde_json::from_str(&content) {
+        Ok(v) => v,
+        Err(e) => {
+            return vec![CheckResult {
+                name: "Claude Code session hook".to_string(),
+                status: Status::Warn,
+                message: format!("~/.claude/settings.json is not valid JSON: {}", e),
+                fix: None,
+                fix_fn: None,
+            }];
+        }
+    };
+
+    // Check whether any SessionStart hook command contains "wai status"
+    let has_hook = json
+        .get("hooks")
+        .and_then(|h| h.get("SessionStart"))
+        .and_then(|s| s.as_array())
+        .map(|entries| {
+            entries.iter().any(|entry| {
+                entry
+                    .get("hooks")
+                    .and_then(|h| h.as_array())
+                    .map(|hooks| {
+                        hooks.iter().any(|hook| {
+                            hook.get("command")
+                                .and_then(|c| c.as_str())
+                                .map(|cmd| cmd.contains("wai status"))
+                                .unwrap_or(false)
+                        })
+                    })
+                    .unwrap_or(false)
+            })
+        })
+        .unwrap_or(false);
+
+    if has_hook {
+        vec![CheckResult {
+            name: "Claude Code session hook".to_string(),
+            status: Status::Pass,
+            message: "`wai status` is in the SessionStart hook".to_string(),
+            fix: None,
+            fix_fn: None,
+        }]
+    } else {
+        vec![CheckResult {
+            name: "Claude Code session hook".to_string(),
+            status: Status::Warn,
+            message: "`wai status` not found in ~/.claude/settings.json SessionStart hooks"
+                .to_string(),
+            fix: Some(
+                r#"Add to ~/.claude/settings.json hooks.SessionStart: {"matcher":"","hooks":[{"type":"command","command":"wai status 2>/dev/null || true"}]}"#
+                    .to_string(),
+            ),
+            fix_fn: Some(Box::new(move |_project_root| {
+                use miette::IntoDiagnostic;
+
+                let content = std::fs::read_to_string(&settings_path).into_diagnostic()?;
+                let mut json: serde_json::Value =
+                    serde_json::from_str(&content).into_diagnostic()?;
+
+                let new_hook = serde_json::json!({
+                    "matcher": "",
+                    "hooks": [{"type": "command", "command": "wai status 2>/dev/null || true"}]
+                });
+
+                // Ensure hooks.SessionStart exists as an array, then push
+                let session_start = json
+                    .get_mut("hooks")
+                    .and_then(|h| h.get_mut("SessionStart"))
+                    .and_then(|s| s.as_array_mut());
+
+                if let Some(arr) = session_start {
+                    arr.push(new_hook);
+                } else {
+                    // Build hooks.SessionStart from scratch, preserving other hooks
+                    let hooks = json
+                        .get_mut("hooks")
+                        .and_then(|h| h.as_object_mut());
+
+                    if let Some(hooks_obj) = hooks {
+                        hooks_obj.insert(
+                            "SessionStart".to_string(),
+                            serde_json::json!([new_hook]),
+                        );
+                    } else {
+                        json["hooks"] = serde_json::json!({
+                            "SessionStart": [new_hook]
+                        });
+                    }
+                }
+
+                let updated = serde_json::to_string_pretty(&json).into_diagnostic()?;
+                std::fs::write(&settings_path, updated).into_diagnostic()?;
+                Ok(())
+            })),
         }]
     }
 }
