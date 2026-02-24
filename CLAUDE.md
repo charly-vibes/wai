@@ -1,3 +1,20 @@
+# This Repo
+
+This is the **wai source code repository** — the Rust CLI (`src/`) is the wai tool itself.
+
+The repo also **dogfoods wai**: `.wai/` tracks wai's own development using wai. This means `.wai/projects/` holds active feature work, beads issues track wai's own tasks, and openspec manages its change proposals.
+
+## Two Kinds of Work
+
+When creating or evaluating tickets, distinguish:
+
+| Type | Description | Touches |
+|------|-------------|---------|
+| **Tool work** | Adding or changing wai functionality | `src/`, `tests/`, `Cargo.toml`, openspec |
+| **Repo maintenance** | Workflows, scripts, docs, wai artifacts | `.wai/`, `CLAUDE.md`, `scripts/`, `.github/` |
+
+Tool tickets require Rust implementation and typically need an openspec change first (`openspec/AGENTS.md`). Maintenance tickets do not touch `src/`.
+
 <!-- WAI:START -->
 # Workflow Tools
 
