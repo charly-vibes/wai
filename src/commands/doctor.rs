@@ -3,6 +3,7 @@ use owo_colors::OwoColorize;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::hash_map::DefaultHasher;
+use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 use std::path::Path;
 
@@ -76,6 +77,8 @@ pub fn run(fix: bool) -> Result<()> {
     checks.push(check_version(&project_root));
     checks.extend(check_plugin_tools(&project_root));
     checks.extend(check_agent_config_sync(&project_root));
+    checks.extend(check_skills_in_repo(&project_root));
+    checks.extend(check_agent_tool_coverage(&project_root));
     checks.extend(check_project_state(&project_root));
     checks.extend(check_custom_plugins(&project_root));
     checks.extend(check_agent_instructions(&project_root));
@@ -1262,6 +1265,219 @@ fn check_claude_session_hook() -> Vec<CheckResult> {
             })),
         }]
     }
+}
+
+/// Known agent tool directories: (dir name, display name)
+const AGENT_TOOL_DIRS: &[(&str, &str)] = &[
+    (".agents", "Agents"),
+    (".amp", "Amp"),
+    (".claude", "Claude Code"),
+    (".cursor", "Cursor"),
+    (".gemini", "Gemini CLI"),
+];
+
+/// Find SKILL.md files outside `.wai/` and agent tool directories, and report any not yet
+/// imported into wai. Agent tool directories (.claude, .amp, .gemini, .cursor) are excluded
+/// because they hold synced copies of skills, not source definitions.
+fn check_skills_in_repo(project_root: &Path) -> Vec<CheckResult> {
+    use walkdir::WalkDir;
+
+    let wai_path = project_root.join(".wai");
+    let target_path = project_root.join("target");
+    let git_path = project_root.join(".git");
+    // Exclude agent tool dirs — those contain synced copies, not source definitions
+    let agent_tool_paths: Vec<std::path::PathBuf> = AGENT_TOOL_DIRS
+        .iter()
+        .map(|(dir, _)| project_root.join(dir))
+        .collect();
+    let skills_dir = agent_config_dir(project_root).join(SKILLS_DIR);
+
+    // Walk repo, skip managed/build dirs and agent tool dirs
+    let external_skills: Vec<std::path::PathBuf> = WalkDir::new(project_root)
+        .follow_links(false)
+        .into_iter()
+        .filter_entry(|e| {
+            let p = e.path();
+            !p.starts_with(&wai_path)
+                && !p.starts_with(&target_path)
+                && !p.starts_with(&git_path)
+                && !agent_tool_paths.iter().any(|ap| p.starts_with(ap))
+        })
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_name() == "SKILL.md" && e.file_type().is_file())
+        .map(|e| e.path().to_path_buf())
+        .collect();
+
+    if external_skills.is_empty() {
+        return vec![];
+    }
+
+    // Collect skill directory names already managed by wai
+    let imported: HashSet<String> = if skills_dir.exists() {
+        std::fs::read_dir(&skills_dir)
+            .ok()
+            .into_iter()
+            .flatten()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().join("SKILL.md").exists())
+            .filter_map(|e| e.file_name().to_str().map(|s| s.to_string()))
+            .collect()
+    } else {
+        HashSet::new()
+    };
+
+    let mut unimported: Vec<String> = Vec::new();
+    for skill_path in &external_skills {
+        if let Some(parent) = skill_path.parent() {
+            if let Some(dir_name) = parent.file_name().and_then(|n| n.to_str()) {
+                if !imported.contains(dir_name) {
+                    let rel = skill_path
+                        .strip_prefix(project_root)
+                        .unwrap_or(skill_path)
+                        .display()
+                        .to_string();
+                    unimported.push(rel);
+                }
+            }
+        }
+    }
+
+    if unimported.is_empty() {
+        vec![CheckResult {
+            name: "Skills import".to_string(),
+            status: Status::Pass,
+            message: format!(
+                "{} SKILL.md file(s) found outside wai — all imported",
+                external_skills.len()
+            ),
+            fix: None,
+            fix_fn: None,
+        }]
+    } else {
+        vec![CheckResult {
+            name: "Skills import".to_string(),
+            status: Status::Warn,
+            message: format!(
+                "{} SKILL.md file(s) found outside wai but not imported: {}",
+                unimported.len(),
+                unimported.join(", ")
+            ),
+            fix: Some(
+                "Copy each skill to .wai/resources/agent-config/skills/<name>/SKILL.md".to_string(),
+            ),
+            fix_fn: None,
+        }]
+    }
+}
+
+/// Check that detected agent tool directories (.claude, .amp, .gemini, .cursor) are covered by
+/// projections, and that wai skills are synced to them.
+fn check_agent_tool_coverage(project_root: &Path) -> Vec<CheckResult> {
+    let config_dir = agent_config_dir(project_root);
+    let projections_path = config_dir.join(".projections.yml");
+    let skills_dir = config_dir.join(SKILLS_DIR);
+
+    // Does wai manage any skills?
+    let has_skills = skills_dir.exists()
+        && std::fs::read_dir(&skills_dir)
+            .ok()
+            .map(|entries| {
+                entries
+                    .filter_map(|e| e.ok())
+                    .any(|e| e.path().join("SKILL.md").exists())
+            })
+            .unwrap_or(false);
+
+    // Which known agent tool directories exist at the project root?
+    let detected: Vec<(&str, &str)> = AGENT_TOOL_DIRS
+        .iter()
+        .filter(|(dir, _)| project_root.join(dir).is_dir())
+        .copied()
+        .collect();
+
+    if detected.is_empty() {
+        return vec![];
+    }
+
+    // Load projections (empty if file missing / parse error)
+    let projections: Vec<ProjectionEntry> = projections_path
+        .exists()
+        .then(|| {
+            std::fs::read_to_string(&projections_path)
+                .ok()
+                .and_then(|c| serde_yaml::from_str::<ProjectionsConfig>(&c).ok())
+                .map(|cfg| cfg.projections)
+        })
+        .flatten()
+        .unwrap_or_default();
+
+    let mut results = Vec::new();
+
+    for (tool_dir, tool_name) in &detected {
+        // Projections that target this tool dir or a sub-path of it
+        let covering: Vec<&ProjectionEntry> = projections
+            .iter()
+            .filter(|p| {
+                p.target == *tool_dir
+                    || p.target.starts_with(&format!("{}/", tool_dir))
+            })
+            .collect();
+
+        if covering.is_empty() {
+            results.push(CheckResult {
+                name: format!("Agent tool projection: {}", tool_name),
+                status: Status::Warn,
+                message: format!(
+                    "{} directory detected but not in .projections.yml",
+                    tool_dir
+                ),
+                fix: Some(format!(
+                    "Add a projection for {} in .wai/resources/agent-config/.projections.yml",
+                    tool_dir
+                )),
+                fix_fn: None,
+            });
+        } else if has_skills {
+            let skills_synced = covering.iter().any(|p| {
+                p.sources
+                    .iter()
+                    .any(|s| s == SKILLS_DIR || s.ends_with(&format!("/{}", SKILLS_DIR)))
+            });
+            if skills_synced {
+                results.push(CheckResult {
+                    name: format!("Agent tool projection: {}", tool_name),
+                    status: Status::Pass,
+                    message: format!("{} projected with skills synced", tool_dir),
+                    fix: None,
+                    fix_fn: None,
+                });
+            } else {
+                results.push(CheckResult {
+                    name: format!("Agent tool projection: {}", tool_name),
+                    status: Status::Warn,
+                    message: format!(
+                        "{} projected but skills source not included — wai skills won't sync to {}",
+                        tool_dir, tool_name
+                    ),
+                    fix: Some(format!(
+                        "Add 'skills' to sources for the {} projection in .projections.yml",
+                        tool_dir
+                    )),
+                    fix_fn: None,
+                });
+            }
+        } else {
+            results.push(CheckResult {
+                name: format!("Agent tool projection: {}", tool_name),
+                status: Status::Pass,
+                message: format!("{} has a projection defined", tool_dir),
+                fix: None,
+                fix_fn: None,
+            });
+        }
+    }
+
+    results
 }
 
 fn check_agent_instructions(project_root: &Path) -> Vec<CheckResult> {
