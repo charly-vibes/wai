@@ -7,7 +7,7 @@ use walkdir::WalkDir;
 
 use crate::config::{ProjectConfig, STATE_FILE, WhyConfig, wai_dir};
 use crate::error::WaiError;
-use crate::llm::{LlmError, detect_backend, ollama_binary_exists};
+use crate::llm::{LlmError, claude_binary_exists, detect_backend, ollama_binary_exists};
 
 use super::require_project;
 
@@ -805,7 +805,7 @@ pub fn fallback_mode(cfg: &WhyConfig) -> FallbackMode {
 
 /// Return `true` if the backend sends data to an external API (e.g. Claude).
 pub fn is_external_backend(backend_name: &str) -> bool {
-    backend_name == "Claude"
+    backend_name == "Claude" || backend_name == "Claude CLI"
 }
 
 /// Return `true` if the one-time privacy notice must be shown before this query.
@@ -1024,13 +1024,23 @@ pub fn run(query: String, no_llm: bool, json: bool, verbose: u8) -> Result<()> {
                     "○".dimmed(),
                     format!("ollama pull {}", model).bold()
                 );
+            } else if claude_binary_exists() {
+                // claude binary found but couldn't be used (shouldn't normally happen)
+                eprintln!(
+                    "  {} No LLM available. Falling back to `wai search`.",
+                    "⚠".yellow()
+                );
+                eprintln!(
+                    "  {} Set ANTHROPIC_API_KEY or configure `[why] llm = \"claude-cli\"` in .wai/config.toml",
+                    "○".dimmed()
+                );
             } else {
                 eprintln!(
                     "  {} No LLM available. Falling back to `wai search`.",
                     "⚠".yellow()
                 );
                 eprintln!(
-                    "  {} Set ANTHROPIC_API_KEY or install Ollama for synthesized answers.",
+                    "  {} Install Claude Code, set ANTHROPIC_API_KEY, or install Ollama.",
                     "○".dimmed()
                 );
             }

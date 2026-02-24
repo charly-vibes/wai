@@ -189,6 +189,86 @@ impl LlmClient for ClaudeClient {
     }
 }
 
+// ── Claude CLI client ─────────────────────────────────────────────────────────
+
+/// Backend that delegates to the `claude` binary (Claude Code CLI) in print mode.
+///
+/// Requires no API key configuration — claude manages its own auth. Ideal for
+/// users who already have Claude Code installed.
+pub struct ClaudeCliClient;
+
+impl ClaudeCliClient {
+    pub fn new() -> Self {
+        ClaudeCliClient
+    }
+
+    pub fn from_config(_cfg: &WhyConfig) -> Self {
+        ClaudeCliClient
+    }
+}
+
+/// Return `true` if the `claude` binary is on PATH.
+pub fn claude_binary_exists() -> bool {
+    std::process::Command::new("claude")
+        .arg("--version")
+        .env("CLAUDECODE", "") // bypass nested-session guard
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .is_some()
+}
+
+impl LlmClient for ClaudeCliClient {
+    fn complete(&self, prompt: &str) -> Result<String, LlmError> {
+        use std::io::Write;
+
+        let mut child = std::process::Command::new("claude")
+            .args(["-p", "--tools", "", "--no-session-persistence"])
+            .env("CLAUDECODE", "") // bypass nested-session guard
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .map_err(|e| LlmError::NetworkError(format!("Failed to spawn claude: {}", e)))?;
+
+        if let Some(mut stdin) = child.stdin.take() {
+            stdin
+                .write_all(prompt.as_bytes())
+                .map_err(|e| LlmError::Other(e.to_string()))?;
+        }
+
+        let out = child
+            .wait_with_output()
+            .map_err(|e| LlmError::Other(e.to_string()))?;
+
+        if !out.status.success() {
+            let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+            return Err(LlmError::Other(stderr));
+        }
+
+        let text = String::from_utf8_lossy(&out.stdout).to_string();
+        if text.trim().is_empty() {
+            return Err(LlmError::Other(
+                "Empty response from claude CLI".to_string(),
+            ));
+        }
+
+        Ok(text)
+    }
+
+    fn is_available(&self) -> bool {
+        claude_binary_exists()
+    }
+
+    fn name(&self) -> &str {
+        "Claude CLI"
+    }
+
+    fn model_id(&self) -> &str {
+        "claude-cli"
+    }
+}
+
 // ── Ollama client ─────────────────────────────────────────────────────────────
 
 const OLLAMA_DEFAULT_MODEL: &str = "llama3.1:8b";
@@ -295,14 +375,22 @@ impl LlmClient for OllamaClient {
 /// Select the best available LLM backend given `WhyConfig`.
 ///
 /// Priority:
-/// 1. Explicit `llm = "claude"` or `llm = "ollama"` in config
-/// 2. Auto-detect: Claude (if ANTHROPIC_API_KEY set) then Ollama (if binary + model found)
+/// 1. Explicit `llm = "claude"` / `"claude-cli"` / `"ollama"` in config
+/// 2. Auto-detect: Claude API → Claude CLI → Ollama
 /// 3. `None` → caller should fall back to `wai search`
 pub fn detect_backend(cfg: &WhyConfig) -> Option<Box<dyn LlmClient>> {
     match cfg.llm.as_deref() {
         Some("claude") => {
             let client = ClaudeClient::from_config(cfg)?;
             Some(Box::new(client))
+        }
+        Some("claude-cli") => {
+            let client = ClaudeCliClient::from_config(cfg);
+            if client.is_available() {
+                Some(Box::new(client))
+            } else {
+                None
+            }
         }
         Some("ollama") => {
             let client = OllamaClient::from_config(cfg);
@@ -314,11 +402,16 @@ pub fn detect_backend(cfg: &WhyConfig) -> Option<Box<dyn LlmClient>> {
         }
         // Auto-detect
         _ => {
-            // Try Claude first
+            // 1. Claude API (direct, fastest)
             if let Some(client) = ClaudeClient::from_config(cfg) {
                 return Some(Box::new(client));
             }
-            // Try Ollama
+            // 2. Claude CLI (zero-config for Claude Code users)
+            let cli = ClaudeCliClient::from_config(cfg);
+            if cli.is_available() {
+                return Some(Box::new(cli));
+            }
+            // 3. Ollama (local fallback)
             let ollama = OllamaClient::from_config(cfg);
             if ollama.is_available() {
                 return Some(Box::new(ollama));

@@ -2612,9 +2612,16 @@ fn completely_unknown_command_shows_help_hint() {
 fn force_why_llm(dir: &std::path::Path, llm: &str) {
     let config_path = dir.join(".wai").join("config.toml");
     let existing = fs::read_to_string(&config_path).unwrap_or_default();
+    // Strip any existing [why] section (always the last section in wai config)
+    // before appending to avoid duplicate-section TOML errors.
+    let base = existing
+        .split("[why]")
+        .next()
+        .unwrap_or(&existing)
+        .trim_end();
     let updated = format!(
         "{}\n[why]\nllm = \"{}\"\nprivacy_notice_shown = true\n",
-        existing, llm
+        base, llm
     );
     fs::write(&config_path, updated).unwrap();
 }
