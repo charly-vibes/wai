@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand};
+use std::path::PathBuf;
 
 const VERSION: &str = concat!(
     env!("CARGO_PKG_VERSION"),
@@ -190,6 +191,26 @@ pub enum Commands {
         /// Project name (auto-detected when only one project exists)
         #[arg(short, long)]
         project: Option<String>,
+    },
+
+    /// List all wai projects across workspaces
+    #[command(
+        about = "List all wai projects across workspaces",
+        long_about = "Scans for wai workspaces under a root directory (default: $HOME) and\n\
+            prints a one-line summary per project showing its phase and beads issue counts.\n\n\
+            EXAMPLES\n\
+              wai ls                    Scan $HOME (default, depth 3)\n\
+              wai ls --root ~/dev       Scan a custom root directory\n\
+              wai ls --depth 2          Limit scan to 2 levels deep"
+    )]
+    Ls {
+        /// Root directory to scan (default: $HOME)
+        #[arg(short, long)]
+        root: Option<PathBuf>,
+
+        /// Maximum scan depth (default: 3)
+        #[arg(short, long)]
+        depth: Option<usize>,
     },
 
     /// Ask why a decision was made (LLM-powered reasoning oracle)

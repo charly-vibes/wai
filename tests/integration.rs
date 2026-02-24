@@ -3561,3 +3561,180 @@ fn prime_outside_workspace_fails() {
         .failure()
         .stderr(predicate::str::contains("wai init"));
 }
+
+// ─── wai ls ──────────────────────────────────────────────────────────────────
+
+/// Helper: write a minimal .wai/config.toml in a directory so it is detected
+/// as a wai workspace.
+fn make_workspace(dir: &std::path::Path, ws_name: &str) {
+    fs::create_dir_all(dir.join(".wai/projects")).unwrap();
+    fs::write(
+        dir.join(".wai/config.toml"),
+        format!("[project]\nname = \"{}\"\n", ws_name),
+    )
+    .unwrap();
+}
+
+/// Helper: create a project directory with an optional phase state file.
+fn make_project(workspace: &std::path::Path, project_name: &str, phase: Option<&str>) {
+    let proj_dir = workspace.join(".wai/projects").join(project_name);
+    fs::create_dir_all(&proj_dir).unwrap();
+    if let Some(p) = phase {
+        fs::write(
+            proj_dir.join(".state"),
+            format!("current: {}\nhistory: []\n", p),
+        )
+        .unwrap();
+    }
+}
+
+#[test]
+fn ls_single_workspace_one_project() {
+    let root = TempDir::new().unwrap();
+    let ws = root.path().join("my-repo");
+    make_workspace(&ws, "my-ws");
+    make_project(&ws, "my-proj", Some("implement"));
+
+    wai_cmd(root.path())
+        .args(["ls", "--root", root.path().to_str().unwrap()])
+        .env("NO_COLOR", "1")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("my-proj"))
+        .stdout(predicate::str::contains("implement"));
+}
+
+#[test]
+fn ls_multiple_workspaces_sorted_by_name() {
+    let root = TempDir::new().unwrap();
+
+    let ws_a = root.path().join("alpha-repo");
+    make_workspace(&ws_a, "alpha");
+    make_project(&ws_a, "zebra", Some("plan"));
+
+    let ws_b = root.path().join("beta-repo");
+    make_workspace(&ws_b, "beta");
+    make_project(&ws_b, "apple", Some("research"));
+
+    let out = wai_cmd(root.path())
+        .args(["ls", "--root", root.path().to_str().unwrap()])
+        .env("NO_COLOR", "1")
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let output = String::from_utf8_lossy(&out);
+    // Both projects appear
+    assert!(output.contains("apple"), "apple missing: {}", output);
+    assert!(output.contains("zebra"), "zebra missing: {}", output);
+
+    // apple (a) appears before zebra (z) when sorted
+    let pos_apple = output.find("apple").unwrap();
+    let pos_zebra = output.find("zebra").unwrap();
+    assert!(
+        pos_apple < pos_zebra,
+        "projects not sorted: apple at {} vs zebra at {}",
+        pos_apple,
+        pos_zebra
+    );
+}
+
+#[test]
+fn ls_no_workspaces_prints_message() {
+    let root = TempDir::new().unwrap();
+    // No workspaces — plain empty directory
+
+    wai_cmd(root.path())
+        .args(["ls", "--root", root.path().to_str().unwrap()])
+        .env("NO_COLOR", "1")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No wai workspaces found"));
+}
+
+#[test]
+fn ls_no_beads_omits_counts_column() {
+    let root = TempDir::new().unwrap();
+    let ws = root.path().join("proj");
+    make_workspace(&ws, "my-ws");
+    make_project(&ws, "my-proj", Some("review"));
+    // No .beads/ directory
+
+    wai_cmd(root.path())
+        .args(["ls", "--root", root.path().to_str().unwrap()])
+        .env("NO_COLOR", "1")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("my-proj"))
+        // No "open" or "ready" in output when no beads
+        .stdout(predicate::str::contains("open").not())
+        .stdout(predicate::str::contains("ready").not());
+}
+
+#[test]
+fn ls_beads_present_but_unavailable_is_graceful() {
+    // When .beads/ exists but `bd` is not available (or returns no data),
+    // the command must still succeed without crashing.
+    let root = TempDir::new().unwrap();
+    let ws = root.path().join("proj");
+    make_workspace(&ws, "my-ws");
+    make_project(&ws, "my-proj", Some("implement"));
+    // Create .beads/ dir to trigger beads detection
+    fs::create_dir_all(ws.join(".beads")).unwrap();
+
+    // Use an empty PATH so 'bd' cannot be found — graceful skip
+    wai_cmd(root.path())
+        .args(["ls", "--root", root.path().to_str().unwrap()])
+        .env("PATH", "")
+        .env("NO_COLOR", "1")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("my-proj"));
+}
+
+#[test]
+fn ls_depth_limits_recursion() {
+    let root = TempDir::new().unwrap();
+
+    // Workspace at depth 1 (root/shallow-repo)
+    let shallow = root.path().join("shallow-repo");
+    make_workspace(&shallow, "shallow");
+    make_project(&shallow, "shallow-proj", Some("plan"));
+
+    // Workspace at depth 2 (root/dir/deep-repo) — only found with depth >= 2
+    let deep = root.path().join("dir").join("deep-repo");
+    make_workspace(&deep, "deep");
+    make_project(&deep, "deep-proj", Some("research"));
+
+    // With --depth 1, only the depth-1 workspace is found
+    wai_cmd(root.path())
+        .args(["ls", "--root", root.path().to_str().unwrap(), "--depth", "1"])
+        .env("NO_COLOR", "1")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("shallow-proj"))
+        .stdout(predicate::str::contains("deep-proj").not());
+
+    // With --depth 2, both are found
+    wai_cmd(root.path())
+        .args(["ls", "--root", root.path().to_str().unwrap(), "--depth", "2"])
+        .env("NO_COLOR", "1")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("shallow-proj"))
+        .stdout(predicate::str::contains("deep-proj"));
+}
+
+#[test]
+fn ls_invalid_root_fails_with_diagnostic() {
+    let tmp = TempDir::new().unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["ls", "--root", "/nonexistent-path-that-does-not-exist"])
+        .env("NO_COLOR", "1")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("/nonexistent-path-that-does-not-exist"));
+}

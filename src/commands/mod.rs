@@ -10,6 +10,7 @@ use crate::suggestions::SuggestionEngine;
 mod add;
 mod close;
 mod config_cmd;
+mod ls;
 mod prime;
 mod doctor;
 mod handoff;
@@ -64,6 +65,7 @@ pub fn run(cli: Cli) -> Result<()> {
         },
         Some(Commands::Close { project }) => close::run(project),
         Some(Commands::Prime { project }) => prime::run(project),
+        Some(Commands::Ls { root, depth }) => ls::run(root, depth),
         Some(Commands::Tutorial) => crate::tutorial::run(),
         Some(Commands::Why {
             query,
@@ -201,7 +203,7 @@ fn run_external(args: Vec<String>) -> Result<()> {
     let valid_commands = &[
         "new", "add", "show", "move", "init", "status", "phase", "sync", "config", "handoff",
         "search", "timeline", "plugin", "doctor", "way", "why", "import", "resource", "tutorial",
-        "close", "prime",
+        "close", "prime", "ls",
     ];
     // Valid (verb, noun) subcommand patterns for wrong-order detection
     let valid_patterns = &[
