@@ -79,8 +79,19 @@ wai search "authentication"
 wai search --type research --regex "api.*auth"
 wai timeline my-app --from 2026-02-01
 
-# Generate a handoff document
-wai handoff create my-app
+# Session management
+wai prime              # Orient at session start (detects in-progress work)
+wai close              # Wrap up session: create handoff + show next steps
+wai handoff create my-app  # Generate handoff manually
+
+# AI-powered features
+wai why "why this approach?"        # LLM-powered reasoning oracle
+wai why src/config.rs               # Explain a file's history
+wai reflect                         # Synthesize context into CLAUDE.md
+
+# List projects across workspaces
+wai ls                 # Scan $HOME for wai projects
+wai ls --root ~/dev    # Scan a custom root directory
 
 # Sync agent configs to tool-specific locations
 wai sync --status      # Check sync status
@@ -133,6 +144,7 @@ wai beads list         # Pass-through to beads plugin
 | `wai show [name]` | Show PARA overview or item details |
 | `wai move <item> <category>` | Move item between categories |
 | `wai status` | Show project status with suggestions |
+| `wai ls [--root <dir>]` | List all wai projects across workspaces |
 | `wai way` | Check repository best practices (AI-friendly setup) |
 | `wai tutorial` | Run interactive quickstart tutorial |
 | `wai doctor [--fix]` | Diagnose workspace health (--fix to auto-repair) |
@@ -191,6 +203,8 @@ wai beads list         # Pass-through to beads plugin
 
 | Command | Description |
 |---------|-------------|
+| `wai prime [--project <name>]` | Orient at session start: phase, last handoff, next step |
+| `wai close [--project <name>]` | Wrap up session: create handoff and show next steps |
 | `wai handoff create <project>` | Generate handoff document |
 
 ### Plugin Management
@@ -396,6 +410,58 @@ wai add research "API findings" --tags "api,security,authentication"
 - ❌ Bad: `"api security"` (use comma separator)
 
 Tags are stored in YAML frontmatter and searchable via `wai search`.
+
+### AI-Powered Features
+
+#### Why — Reasoning Oracle
+
+Ask why decisions were made using an LLM that queries your accumulated artifacts:
+
+```bash
+wai why "why use TOML for config?"
+wai why "what drove the microservices decision?"
+wai why src/config.rs                # Explain a file's history
+wai why --no-llm "auth approach"     # Force fallback to search (offline/testing)
+```
+
+Configure the LLM backend in `.wai/config.toml`:
+
+```toml
+[why]
+llm      = "claude"       # "claude" or "ollama" (auto-detected if omitted)
+model    = "haiku"        # Claude: "haiku"/"sonnet"; Ollama: "llama3.1:8b"
+api_key  = "sk-ant-..."   # Or set ANTHROPIC_API_KEY env var
+fallback = "search"       # "search" (default) or "error" when LLM unavailable
+```
+
+Both Claude (via API key or `claude` CLI) and Ollama (local models) are supported. Falls back to `wai search` when no LLM is available.
+
+#### Reflect — CLAUDE.md Synthesis
+
+Synthesize session context into persistent AI guidance:
+
+```bash
+wai reflect                          # Auto-detect project and output targets
+wai reflect --conversation chat.md   # Include conversation transcript (richest input)
+wai reflect --output agents.md       # Write only to AGENTS.md
+wai reflect --dry-run                # Preview changes without writing
+```
+
+`wai reflect` reads your handoffs, research, and optional conversation transcript, then asks an LLM to extract project-specific conventions, gotchas, and patterns. The result is injected into `CLAUDE.md` and/or `AGENTS.md` as a persistent `WAI:REFLECT` block that persists across sessions.
+
+#### Session Resume Loop
+
+Use `wai prime` and `wai close` for reliable multi-session continuity:
+
+```bash
+# Start of session
+wai prime          # Shows ⚡ RESUMING if mid-task, with exact next steps
+
+# End of session
+wai close          # Creates handoff + prints resume checklist
+```
+
+`wai prime` detects an in-progress session via a `.pending-resume` signal and surfaces the exact next steps from the last handoff. Always run `wai close` before `/clear` or ending a session.
 
 ### Doctor Command
 

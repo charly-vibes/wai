@@ -54,6 +54,7 @@ Available for all commands:
 | `wai show [name]` | Show PARA overview or item details |
 | `wai move <item> <category>` | Move item between PARA categories |
 | `wai status` | Show project status with suggestions |
+| `wai ls [--root <dir>] [--depth <n>]` | List all wai projects across workspaces |
 
 ## Searching & Timeline
 
@@ -104,7 +105,11 @@ Available phases: `research`, `design`, `plan`, `implement`, `review`, `archive`
 
 | Command | Description |
 |---------|-------------|
+| `wai prime [--project <name>]` | Orient at session start: phase, last handoff, suggested next step |
+| `wai close [--project <name>]` | Wrap up session: create handoff and show next steps |
 | `wai handoff create <project>` | Generate handoff document with plugin context |
+
+`wai prime` detects an in-progress session (via a `.pending-resume` signal) and shows a "RESUMING" banner with the exact next steps from the previous handoff. `wai close` creates the handoff and prints the resume checklist — run it before every `/clear` or end of session.
 
 ## Plugins
 
@@ -120,6 +125,51 @@ Available phases: `research`, `design`, `plan`, `implement`, `review`, `archive`
 - **beads** — Commands: `list`, `show`, `ready`
 - **git** — Provides context via hooks
 - **openspec** — Integrated into status display
+
+## AI-Powered Features
+
+### Why — Reasoning Oracle
+
+| Command | Description |
+|---------|-------------|
+| `wai why <query>` | Ask why a decision was made (LLM-powered) |
+| `wai why <file-path>` | Explain a file's history and rationale |
+| `wai why --no-llm <query>` | Force fallback to `wai search` (offline/testing) |
+| `wai why --json <query>` | Output machine-readable JSON |
+
+`wai why` queries your accumulated artifacts using an LLM to synthesize a coherent narrative explaining why decisions were made. Falls back to `wai search` when no LLM is configured.
+
+**Configuration** (`.wai/config.toml`):
+```toml
+[why]
+llm     = "claude"        # Backend: "claude" or "ollama" (auto-detected if omitted)
+model   = "haiku"         # Claude: "haiku"/"sonnet"; Ollama: "llama3.1:8b"
+api_key = "sk-ant-..."    # Claude API key (or ANTHROPIC_API_KEY env var)
+fallback = "search"       # On LLM unavailable: "search" (default) or "error"
+```
+
+**LLM Backends:**
+- **Claude** — set `ANTHROPIC_API_KEY` or add `api_key` to `[why]` config
+- **Ollama** — install from https://ollama.com and run a local model
+
+### Reflect — CLAUDE.md Synthesis
+
+| Command | Description |
+|---------|-------------|
+| `wai reflect` | Synthesize session context into AI guidance block |
+| `wai reflect --conversation <file>` | Include conversation transcript as richest input |
+| `wai reflect --output <target>` | Target: `claude.md`, `agents.md`, or `both` |
+| `wai reflect --dry-run` | Preview changes without writing |
+| `wai reflect --yes` | Skip confirmation prompt |
+
+`wai reflect` reads accumulated handoffs, research, and optional conversation transcript, then asks an LLM to extract project-specific conventions and gotchas. Injects the result into `CLAUDE.md`/`AGENTS.md` as a persistent `WAI:REFLECT` block.
+
+**Context sources (ranked by richness):**
+1. Conversation transcript (`--conversation <file>`) — raw session detail
+2. Handoff artifacts — session summaries and next steps
+3. Research/design/plan artifacts — curated decisions
+
+Reuses the `[why]` LLM config — no separate setup required.
 
 ## Diagnostics
 
