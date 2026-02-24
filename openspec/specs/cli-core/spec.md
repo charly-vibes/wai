@@ -39,7 +39,7 @@ This spec covers the foundational elements of the CLI.
 
 ### Requirement: Command Structure
 
-The CLI SHALL use consistent verb-noun command patterns with primary verbs: `new`, `add`, `show`, `move`, plus dedicated top-level commands for `phase`, `sync`, `config`, `handoff`, `search`, `timeline`, and `doctor`.
+The CLI SHALL use consistent verb-noun command patterns with primary verbs: `new`, `add`, `show`, `move`, plus dedicated top-level commands for `phase`, `sync`, `config`, `handoff`, `search`, `timeline`, `why`, `reflect`, and `doctor`.
 
 #### Scenario: Create new items
 
@@ -90,6 +90,24 @@ The CLI SHALL use consistent verb-noun command patterns with primary verbs: `new
 
 - **WHEN** user runs `wai timeline <project>`
 - **THEN** the system displays a chronological view of the project's artifacts
+
+#### Scenario: Ask reasoning questions
+
+- **WHEN** user runs `wai why <query>`
+- **THEN** the system uses LLM synthesis to answer why decisions were made
+- **AND** displays relevant artifacts, decision chains, and suggestions
+- **AND** gracefully falls back to `wai search` if no LLM available
+
+#### Scenario: Reflect on session history
+
+- **WHEN** user runs `wai reflect`
+- **THEN** the system reads accumulated handoffs and artifacts
+- **AND** optionally accepts a conversation transcript via `--conversation <file>`
+- **AND** uses LLM synthesis to surface project-specific conventions, gotchas, and patterns
+- **AND** shows a unified diff of old vs proposed REFLECT block content
+- **AND** requires user confirmation before writing to CLAUDE.md and/or AGENTS.md
+- **AND** updates whichever AI config files exist in the repo root by default
+- **AND** fails with a clear diagnostic if no LLM is available (does not fall back)
 
 #### Scenario: Diagnose workspace health
 
@@ -284,4 +302,156 @@ The CLI SHALL provide `wai way` to validate repository best practices and provid
 - **AND** includes actionable fix text with URLs (in parentheses) for each WayStatus::Info
 - **AND** supports `--json` flag for machine-readable output
 - **AND** critical recommendations (missing .gitignore/README.md) display with ⚠️ marker
+
+### Requirement: Session Close Command
+
+`wai close` SHALL write a `.pending-resume` signal after every successful handoff
+creation.
+
+#### Scenario: Pending-resume written on success
+
+- **WHEN** `wai close` successfully creates a handoff document
+- **THEN** the system writes `.wai/projects/<project>/.pending-resume` containing
+  the path to the new handoff, relative to the project directory
+- **AND** this file is not mentioned in the command's terminal output
+- **AND** the file appears in the uncommitted-changes list (it is a tracked
+  workspace artifact, committed with other `.wai/` changes)
+
+---
+
+### Requirement: Global Workspace View
+
+The CLI SHALL provide `wai ls` to scan for wai workspaces under a root directory and
+display each project's phase and open issue count as a single line per project.
+
+The expected terminal output shape is:
+
+```
+why-command   [review]    3 open, 2 ready
+para          [plan]      7 open, 0 ready
+rizomas       [implement] 1 open, 1 ready
+```
+
+Columns are left-aligned and padded to the longest project name in the result set. The
+counts column is a **global toggle**: it appears for ALL rows when at least one workspace
+has beads data (rows without beads show a blank cell), and is omitted entirely when no
+workspace has beads. When no workspaces are found, the system prints a single message
+indicating the root that was scanned. When two projects in different workspaces share the
+same name, a short path suffix disambiguates each: `name (~/path/to/repo)`.
+
+The default root is `$HOME`; the default depth is 3. Both are overridable via flags.
+The filesystem walker never follows symlinks.
+
+#### Scenario: Workspaces found — table rendered
+
+- **WHEN** user runs `wai ls` and at least one `.wai/config.toml` exists under `$HOME` at depth ≤ 3
+- **THEN** the system displays one line per (workspace, project) pair
+- **AND** each line shows the project name, phase in brackets, and beads counts when available
+
+#### Scenario: No workspaces found
+
+- **WHEN** user runs `wai ls` and no `.wai/config.toml` is found under the root
+- **THEN** the system prints `No wai workspaces found under <root>`
+
+#### Scenario: Custom root
+
+- **WHEN** user runs `wai ls --root <path>`
+- **THEN** the system scans from `<path>` instead of `$HOME`
+
+#### Scenario: Custom depth
+
+- **WHEN** user runs `wai ls --depth <n>`
+- **THEN** the system limits filesystem traversal to `<n>` levels below the root
+
+#### Scenario: At least one workspace has beads — counts column shown globally
+
+- **WHEN** at least one discovered workspace has `.beads/` present and `bd` is installed
+- **THEN** the counts column appears for all rows in the output
+- **AND** rows for projects in beads-enabled workspaces show `N open, M ready`
+- **AND** rows for projects in workspaces without beads show a blank counts cell
+
+#### Scenario: No workspace has beads — counts column omitted
+
+- **WHEN** no discovered workspace has `.beads/` present or `bd` is not installed anywhere
+- **THEN** the counts column is omitted entirely from the output
+
+#### Scenario: Multiple projects in one workspace
+
+- **WHEN** a discovered workspace contains more than one project
+- **THEN** each project appears as a separate line in the output
+
+#### Scenario: Duplicate project names across workspaces
+
+- **WHEN** two projects from different workspaces share the same name
+- **THEN** each line appends a short path suffix to disambiguate: `name (~/path/to/repo)`
+
+#### Scenario: Invalid root path
+
+- **WHEN** user runs `wai ls --root <path>` and `<path>` does not exist
+- **THEN** the system fails with a diagnostic error naming the invalid path
+
+### Requirement: Session Orientation Command
+
+`wai prime` SHALL detect a `.pending-resume` signal and render a `⚡ RESUMING`
+block when the referenced handoff is dated today.
+
+#### Scenario: Resume mode — today's handoff
+
+- **WHEN** user runs `wai prime`
+- **AND** `.wai/projects/<project>/.pending-resume` exists
+- **AND** the referenced handoff file exists and its frontmatter `date` equals
+  today's date
+- **THEN** the system renders a `⚡ RESUMING` block before the plugin status lines
+- **AND** the block shows the handoff date and one-line snippet on the first line
+- **AND** the block shows the contents of the handoff's `## Next Steps` section
+  immediately below, rendered as described in "Resume mode — next steps rendering"
+- **AND** the normal `• Handoff:` line is omitted (replaced by the RESUMING block)
+- **AND** the `.pending-resume` file is NOT modified or deleted
+
+#### Scenario: Resume mode — next steps rendering
+
+- **WHEN** the RESUMING block is rendered
+- **THEN** the `  Next Steps:` label is printed indented two spaces from the
+  left margin, with no `##` heading markers and with a trailing colon
+- **AND** each content line from the `## Next Steps` section is printed indented
+  four spaces from the left margin
+- **AND** blank lines and lines starting with `<!--` within the section are skipped
+
+#### Scenario: Resume mode — next steps present
+
+- **WHEN** the handoff referenced by `.pending-resume` contains a `## Next Steps`
+  section with renderable content (non-blank, non-comment lines)
+- **THEN** the RESUMING block shows the `  Next Steps:` label followed by the items
+
+#### Scenario: Resume mode — no next steps section
+
+- **WHEN** the handoff referenced by `.pending-resume` does not contain a
+  `## Next Steps` section, or the section contains only blank lines and HTML
+  comments
+- **THEN** the RESUMING block shows only the `⚡ RESUMING: {date} — '{snippet}'`
+  header line with no indented items
+
+#### Scenario: Signal not consumed by prime
+
+- **WHEN** user runs `wai prime` and a RESUMING block is rendered
+- **THEN** the `.pending-resume` file is NOT modified or deleted
+- **AND** a subsequent `wai prime` call in the same session renders the same
+  RESUMING block again
+
+#### Scenario: Stale signal — not today's handoff
+
+- **WHEN** user runs `wai prime`
+- **AND** `.wai/projects/<project>/.pending-resume` exists
+- **AND** the referenced handoff's frontmatter `date` is before today, or the
+  date field is missing or unparseable
+- **THEN** the system ignores the signal entirely
+- **AND** renders the normal `• Handoff:` line using the latest handoff
+
+#### Scenario: Missing handoff — signal ignored
+
+- **WHEN** user runs `wai prime`
+- **AND** `.pending-resume` exists but the referenced file does not exist on disk
+- **THEN** the system ignores the signal
+- **AND** renders the normal `• Handoff:` line (or omits the line if no handoffs
+  exist at all)
 

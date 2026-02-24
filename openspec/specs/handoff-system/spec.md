@@ -38,7 +38,8 @@ This spec covers the handoff artifact format, generation command, and plugin int
 
 ### Requirement: Handoff Format
 
-Handoffs SHALL be markdown files with structured frontmatter.
+Handoffs SHALL be markdown files with structured frontmatter, including dedicated
+sections for operational nuances that serve as high-signal input to `wai reflect`.
 
 #### Scenario: Handoff file structure
 
@@ -59,6 +60,12 @@ Handoffs SHALL be markdown files with structured frontmatter.
 
   ## Key Decisions
   <!-- Decisions made and rationale -->
+
+  ## Gotchas & Surprises
+  <!-- What behaved unexpectedly? Non-obvious requirements? Hidden dependencies? -->
+
+  ## What Took Longer Than Expected
+  <!-- Steps that needed multiple attempts. Commands that failed before the right one. -->
 
   ## Open Questions
   <!-- Unresolved questions -->
@@ -97,3 +104,23 @@ Handoffs SHALL be stored in the project's handoffs directory with date prefixes.
 - **WHEN** a handoff is created for project "my-app"
 - **THEN** it is stored at `.wai/projects/my-app/handoffs/YYYY-MM-DD-session-end.md`
 - **AND** multiple handoffs per day are differentiated by suffix
+## Requirements
+### Requirement: Pending-Resume Signal
+
+`wai close` SHALL write a `.pending-resume` file to the project directory after
+every successful handoff creation, enabling `wai prime` to detect resume context
+without requiring the user to manually open the handoff.
+
+#### Scenario: Signal written on close
+
+- **WHEN** `wai close` successfully creates a handoff
+- **THEN** the system writes `.wai/projects/<project>/.pending-resume`
+- **AND** the file contains the path to the new handoff, relative to the project
+  directory (e.g. `handoffs/2026-02-24-session-end.md`)
+
+#### Scenario: Signal overwritten on repeated close
+
+- **WHEN** user runs `wai close` more than once (same day or different days)
+- **THEN** the `.pending-resume` file is overwritten with the path of the newest
+  handoff
+
