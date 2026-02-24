@@ -37,18 +37,44 @@ pub fn run(project: Option<String>) -> Result<()> {
         phase
     );
 
-    // Handoff
-    if let Some(handoff_path) = find_latest_handoff(&project_root, &project_name)? {
-        let (date, snippet) = read_handoff_summary(&handoff_path);
-        if !snippet.is_empty() {
-            println!(
-                "{} Handoff: {} — '{}'",
-                "•".dimmed(),
-                date,
-                snippet
-            );
+    // Resume detection: check for .pending-resume signal from wai close
+    let today_naive = Local::now().date_naive();
+    let resume_info = read_pending_resume(&proj_dir).and_then(|hp| {
+        // Parse date strictly: None if frontmatter absent or date malformed (→ treated as stale)
+        let date = parse_handoff_date_strict(&hp)?;
+        if date != today_naive {
+            return None; // stale signal
         }
-        // If snippet is empty, it means missing/invalid frontmatter → skip the line
+        let (_, snippet) = read_handoff_summary(&hp);
+        if snippet.is_empty() {
+            return None;
+        }
+        Some((hp, date, snippet))
+    });
+
+    if let Some((handoff_path, date, snippet)) = resume_info {
+        println!("⚡ RESUMING: {} — '{}'", date.format("%Y-%m-%d"), snippet);
+        let steps = extract_next_steps(&handoff_path);
+        if !steps.is_empty() {
+            println!("  Next Steps:");
+            for step in &steps {
+                println!("    {}", step);
+            }
+        }
+    } else {
+        // Handoff (normal path)
+        if let Some(handoff_path) = find_latest_handoff(&project_root, &project_name)? {
+            let (date, snippet) = read_handoff_summary(&handoff_path);
+            if !snippet.is_empty() {
+                println!(
+                    "{} Handoff: {} — '{}'",
+                    "•".dimmed(),
+                    date,
+                    snippet
+                );
+            }
+            // If snippet is empty, it means missing/invalid frontmatter → skip the line
+        }
     }
 
     // Plugin summaries (beads, openspec)
@@ -86,6 +112,66 @@ pub fn run(project: Option<String>) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Parse the `date:` field from a handoff's frontmatter, returning `None` if
+/// frontmatter is absent, the date field is missing, or parsing fails.
+fn parse_handoff_date_strict(path: &Path) -> Option<NaiveDate> {
+    let content = std::fs::read_to_string(path).ok()?;
+    let body = content.trim_start();
+    if !body.starts_with("---") {
+        return None;
+    }
+    let after = &body[3..];
+    let close = after.find("\n---")?;
+    after[..close].lines().find_map(|line| {
+        line.trim()
+            .strip_prefix("date:")
+            .and_then(|v| NaiveDate::parse_from_str(v.trim(), "%Y-%m-%d").ok())
+    })
+}
+
+/// Read `.pending-resume` and resolve the handoff path it points to.
+///
+/// Returns `None` if the file is absent, the path is invalid, or the target
+/// handoff file does not exist on disk.
+pub fn read_pending_resume(project_dir: &Path) -> Option<PathBuf> {
+    let content = std::fs::read_to_string(project_dir.join(".pending-resume")).ok()?;
+    let relative = content.trim();
+    if relative.is_empty() {
+        return None;
+    }
+    let resolved = project_dir.join(relative);
+    if resolved.exists() { Some(resolved) } else { None }
+}
+
+/// Extract lines from the `## Next Steps` section of a handoff file.
+///
+/// Collects lines from after the heading until the next `##` heading or EOF.
+/// Skips blank lines and lines starting with `<!--`.
+pub fn extract_next_steps(handoff_path: &Path) -> Vec<String> {
+    let Ok(content) = std::fs::read_to_string(handoff_path) else {
+        return Vec::new();
+    };
+    let mut in_section = false;
+    let mut items = Vec::new();
+    for line in content.lines() {
+        if line.starts_with("## Next Steps") {
+            in_section = true;
+            continue;
+        }
+        if in_section {
+            if line.starts_with("## ") {
+                break;
+            }
+            let trimmed = line.trim();
+            if trimmed.is_empty() || trimmed.starts_with("<!--") {
+                continue;
+            }
+            items.push(line.to_string());
+        }
+    }
+    items
 }
 
 /// Find the most recent handoff file for a project (sorted descending by filename).

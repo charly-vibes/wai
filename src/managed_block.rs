@@ -150,7 +150,22 @@ pub fn wai_block_content(detected_plugins: &[&str]) -> String {
     }
     block.push_str(
         "[ ] git add <files> && git commit  # commit code + handoff\n\
-         ```\n",
+         ```\n\
+         \n\
+         ### Autonomous Loop\n\
+         \n\
+         One task per session. The resume loop:\n\
+         \n\
+         1. `wai prime` — orient (shows ⚡ RESUMING if mid-task)\n\
+         2. Work on the single task\n\
+         3. `wai close` — capture state (run this before every `/clear`)\n\
+         4. `git add <files> && git commit`\n\
+         5. `/clear` — fresh context\n\
+         \n\
+         → Next session: `wai prime` shows RESUMING with exact next steps.\n\
+         \n\
+         When context reaches ~40%: run `wai close`, then `/clear`.\n\
+         Do NOT skip `wai close` — it enables resume detection.\n",
     );
 
     // Quick Reference

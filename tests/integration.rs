@@ -1,4 +1,5 @@
 use assert_cmd::Command;
+use chrono::Local;
 use predicates::prelude::*;
 use std::fs;
 use tempfile::TempDir;
@@ -3427,6 +3428,68 @@ fn close_repeated_same_day_increments_suffix() {
     );
 }
 
+#[test]
+fn close_writes_pending_resume_signal() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproject");
+
+    wai_cmd(tmp.path())
+        .args(["close", "--project", "myproject"])
+        .assert()
+        .success();
+
+    let proj_dir = tmp.path().join(".wai/projects/myproject");
+    let signal = proj_dir.join(".pending-resume");
+    assert!(signal.exists(), ".pending-resume should be written after close");
+
+    let content = fs::read_to_string(&signal).unwrap();
+    let relative = content.trim();
+    // Should point to a file under handoffs/
+    assert!(
+        relative.starts_with("handoffs/"),
+        ".pending-resume should contain a handoffs/ relative path, got: {relative}"
+    );
+    // The referenced file should actually exist
+    assert!(
+        proj_dir.join(relative).exists(),
+        "handoff referenced by .pending-resume should exist at {relative}"
+    );
+}
+
+#[test]
+fn close_overwrites_pending_resume_on_second_call() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproject");
+
+    wai_cmd(tmp.path())
+        .args(["close", "--project", "myproject"])
+        .assert()
+        .success();
+
+    let proj_dir = tmp.path().join(".wai/projects/myproject");
+    let first = fs::read_to_string(proj_dir.join(".pending-resume")).unwrap();
+
+    // Second close on the same day produces a suffixed file
+    wai_cmd(tmp.path())
+        .args(["close", "--project", "myproject"])
+        .assert()
+        .success();
+
+    let second = fs::read_to_string(proj_dir.join(".pending-resume")).unwrap();
+    assert_ne!(
+        first.trim(),
+        second.trim(),
+        ".pending-resume should be overwritten with the newest handoff path"
+    );
+    // The new path should exist
+    assert!(
+        proj_dir.join(second.trim()).exists(),
+        "second .pending-resume path should exist"
+    );
+}
+
 // ─── wai prime ───────────────────────────────────────────────────────────────
 
 /// Helper: write a handoff file directly into a project's handoffs directory.
@@ -3560,6 +3623,202 @@ fn prime_outside_workspace_fails() {
         .assert()
         .failure()
         .stderr(predicate::str::contains("wai init"));
+}
+
+/// Helper: write a `.pending-resume` file pointing to a handoff in the project dir.
+fn write_pending_resume(dir: &std::path::Path, project: &str, handoff_relative: &str) {
+    let proj_dir = dir.join(".wai/projects").join(project);
+    fs::write(proj_dir.join(".pending-resume"), handoff_relative).unwrap();
+}
+
+#[test]
+fn prime_shows_resuming_block_when_pending_resume_present_today() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproject");
+
+    let today = Local::now().format("%Y-%m-%d").to_string();
+    let filename = format!("{today}-session-end.md");
+    let content = format!(
+        "---\ndate: {today}\nproject: myproject\nphase: implement\n---\n\n\
+         Implementing the state machine.\n\n\
+         ## Next Steps\n\n\
+         1. Finish src/state.rs\n\
+         2. Write tests\n"
+    );
+    write_handoff(tmp.path(), "myproject", &filename, &content);
+    write_pending_resume(tmp.path(), "myproject", &format!("handoffs/{filename}"));
+
+    let stdout = wai_cmd(tmp.path())
+        .args(["prime", "--project", "myproject", "--no-input"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let out = String::from_utf8(stdout).unwrap();
+
+    assert!(out.contains("RESUMING"), "expected RESUMING in output: {out}");
+    assert!(out.contains("Next Steps:"), "expected Next Steps: in output: {out}");
+    assert!(out.contains("Finish src/state.rs"), "expected step 1 in output: {out}");
+    assert!(!out.contains("• Handoff:"), "normal Handoff: line should be suppressed: {out}");
+}
+
+#[test]
+fn prime_resuming_signal_not_consumed_on_second_call() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproject");
+
+    let today = Local::now().format("%Y-%m-%d").to_string();
+    let filename = format!("{today}-session-end.md");
+    let content = format!(
+        "---\ndate: {today}\nproject: myproject\nphase: implement\n---\n\nDoing work.\n\n## Next Steps\n\n1. Next thing\n"
+    );
+    write_handoff(tmp.path(), "myproject", &filename, &content);
+    write_pending_resume(tmp.path(), "myproject", &format!("handoffs/{filename}"));
+
+    // First call
+    wai_cmd(tmp.path())
+        .args(["prime", "--project", "myproject", "--no-input"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("RESUMING"));
+
+    // Second call — signal must not have been deleted
+    wai_cmd(tmp.path())
+        .args(["prime", "--project", "myproject", "--no-input"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("RESUMING"));
+}
+
+#[test]
+fn prime_ignores_stale_pending_resume_dated_yesterday() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproject");
+
+    // Handoff with yesterday's date
+    let yesterday = (Local::now() - chrono::Duration::days(1))
+        .format("%Y-%m-%d")
+        .to_string();
+    let filename = format!("{yesterday}-session-end.md");
+    let content = format!(
+        "---\ndate: {yesterday}\nproject: myproject\nphase: implement\n---\n\nOld work.\n\n## Next Steps\n\n1. Old step\n"
+    );
+    write_handoff(tmp.path(), "myproject", &filename, &content);
+    write_pending_resume(tmp.path(), "myproject", &format!("handoffs/{filename}"));
+
+    wai_cmd(tmp.path())
+        .args(["prime", "--project", "myproject", "--no-input"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("RESUMING").not())
+        .stdout(predicate::str::contains("Handoff:"));
+}
+
+#[test]
+fn prime_renders_normally_without_pending_resume() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproject");
+
+    // A normal handoff from yesterday — no .pending-resume
+    write_handoff(
+        tmp.path(),
+        "myproject",
+        "2026-02-23-session-end.md",
+        "---\ndate: 2026-02-23\nproject: myproject\nphase: research\n---\n\nCompleted research.\n",
+    );
+
+    wai_cmd(tmp.path())
+        .args(["prime", "--project", "myproject", "--no-input"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("RESUMING").not())
+        .stdout(predicate::str::contains("Handoff: 2026-02-23"));
+}
+
+#[test]
+fn prime_resuming_empty_next_steps_shows_only_header() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproject");
+
+    let today = Local::now().format("%Y-%m-%d").to_string();
+    let filename = format!("{today}-session-end.md");
+    // ## Next Steps section exists but only has HTML comments
+    let content = format!(
+        "---\ndate: {today}\nproject: myproject\nphase: implement\n---\n\nDoing work.\n\n\
+         ## Next Steps\n\n<!-- TODO: fill this in -->\n"
+    );
+    write_handoff(tmp.path(), "myproject", &filename, &content);
+    write_pending_resume(tmp.path(), "myproject", &format!("handoffs/{filename}"));
+
+    let stdout = wai_cmd(tmp.path())
+        .args(["prime", "--project", "myproject", "--no-input"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let out = String::from_utf8(stdout).unwrap();
+
+    assert!(out.contains("RESUMING"), "expected RESUMING header: {out}");
+    assert!(!out.contains("Next Steps:"), "no Next Steps: label when section is empty: {out}");
+}
+
+#[test]
+fn prime_close_prime_close_prime_end_to_end_resume_loop() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproject");
+
+    // First close
+    wai_cmd(tmp.path())
+        .args(["close", "--project", "myproject"])
+        .assert()
+        .success();
+
+    let proj_dir = tmp.path().join(".wai/projects/myproject");
+    let signal1 = fs::read_to_string(proj_dir.join(".pending-resume")).unwrap();
+    assert!(!signal1.trim().is_empty(), ".pending-resume written after first close");
+
+    // prime should show RESUMING (handoff dated today by wai close)
+    let out1 = wai_cmd(tmp.path())
+        .args(["prime", "--project", "myproject", "--no-input"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    assert!(
+        String::from_utf8(out1).unwrap().contains("RESUMING"),
+        "first prime after close should show RESUMING"
+    );
+
+    // Second close
+    wai_cmd(tmp.path())
+        .args(["close", "--project", "myproject"])
+        .assert()
+        .success();
+
+    let signal2 = fs::read_to_string(proj_dir.join(".pending-resume")).unwrap();
+    assert_ne!(signal1.trim(), signal2.trim(), "second close should overwrite .pending-resume");
+
+    // second prime should show RESUMING pointing to the new handoff
+    let out2 = wai_cmd(tmp.path())
+        .args(["prime", "--project", "myproject", "--no-input"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    assert!(
+        String::from_utf8(out2).unwrap().contains("RESUMING"),
+        "second prime after close should still show RESUMING"
+    );
 }
 
 // ─── wai ls ──────────────────────────────────────────────────────────────────

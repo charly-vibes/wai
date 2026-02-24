@@ -85,6 +85,21 @@ Before saying "done", run this checklist:
 [ ] git add <files> && git commit  # commit code + handoff
 ```
 
+### Autonomous Loop
+
+One task per session. The resume loop:
+
+1. `wai prime` — orient (shows ⚡ RESUMING if mid-task)
+2. Work on the single task
+3. `wai close` — capture state (run this before every `/clear`)
+4. `git add <files> && git commit`
+5. `/clear` — fresh context
+
+→ Next session: `wai prime` shows RESUMING with exact next steps.
+
+When context reaches ~40%: run `wai close`, then `/clear`.
+Do NOT skip `wai close` — it enables resume detection.
+
 ## Quick Reference
 
 ### wai

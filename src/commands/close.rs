@@ -17,6 +17,12 @@ pub fn run(project: Option<String>) -> Result<()> {
 
     let handoff_path = create_handoff(&project_root, &project_name)?;
 
+    // Write .pending-resume signal so wai prime can detect a mid-task resume
+    let proj_dir = projects_dir(&project_root).join(&project_name);
+    if let Ok(relative) = handoff_path.strip_prefix(&proj_dir) {
+        let _ = std::fs::write(proj_dir.join(".pending-resume"), relative.to_string_lossy().as_bytes());
+    }
+
     // Display relative path from project root
     let display_path = handoff_path
         .strip_prefix(&project_root)
