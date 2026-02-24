@@ -273,22 +273,31 @@ pub fn render_main_help(verbose: u8) -> String {
     out.push_str("  wai phase next              Advance project phase\n");
     out.push('\n');
 
+    // COMMANDS: keep in alphabetical order
     out.push_str("COMMANDS:\n");
-    out.push_str("  new       Create a new project, area, or resource\n");
     out.push_str("  add       Add artifacts (research, plans, designs) to a project\n");
-    out.push_str("  show      Show information about items\n");
-    out.push_str("  move      Move items between PARA categories\n");
-    out.push_str("  init      Initialize wai in the current directory\n");
-    out.push_str("  status    Check project status and suggest next steps\n");
-    out.push_str("  phase     Show or change the current project phase\n");
-    out.push_str("  sync      Sync agent configs to tool-specific locations\n");
+    out.push_str("  close     Wrap up a session and save handoff\n");
     out.push_str("  config    Manage agent configuration files\n");
-    out.push_str("  handoff   Generate handoff documents\n");
-    out.push_str("  search    Search across all artifacts\n");
-    out.push_str("  timeline  View chronological timeline of artifacts\n");
-    out.push_str("  plugin    Manage plugins\n");
     out.push_str("  doctor    Diagnose workspace health\n");
+    out.push_str("  handoff   Generate handoff documents\n");
     out.push_str("  import    Import existing tool configurations\n");
+    out.push_str("  init      Initialize wai in the current directory\n");
+    out.push_str("  ls        List all wai projects across workspaces\n");
+    out.push_str("  move      Move items between PARA categories\n");
+    out.push_str("  new       Create a new project, area, or resource\n");
+    out.push_str("  phase     Show or change the current project phase\n");
+    out.push_str("  plugin    Manage plugins\n");
+    out.push_str("  prime     Orient yourself at session start\n");
+    out.push_str("  reflect   Synthesize session context into AI guidance\n");
+    out.push_str("  resource  Manage resources (skills, rules, context)\n");
+    out.push_str("  search    Search across all artifacts\n");
+    out.push_str("  show      Show information about items\n");
+    out.push_str("  status    Check project status and suggest next steps\n");
+    out.push_str("  sync      Sync agent configs to tool-specific locations\n");
+    out.push_str("  timeline  View chronological timeline of artifacts\n");
+    out.push_str("  tutorial  Run the interactive quickstart tutorial\n");
+    out.push_str("  way       Check repository best practices\n");
+    out.push_str("  why       Ask why a decision was made (LLM-powered)\n");
     out.push('\n');
 
     out.push_str("OPTIONS:\n");

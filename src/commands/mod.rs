@@ -172,6 +172,7 @@ fn show_welcome() -> Result<()> {
             "  {} wai tutorial       Run the quickstart tutorial",
             "→".cyan()
         );
+        println!("  {} wai way            Check repo best practices", "→".cyan());
         println!("  {} wai --help         Show all commands", "→".cyan());
 
         if is_first_run {
@@ -190,6 +191,7 @@ fn show_welcome() -> Result<()> {
             "→".cyan()
         );
         println!("  {} wai new project    Create a new project", "→".cyan());
+        println!("  {} wai way            Check repo best practices", "→".cyan());
         println!("  {} Run 'wai --help' for detailed usage", "•".dimmed());
     }
 
