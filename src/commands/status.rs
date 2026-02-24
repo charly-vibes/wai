@@ -87,19 +87,51 @@ pub fn run(verbose: u8) -> Result<()> {
 
     // Run on_status hooks for enrichment
     let hook_outputs = plugin::run_hooks(&project_root, "on_status");
-    if !hook_outputs.is_empty() {
+
+    // OpenSpec status — computed here for both Plugin Info summary and the detail section
+    let spec_status = openspec::read_status(&project_root);
+
+    let has_plugin_info = !hook_outputs.is_empty()
+        || spec_status
+            .as_ref()
+            .map_or(false, |s| !s.changes.is_empty());
+
+    if has_plugin_info {
         println!();
         println!("  {} Plugin Info", "◆".cyan());
         for output in &hook_outputs {
+            if output.label == "beads_stats" {
+                if let Some(summary) = beads_summary(&output.content) {
+                    println!("    {} beads: {}", "•".dimmed(), summary);
+                    continue;
+                }
+            }
             println!("    {} {}:", "•".dimmed(), output.label.bold());
             for line in output.content.lines().take(5) {
                 println!("      {}", line.dimmed());
             }
         }
+        if let Some(ref spec) = spec_status {
+            for change in &spec.changes {
+                let pct = if change.total > 0 {
+                    change.done * 100 / change.total
+                } else {
+                    0
+                };
+                println!(
+                    "    {} {}: {}/{} ({}%)",
+                    "•".dimmed(),
+                    change.name,
+                    change.done,
+                    change.total,
+                    pct
+                );
+            }
+        }
     }
 
-    // OpenSpec status
-    if let Some(spec_status) = openspec::read_status(&project_root) {
+    // OpenSpec status — detailed section
+    if let Some(ref spec_status) = spec_status {
         println!();
         println!("  {} OpenSpec", "◆".cyan());
 
@@ -310,5 +342,24 @@ fn format_phase(phase: Phase) -> String {
         Phase::Implement => "implement".green().to_string(),
         Phase::Review => "review".cyan().to_string(),
         Phase::Archive => "archive".dimmed().to_string(),
+    }
+}
+
+/// Parse `bd stats` output and return a compact one-liner like "3 open issues (2 ready)".
+fn beads_summary(content: &str) -> Option<String> {
+    let mut open: Option<u64> = None;
+    let mut ready: Option<u64> = None;
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if let Some(val) = trimmed.strip_prefix("Open:") {
+            open = val.trim().parse().ok();
+        } else if let Some(val) = trimmed.strip_prefix("Ready to Work:") {
+            ready = val.trim().parse().ok();
+        }
+    }
+    if let (Some(o), Some(r)) = (open, ready) {
+        Some(format!("{} open issues ({} ready)", o, r))
+    } else {
+        None
     }
 }
