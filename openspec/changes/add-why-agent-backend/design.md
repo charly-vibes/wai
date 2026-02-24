@@ -64,7 +64,7 @@ fn in_agent_session() -> bool {
 **Format**:
 ```
   ◆ wai why — agent mode
-  ○ Context prepared for your agent: 4 artifacts, git history
+  ○ Context prepared: 4 artifacts, git history for src/config.rs
 
 [AGENT CONTEXT]
 You are an oracle helping understand why code and decisions exist as they do.
@@ -83,11 +83,11 @@ why was TOML chosen?
 
 ## Decision 4: `complete()` Contract for Agent Mode
 
-**What**: The `LlmClient` trait gains a new optional method `is_agent_mode() -> bool` (default: `false`). `AgentBackend::complete()` prints the prompt to stdout and returns `Ok(AGENT_SENTINEL)`. The `run()` function in `why.rs` detects the sentinel and skips normal response formatting.
+**What**: `AgentBackend::complete()` prints the context block to stdout and returns `Ok(AGENT_SENTINEL)`. The `run()` function in `why.rs` detects the sentinel and skips normal response formatting. No new trait method is added.
 
-**Why not a new trait method for the whole flow**: Keeping `complete()` in the loop (even if it just prints) means the existing error handling and backend-selection code in `run()` stays unchanged. Only the output formatting branch diverges.
+**Why keeping `complete()` in the loop**: Existing error handling and backend-selection code in `run()` stays unchanged. Only the output formatting branch diverges on the sentinel value.
 
-**Alternative considered**: Have `run()` check `backend.is_agent_mode()` before calling `complete()` and skip the call entirely. Rejected: separating "write context to stdout" from `complete()` would require a new method on the trait, complicating the abstraction.
+**Alternative considered**: Have `run()` check an `is_agent_mode()` trait method before calling `complete()` and skip the call entirely. Rejected: separating "write context to stdout" from `complete()` would require a new method on the trait, complicating the abstraction with no benefit.
 
 ## Decision 5: claude-cli Constraint (Inside vs Outside)
 
@@ -109,3 +109,4 @@ why was TOML chosen?
 | Agent ignores the context block and doesn't answer | Low | The context is clearly formatted; agents naturally respond to Bash output |
 | Human user confused by context dump in terminal | Medium | Clear header explains what happened; answer follows in the conversation |
 | Context too large for agent's context window | Low | Same truncation logic applies as for other backends |
+| Explicit `llm = "agent"` set outside a Claude Code session | Low | System warns and exits 0; user sees the context dump but gets no synthesized answer |

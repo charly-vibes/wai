@@ -257,6 +257,52 @@ pub enum Commands {
         json: bool,
     },
 
+    /// Synthesize session context into project-specific AI guidance
+    #[command(
+        about = "Synthesize session context into project-specific AI guidance",
+        long_about = "Reads accumulated session context (handoffs, research, optional conversation\n\
+            transcript) and asks an LLM to extract project-specific conventions, gotchas,\n\
+            and patterns that AI assistants should know. Injects the result into CLAUDE.md\n\
+            and/or AGENTS.md as a persistent WAI:REFLECT block.\n\n\
+            USAGE\n\
+              wai reflect                        Auto-detect project and output targets\n\
+              wai reflect --conversation chat.md Include conversation transcript as richest input\n\
+              wai reflect --output agents.md     Write only to AGENTS.md\n\
+              wai reflect --dry-run              Show what would change without writing\n\
+              wai reflect --yes                  Skip confirmation prompt\n\n\
+            OUTPUT TARGETS\n\
+              claude.md  — Write to CLAUDE.md only\n\
+              agents.md  — Write to AGENTS.md only\n\
+              both       — Write to both CLAUDE.md and AGENTS.md\n\
+              (default: whichever target files already exist in the repo root)\n\n\
+            CONTEXT SOURCES (ranked by richness)\n\
+              1. Conversation transcript (--conversation <file>) — raw session detail\n\
+              2. Handoff artifacts — session summaries and next steps\n\
+              3. Research/design/plan artifacts — curated decisions\n\n\
+            Reuses the [why] LLM config from .wai/config.toml — no separate setup."
+    )]
+    Reflect {
+        /// Project name (auto-detected when only one project exists)
+        #[arg(short, long)]
+        project: Option<String>,
+
+        /// Path to a plain-text conversation transcript (highest-priority context)
+        #[arg(short, long, value_name = "FILE")]
+        conversation: Option<PathBuf>,
+
+        /// Output target: claude.md, agents.md, or both (default: auto-detect)
+        #[arg(short, long, value_name = "TARGET")]
+        output: Option<String>,
+
+        /// Show what would change without writing
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Skip the confirmation prompt and write directly
+        #[arg(short, long)]
+        yes: bool,
+    },
+
     /// Pass-through to plugin commands (e.g., wai beads list)
     #[command(external_subcommand)]
     External(Vec<String>),

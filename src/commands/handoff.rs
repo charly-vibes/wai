@@ -80,6 +80,10 @@ pub fn create_handoff(project_root: &Path, project: &str) -> Result<PathBuf> {
          <!-- Summary of completed work -->\n\n\
          ## Key Decisions\n\n\
          <!-- Decisions made and rationale -->\n\n\
+         ## Gotchas & Surprises\n\n\
+         <!-- What behaved unexpectedly? Non-obvious requirements? Hidden dependencies? -->\n\n\
+         ## What Took Longer Than Expected\n\n\
+         <!-- Steps that needed multiple attempts. Commands that failed before the right one. -->\n\n\
          ## Open Questions\n\n\
          <!-- Unresolved questions -->\n\n\
          ## Next Steps\n\n\

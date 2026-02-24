@@ -26,6 +26,7 @@ mod show;
 mod status;
 mod sync;
 mod timeline;
+mod reflect;
 mod way;
 mod why;
 
@@ -72,6 +73,13 @@ pub fn run(cli: Cli) -> Result<()> {
             no_llm,
             json,
         }) => why::run(query, no_llm, json, cli.verbose),
+        Some(Commands::Reflect {
+            project,
+            conversation,
+            output,
+            dry_run,
+            yes,
+        }) => reflect::run(project, conversation, output, dry_run, yes, cli.verbose),
         Some(Commands::External(args)) => run_external(args),
         None => show_welcome(),
     }
@@ -203,7 +211,7 @@ fn run_external(args: Vec<String>) -> Result<()> {
     let valid_commands = &[
         "new", "add", "show", "move", "init", "status", "phase", "sync", "config", "handoff",
         "search", "timeline", "plugin", "doctor", "way", "why", "import", "resource", "tutorial",
-        "close", "prime", "ls",
+        "close", "prime", "ls", "reflect",
     ];
     // Valid (verb, noun) subcommand patterns for wrong-order detection
     let valid_patterns = &[

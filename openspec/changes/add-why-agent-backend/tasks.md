@@ -45,31 +45,33 @@
   <prompt>
   [/AGENT CONTEXT]
   ```
-- [ ] 5.2 Status line counts artifacts from the prompt (or take `GatheredContext` as param — see note)
+- [ ] 5.2 Status line format: `○ Context prepared: N artifacts[, git history for <file>]` — derive artifact count from the prompt if feasible; MAY omit count if not directly available (spec allows omission)
 - [ ] 5.3 Unit test: output includes `[AGENT CONTEXT]` and `[/AGENT CONTEXT]` delimiters
 - [ ] 5.4 Unit test: output includes the prompt content between delimiters
 
-**Note**: `complete(prompt: &str)` receives the already-built prompt string. Artifact count is not directly available; either parse it from the prompt or restructure to pass `&GatheredContext` to agent mode separately. Prefer the simpler approach: derive count from the prompt or omit it from the status line.
-
 ## Phase 6: Privacy Notice
 
-- [ ] 6.1 Add `"Agent"` to `is_external_backend()` in `why.rs` (already done — confirm)
-- [ ] 6.2 Verify privacy notice is shown on first agent-mode use and suppressed thereafter
-- [ ] 6.3 Integration test: agent mode with `privacy_notice_shown = false` → notice shown
+- [ ] 6.1 Add `"Agent"` to `is_external_backend()` in `why.rs`
+- [ ] 6.2 Verify privacy notice is emitted BEFORE the `[AGENT CONTEXT]` block, never interleaved within it
+- [ ] 6.3 Verify privacy notice is shown on first agent-mode use and suppressed thereafter (shared `privacy_notice_shown` flag with Claude API backend)
+- [ ] 6.4 Integration test: agent mode with `privacy_notice_shown = false` → notice shown before context block
 
 ## Phase 7: Fallback Message Update
 
-- [ ] 7.1 When falling back to search inside a Claude Code session, update warning to mention agent mode
-- [ ] 7.2 Unit test: fallback message inside CLAUDECODE session mentions agent mode
+**Scope note**: The auto-detect fallback inside a Claude Code session is unreachable when agent mode is operating correctly (agent is always available when `CLAUDECODE` is set). These tasks apply only to the explicit-config path, where the user has set `[why] llm = "claude"` or `[why] llm = "ollama"` and that backend fails.
+
+- [ ] 7.1 When explicit backend config fails and system falls back to search inside a Claude Code session, update warning to mention agent mode as an alternative
+- [ ] 7.2 Unit test: explicit backend failure + `CLAUDECODE` set → fallback message mentions agent mode
 
 ## Phase 8: Integration Tests
 
 - [ ] 8.1 Integration test: `CLAUDECODE=1`, no API key → wai why prints `[AGENT CONTEXT]` block to stdout, exits 0
-- [ ] 8.2 Integration test: `CLAUDECODE=` (empty), no API key, no claude binary → falls back to search (claude-cli not selected)
+- [ ] 8.2 Integration test: `CLAUDECODE` unset, no API key, no claude binary → falls back to search (neither agent nor claude-cli selected)
 - [ ] 8.3 Integration test: explicit `[why] llm = "agent"` → agent mode regardless of CLAUDECODE
 
-## Phase 9: Documentation
+## Phase 9: Documentation and Validation
 
 - [ ] 9.1 Update `wai why --help` to document `agent` as a valid `llm` config value
 - [ ] 9.2 Add `claude-cli` to `wai why --help` config documentation
 - [ ] 9.3 Add detection priority note to help text (inside vs outside Claude Code sessions)
+- [ ] 9.4 Run `openspec validate add-why-agent-backend --strict` and confirm zero errors

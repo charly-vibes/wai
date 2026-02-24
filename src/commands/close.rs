@@ -7,6 +7,7 @@ use crate::error::WaiError;
 use crate::plugin;
 
 use super::handoff::create_handoff;
+use super::reflect::{count_handoffs_since, read_reflect_meta};
 use super::require_project;
 
 pub fn run(project: Option<String>) -> Result<()> {
@@ -67,6 +68,31 @@ pub fn run(project: Option<String>) -> Result<()> {
         git_add_part
     };
     println!("→ Next: {}", next_steps);
+
+    // 5.1–5.3: Reflect nudge — show if 5+ handoffs since last reflect.
+    let context = current_context();
+    if !context.json {
+        let proj_dir = projects_dir(&project_root).join(&project_name);
+        let handoffs_dir = proj_dir.join("handoffs");
+        let meta = read_reflect_meta(&proj_dir).unwrap_or(None);
+        let last_reflected = meta.as_ref().map(|m| m.last_reflected.as_str()).unwrap_or("");
+        let session_count = count_handoffs_since(&handoffs_dir, last_reflected);
+        if session_count >= 5 {
+            // Determine which target files exist.
+            let has_claude = project_root.join("CLAUDE.md").exists();
+            let has_agents = project_root.join("AGENTS.md").exists();
+            let target_hint = match (has_claude, has_agents) {
+                (true, true) => "CLAUDE.md and AGENTS.md",
+                (true, false) => "CLAUDE.md",
+                (false, true) => "AGENTS.md",
+                (false, false) => "CLAUDE.md",
+            };
+            println!(
+                "→ {} sessions since last reflect — run `wai reflect` to update {}",
+                session_count, target_hint
+            );
+        }
+    }
 
     Ok(())
 }

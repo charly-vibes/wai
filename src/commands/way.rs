@@ -297,15 +297,25 @@ fn check_documentation(repo_root: &Path) -> CheckResult {
 }
 
 fn check_ai_instructions(repo_root: &Path) -> CheckResult {
+    use crate::managed_block::has_reflect_block;
+
     let claude_md = repo_root.join("CLAUDE.md");
     let agents_md = repo_root.join("AGENTS.md");
 
     if claude_md.exists() {
+        let has_reflect = has_reflect_block(&claude_md);
+        let suggestion = if !has_reflect {
+            Some(
+                "No WAI:REFLECT block found — run `wai reflect` to synthesize project-specific AI guidance into CLAUDE.md".to_string(),
+            )
+        } else {
+            None
+        };
         CheckResult {
             name: "AI instructions".to_string(),
             status: Status::Pass,
             message: "CLAUDE.md detected (recommended for Claude Code)".to_string(),
-            suggestion: None,
+            suggestion,
         }
     } else if agents_md.exists() {
         CheckResult {

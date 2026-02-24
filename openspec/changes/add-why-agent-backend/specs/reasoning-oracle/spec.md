@@ -55,6 +55,14 @@ The system SHALL support multiple LLM backends via configuration and context-awa
 - **THEN** the system uses agent mode regardless of the `CLAUDECODE` environment variable
 - **AND** outputs the prepared context block to stdout for the invoking agent to process
 
+#### Scenario: Force fallback
+
+- **WHEN** user runs `wai why <query> --no-llm`
+- **THEN** the system skips LLM entirely and uses `wai search` directly
+- **AND** displays results in search format
+
+## ADDED Requirements
+
 ### Requirement: Agent Backend
 
 When running inside a Claude Code session, the system SHALL delegate reasoning to the invoking agent by outputting the prepared context to stdout rather than calling an external LLM.
@@ -72,7 +80,12 @@ When running inside a Claude Code session, the system SHALL delegate reasoning t
 - **WHEN** outputting context in agent mode
 - **THEN** the block uses the same prompt structure as other backends (role definition, user question, artifacts, git context, task instructions)
 - **AND** the block is delimited with `[AGENT CONTEXT]` and `[/AGENT CONTEXT]` tags
-- **AND** a status line precedes the block (e.g., `○ Context prepared: N artifacts`)
+- **AND** a status line precedes the block: `○ Context prepared: N artifacts[, git history for <file>]` (artifact count MAY be omitted if not directly available from the prompt string)
+
+#### Scenario: Privacy notice precedes context block
+
+- **WHEN** agent mode is used for the first time (privacy notice required)
+- **THEN** the privacy notice is printed BEFORE the `[AGENT CONTEXT]` block, never interleaved within it
 
 #### Scenario: Human user in a Claude Code terminal
 
@@ -90,12 +103,22 @@ When running inside a Claude Code session, the system SHALL delegate reasoning t
 - **AND** the agent uses the context to synthesize the answer in its next response
 - **AND** no additional tool calls or round-trips are required
 
+#### Scenario: Explicit agent mode outside a Claude Code session
+
+- **WHEN** `.wai/config.toml` contains `[why] llm = "agent"`
+- **AND** `CLAUDECODE` is unset or empty (not inside a Claude Code session)
+- **THEN** the system warns: "agent mode requires an active Claude Code session; no synthesized answer will be produced"
+- **AND** still outputs the context block (allowing manual inspection)
+- **AND** exits 0 — this is a misconfiguration warning, not a fatal error
+
 #### Scenario: Privacy notice for agent mode
 
 - **WHEN** agent mode is used for the first time
-- **AND** `privacy_notice_shown` is not set to `true` in config
-- **THEN** the system shows the standard one-time privacy notice
+- **AND** the shared `privacy_notice_shown` flag is not set to `true` in `.wai/config.toml`
+- **THEN** the system shows the standard one-time privacy notice (before the context block)
 - **AND** records acknowledgment in `.wai/config.toml`
+
+**Note**: Agent mode shares the `privacy_notice_shown` flag with other external backends (Claude API). Users who have already acknowledged the notice for Claude API will not see it again for agent mode.
 
 **Rationale**: Artifacts sent via agent mode still flow to Anthropic through the parent Claude Code session. The privacy implications are equivalent to the Claude API backend.
 

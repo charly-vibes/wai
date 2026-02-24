@@ -4004,3 +4004,177 @@ fn ls_invalid_root_fails_with_diagnostic() {
         .failure()
         .stderr(predicate::str::contains("/nonexistent-path-that-does-not-exist"));
 }
+
+// ─── wai reflect ─────────────────────────────────────────────────────────────
+
+/// Helper: initialize a workspace with a git repo and CLAUDE.md.
+fn reflect_workspace(dir: &std::path::Path) {
+    // Initialize git repo (required for wai init which may check git).
+    std::process::Command::new("git")
+        .args(["init", "-q"])
+        .current_dir(dir)
+        .output()
+        .ok();
+    std::process::Command::new("git")
+        .args(["commit", "--allow-empty", "-m", "init", "--no-gpg-sign"])
+        .current_dir(dir)
+        .output()
+        .ok();
+
+    init_workspace(dir);
+    create_project(dir, "test-proj");
+    fs::write(dir.join("CLAUDE.md"), "# Claude\n").unwrap();
+}
+
+const MOCK_REFLECT_CONTENT: &str = "\
+## Project-Specific AI Context\n\
+_Last reflected: 2026-02-24 · 1 sessions analyzed_\n\
+\n\
+### Conventions\n\
+- Use TDD always";
+
+#[test]
+fn reflect_with_mock_llm_writes_claude_md_and_reflect_meta() {
+    let tmp = TempDir::new().unwrap();
+    reflect_workspace(tmp.path());
+
+    // Write a research artifact so context gathering has something.
+    write_artifact(tmp.path(), "test-proj", "research", "r.md", "some research");
+
+    wai_cmd(tmp.path())
+        .args(["reflect", "--project", "test-proj", "--yes"])
+        .env("WAI_REFLECT_MOCK_RESPONSE", MOCK_REFLECT_CONTENT)
+        .env("NO_COLOR", "1")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("CLAUDE.md"));
+
+    // CLAUDE.md should contain a WAI:REFLECT block.
+    let claude_md = fs::read_to_string(tmp.path().join("CLAUDE.md")).unwrap();
+    assert!(claude_md.contains("<!-- WAI:REFLECT:START -->"));
+    assert!(claude_md.contains("Use TDD always"));
+
+    // .reflect-meta should be created.
+    let meta_path = tmp.path()
+        .join(".wai/projects/test-proj/.reflect-meta");
+    assert!(meta_path.exists(), ".reflect-meta should be created");
+}
+
+#[test]
+fn reflect_dry_run_does_not_modify_claude_md() {
+    let tmp = TempDir::new().unwrap();
+    reflect_workspace(tmp.path());
+
+    let original = fs::read_to_string(tmp.path().join("CLAUDE.md")).unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["reflect", "--project", "test-proj", "--dry-run"])
+        .env("WAI_REFLECT_MOCK_RESPONSE", MOCK_REFLECT_CONTENT)
+        .env("NO_COLOR", "1")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Dry run"));
+
+    let after = fs::read_to_string(tmp.path().join("CLAUDE.md")).unwrap();
+    assert_eq!(original, after, "CLAUDE.md must not change in dry-run");
+}
+
+#[test]
+fn reflect_empty_diff_skips_write() {
+    let tmp = TempDir::new().unwrap();
+    reflect_workspace(tmp.path());
+
+    // Pre-populate CLAUDE.md with exactly what the mock LLM will produce.
+    let existing = format!(
+        "# Claude\n\
+        <!-- WAI:REFLECT:START -->\n{}\n<!-- WAI:REFLECT:END -->\n",
+        MOCK_REFLECT_CONTENT
+    );
+    fs::write(tmp.path().join("CLAUDE.md"), &existing).unwrap();
+
+    // Target only claude.md so AGENTS.md (also created by init) doesn't interfere.
+    wai_cmd(tmp.path())
+        .args(["reflect", "--project", "test-proj", "--output", "claude.md", "--yes"])
+        .env("WAI_REFLECT_MOCK_RESPONSE", MOCK_REFLECT_CONTENT)
+        .env("NO_COLOR", "1")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("up to date"));
+
+    // CLAUDE.md should be unchanged.
+    let after = fs::read_to_string(tmp.path().join("CLAUDE.md")).unwrap();
+    assert_eq!(existing, after);
+}
+
+#[test]
+fn reflect_diff_shown_for_existing_reflect_block() {
+    let tmp = TempDir::new().unwrap();
+    reflect_workspace(tmp.path());
+
+    // Pre-populate with old content.
+    let old_block = "<!-- WAI:REFLECT:START -->\n## Old content\n<!-- WAI:REFLECT:END -->\n";
+    fs::write(tmp.path().join("CLAUDE.md"), format!("# Claude\n{}", old_block)).unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["reflect", "--project", "test-proj", "--dry-run"])
+        .env("WAI_REFLECT_MOCK_RESPONSE", MOCK_REFLECT_CONTENT)
+        .env("NO_COLOR", "1")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Dry run"));
+}
+
+#[test]
+fn close_nudge_fires_at_five_plus_handoffs() {
+    let tmp = TempDir::new().unwrap();
+    reflect_workspace(tmp.path());
+
+    let handoffs_dir = tmp.path().join(".wai/projects/test-proj/handoffs");
+    fs::create_dir_all(&handoffs_dir).unwrap();
+
+    // Write 5 handoff files.
+    for i in 1..=5 {
+        fs::write(
+            handoffs_dir.join(format!("2026-02-{:02}-session.md", i)),
+            "# Session Handoff\n## What Was Done\nWork.",
+        )
+        .unwrap();
+    }
+
+    // wai close should produce the nudge.
+    wai_cmd(tmp.path())
+        .args(["close", "--project", "test-proj"])
+        .env("NO_COLOR", "1")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("sessions since last reflect"));
+}
+
+#[test]
+fn close_nudge_does_not_fire_for_fewer_than_five_handoffs() {
+    let tmp = TempDir::new().unwrap();
+    reflect_workspace(tmp.path());
+
+    let handoffs_dir = tmp.path().join(".wai/projects/test-proj/handoffs");
+    fs::create_dir_all(&handoffs_dir).unwrap();
+
+    // Write only 3 handoff files — below the threshold.
+    for i in 1..=3 {
+        fs::write(
+            handoffs_dir.join(format!("2026-02-{:02}-session.md", i)),
+            "# Session Handoff\n",
+        )
+        .unwrap();
+    }
+
+    let output = wai_cmd(tmp.path())
+        .args(["close", "--project", "test-proj"])
+        .env("NO_COLOR", "1")
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        !stdout.contains("sessions since last reflect"),
+        "nudge should not appear with only 3 handoffs"
+    );
+}

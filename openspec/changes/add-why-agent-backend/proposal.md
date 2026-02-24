@@ -24,8 +24,9 @@ Two gaps exist:
 
 ## Impact
 
-- **Affected specs**: `reasoning-oracle` (MODIFIED)
-- **Affected code**: `src/llm.rs` (new `AgentBackend`), `src/commands/why.rs` (agent-mode output path)
+- **Affected specs**: `reasoning-oracle` (MODIFIED + ADDED)
+- **Affected code**: `src/llm.rs` (new `AgentBackend`), `src/commands/why.rs` (agent-mode output path), `tests/integration/`
+- **Depends on**: `add-why-command` — the `reasoning-oracle` spec this change modifies is introduced by `add-why-command` and must be deployed before this change is archived
 - **Breaking changes**: None — `claude-cli` continues to work outside Claude Code sessions; agent mode is auto-selected inside them
 - **User impact**:
   - Claude Code users get `wai why` for free with zero configuration
