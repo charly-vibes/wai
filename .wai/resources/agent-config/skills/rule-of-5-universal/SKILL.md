@@ -1,5 +1,6 @@
 ---
 name: rule-of-5-universal
+aliases: [ro5]
 description: Apply Steve Yegge's Rule of 5 iterative review to any artifact - code, plans, research, issues, specs, or documents. Five stages from draft through excellence.
 ---
 

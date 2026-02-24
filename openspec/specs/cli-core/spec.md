@@ -303,6 +303,14 @@ The CLI SHALL provide `wai way` to validate repository best practices and provid
 - **AND** supports `--json` flag for machine-readable output
 - **AND** critical recommendations (missing .gitignore/README.md) display with ⚠️ marker
 
+#### Scenario: Fix skills
+
+- **WHEN** user runs `wai way --fix skills`
+- **THEN** the system scaffolds missing recommended agent skills (rule-of-5-universal, commit)
+- **AND** skips skills that already exist
+- **AND** exits with code 0
+- **AND** does NOT run the normal check output (fix mode is separate from check mode)
+
 ### Requirement: Session Close Command
 
 `wai close` SHALL write a `.pending-resume` signal after every successful handoff

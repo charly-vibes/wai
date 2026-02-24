@@ -234,28 +234,71 @@ The system SHALL check for llm.txt file and recommend it for AI-friendly project
 
 ### Requirement: Agent Skills Check
 
-The system SHALL check for agent skills documentation and recommend best practices for AI-assisted development workflows.
+The system SHALL check for agent skills documentation in `.wai/resources/agent-config/skills/` and recommend two skills for AI-assisted development workflows: `rule-of-5-universal` (iterative review) and `commit` (deliberate commits).
 
-#### Scenario: Skills directory present
+Skill identity is resolved by directory name OR by `aliases` declared in SKILL.md frontmatter (e.g. `aliases: [ro5]`). This means a skill named `rule-of-5-universal` with `aliases: [ro5]` satisfies a check for either name.
 
-- **WHEN** `wai way` runs and `.wai/resources/skills/` directory exists with SKILL.md files
+#### Scenario: Both recommended skills present
+
+- **WHEN** `wai way` runs and `.wai/resources/agent-config/skills/` contains both `rule-of-5-universal` (or `ro5`) and `commit`
 - **THEN** it reports WayStatus::Pass
-- **AND** includes message "Agent skills: Configured ({count} skills found)"
-- **AND** lists key skills if present: "universal-rule-of-5-review", "deliberate-commit"
+- **AND** includes message "{count} skill(s) configured — includes rule-of-5-universal (ro5) and commit"
+
+#### Scenario: Skills present via alias (ro5)
+
+- **WHEN** `wai way` runs and a skill directory exists with `aliases: [ro5]` in its SKILL.md frontmatter
+- **THEN** that skill satisfies the `rule-of-5-universal` check
+- **AND** the check reports the same as if the directory were named `rule-of-5-universal`
 
 #### Scenario: Partial skills configuration
 
-- **WHEN** `wai way` runs and skills directory exists but missing recommended skills
+- **WHEN** `wai way` runs and skills directory exists but one or both recommended skills are missing
 - **THEN** it reports WayStatus::Info
-- **AND** includes message "Agent skills: {count} configured, missing recommended skills"
-- **AND** suggests "Add recommended agent skills: universal-rule-of-5-review (code review practice), deliberate-commit (intentional commit messages)"
+- **AND** includes message "{count} skill(s) configured — missing recommended: {list}"
+- **AND** suggests "Add to .wai/resources/agent-config/skills/: {list}"
 
 #### Scenario: No skills configured
 
-- **WHEN** `wai way` runs and no `.wai/resources/skills/` directory exists
+- **WHEN** `wai way` runs and `.wai/resources/agent-config/skills/` does not exist
 - **THEN** it reports WayStatus::Info
-- **AND** includes message "Agent skills: Not configured"
-- **AND** suggests "Create .wai/resources/skills/ with SKILL.md files for AI development workflows (e.g., universal-rule-of-5-review, deliberate-commit)"
+- **AND** includes message "No skills configured"
+- **AND** suggests "Add rule-of-5-universal (ro5) and commit to .wai/resources/agent-config/skills/"
+
+#### Scenario: Skills directory empty
+
+- **WHEN** `wai way` runs and `.wai/resources/agent-config/skills/` exists but contains no SKILL.md files
+- **THEN** it reports WayStatus::Info
+- **AND** includes message "Skills directory present but empty"
+- **AND** suggests "Add rule-of-5-universal (ro5) and commit to .wai/resources/agent-config/skills/"
+
+### Requirement: Agent Skills Fix
+
+The system SHALL provide `wai way --fix skills` to scaffold missing recommended skills into the current project's agent-config skills directory.
+
+#### Scenario: Fix scaffolds missing skills
+
+- **WHEN** user runs `wai way --fix skills`
+- **THEN** the system creates `.wai/resources/agent-config/skills/` if it does not exist
+- **AND** creates `rule-of-5-universal/SKILL.md` if not present, with full template content and `aliases: [ro5]` in frontmatter
+- **AND** creates `commit/SKILL.md` if not present, with full deliberate-commit template content
+- **AND** reports each created skill with a success indicator
+- **AND** reports a count of skills added
+
+#### Scenario: Fix skips existing skills
+
+- **WHEN** user runs `wai way --fix skills` and a recommended skill already exists
+- **THEN** the system skips that skill and reports "already present"
+- **AND** does not overwrite existing skill content
+
+#### Scenario: Fix with all skills present
+
+- **WHEN** user runs `wai way --fix skills` and both recommended skills already exist
+- **THEN** the system reports "Recommended skills already present — nothing to do."
+
+#### Scenario: Unknown fix target
+
+- **WHEN** user runs `wai way --fix <unknown>`
+- **THEN** the system exits with an error: "Unknown fix target '{value}'. Available: skills"
 
 ### Requirement: GitHub CLI Check
 

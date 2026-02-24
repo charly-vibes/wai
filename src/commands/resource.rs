@@ -87,6 +87,8 @@ pub fn validate_skill_name(name: &str) -> Result<(), WaiError> {
 pub struct SkillMetadata {
     pub name: String,
     pub description: String,
+    #[serde(default)]
+    pub aliases: Vec<String>,
 }
 
 /// Skill entry for listing

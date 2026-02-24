@@ -1,10 +1,23 @@
-use miette::Result;
+use miette::{IntoDiagnostic, Result};
 use owo_colors::OwoColorize;
 use serde::Serialize;
+use std::collections::HashSet;
 use std::path::Path;
 
+use crate::commands::resource::parse_skill_frontmatter;
+use crate::config::{SKILLS_DIR, agent_config_dir};
 use crate::context::current_context;
 use crate::output::print_json;
+
+const SKILL_RULE_OF_5: (&str, &str) = (
+    "rule-of-5-universal",
+    include_str!("../../.wai/resources/agent-config/skills/rule-of-5-universal/SKILL.md"),
+);
+
+const SKILL_COMMIT: (&str, &str) = (
+    "commit",
+    include_str!("../../.wai/resources/agent-config/skills/commit/SKILL.md"),
+);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -34,10 +47,17 @@ struct Summary {
     recommendations: usize,
 }
 
-pub fn run() -> Result<()> {
+pub fn run(fix: Option<String>) -> Result<()> {
     // way works in any directory - doesn't require .wai/ initialization
     let repo_root = std::env::current_dir()
         .map_err(|e| miette::miette!("Cannot determine current directory: {}", e))?;
+
+    if let Some(target) = fix {
+        return match target.as_str() {
+            "skills" => fix_skills(&repo_root),
+            other => miette::bail!("Unknown fix target '{}'. Available: skills", other),
+        };
+    }
 
     let context = current_context();
 
@@ -67,6 +87,39 @@ pub fn run() -> Result<()> {
     }
 
     // Always exit 0 - these are recommendations, not requirements
+    Ok(())
+}
+
+fn fix_skills(repo_root: &Path) -> Result<()> {
+    use cliclack::log;
+
+    let skills_dir = agent_config_dir(repo_root).join(SKILLS_DIR);
+    std::fs::create_dir_all(&skills_dir).into_diagnostic()?;
+
+    let mut created = 0usize;
+
+    for (skill_name, content) in [SKILL_RULE_OF_5, SKILL_COMMIT] {
+        let skill_dir = skills_dir.join(skill_name);
+        let skill_file = skill_dir.join("SKILL.md");
+        if skill_file.exists() {
+            println!("  {} {} — already present", "○".dimmed(), skill_name);
+            continue;
+        }
+        std::fs::create_dir_all(&skill_dir).into_diagnostic()?;
+        std::fs::write(&skill_file, content).into_diagnostic()?;
+        log::success(format!("Created skill '{}'", skill_name)).into_diagnostic()?;
+        created += 1;
+    }
+
+    if created == 0 {
+        println!("\n  Recommended skills already present — nothing to do.");
+    } else {
+        println!(
+            "\n  {} skill(s) added to .wai/resources/agent-config/skills/",
+            created
+        );
+    }
+
     Ok(())
 }
 
@@ -439,44 +492,88 @@ fn check_llm_txt(repo_root: &Path) -> CheckResult {
 }
 
 fn check_agent_skills(repo_root: &Path) -> CheckResult {
-    let skills_dir = repo_root.join(".wai/resources/skills");
+    let skills_dir = agent_config_dir(repo_root).join(SKILLS_DIR);
 
     if !skills_dir.exists() {
         return CheckResult {
             name: "Agent skills".to_string(),
             status: Status::Info,
-            message: "No skills directory detected".to_string(),
+            message: "No skills configured".to_string(),
             suggestion: Some(
-                "Add agent skills to .wai/resources/skills/ for Claude Code".to_string(),
+                "Add rule-of-5-universal (ro5) and commit to .wai/resources/agent-config/skills/"
+                    .to_string(),
             ),
         };
     }
 
-    let skill_count = std::fs::read_dir(&skills_dir)
-        .ok()
-        .map(|entries| {
-            entries
-                .filter_map(|e| e.ok())
-                .filter(|e| e.file_name().to_str().unwrap_or("").ends_with("SKILL.md"))
-                .count()
-        })
-        .unwrap_or(0);
+    // Collect skill dir names and aliases from frontmatter
+    let mut skill_ids: HashSet<String> = HashSet::new();
+    let mut skill_count = 0usize;
 
-    if skill_count > 0 {
+    if let Ok(entries) = std::fs::read_dir(&skills_dir) {
+        for entry in entries.filter_map(|e| e.ok()) {
+            let skill_file = entry.path().join("SKILL.md");
+            if skill_file.exists() {
+                skill_count += 1;
+                if let Some(dir_name) = entry.file_name().to_str() {
+                    skill_ids.insert(dir_name.to_string());
+                }
+                if let Some(meta) = parse_skill_frontmatter(&skill_file) {
+                    for alias in meta.aliases {
+                        skill_ids.insert(alias);
+                    }
+                }
+            }
+        }
+    }
+
+    if skill_count == 0 {
+        return CheckResult {
+            name: "Agent skills".to_string(),
+            status: Status::Info,
+            message: "Skills directory present but empty".to_string(),
+            suggestion: Some(
+                "Add rule-of-5-universal (ro5) and commit to .wai/resources/agent-config/skills/"
+                    .to_string(),
+            ),
+        };
+    }
+
+    let has_ro5 =
+        skill_ids.contains("rule-of-5-universal") || skill_ids.contains("ro5");
+    let has_commit = skill_ids.contains("commit");
+
+    let missing: Vec<&str> = [
+        (!has_ro5).then_some("rule-of-5-universal (ro5)"),
+        (!has_commit).then_some("commit"),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+
+    if missing.is_empty() {
         CheckResult {
             name: "Agent skills".to_string(),
             status: Status::Pass,
-            message: format!("{} skill(s) configured", skill_count),
-            suggestion: Some(
-                "Consider adding: universal-rule-of-5-review, deliberate-commit".to_string(),
+            message: format!(
+                "{} skill(s) configured — includes rule-of-5-universal (ro5) and commit",
+                skill_count
             ),
+            suggestion: None,
         }
     } else {
         CheckResult {
             name: "Agent skills".to_string(),
             status: Status::Info,
-            message: "Skills directory present but empty".to_string(),
-            suggestion: Some("Add SKILL.md files to .wai/resources/skills/".to_string()),
+            message: format!(
+                "{} skill(s) configured — missing recommended: {}",
+                skill_count,
+                missing.join(", ")
+            ),
+            suggestion: Some(format!(
+                "Add to .wai/resources/agent-config/skills/: {}",
+                missing.join(", ")
+            )),
         }
     }
 }

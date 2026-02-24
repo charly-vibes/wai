@@ -162,9 +162,14 @@ pub enum Commands {
             These are recommendations, not requirements — the command always exits successfully\n\
             and suggests improvements without enforcing them. Works in any directory; wai\n\
             initialization is not required.\n\n\
+            Use --fix skills to scaffold missing recommended agent skills.\n\
             Use --json for machine-readable output suitable for CI integration and automation."
     )]
-    Way,
+    Way {
+        /// Scaffold missing items for a check: skills
+        #[arg(long, value_name = "CHECK")]
+        fix: Option<String>,
+    },
 
     /// Import existing tool configurations
     Import {
