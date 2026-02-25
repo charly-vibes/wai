@@ -4,7 +4,9 @@ use miette::{IntoDiagnostic, Result};
 use std::io::IsTerminal;
 
 use crate::cli::AddCommands;
-use crate::config::{DESIGNS_DIR, PLANS_DIR, RESEARCH_DIR, areas_dir, archives_dir, projects_dir, resources_dir};
+use crate::config::{
+    DESIGNS_DIR, PLANS_DIR, RESEARCH_DIR, archives_dir, areas_dir, projects_dir, resources_dir,
+};
 use crate::context::require_safe_mode;
 use crate::error::WaiError;
 use crate::json::Suggestion;
@@ -194,10 +196,10 @@ fn resolve_project(
         }
         for entry in std::fs::read_dir(base).into_diagnostic()? {
             let entry = entry.into_diagnostic()?;
-            if entry.file_type().into_diagnostic()?.is_dir() {
-                if let Some(name) = entry.file_name().to_str() {
-                    projects.push((name.to_string(), entry.path()));
-                }
+            if entry.file_type().into_diagnostic()?.is_dir()
+                && let Some(name) = entry.file_name().to_str()
+            {
+                projects.push((name.to_string(), entry.path()));
             }
         }
     }
@@ -247,7 +249,11 @@ fn build_tags(user_tags: Option<&str>) -> Vec<String> {
     let mut tags: Vec<String> = Vec::new();
 
     if let Some(t) = user_tags {
-        tags.extend(t.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()));
+        tags.extend(
+            t.split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty()),
+        );
     }
 
     if let Ok(run_id) = std::env::var("WAI_PIPELINE_RUN") {

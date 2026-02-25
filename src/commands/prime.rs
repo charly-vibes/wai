@@ -31,12 +31,7 @@ pub fn run(project: Option<String>) -> Result<()> {
     println!("{} wai prime — {}", "◆".cyan(), today);
 
     // Project + phase
-    println!(
-        "{} Project: {} [{}]",
-        "•".dimmed(),
-        project_name,
-        phase
-    );
+    println!("{} Project: {} [{}]", "•".dimmed(), project_name, phase);
 
     // Resume detection: check for .pending-resume signal from wai close
     let today_naive = Local::now().date_naive();
@@ -67,12 +62,7 @@ pub fn run(project: Option<String>) -> Result<()> {
         if let Some(handoff_path) = find_latest_handoff(&project_root, &project_name)? {
             let (date, snippet) = read_handoff_summary(&handoff_path);
             if !snippet.is_empty() {
-                println!(
-                    "{} Handoff: {} — '{}'",
-                    "•".dimmed(),
-                    date,
-                    snippet
-                );
+                println!("{} Handoff: {} — '{}'", "•".dimmed(), date, snippet);
             }
             // If snippet is empty, it means missing/invalid frontmatter → skip the line
         }
@@ -81,10 +71,10 @@ pub fn run(project: Option<String>) -> Result<()> {
     // Plugin summaries (beads, openspec)
     let hook_outputs = plugin::run_hooks(&project_root, "on_status");
     for output in &hook_outputs {
-        if output.label == "beads_stats" {
-            if let Some(summary) = beads_summary(&output.content) {
-                println!("{} Beads:   {}", "•".dimmed(), summary);
-            }
+        if output.label == "beads_stats"
+            && let Some(summary) = beads_summary(&output.content)
+        {
+            println!("{} Beads:   {}", "•".dimmed(), summary);
         }
     }
 
@@ -143,7 +133,11 @@ pub fn read_pending_resume(project_dir: &Path) -> Option<PathBuf> {
         return None;
     }
     let resolved = project_dir.join(relative);
-    if resolved.exists() { Some(resolved) } else { None }
+    if resolved.exists() {
+        Some(resolved)
+    } else {
+        None
+    }
 }
 
 /// Extract lines from the `## Next Steps` section of a handoff file.
@@ -177,9 +171,7 @@ pub fn extract_next_steps(handoff_path: &Path) -> Vec<String> {
 
 /// Find the most recent handoff file for a project (sorted descending by filename).
 pub fn find_latest_handoff(project_root: &Path, project: &str) -> Result<Option<PathBuf>> {
-    let handoffs_dir = projects_dir(project_root)
-        .join(project)
-        .join(HANDOFFS_DIR);
+    let handoffs_dir = projects_dir(project_root).join(project).join(HANDOFFS_DIR);
 
     if !handoffs_dir.exists() {
         return Ok(None);
@@ -188,9 +180,7 @@ pub fn find_latest_handoff(project_root: &Path, project: &str) -> Result<Option<
     let entries = std::fs::read_dir(&handoffs_dir).into_diagnostic()?;
     let mut files: Vec<PathBuf> = entries
         .filter_map(|e| e.ok())
-        .filter(|e| {
-            e.path().extension().and_then(|x| x.to_str()) == Some("md")
-        })
+        .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("md"))
         .map(|e| e.path())
         .collect();
 
@@ -321,9 +311,7 @@ fn resolve_project(project_root: &Path, project: Option<String>) -> Result<Strin
     projects.sort();
 
     match projects.len() {
-        0 => miette::bail!(
-            "No projects found. Create one with `wai new project <name>`."
-        ),
+        0 => miette::bail!("No projects found. Create one with `wai new project <name>`."),
         1 => Ok(projects.remove(0)),
         _ => {
             let ctx = current_context();

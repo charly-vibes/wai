@@ -22,7 +22,10 @@ pub fn run(project: Option<String>) -> Result<()> {
     // Write .pending-resume signal so wai prime can detect a mid-task resume
     let proj_dir = projects_dir(&project_root).join(&project_name);
     if let Ok(relative) = handoff_path.strip_prefix(&proj_dir) {
-        let _ = std::fs::write(proj_dir.join(".pending-resume"), relative.to_string_lossy().as_bytes());
+        let _ = std::fs::write(
+            proj_dir.join(".pending-resume"),
+            relative.to_string_lossy().as_bytes(),
+        );
     }
 
     // Display relative path from project root
@@ -56,10 +59,7 @@ pub fn run(project: Option<String>) -> Result<()> {
     let git_add_part = if uncommitted.is_empty() {
         "git add <files> && git commit".to_string()
     } else {
-        let quoted: Vec<String> = uncommitted
-            .iter()
-            .map(|f| format!("\"{}\"", f))
-            .collect();
+        let quoted: Vec<String> = uncommitted.iter().map(|f| format!("\"{}\"", f)).collect();
         format!("git add {} && git commit", quoted.join(" "))
     };
 
@@ -76,7 +76,10 @@ pub fn run(project: Option<String>) -> Result<()> {
         let proj_dir = projects_dir(&project_root).join(&project_name);
         let handoffs_dir = proj_dir.join("handoffs");
         let meta = read_reflect_meta(&proj_dir).unwrap_or(None);
-        let last_reflected = meta.as_ref().map(|m| m.last_reflected.as_str()).unwrap_or("");
+        let last_reflected = meta
+            .as_ref()
+            .map(|m| m.last_reflected.as_str())
+            .unwrap_or("");
         let session_count = count_handoffs_since(&handoffs_dir, last_reflected);
         if session_count >= 5 {
             // Determine which target files exist.
@@ -121,9 +124,7 @@ fn resolve_project(project_root: &Path, project: Option<String>) -> Result<Strin
     projects.sort();
 
     match projects.len() {
-        0 => miette::bail!(
-            "No projects found. Create one with `wai new project <name>`."
-        ),
+        0 => miette::bail!("No projects found. Create one with `wai new project <name>`."),
         1 => Ok(projects.remove(0)),
         _ => {
             let ctx = current_context();

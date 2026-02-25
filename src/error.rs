@@ -156,9 +156,7 @@ pub enum WaiError {
     #[error("Hmm, no LLM backend found")]
     #[diagnostic(
         code(wai::llm::not_available),
-        help(
-            "Set ANTHROPIC_API_KEY environment variable or install Ollama (https://ollama.com)"
-        )
+        help("Set ANTHROPIC_API_KEY environment variable or install Ollama (https://ollama.com)")
     )]
     LlmNotAvailable,
 }

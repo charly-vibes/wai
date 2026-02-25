@@ -179,7 +179,10 @@ fn render_human(checks: &[CheckResult], summary: &Summary, verbose: u8) -> Resul
 fn check_task_runner(repo_root: &Path) -> CheckResult {
     let name = "Command standardization";
     let intent = Some("Provide a single, tool-agnostic entry point for common repository tasks (build, test, deploy).".to_string());
-    let success_criteria = Some("A standard interface (justfile, Makefile, npm scripts) exists for common tasks.".to_string());
+    let success_criteria = Some(
+        "A standard interface (justfile, Makefile, npm scripts) exists for common tasks."
+            .to_string(),
+    );
 
     let justfile = repo_root.join("justfile");
     let makefile = repo_root.join("Makefile");
@@ -262,8 +265,13 @@ fn parse_justfile_recipes(justfile_path: &Path) -> Vec<String> {
 
 fn check_git_hooks(repo_root: &Path) -> CheckResult {
     let name = "Pre-commit quality gates";
-    let intent = Some("Prevent low-quality commits by running automated checks before code is saved to history.".to_string());
-    let success_criteria = Some("Automated checks (linters, tests) run automatically before code is committed.".to_string());
+    let intent = Some(
+        "Prevent low-quality commits by running automated checks before code is saved to history."
+            .to_string(),
+    );
+    let success_criteria = Some(
+        "Automated checks (linters, tests) run automatically before code is committed.".to_string(),
+    );
 
     let prek_config = repo_root.join(".prek.toml");
     let precommit_config = repo_root.join(".pre-commit-config.yaml");
@@ -305,8 +313,10 @@ fn check_git_hooks(repo_root: &Path) -> CheckResult {
 
 fn check_editorconfig(repo_root: &Path) -> CheckResult {
     let name = "Consistent formatting";
-    let intent = Some("Ensure consistent code formatting across different editors and IDEs.".to_string());
-    let success_criteria = Some("Project-wide style rules are enforced by a shared configuration file.".to_string());
+    let intent =
+        Some("Ensure consistent code formatting across different editors and IDEs.".to_string());
+    let success_criteria =
+        Some("Project-wide style rules are enforced by a shared configuration file.".to_string());
 
     let editorconfig = repo_root.join(".editorconfig");
 
@@ -336,8 +346,14 @@ fn check_editorconfig(repo_root: &Path) -> CheckResult {
 
 fn check_documentation(repo_root: &Path) -> CheckResult {
     let name = "Project documentation";
-    let intent = Some("Provide essential project identity, onboarding, and legal/contribution guidance.".to_string());
-    let success_criteria = Some("Essential files (README, .gitignore, LICENSE) provide project context and rules.".to_string());
+    let intent = Some(
+        "Provide essential project identity, onboarding, and legal/contribution guidance."
+            .to_string(),
+    );
+    let success_criteria = Some(
+        "Essential files (README, .gitignore, LICENSE) provide project context and rules."
+            .to_string(),
+    );
 
     let readme = repo_root.join("README.md").exists();
     let license = repo_root.join("LICENSE").exists() || repo_root.join("LICENSE.md").exists();
@@ -405,8 +421,14 @@ fn check_ai_instructions(repo_root: &Path) -> CheckResult {
     use crate::managed_block::has_reflect_block;
 
     let name = "AI-agent context";
-    let intent = Some("Provide persistent \"rules of the road\" and project context for AI collaborators.".to_string());
-    let success_criteria = Some("Persistent instructions define coding standards and context for AI assistants.".to_string());
+    let intent = Some(
+        "Provide persistent \"rules of the road\" and project context for AI collaborators."
+            .to_string(),
+    );
+    let success_criteria = Some(
+        "Persistent instructions define coding standards and context for AI assistants."
+            .to_string(),
+    );
 
     let claude_md = repo_root.join("CLAUDE.md");
     let agents_md = repo_root.join("AGENTS.md");
@@ -451,8 +473,13 @@ fn check_ai_instructions(repo_root: &Path) -> CheckResult {
 
 fn check_ci_cd(repo_root: &Path) -> CheckResult {
     let name = "Automated verification";
-    let intent = Some("Ensure code quality and correctness through automated builds and tests on every change.".to_string());
-    let success_criteria = Some("Every change is automatically validated by a remote build/test pipeline.".to_string());
+    let intent = Some(
+        "Ensure code quality and correctness through automated builds and tests on every change."
+            .to_string(),
+    );
+    let success_criteria = Some(
+        "Every change is automatically validated by a remote build/test pipeline.".to_string(),
+    );
 
     let github_workflows = repo_root.join(".github/workflows");
     let gitlab_ci = repo_root.join(".gitlab-ci.yml");
@@ -515,8 +542,11 @@ fn check_ci_cd(repo_root: &Path) -> CheckResult {
 
 fn check_devcontainer(repo_root: &Path) -> CheckResult {
     let name = "Reproducible environments";
-    let intent = Some("Provide a standardized, containerized environment for all contributors.".to_string());
-    let success_criteria = Some("A configuration exists to spin up a consistent, reproducible dev environment.".to_string());
+    let intent =
+        Some("Provide a standardized, containerized environment for all contributors.".to_string());
+    let success_criteria = Some(
+        "A configuration exists to spin up a consistent, reproducible dev environment.".to_string(),
+    );
 
     let devcontainer_dir = repo_root.join(".devcontainer");
     let devcontainer_json = repo_root.join(".devcontainer.json");
@@ -556,8 +586,10 @@ fn check_devcontainer(repo_root: &Path) -> CheckResult {
 
 fn check_llm_txt(repo_root: &Path) -> CheckResult {
     let name = "LLM-friendly context";
-    let intent = Some("Provide machine-readable project context and navigation for LLMs.".to_string());
-    let success_criteria = Some("Machine-readable project documentation (llm.txt) exists for AI tools.".to_string());
+    let intent =
+        Some("Provide machine-readable project context and navigation for LLMs.".to_string());
+    let success_criteria =
+        Some("Machine-readable project documentation (llm.txt) exists for AI tools.".to_string());
 
     let llm_txt = repo_root.join("llm.txt");
 
@@ -587,8 +619,12 @@ fn check_llm_txt(repo_root: &Path) -> CheckResult {
 
 fn check_agent_skills(repo_root: &Path) -> CheckResult {
     let name = "Extended agent capabilities";
-    let intent = Some("Enhance agent functionality with specialized iterative review and commit workflows.".to_string());
-    let success_criteria = Some("Specialized agent workflows (Rule of 5, Deliberate Commits) are active.".to_string());
+    let intent = Some(
+        "Enhance agent functionality with specialized iterative review and commit workflows."
+            .to_string(),
+    );
+    let success_criteria =
+        Some("Specialized agent workflows (Rule of 5, Deliberate Commits) are active.".to_string());
 
     let skills_dir = agent_config_dir(repo_root).join(SKILLS_DIR);
 
@@ -641,8 +677,7 @@ fn check_agent_skills(repo_root: &Path) -> CheckResult {
         };
     }
 
-    let has_ro5 =
-        skill_ids.contains("rule-of-5-universal") || skill_ids.contains("ro5");
+    let has_ro5 = skill_ids.contains("rule-of-5-universal") || skill_ids.contains("ro5");
     let has_commit = skill_ids.contains("commit");
 
     let missing: Vec<&str> = [
@@ -686,8 +721,13 @@ fn check_agent_skills(repo_root: &Path) -> CheckResult {
 
 fn check_release_pipeline(repo_root: &Path) -> CheckResult {
     let name = "Automated delivery";
-    let intent = Some("Automate the process of building, packaging, and publishing software releases.".to_string());
-    let success_criteria = Some("Software releases and distribution (packages, binaries) are fully automated.".to_string());
+    let intent = Some(
+        "Automate the process of building, packaging, and publishing software releases."
+            .to_string(),
+    );
+    let success_criteria = Some(
+        "Software releases and distribution (packages, binaries) are fully automated.".to_string(),
+    );
 
     if !has_binary_target(repo_root) {
         return CheckResult {
@@ -750,29 +790,28 @@ fn has_binary_target(repo_root: &Path) -> bool {
     if repo_root.join("src/main.rs").exists() {
         return true;
     }
-    if let Ok(content) = std::fs::read_to_string(repo_root.join("Cargo.toml")) {
-        if content.contains("[[bin]]") {
-            return true;
-        }
+    if let Ok(content) = std::fs::read_to_string(repo_root.join("Cargo.toml"))
+        && content.contains("[[bin]]")
+    {
+        return true;
     }
     // Go: any top-level .go file with "package main"
     if let Ok(entries) = std::fs::read_dir(repo_root) {
         for entry in entries.filter_map(|e| e.ok()) {
             let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) == Some("go") {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    if content.contains("package main") {
-                        return true;
-                    }
-                }
+            if path.extension().and_then(|e| e.to_str()) == Some("go")
+                && let Ok(content) = std::fs::read_to_string(&path)
+                && content.contains("package main")
+            {
+                return true;
             }
         }
     }
     // Python: [project.scripts] or [tool.poetry.scripts] in pyproject.toml
-    if let Ok(content) = std::fs::read_to_string(repo_root.join("pyproject.toml")) {
-        if content.contains("[project.scripts]") || content.contains("[tool.poetry.scripts]") {
-            return true;
-        }
+    if let Ok(content) = std::fs::read_to_string(repo_root.join("pyproject.toml"))
+        && (content.contains("[project.scripts]") || content.contains("[tool.poetry.scripts]"))
+    {
+        return true;
     }
     false
 }
@@ -796,7 +835,7 @@ fn has_release_workflow(repo_root: &Path) -> bool {
             let is_yaml = path
                 .extension()
                 .and_then(|e| e.to_str())
-                .map_or(false, |e| e == "yml" || e == "yaml");
+                .is_some_and(|e| e == "yml" || e == "yaml");
             if !is_yaml {
                 continue;
             }
@@ -804,15 +843,16 @@ fn has_release_workflow(repo_root: &Path) -> bool {
             if path
                 .file_name()
                 .and_then(|n| n.to_str())
-                .map_or(false, |n| n.contains("release"))
+                .is_some_and(|n| n.contains("release"))
             {
                 return true;
             }
             // Content has tag trigger matching "v*"
-            if let Ok(content) = std::fs::read_to_string(&path) {
-                if content.contains("tags:") && content.contains("v*") {
-                    return true;
-                }
+            if let Ok(content) = std::fs::read_to_string(&path)
+                && content.contains("tags:")
+                && content.contains("v*")
+            {
+                return true;
             }
         }
     }
@@ -821,8 +861,12 @@ fn has_release_workflow(repo_root: &Path) -> bool {
 
 fn check_gh_cli() -> CheckResult {
     let name = "Integration & automation";
-    let intent = Some("Streamline repository interactions (PRs, issues, releases) from the CLI.".to_string());
-    let success_criteria = Some("CLI tools are configured for seamless integration with the hosting provider.".to_string());
+    let intent = Some(
+        "Streamline repository interactions (PRs, issues, releases) from the CLI.".to_string(),
+    );
+    let success_criteria = Some(
+        "CLI tools are configured for seamless integration with the hosting provider.".to_string(),
+    );
 
     let gh_installed = std::process::Command::new("gh")
         .arg("--version")

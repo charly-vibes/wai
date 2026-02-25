@@ -7,7 +7,9 @@ use walkdir::WalkDir;
 
 use crate::config::{ProjectConfig, STATE_FILE, WhyConfig, wai_dir};
 use crate::error::WaiError;
-use crate::llm::{AGENT_SENTINEL, LlmError, claude_binary_exists, detect_backend, ollama_binary_exists};
+use crate::llm::{
+    AGENT_SENTINEL, LlmError, claude_binary_exists, detect_backend, ollama_binary_exists,
+};
 
 use super::require_project;
 
@@ -757,15 +759,12 @@ pub fn llm_error_hint(err: &LlmError) -> (String, Option<String>) {
     match err {
         LlmError::InvalidApiKey => (
             "API key is invalid or missing".to_string(),
-            Some(
-                "Set ANTHROPIC_API_KEY or add `api_key` to [why] in .wai/config.toml".to_string(),
-            ),
+            Some("Set ANTHROPIC_API_KEY or add `api_key` to [why] in .wai/config.toml".to_string()),
         ),
         LlmError::RateLimit => (
             "Rate limit exceeded".to_string(),
             Some(
-                "Wait 60 seconds and retry, or use Ollama for unlimited local queries"
-                    .to_string(),
+                "Wait 60 seconds and retry, or use Ollama for unlimited local queries".to_string(),
             ),
         ),
         LlmError::NetworkError(msg) => (
@@ -865,8 +864,7 @@ pub fn mark_privacy_notice_shown(project_root: &std::path::Path) {
 // ── README badge detection (8.7) ─────────────────────────────────────────────
 
 /// Badge markdown snippet to recommend when a project has no wai badge.
-pub const WAI_BADGE_MARKDOWN: &str =
-    "[![tracked with wai](https://img.shields.io/badge/tracked%20with-wai-blue)](https://github.com/charly-vibes/wai)";
+pub const WAI_BADGE_MARKDOWN: &str = "[![tracked with wai](https://img.shields.io/badge/tracked%20with-wai-blue)](https://github.com/charly-vibes/wai)";
 
 /// Return `true` if `content` appears to contain a wai badge.
 ///
@@ -876,8 +874,7 @@ pub const WAI_BADGE_MARKDOWN: &str =
 pub fn content_has_wai_badge(content: &str) -> bool {
     let lower = content.to_lowercase();
     for line in lower.lines() {
-        let has_badge_syntax =
-            line.contains("![") || line.contains("img.shields.io");
+        let has_badge_syntax = line.contains("![") || line.contains("img.shields.io");
         if has_badge_syntax && line.contains("wai") {
             return true;
         }
@@ -1100,9 +1097,7 @@ pub fn run(query: String, no_llm: bool, json: bool, verbose: u8) -> Result<()> {
                     LlmError::InvalidApiKey => WaiError::LlmInvalidApiKey,
                     LlmError::RateLimit => WaiError::LlmRateLimit,
                     LlmError::NetworkError(m) => WaiError::LlmNetworkError { message: m.clone() },
-                    LlmError::ModelNotFound(m) => {
-                        WaiError::LlmModelNotFound { model: m.clone() }
-                    }
+                    LlmError::ModelNotFound(m) => WaiError::LlmModelNotFound { model: m.clone() },
                     LlmError::Other(m) => WaiError::LlmNetworkError { message: m.clone() },
                 };
                 return Err(wai_err.into());
@@ -1128,7 +1123,13 @@ pub fn run(query: String, no_llm: bool, json: bool, verbose: u8) -> Result<()> {
         format_terminal(&parsed, &query);
         // 9.1: Show verbose diagnostics (timing, token estimates, cost, full prompt)
         if verbose > 0 {
-            print_verbose_stats(verbose, elapsed_ms, &prompt, &raw_response, backend.model_id());
+            print_verbose_stats(
+                verbose,
+                elapsed_ms,
+                &prompt,
+                &raw_response,
+                backend.model_id(),
+            );
         }
         // 8.7: Suggest adding a badge if README has none
         if !readme_has_wai_badge(&project_root) {
@@ -1787,7 +1788,10 @@ mod tests {
         setup_wai_project(&tmp);
         let ctx = gather_context(tmp.path(), "why was this designed this way?");
         assert!(!ctx.artifacts.is_empty(), "should find artifacts in tmpdir");
-        assert!(!ctx.is_file_query, "natural language query is not a file query");
+        assert!(
+            !ctx.is_file_query,
+            "natural language query is not a file query"
+        );
         assert!(ctx.git_context.is_none(), "no git context for NL queries");
         assert!(!ctx.is_empty());
     }
@@ -1801,7 +1805,10 @@ mod tests {
         fs::create_dir_all(src_file.parent().unwrap()).unwrap();
         fs::write(&src_file, "fn main() {}").unwrap();
         let ctx = gather_context(tmp.path(), src_file.to_str().unwrap());
-        assert!(ctx.is_file_query, "absolute path to existing file is a file query");
+        assert!(
+            ctx.is_file_query,
+            "absolute path to existing file is a file query"
+        );
     }
 
     // ── full pipeline integration test (7.4) ──
@@ -1838,7 +1845,10 @@ Research → Design → Implementation\n\
             "The design was chosen for simplicity and maintainability."
         );
         assert_eq!(parsed.relevant_artifacts.len(), 1);
-        assert_eq!(parsed.relevant_artifacts[0].relevance, Some(Relevance::High));
+        assert_eq!(
+            parsed.relevant_artifacts[0].relevance,
+            Some(Relevance::High)
+        );
         assert_eq!(parsed.decision_chain, "Research → Design → Implementation");
         assert_eq!(parsed.suggestions.len(), 2);
 
@@ -1862,8 +1872,7 @@ Research → Design → Implementation\n\
         let tmp = TempDir::new().unwrap();
         let wai_dir_path = tmp.path().join(".wai");
         fs::create_dir_all(&wai_dir_path).unwrap();
-        let config_content =
-            "[project]\nname = \"test\"\nversion = \"\"\ndescription = \"\"\n";
+        let config_content = "[project]\nname = \"test\"\nversion = \"\"\ndescription = \"\"\n";
         fs::write(wai_dir_path.join("config.toml"), config_content).unwrap();
 
         mark_privacy_notice_shown(tmp.path());
@@ -1883,8 +1892,7 @@ Research → Design → Implementation\n\
 
     #[test]
     fn badge_markdown_detected_in_content() {
-        let content =
-            "# My Project\n[![tracked with wai](https://img.shields.io/badge/tracked%20with-wai-blue)](https://github.com/charly-vibes/wai)\n";
+        let content = "# My Project\n[![tracked with wai](https://img.shields.io/badge/tracked%20with-wai-blue)](https://github.com/charly-vibes/wai)\n";
         assert!(content_has_wai_badge(content));
     }
 
@@ -1933,7 +1941,11 @@ Research → Design → Implementation\n\
     #[test]
     fn readme_has_wai_badge_returns_false_when_badge_missing() {
         let tmp = TempDir::new().unwrap();
-        fs::write(tmp.path().join("README.md"), "# My Project\n\nNo badge here.\n").unwrap();
+        fs::write(
+            tmp.path().join("README.md"),
+            "# My Project\n\nNo badge here.\n",
+        )
+        .unwrap();
         assert!(!readme_has_wai_badge(tmp.path()));
     }
 
@@ -1949,7 +1961,11 @@ Research → Design → Implementation\n\
     fn verbose_one_returns_timing_only() {
         let lines = verbose_stats_lines(1, 2500, "prompt", "response", "mock");
         assert_eq!(lines.len(), 1);
-        assert!(lines[0].contains("2.50s"), "expected timing, got: {}", lines[0]);
+        assert!(
+            lines[0].contains("2.50s"),
+            "expected timing, got: {}",
+            lines[0]
+        );
     }
 
     #[test]
@@ -1972,8 +1988,7 @@ Research → Design → Implementation\n\
     fn verbose_two_includes_cost_for_claude_model() {
         let prompt = "a".repeat(4000);
         let response = "b".repeat(400);
-        let lines =
-            verbose_stats_lines(2, 1000, &prompt, &response, "claude-haiku-3-5-20251001");
+        let lines = verbose_stats_lines(2, 1000, &prompt, &response, "claude-haiku-3-5-20251001");
         assert!(lines.iter().any(|l| l.contains("estimated")));
     }
 

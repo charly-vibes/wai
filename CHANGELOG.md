@@ -5,6 +5,47 @@ All notable changes to wai will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Calendar Versioning](https://calver.org/) (YYYY.M.MICRO).
 
+## [2026.2.1] - 2026-02-25
+
+### Added
+
+#### Pipeline Workflows
+- **Pipeline Resource** — `wai pipeline create/run/advance/status/list` for ordered multi-skill workflows
+- **Auto-tagging** — `wai add` commands auto-inject `pipeline-run:<id>` tag when `WAI_PIPELINE_RUN` env var is set
+- Pipeline state persisted as YAML in `.wai/resources/pipelines/`
+
+#### Skills & Resources
+- **Hierarchical Skill Names** — `category/action` format (e.g. `issue/gather`) with full path support
+- **Skill Templates** — `wai resource add skill --template=gather|create|tdd|rule-of-5` built-in starters
+- **Global Skill Library** — `wai resource install --global` / `--from-repo` for cross-project sharing
+- **Skill Export/Import** — `wai resource export` and `wai resource import archive` for tar.gz archives
+
+#### Sync & Agent Config
+- **Claude Code Projection** — `target: claude-code` built-in translates wai skills to Claude Code slash commands
+- **Copy Sync Strategy** — new `copy` strategy alongside symlink/inline/reference
+- **Sync Dry-run** — `wai sync --dry-run` previews changes without writing
+
+#### Search & Artifacts
+- **Tag Filtering** — `wai search --tag <tag>` filters by YAML frontmatter tags
+- **Latest Filter** — `wai search --latest` returns only the most recent match
+- **Tags on Plans/Designs** — `--tags` flag added to `wai add plan` and `wai add design`
+
+#### Session Management
+- **OpenSpec in Checklist** — `wai close` session-close checklist now includes openspec tasks.md step
+- **Cross-tool Tracking** — managed block tracks beads + openspec state across sessions
+
+### Fixed
+- 32 test failures after way-agnostic rename and workspace changes
+- Symlink sync strategy handling
+- Non-TTY multi-project resolve now errors cleanly
+
+### Documentation
+- `pipeline` added to `wai --help` COMMANDS, per-command help, and `wai -vv` env vars
+- `WAI_PIPELINE_RUN` documented in `wai add --help` and `wai pipeline run --help`
+- `wai way` checks refactored to tool-agnostic capability names
+
+---
+
 ## [2026.2.0] - 2026-02-20
 
 ### Added

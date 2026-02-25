@@ -2,8 +2,8 @@ use miette::{IntoDiagnostic, Result};
 use owo_colors::OwoColorize;
 use serde::Deserialize;
 use serde::Serialize;
-use std::collections::hash_map::DefaultHasher;
 use std::collections::HashSet;
+use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::path::Path;
 
@@ -755,16 +755,17 @@ fn check_symlink_strategy(
     // Also scan the target directory for any broken symlinks (e.g. source file deleted
     // after sync, leaving a dangling symlink with no corresponding source entry).
     #[cfg(unix)]
-    if target_path.exists() {
-        if let Ok(entries) = std::fs::read_dir(target_path) {
-            for entry in entries.filter_map(|e| e.ok()) {
-                let link_path = entry.path();
-                if let Ok(meta) = std::fs::symlink_metadata(&link_path) {
-                    if meta.file_type().is_symlink() && !link_path.exists() {
-                        broken_count += 1;
-                        has_issues = true;
-                    }
-                }
+    if target_path.exists()
+        && let Ok(entries) = std::fs::read_dir(target_path)
+    {
+        for entry in entries.filter_map(|e| e.ok()) {
+            let link_path = entry.path();
+            if let Ok(meta) = std::fs::symlink_metadata(&link_path)
+                && meta.file_type().is_symlink()
+                && !link_path.exists()
+            {
+                broken_count += 1;
+                has_issues = true;
             }
         }
     }
@@ -1185,10 +1186,7 @@ fn check_readme_badge(project_root: &Path) -> Vec<CheckResult> {
             name: "README badge".to_string(),
             status: Status::Warn,
             message: "No wai badge in README — add one to show the project uses wai".to_string(),
-            fix: Some(format!(
-                "Add to README: {}",
-                WAI_BADGE_MARKDOWN
-            )),
+            fix: Some(format!("Add to README: {}", WAI_BADGE_MARKDOWN)),
             fix_fn: None,
         }]
     }
@@ -1393,17 +1391,16 @@ fn check_skills_in_repo(project_root: &Path) -> Vec<CheckResult> {
 
     let mut unimported: Vec<String> = Vec::new();
     for skill_path in &external_skills {
-        if let Some(parent) = skill_path.parent() {
-            if let Some(dir_name) = parent.file_name().and_then(|n| n.to_str()) {
-                if !imported.contains(dir_name) {
-                    let rel = skill_path
-                        .strip_prefix(project_root)
-                        .unwrap_or(skill_path)
-                        .display()
-                        .to_string();
-                    unimported.push(rel);
-                }
-            }
+        if let Some(parent) = skill_path.parent()
+            && let Some(dir_name) = parent.file_name().and_then(|n| n.to_str())
+            && !imported.contains(dir_name)
+        {
+            let rel = skill_path
+                .strip_prefix(project_root)
+                .unwrap_or(skill_path)
+                .display()
+                .to_string();
+            unimported.push(rel);
         }
     }
 
@@ -1482,10 +1479,7 @@ fn check_agent_tool_coverage(project_root: &Path) -> Vec<CheckResult> {
         // Projections that target this tool dir or a sub-path of it
         let covering: Vec<&ProjectionEntry> = projections
             .iter()
-            .filter(|p| {
-                p.target == *tool_dir
-                    || p.target.starts_with(&format!("{}/", tool_dir))
-            })
+            .filter(|p| p.target == *tool_dir || p.target.starts_with(&format!("{}/", tool_dir)))
             .collect();
 
         if covering.is_empty() {

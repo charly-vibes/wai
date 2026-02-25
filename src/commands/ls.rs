@@ -2,8 +2,8 @@ use miette::Result;
 use owo_colors::OwoColorize;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use walkdir::WalkDir;
 use std::sync::{Arc, Mutex};
+use walkdir::WalkDir;
 
 use crate::config::{STATE_FILE, projects_dir};
 use crate::state::ProjectState;
@@ -24,8 +24,9 @@ pub fn run(root: Option<PathBuf>, depth: Option<usize>) -> Result<()> {
             }
             r
         }
-        None => dirs::home_dir()
-            .ok_or_else(|| miette::miette!("Could not determine home directory"))?,
+        None => {
+            dirs::home_dir().ok_or_else(|| miette::miette!("Could not determine home directory"))?
+        }
     };
 
     // Task 4.3: Resolve depth

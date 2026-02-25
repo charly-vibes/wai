@@ -49,7 +49,10 @@ fn minimal_research_at_one_artifact() {
 fn research_threshold_triggers_advance_at_three() {
     let detections = detect_patterns(&ctx(Phase::Research, 3, 0, 0));
     assert_eq!(detections.len(), 1);
-    assert_eq!(detections[0].pattern, WorkflowPattern::ResearchReadyToAdvance);
+    assert_eq!(
+        detections[0].pattern,
+        WorkflowPattern::ResearchReadyToAdvance
+    );
 }
 
 #[test]
@@ -193,7 +196,10 @@ fn init_and_create(dir: &std::path::Path, project: &str) {
 fn scan_project_returns_none_for_missing_project() {
     let tmp = TempDir::new().unwrap();
     let result = scan_project(tmp.path(), "nonexistent");
-    assert!(result.is_none(), "scan_project should return None for missing project");
+    assert!(
+        result.is_none(),
+        "scan_project should return None for missing project"
+    );
 }
 
 #[test]

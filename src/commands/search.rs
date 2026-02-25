@@ -131,7 +131,7 @@ pub fn run(
         let best_path = results
             .iter()
             .map(|(path, ..)| path.clone())
-            .max_by(|a, b| date_prefix(a).cmp(&date_prefix(b)))
+            .max_by(|a, b| date_prefix(a).cmp(date_prefix(b)))
             .unwrap_or_default();
         results.retain(|(path, ..)| *path == best_path);
     }
@@ -202,7 +202,9 @@ fn parse_frontmatter_tags(content: &str) -> Vec<String> {
     }
     // Find the closing ---
     let rest = &body[3..];
-    let end = rest.find("\n---").unwrap_or(rest.find("\r\n---").unwrap_or(rest.len()));
+    let end = rest
+        .find("\n---")
+        .unwrap_or(rest.find("\r\n---").unwrap_or(rest.len()));
     let frontmatter = &rest[..end];
 
     let mut tags = Vec::new();
@@ -287,7 +289,10 @@ mod tests {
 
     #[test]
     fn date_prefix_extracts_correctly() {
-        assert_eq!(date_prefix(".wai/projects/p/research/2026-02-25-notes.md"), "2026-02-25");
+        assert_eq!(
+            date_prefix(".wai/projects/p/research/2026-02-25-notes.md"),
+            "2026-02-25"
+        );
         assert_eq!(date_prefix("no-date-here.md"), "");
         assert_eq!(date_prefix("2025-01-01-something.md"), "2025-01-01");
     }

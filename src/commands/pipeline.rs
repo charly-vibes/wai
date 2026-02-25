@@ -144,9 +144,7 @@ fn cmd_run(name: &str, topic: &str) -> Result<()> {
     };
 
     // Persist run state
-    let runs_dir = pipelines_dir(&project_root)
-        .join(name)
-        .join("runs");
+    let runs_dir = pipelines_dir(&project_root).join(name).join("runs");
     fs::create_dir_all(&runs_dir).into_diagnostic()?;
 
     let run_path = runs_dir.join(format!("{}.yml", run_id));
@@ -251,15 +249,15 @@ fn cmd_status(name: &str, run_filter: Option<&str>) -> Result<()> {
         if path.extension().and_then(|e| e.to_str()) != Some("yml") {
             continue;
         }
-        if let Ok(content) = fs::read_to_string(&path) {
-            if let Ok(run) = serde_yaml::from_str::<PipelineRun>(&content) {
-                if let Some(filter) = run_filter {
-                    if run.run_id != filter {
-                        continue;
-                    }
-                }
-                runs.push(run);
+        if let Ok(content) = fs::read_to_string(&path)
+            && let Ok(run) = serde_yaml::from_str::<PipelineRun>(&content)
+        {
+            if let Some(filter) = run_filter
+                && run.run_id != filter
+            {
+                continue;
             }
+            runs.push(run);
         }
     }
 
@@ -287,7 +285,11 @@ fn cmd_status(name: &str, run_filter: Option<&str>) -> Result<()> {
 
     for run in &runs {
         let done = run.current_stage >= run.stages.len();
-        let status_icon = if done { "✓".green().to_string() } else { "●".yellow().to_string() };
+        let status_icon = if done {
+            "✓".green().to_string()
+        } else {
+            "●".yellow().to_string()
+        };
         println!();
         println!(
             "  {} {} (topic: {})",
@@ -335,10 +337,11 @@ fn cmd_list() -> Result<()> {
     let mut names: Vec<String> = Vec::new();
     for entry in fs::read_dir(&pipelines).into_diagnostic()?.flatten() {
         let path = entry.path();
-        if path.is_file() && path.extension().and_then(|e| e.to_str()) == Some("yml") {
-            if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-                names.push(stem.to_string());
-            }
+        if path.is_file()
+            && path.extension().and_then(|e| e.to_str()) == Some("yml")
+            && let Some(stem) = path.file_stem().and_then(|s| s.to_str())
+        {
+            names.push(stem.to_string());
         }
     }
 
@@ -482,12 +485,11 @@ fn find_run(project_root: &Path, run_id: &str) -> Result<(PipelineRun, PathBuf)>
                     == Some("runs")
         })
     {
-        if let Ok(content) = fs::read_to_string(entry.path()) {
-            if let Ok(run) = serde_yaml::from_str::<PipelineRun>(&content) {
-                if run.run_id == run_id {
-                    return Ok((run, entry.path().to_path_buf()));
-                }
-            }
+        if let Ok(content) = fs::read_to_string(entry.path())
+            && let Ok(run) = serde_yaml::from_str::<PipelineRun>(&content)
+            && run.run_id == run_id
+        {
+            return Ok((run, entry.path().to_path_buf()));
         }
     }
 
@@ -509,24 +511,19 @@ fn find_latest_tagged_artifact(project_root: &Path, run_id: &str) -> Option<Stri
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| {
-            e.path().is_file()
-                && e.path().extension().and_then(|x| x.to_str()) == Some("md")
+            e.path().is_file() && e.path().extension().and_then(|x| x.to_str()) == Some("md")
         })
     {
         let Ok(content) = fs::read_to_string(entry.path()) else {
             continue;
         };
-        if has_tag(&content, &search_tag) {
-            if let Ok(meta) = fs::metadata(entry.path()) {
-                if let Ok(modified) = meta.modified() {
-                    let is_newer = best
-                        .as_ref()
-                        .map(|(t, _)| modified > *t)
-                        .unwrap_or(true);
-                    if is_newer {
-                        best = Some((modified, entry.path().to_path_buf()));
-                    }
-                }
+        if has_tag(&content, &search_tag)
+            && let Ok(meta) = fs::metadata(entry.path())
+            && let Ok(modified) = meta.modified()
+        {
+            let is_newer = best.as_ref().map(|(t, _)| modified > *t).unwrap_or(true);
+            if is_newer {
+                best = Some((modified, entry.path().to_path_buf()));
             }
         }
     }
@@ -576,9 +573,7 @@ fn count_runs(project_root: &Path, name: &str) -> usize {
     fs::read_dir(&runs_dir)
         .map(|d| {
             d.flatten()
-                .filter(|e| {
-                    e.path().extension().and_then(|x| x.to_str()) == Some("yml")
-                })
+                .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("yml"))
                 .count()
         })
         .unwrap_or(0)

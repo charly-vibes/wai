@@ -91,20 +91,18 @@ pub fn run(verbose: u8) -> Result<()> {
     // OpenSpec status — computed here for both Plugin Info summary and the detail section
     let spec_status = openspec::read_status(&project_root);
 
-    let has_plugin_info = !hook_outputs.is_empty()
-        || spec_status
-            .as_ref()
-            .map_or(false, |s| !s.changes.is_empty());
+    let has_plugin_info =
+        !hook_outputs.is_empty() || spec_status.as_ref().is_some_and(|s| !s.changes.is_empty());
 
     if has_plugin_info {
         println!();
         println!("  {} Plugin Info", "◆".cyan());
         for output in &hook_outputs {
-            if output.label == "beads_stats" {
-                if let Some(summary) = beads_summary(&output.content) {
-                    println!("    {} beads: {}", "•".dimmed(), summary);
-                    continue;
-                }
+            if output.label == "beads_stats"
+                && let Some(summary) = beads_summary(&output.content)
+            {
+                println!("    {} beads: {}", "•".dimmed(), summary);
+                continue;
             }
             println!("    {} {}:", "•".dimmed(), output.label.bold());
             for line in output.content.lines().take(5) {

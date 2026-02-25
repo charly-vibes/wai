@@ -197,7 +197,10 @@ pub fn global_skills_dir() -> PathBuf {
     if let Some(home) = dirs::home_dir() {
         home.join(".wai").join(RESOURCES_DIR).join(SKILLS_DIR)
     } else {
-        PathBuf::from(".").join(".wai").join(RESOURCES_DIR).join(SKILLS_DIR)
+        PathBuf::from(".")
+            .join(".wai")
+            .join(RESOURCES_DIR)
+            .join(SKILLS_DIR)
     }
 }
 

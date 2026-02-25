@@ -175,10 +175,7 @@ pub fn read_handoffs(project_root: &Path, budget: usize) -> Vec<HandoffEntry> {
         let path = entry.path();
 
         // Must be in a handoffs/ subdirectory and have .md extension.
-        if !path
-            .to_string_lossy()
-            .contains("/handoffs/")
-        {
+        if !path.to_string_lossy().contains("/handoffs/") {
             continue;
         }
         if path.extension().and_then(|x| x.to_str()) != Some("md") {
@@ -317,9 +314,7 @@ pub fn gather_reflect_context(
     // Read existing REFLECT blocks from each target so LLM can avoid repeating them.
     let existing_blocks = output_targets
         .iter()
-        .filter_map(|p| {
-            read_reflect_block(p).map(|block| (p.clone(), block))
-        })
+        .filter_map(|p| read_reflect_block(p).map(|block| (p.clone(), block)))
         .collect();
 
     Ok(ReflectContext {
@@ -393,7 +388,7 @@ pub fn parse_date_to_system_time(date: &str) -> Option<SystemTime> {
 
 /// Compute the number of days from 1970-01-01 to the given date.
 fn days_since_epoch(year: i32, month: u32, day: u32) -> Option<u64> {
-    if month < 1 || month > 12 || day < 1 || day > 31 {
+    if !(1..=12).contains(&month) || !(1..=31).contains(&day) {
         return None;
     }
     // Use the Julian Day Number algorithm.
@@ -427,7 +422,7 @@ pub fn build_reflect_prompt(ctx: &ReflectContext, today: &str) -> String {
          gotchas, and architectural notes that AI assistants should know when working on \
          this project. Focus on information that is NOT already in the 'Already Documented' \
          section below.\n"
-        .to_string(),
+            .to_string(),
     );
 
     parts.push(
@@ -439,7 +434,7 @@ pub fn build_reflect_prompt(ctx: &ReflectContext, today: &str) -> String {
          3. **Research/design/plan artifacts** — explicit decisions and domain knowledge\n\
          When referencing patterns, note the artifact date. If an artifact is older than \
          6 months, flag it as potentially stale.\n"
-        .to_string(),
+            .to_string(),
     );
 
     if !ctx.existing_blocks.is_empty() {
@@ -669,17 +664,11 @@ pub fn run(
 
     // 2.1–2.5: Gather context.
     println!();
-    println!(
-        "  {} Gathering context …",
-        "◆".cyan()
-    );
+    println!("  {} Gathering context …", "◆".cyan());
     let ctx = gather_reflect_context(&project_root, conversation.as_deref(), &targets)?;
 
     // 3.1–3.3: Call LLM.
-    println!(
-        "  {} Calling LLM …",
-        "○".dimmed()
-    );
+    println!("  {} Calling LLM …", "○".dimmed());
 
     let today = chrono::Local::now().format("%Y-%m-%d").to_string();
     let prompt = build_reflect_prompt(&ctx, &today);
@@ -701,10 +690,7 @@ pub fn run(
     let all_unchanged = target_diffs.iter().all(|(_, d)| d.is_none());
     if all_unchanged {
         println!();
-        println!(
-            "  {} REFLECT block is already up to date.",
-            "○".dimmed()
-        );
+        println!("  {} REFLECT block is already up to date.", "○".dimmed());
         return Ok(());
     }
 
@@ -722,21 +708,14 @@ pub fn run(
             print_diff(diff);
         } else {
             println!();
-            println!(
-                "  {} {} — no changes",
-                "○".dimmed(),
-                filename
-            );
+            println!("  {} {} — no changes", "○".dimmed(), filename);
         }
     }
 
     // 4.2: --dry-run exits here.
     if dry_run {
         println!();
-        println!(
-            "  {} Dry run — no files written.",
-            "○".dimmed()
-        );
+        println!("  {} Dry run — no files written.", "○".dimmed());
         return Ok(());
     }
 
@@ -765,8 +744,7 @@ pub fn run(
     let mut written = Vec::new();
     for (target, diff_opt) in &target_diffs {
         if diff_opt.is_some() {
-            inject_reflect_block(target, &new_content)
-                .into_diagnostic()?;
+            inject_reflect_block(target, &new_content).into_diagnostic()?;
             written.push(target.clone());
         }
     }
@@ -812,11 +790,7 @@ pub fn run(
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("unknown");
-        println!(
-            "  {} Updated {}",
-            "✓".green(),
-            filename.bold()
-        );
+        println!("  {} Updated {}", "✓".green(), filename.bold());
     }
     println!();
 
@@ -852,7 +826,9 @@ mod tests {
             session_count: 7,
         };
         write_reflect_meta(dir.path(), &meta).unwrap();
-        let read_back = read_reflect_meta(dir.path()).unwrap().expect("should exist");
+        let read_back = read_reflect_meta(dir.path())
+            .unwrap()
+            .expect("should exist");
         assert_eq!(read_back.last_reflected, "2026-02-24");
         assert_eq!(read_back.session_count, 7);
     }
@@ -994,7 +970,12 @@ mod tests {
     #[test]
     fn read_handoffs_collects_handoff_files() {
         let dir = tmp();
-        make_wai_handoff(dir.path(), "my-project", "2026-02-24-session.md", "# Session\nContent");
+        make_wai_handoff(
+            dir.path(),
+            "my-project",
+            "2026-02-24-session.md",
+            "# Session\nContent",
+        );
         let handoffs = read_handoffs(dir.path(), HANDOFF_BUDGET);
         assert_eq!(handoffs.len(), 1);
         assert!(handoffs[0].content.contains("Content"));
@@ -1084,13 +1065,19 @@ mod tests {
     #[test]
     fn compute_diff_marks_new_lines_as_added() {
         let diff = compute_diff(Some(""), "added line").unwrap();
-        assert!(diff.iter().any(|l| matches!(l, DiffLine::Added(s) if s == "added line")));
+        assert!(
+            diff.iter()
+                .any(|l| matches!(l, DiffLine::Added(s) if s == "added line"))
+        );
     }
 
     #[test]
     fn compute_diff_marks_removed_lines_as_removed() {
         let diff = compute_diff(Some("removed line"), "").unwrap();
-        assert!(diff.iter().any(|l| matches!(l, DiffLine::Removed(s) if s == "removed line")));
+        assert!(
+            diff.iter()
+                .any(|l| matches!(l, DiffLine::Removed(s) if s == "removed line"))
+        );
     }
 
     #[test]
@@ -1098,10 +1085,22 @@ mod tests {
         let old = "same\nchanged\nsame2";
         let new = "same\nnew content\nsame2";
         let diff = compute_diff(Some(old), new).unwrap();
-        assert!(diff.iter().any(|l| matches!(l, DiffLine::Context(s) if s == "same")));
-        assert!(diff.iter().any(|l| matches!(l, DiffLine::Context(s) if s == "same2")));
-        assert!(diff.iter().any(|l| matches!(l, DiffLine::Added(s) if s == "new content")));
-        assert!(diff.iter().any(|l| matches!(l, DiffLine::Removed(s) if s == "changed")));
+        assert!(
+            diff.iter()
+                .any(|l| matches!(l, DiffLine::Context(s) if s == "same"))
+        );
+        assert!(
+            diff.iter()
+                .any(|l| matches!(l, DiffLine::Context(s) if s == "same2"))
+        );
+        assert!(
+            diff.iter()
+                .any(|l| matches!(l, DiffLine::Added(s) if s == "new content"))
+        );
+        assert!(
+            diff.iter()
+                .any(|l| matches!(l, DiffLine::Removed(s) if s == "changed"))
+        );
     }
 
     // ── Reflection prompt construction tests ─────────────────────────────
@@ -1165,10 +1164,7 @@ mod tests {
             conversation: None,
             handoffs: vec![],
             secondary: vec![],
-            existing_blocks: vec![(
-                PathBuf::from("CLAUDE.md"),
-                "existing guidance".to_string(),
-            )],
+            existing_blocks: vec![(PathBuf::from("CLAUDE.md"), "existing guidance".to_string())],
         };
         let prompt = build_reflect_prompt(&ctx, "2026-02-24");
         assert!(prompt.contains("existing guidance"));
@@ -1212,7 +1208,10 @@ mod tests {
     #[test]
     fn extract_reflect_content_passthrough_for_plain_text() {
         let response = "## Project Notes\n- Use TDD";
-        assert_eq!(extract_reflect_content(response), "## Project Notes\n- Use TDD");
+        assert_eq!(
+            extract_reflect_content(response),
+            "## Project Notes\n- Use TDD"
+        );
     }
 
     #[test]

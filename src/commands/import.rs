@@ -42,7 +42,11 @@ fn import_directory(source: &Path, config_dir: &Path) -> Result<()> {
     std::fs::create_dir_all(&context_dir).into_diagnostic()?;
     std::fs::create_dir_all(&skills_dir).into_diagnostic()?;
 
-    for entry in WalkDir::new(source).min_depth(1).into_iter().filter_map(|e| e.ok()) {
+    for entry in WalkDir::new(source)
+        .min_depth(1)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
         let path = entry.path();
 
         if !path.is_file() {

@@ -167,9 +167,7 @@ pub fn wai_block_content(detected_plugins: &[&str]) -> String {
         );
     }
     if has_openspec {
-        block.push_str(
-            "[ ] openspec tasks.md — mark completed tasks [x]\n",
-        );
+        block.push_str("[ ] openspec tasks.md — mark completed tasks [x]\n");
     }
     block.push_str(
         "[ ] wai reflect                    # update CLAUDE.md with project patterns (every ~5 sessions)\n\
@@ -423,9 +421,7 @@ mod wai_block_tests {
         let openspec_pos = output
             .find("openspec tasks.md")
             .expect("openspec tasks.md not found");
-        let wai_reflect_pos = output
-            .find("wai reflect")
-            .expect("wai reflect not found");
+        let wai_reflect_pos = output.find("wai reflect").expect("wai reflect not found");
         assert!(
             bd_sync_pos < openspec_pos,
             "openspec tasks.md should appear after bd sync --from-main"
@@ -604,16 +600,15 @@ mod reflect_tests {
     fn inject_reflect_block_appends_after_wai_end() {
         let dir = tmp();
         let path = dir.path().join("CLAUDE.md");
-        std::fs::write(
-            &path,
-            "<!-- WAI:START -->\nwai stuff\n<!-- WAI:END -->\n",
-        )
-        .unwrap();
+        std::fs::write(&path, "<!-- WAI:START -->\nwai stuff\n<!-- WAI:END -->\n").unwrap();
         inject_reflect_block(&path, "project guidance").unwrap();
         let content = std::fs::read_to_string(&path).unwrap();
         let wai_end_pos = content.find(WAI_END).unwrap();
         let reflect_start_pos = content.find(REFLECT_START).unwrap();
-        assert!(reflect_start_pos > wai_end_pos, "REFLECT block should come after WAI:END");
+        assert!(
+            reflect_start_pos > wai_end_pos,
+            "REFLECT block should come after WAI:END"
+        );
     }
 
     #[test]

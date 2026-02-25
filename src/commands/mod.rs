@@ -10,24 +10,24 @@ use crate::suggestions::SuggestionEngine;
 mod add;
 mod close;
 mod config_cmd;
-mod ls;
-mod pipeline;
-mod prime;
 mod doctor;
 mod handoff;
 mod import;
 mod init;
+mod ls;
 mod move_cmd;
 mod new;
 mod phase;
+mod pipeline;
 mod plugin;
+mod prime;
+mod reflect;
 mod resource;
 mod search;
 mod show;
 mod status;
 mod sync;
 mod timeline;
-mod reflect;
 mod way;
 mod why;
 
@@ -178,7 +178,10 @@ fn show_welcome() -> Result<()> {
             "  {} wai tutorial       Run the quickstart tutorial",
             "→".cyan()
         );
-        println!("  {} wai way            Check repo best practices", "→".cyan());
+        println!(
+            "  {} wai way            Check repo best practices",
+            "→".cyan()
+        );
         println!("  {} wai --help         Show all commands", "→".cyan());
 
         if is_first_run {
@@ -197,7 +200,10 @@ fn show_welcome() -> Result<()> {
             "→".cyan()
         );
         println!("  {} wai new project    Create a new project", "→".cyan());
-        println!("  {} wai way            Check repo best practices", "→".cyan());
+        println!(
+            "  {} wai way            Check repo best practices",
+            "→".cyan()
+        );
         println!("  {} Run 'wai --help' for detailed usage", "•".dimmed());
     }
 
@@ -265,20 +271,18 @@ fn run_external(args: Vec<String>) -> Result<()> {
     }
 
     // Skip typo detection if the first arg matches a detected plugin name.
-    let is_known_plugin = find_project_root().map_or(false, |root| {
+    let is_known_plugin = find_project_root().is_some_and(|root| {
         crate::plugin::detect_plugins(&root)
             .iter()
             .any(|p| p.def.name == *plugin_name && p.detected)
     });
 
-    if !is_known_plugin {
-        if let Some(suggestion) = engine.suggest_typo(plugin_name, valid_commands) {
-            miette::bail!(
-                "{}. {}",
-                suggestion.message(),
-                "Run 'wai --help' to see available commands."
-            );
-        }
+    if !is_known_plugin && let Some(suggestion) = engine.suggest_typo(plugin_name, valid_commands) {
+        miette::bail!(
+            "{}. {}",
+            suggestion.message(),
+            "Run 'wai --help' to see available commands."
+        );
     }
 
     // Typo/order checks passed — this looks like a genuine plugin or unknown command.

@@ -111,7 +111,11 @@ fn list_config_dir(dir: &Path, label: &str) -> Result<()> {
     let mut entries: Vec<_> = std::fs::read_dir(dir)
         .into_diagnostic()?
         .filter_map(|e| e.ok())
-        .filter(|e| e.file_type().map(|t| t.is_file() || t.is_dir()).unwrap_or(false))
+        .filter(|e| {
+            e.file_type()
+                .map(|t| t.is_file() || t.is_dir())
+                .unwrap_or(false)
+        })
         .collect();
     entries.sort_by_key(|e| e.file_name());
 

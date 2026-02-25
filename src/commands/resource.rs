@@ -429,7 +429,12 @@ fn list_skills(json: bool) -> Result<()> {
     let mut entries = Vec::new();
 
     if local_skills_dir.exists() {
-        scan_skills_dir(&local_skills_dir, &local_skills_dir, SkillSource::Local, &mut entries);
+        scan_skills_dir(
+            &local_skills_dir,
+            &local_skills_dir,
+            SkillSource::Local,
+            &mut entries,
+        );
     }
     // Track names from local skills to suppress global duplicates
     for e in &entries {
@@ -439,7 +444,12 @@ fn list_skills(json: bool) -> Result<()> {
     // Also collect global skills that aren't shadowed by local ones
     if global_dir.exists() {
         let mut global_entries = Vec::new();
-        scan_skills_dir(&global_dir, &global_dir, SkillSource::Global, &mut global_entries);
+        scan_skills_dir(
+            &global_dir,
+            &global_dir,
+            SkillSource::Global,
+            &mut global_entries,
+        );
         for e in global_entries {
             if !seen_names.contains(&e.name) {
                 entries.push(e);
@@ -827,10 +837,7 @@ fn install_skill_from_repo(name: &str, repo_path: &str) -> Result<()> {
     let dst_skill_dir = local_skills_dir.join(name);
 
     if dst_skill_dir.exists() {
-        miette::bail!(
-            "Skill '{}' already exists in current project",
-            name
-        );
+        miette::bail!("Skill '{}' already exists in current project", name);
     }
 
     // Warn about hardcoded content (use current project's name as the suspect)
@@ -925,7 +932,7 @@ fn validate_archive_entry_path(path_str: &str) -> Result<()> {
     let components: Vec<&str> = path_str.split('/').collect();
     // Valid: ["name", "SKILL.md"] or ["cat", "action", "SKILL.md"]
     let depth = components.len();
-    if depth < 2 || depth > 3 {
+    if !(2..=3).contains(&depth) {
         miette::bail!(
             "Invalid archive entry '{}': expected 'name/SKILL.md' or 'category/action/SKILL.md'",
             path_str
@@ -1018,12 +1025,10 @@ pub(crate) fn write_archive_entries(
                 fs::write(&dst_file, &content).into_diagnostic()?;
                 overwritten += 1;
             } else {
-                let confirmed = cliclack::confirm(format!(
-                    "Skill '{}' already exists. Overwrite?",
-                    skill_name
-                ))
-                .interact()
-                .into_diagnostic()?;
+                let confirmed =
+                    cliclack::confirm(format!("Skill '{}' already exists. Overwrite?", skill_name))
+                        .interact()
+                        .into_diagnostic()?;
 
                 if confirmed {
                     fs::create_dir_all(&dst_dir).into_diagnostic()?;
@@ -1409,7 +1414,10 @@ description: "  "
         assert_eq!(kebab_to_title_case(""), "");
         // Hierarchical names
         assert_eq!(kebab_to_title_case("issue/gather"), "Issue / Gather");
-        assert_eq!(kebab_to_title_case("my-cat/my-action"), "My Cat / My Action");
+        assert_eq!(
+            kebab_to_title_case("my-cat/my-action"),
+            "My Cat / My Action"
+        );
     }
 
     // ── archive path validation ──────────────────────────────────────────────
@@ -1562,9 +1570,14 @@ description: "  "
             fs::write(dst_dir.join("SKILL.md"), &content_bytes).unwrap();
         }
 
-        let imported =
-            fs::read_to_string(dst_skills.path().join("issue").join("gather").join("SKILL.md"))
-                .unwrap();
+        let imported = fs::read_to_string(
+            dst_skills
+                .path()
+                .join("issue")
+                .join("gather")
+                .join("SKILL.md"),
+        )
+        .unwrap();
         assert_eq!(imported, content);
     }
 
@@ -1576,16 +1589,19 @@ description: "  "
         let global_dir = tempfile::tempdir().unwrap();
 
         // Same skill name in both
-        let local_content =
-            "---\nname: my-skill\ndescription: Local version\n---\n\nLocal.\n";
-        let global_content =
-            "---\nname: my-skill\ndescription: Global version\n---\n\nGlobal.\n";
+        let local_content = "---\nname: my-skill\ndescription: Local version\n---\n\nLocal.\n";
+        let global_content = "---\nname: my-skill\ndescription: Global version\n---\n\nGlobal.\n";
         make_skill_dir(local_dir.path(), "my-skill", local_content);
         make_skill_dir(global_dir.path(), "my-skill", global_content);
 
         // Scan local
         let mut entries: Vec<SkillEntry> = Vec::new();
-        scan_skills_dir(local_dir.path(), local_dir.path(), SkillSource::Local, &mut entries);
+        scan_skills_dir(
+            local_dir.path(),
+            local_dir.path(),
+            SkillSource::Local,
+            &mut entries,
+        );
         let mut seen: std::collections::HashSet<String> =
             entries.iter().map(|e| e.name.clone()).collect();
 
@@ -1635,7 +1651,8 @@ description: "  "
         let repo_skills = tempfile::tempdir().unwrap();
         let local_skills = tempfile::tempdir().unwrap();
 
-        let content = "---\nname: impl/run\ndescription: Implementation run\n---\n\nInstructions.\n";
+        let content =
+            "---\nname: impl/run\ndescription: Implementation run\n---\n\nInstructions.\n";
         make_skill_dir(repo_skills.path(), "impl/run", content);
 
         // Simulate the copy that install --from-repo does
@@ -1699,7 +1716,12 @@ description: "  "
         make_skill_dir(global_dir.path(), "shared-skill", global_content);
 
         let mut entries: Vec<SkillEntry> = Vec::new();
-        scan_skills_dir(local_dir.path(), local_dir.path(), SkillSource::Local, &mut entries);
+        scan_skills_dir(
+            local_dir.path(),
+            local_dir.path(),
+            SkillSource::Local,
+            &mut entries,
+        );
         let seen: std::collections::HashSet<String> =
             entries.iter().map(|e| e.name.clone()).collect();
 

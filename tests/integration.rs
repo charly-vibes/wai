@@ -811,22 +811,32 @@ fn add_plan_with_tags_includes_frontmatter() {
 
     wai_cmd(tmp.path())
         .args([
-            "add", "plan", "My plan content",
-            "--project", "my-app",
-            "--tags", "backend,api",
+            "add",
+            "plan",
+            "My plan content",
+            "--project",
+            "my-app",
+            "--tags",
+            "backend,api",
         ])
         .assert()
         .success();
 
     let plans_dir = tmp.path().join(".wai/projects/my-app/plans");
-    let files: Vec<_> = fs::read_dir(&plans_dir).unwrap().filter_map(|e| e.ok()).collect();
+    let files: Vec<_> = fs::read_dir(&plans_dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .collect();
     assert_eq!(files.len(), 1);
     let content = fs::read_to_string(files[0].path()).unwrap();
     assert!(content.contains("---"), "plan should have frontmatter");
     assert!(content.contains("tags:"), "plan should have tags key");
     assert!(content.contains("backend"), "plan should have backend tag");
     assert!(content.contains("api"), "plan should have api tag");
-    assert!(content.contains("My plan content"), "plan body should be present");
+    assert!(
+        content.contains("My plan content"),
+        "plan body should be present"
+    );
 }
 
 #[test]
@@ -837,15 +847,22 @@ fn add_design_with_tags_includes_frontmatter() {
 
     wai_cmd(tmp.path())
         .args([
-            "add", "design", "My design content",
-            "--project", "my-app",
-            "--tags", "ux",
+            "add",
+            "design",
+            "My design content",
+            "--project",
+            "my-app",
+            "--tags",
+            "ux",
         ])
         .assert()
         .success();
 
     let designs_dir = tmp.path().join(".wai/projects/my-app/designs");
-    let files: Vec<_> = fs::read_dir(&designs_dir).unwrap().filter_map(|e| e.ok()).collect();
+    let files: Vec<_> = fs::read_dir(&designs_dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .collect();
     assert_eq!(files.len(), 1);
     let content = fs::read_to_string(files[0].path()).unwrap();
     assert!(content.contains("---"), "design should have frontmatter");
@@ -862,11 +879,17 @@ fn search_tag_filter_returns_only_tagged_files() {
 
     // Write one tagged and one untagged research file.
     write_artifact(
-        tmp.path(), "my-app", "research", "2026-01-10-tagged.md",
+        tmp.path(),
+        "my-app",
+        "research",
+        "2026-01-10-tagged.md",
         "---\ntags: [rust, perf]\n---\n\nfoo bar baz",
     );
     write_artifact(
-        tmp.path(), "my-app", "research", "2026-01-11-untagged.md",
+        tmp.path(),
+        "my-app",
+        "research",
+        "2026-01-11-untagged.md",
         "foo bar baz",
     );
 
@@ -877,7 +900,10 @@ fn search_tag_filter_returns_only_tagged_files() {
     let stdout = String::from_utf8_lossy(&output.stdout);
 
     assert!(stdout.contains("tagged"), "should match the tagged file");
-    assert!(!stdout.contains("untagged"), "should not match the untagged file");
+    assert!(
+        !stdout.contains("untagged"),
+        "should not match the untagged file"
+    );
 }
 
 #[test]
@@ -887,7 +913,10 @@ fn search_tag_filter_no_match_returns_no_results() {
     create_project(tmp.path(), "my-app");
 
     write_artifact(
-        tmp.path(), "my-app", "research", "2026-01-10-file.md",
+        tmp.path(),
+        "my-app",
+        "research",
+        "2026-01-10-file.md",
         "---\ntags: [rust]\n---\n\ncontent",
     );
 
@@ -906,7 +935,10 @@ fn search_malformed_frontmatter_does_not_abort_tag_search() {
     create_project(tmp.path(), "my-app");
 
     write_artifact(
-        tmp.path(), "my-app", "research", "2026-01-10-bad.md",
+        tmp.path(),
+        "my-app",
+        "research",
+        "2026-01-10-bad.md",
         "---\n[[ invalid\n---\ncontent",
     );
 
@@ -924,11 +956,17 @@ fn search_latest_returns_only_most_recent_file() {
     create_project(tmp.path(), "my-app");
 
     write_artifact(
-        tmp.path(), "my-app", "research", "2026-01-10-older.md",
+        tmp.path(),
+        "my-app",
+        "research",
+        "2026-01-10-older.md",
         "needle content",
     );
     write_artifact(
-        tmp.path(), "my-app", "research", "2026-02-20-newer.md",
+        tmp.path(),
+        "my-app",
+        "research",
+        "2026-02-20-newer.md",
         "needle content",
     );
 
@@ -939,7 +977,10 @@ fn search_latest_returns_only_most_recent_file() {
     let stdout = String::from_utf8_lossy(&output.stdout);
 
     assert!(stdout.contains("newer"), "should contain the newer file");
-    assert!(!stdout.contains("older"), "should not contain the older file");
+    assert!(
+        !stdout.contains("older"),
+        "should not contain the older file"
+    );
 }
 
 #[test]
@@ -949,26 +990,40 @@ fn search_tag_and_type_and_latest_combined() {
     create_project(tmp.path(), "my-app");
 
     write_artifact(
-        tmp.path(), "my-app", "research", "2026-01-01-r1.md",
+        tmp.path(),
+        "my-app",
+        "research",
+        "2026-01-01-r1.md",
         "---\ntags: [perf]\n---\n\ndata",
     );
     write_artifact(
-        tmp.path(), "my-app", "research", "2026-02-01-r2.md",
+        tmp.path(),
+        "my-app",
+        "research",
+        "2026-02-01-r2.md",
         "---\ntags: [perf]\n---\n\ndata",
     );
     // plan with same tag — should be excluded by --type research
     write_artifact(
-        tmp.path(), "my-app", "plans", "2026-03-01-p1.md",
+        tmp.path(),
+        "my-app",
+        "plans",
+        "2026-03-01-p1.md",
         "---\ntags: [perf]\n---\n\ndata",
     );
 
     let output = wai_cmd(tmp.path())
-        .args(["search", "data", "--tag", "perf", "--type", "research", "--latest"])
+        .args([
+            "search", "data", "--tag", "perf", "--type", "research", "--latest",
+        ])
         .output()
         .unwrap();
     let stdout = String::from_utf8_lossy(&output.stdout);
 
-    assert!(stdout.contains("r2"), "should match the latest research file");
+    assert!(
+        stdout.contains("r2"),
+        "should match the latest research file"
+    );
     assert!(!stdout.contains("r1"), "should exclude older research file");
     assert!(!stdout.contains("p1"), "should exclude the plan file");
 }
@@ -2561,11 +2616,7 @@ fn way_check_agent_skills_present() {
 #[test]
 fn way_check_agent_skills_empty_dir() {
     let tmp = TempDir::new().unwrap();
-    fs::create_dir_all(
-        tmp.path()
-            .join(".wai/resources/agent-config/skills"),
-    )
-    .unwrap();
+    fs::create_dir_all(tmp.path().join(".wai/resources/agent-config/skills")).unwrap();
 
     wai_cmd(tmp.path())
         .args(["way", "--json"])
@@ -3031,7 +3082,9 @@ fn error_not_initialized_is_conversational() {
         .args(["status"])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("Hmm,").or(predicate::str::contains("no project initialized")));
+        .stderr(
+            predicate::str::contains("Hmm,").or(predicate::str::contains("no project initialized")),
+        );
 }
 
 #[test]
@@ -3075,9 +3128,18 @@ fn resource_add_skill_creates_directory_and_skill_md() {
     assert!(skill_md.is_file(), "SKILL.md should be created");
 
     let content = fs::read_to_string(&skill_md).unwrap();
-    assert!(content.contains("---"), "SKILL.md should have frontmatter delimiters");
-    assert!(content.contains("name: my-skill"), "SKILL.md should include skill name");
-    assert!(content.contains("description:"), "SKILL.md should include description field");
+    assert!(
+        content.contains("---"),
+        "SKILL.md should have frontmatter delimiters"
+    );
+    assert!(
+        content.contains("name: my-skill"),
+        "SKILL.md should include skill name"
+    );
+    assert!(
+        content.contains("description:"),
+        "SKILL.md should include description field"
+    );
 }
 
 #[test]
@@ -3106,7 +3168,10 @@ fn resource_add_skill_fails_on_uppercase_name() {
         .args(["resource", "add", "skill", "MySkill"])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("Invalid character").or(predicate::str::contains("Invalid skill")));
+        .stderr(
+            predicate::str::contains("Invalid character")
+                .or(predicate::str::contains("Invalid skill")),
+        );
 }
 
 #[test]
@@ -3143,7 +3208,10 @@ fn resource_add_skill_fails_on_dot_prefix() {
         .args(["resource", "add", "skill", ".hidden"])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("cannot start with '.'").or(predicate::str::contains("Invalid skill")));
+        .stderr(
+            predicate::str::contains("cannot start with '.'")
+                .or(predicate::str::contains("Invalid skill")),
+        );
 }
 
 #[test]
@@ -3173,13 +3241,22 @@ fn resource_add_hierarchical_skill_creates_nested_directory() {
     let skill_dir = tmp
         .path()
         .join(".wai/resources/agent-config/skills/issue/gather");
-    assert!(skill_dir.is_dir(), "nested skill directory should be created");
+    assert!(
+        skill_dir.is_dir(),
+        "nested skill directory should be created"
+    );
 
     let skill_md = skill_dir.join("SKILL.md");
-    assert!(skill_md.is_file(), "SKILL.md should be created in nested directory");
+    assert!(
+        skill_md.is_file(),
+        "SKILL.md should be created in nested directory"
+    );
 
     let content = fs::read_to_string(&skill_md).unwrap();
-    assert!(content.contains("name: issue/gather"), "SKILL.md should include full hierarchical name");
+    assert!(
+        content.contains("name: issue/gather"),
+        "SKILL.md should include full hierarchical name"
+    );
 }
 
 #[test]
@@ -3234,7 +3311,9 @@ fn resource_add_hierarchical_skill_conflicts_with_flat_skill() {
         .args(["resource", "add", "skill", "issue/gather"])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("issue").and(predicate::str::contains("flat skill").or(predicate::str::contains("already exists"))));
+        .stderr(predicate::str::contains("issue").and(
+            predicate::str::contains("flat skill").or(predicate::str::contains("already exists")),
+        ));
 }
 
 // ── wai resource add skill --template ────────────────────────────────────────
@@ -3245,7 +3324,14 @@ fn resource_add_skill_template_gather_contains_wai_search() {
     init_workspace(tmp.path());
 
     wai_cmd(tmp.path())
-        .args(["resource", "add", "skill", "my-gather", "--template", "gather"])
+        .args([
+            "resource",
+            "add",
+            "skill",
+            "my-gather",
+            "--template",
+            "gather",
+        ])
         .assert()
         .success();
 
@@ -3253,10 +3339,22 @@ fn resource_add_skill_template_gather_contains_wai_search() {
         .path()
         .join(".wai/resources/agent-config/skills/my-gather/SKILL.md");
     let content = fs::read_to_string(&skill_md).unwrap();
-    assert!(content.contains("wai search"), "gather template should contain wai search");
-    assert!(content.contains("wai add research"), "gather template should contain wai add research");
-    assert!(content.contains("$ARGUMENTS"), "gather template should use $ARGUMENTS placeholder");
-    assert!(content.contains("$PROJECT"), "gather template should use $PROJECT placeholder");
+    assert!(
+        content.contains("wai search"),
+        "gather template should contain wai search"
+    );
+    assert!(
+        content.contains("wai add research"),
+        "gather template should contain wai add research"
+    );
+    assert!(
+        content.contains("$ARGUMENTS"),
+        "gather template should use $ARGUMENTS placeholder"
+    );
+    assert!(
+        content.contains("$PROJECT"),
+        "gather template should use $PROJECT placeholder"
+    );
 }
 
 #[test]
@@ -3265,7 +3363,14 @@ fn resource_add_skill_template_unknown_fails_with_valid_names() {
     init_workspace(tmp.path());
 
     wai_cmd(tmp.path())
-        .args(["resource", "add", "skill", "my-skill", "--template", "bogus"])
+        .args([
+            "resource",
+            "add",
+            "skill",
+            "my-skill",
+            "--template",
+            "bogus",
+        ])
         .assert()
         .failure()
         .stderr(
@@ -3289,8 +3394,14 @@ fn resource_add_skill_no_template_still_creates_bare_stub() {
         .path()
         .join(".wai/resources/agent-config/skills/bare-skill/SKILL.md");
     let content = fs::read_to_string(&skill_md).unwrap();
-    assert!(content.contains("name: bare-skill"), "bare stub should have skill name");
-    assert!(!content.contains("$ARGUMENTS"), "bare stub should not use $ARGUMENTS");
+    assert!(
+        content.contains("name: bare-skill"),
+        "bare stub should have skill name"
+    );
+    assert!(
+        !content.contains("$ARGUMENTS"),
+        "bare stub should not use $ARGUMENTS"
+    );
 }
 
 // ── wai resource list skills ─────────────────────────────────────────────────
@@ -3464,10 +3575,7 @@ fn resource_import_skills_skips_existing_with_warning() {
         ])
         .assert()
         .success()
-        .stderr(
-            predicate::str::contains("Skipped")
-                .or(predicate::str::contains("already exists")),
-        );
+        .stderr(predicate::str::contains("Skipped").or(predicate::str::contains("already exists")));
 }
 
 #[test]
@@ -3502,7 +3610,10 @@ fn resource_import_skills_copies_full_directory_tree() {
         .path()
         .join(".wai/resources/agent-config/skills/rich-skill");
     assert!(target.join("SKILL.md").is_file());
-    assert!(target.join("examples.md").is_file(), "extra files should be copied");
+    assert!(
+        target.join("examples.md").is_file(),
+        "extra files should be copied"
+    );
     assert!(
         target.join("templates/base.md").is_file(),
         "subdirectory contents should be copied"
@@ -3550,10 +3661,7 @@ fn doctor_detects_stale_inline_projection() {
         tmp.path(),
         "projections:\n  - target: AGENTS.md\n    strategy: inline\n    sources: [my-docs]\n",
     );
-    wai_cmd(tmp.path())
-        .args(["sync"])
-        .assert()
-        .success();
+    wai_cmd(tmp.path()).args(["sync"]).assert().success();
 
     // Modify the source to make the projection stale
     fs::write(source_dir.join("intro.md"), "# Modified content").unwrap();
@@ -3587,10 +3695,7 @@ fn doctor_detects_stale_symlink_projection() {
         tmp.path(),
         "projections:\n  - target: .agents/rules\n    strategy: symlink\n    sources: [link-source]\n",
     );
-    wai_cmd(tmp.path())
-        .args(["sync"])
-        .assert()
-        .success();
+    wai_cmd(tmp.path()).args(["sync"]).assert().success();
 
     // Remove the source file to create a broken symlink
     fs::remove_file(source_dir.join("rule.md")).unwrap();
@@ -3622,10 +3727,7 @@ fn doctor_passes_for_in_sync_inline_projection() {
         tmp.path(),
         "projections:\n  - target: AGENTS.md\n    strategy: inline\n    sources: [sync-docs]\n",
     );
-    wai_cmd(tmp.path())
-        .args(["sync"])
-        .assert()
-        .success();
+    wai_cmd(tmp.path()).args(["sync"]).assert().success();
 
     // Doctor should see the projection as in-sync
     let output = wai_cmd(tmp.path())
@@ -3656,8 +3758,7 @@ fn add_research_no_input_fails_when_multiple_projects() {
         .assert()
         .failure()
         .stderr(
-            predicate::str::contains("Multiple projects")
-                .or(predicate::str::contains("--project")),
+            predicate::str::contains("Multiple projects").or(predicate::str::contains("--project")),
         );
 }
 
@@ -3679,7 +3780,10 @@ fn add_research_explicit_project_works_with_multiple() {
         .unwrap()
         .filter_map(|e| e.ok())
         .collect();
-    assert!(!entries.is_empty(), "research artifact should be in alpha project");
+    assert!(
+        !entries.is_empty(),
+        "research artifact should be in alpha project"
+    );
 }
 
 #[test]
@@ -3704,7 +3808,13 @@ fn add_research_shows_phase_appropriate_suggestions() {
 
     // Add enough research to trigger the "advance to design" suggestion (≥2 artifacts)
     wai_cmd(tmp.path())
-        .args(["add", "research", "--project", "suggest-proj", "first finding"])
+        .args([
+            "add",
+            "research",
+            "--project",
+            "suggest-proj",
+            "first finding",
+        ])
         .assert()
         .success();
 
@@ -3743,8 +3853,7 @@ fn add_research_in_non_research_phase_shows_suggestions() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("wai add research")
-                .or(predicate::str::contains("wai search")),
+            predicate::str::contains("wai add research").or(predicate::str::contains("wai search")),
         );
 }
 
@@ -3759,10 +3868,7 @@ fn close_single_project_creates_handoff() {
     // Create .beads dir so the beads plugin is detected
     fs::create_dir(tmp.path().join(".beads")).unwrap();
 
-    let output = wai_cmd(tmp.path())
-        .args(["close"])
-        .assert()
-        .success();
+    let output = wai_cmd(tmp.path()).args(["close"]).assert().success();
 
     let stdout = String::from_utf8(output.get_output().stdout.clone()).unwrap();
 
@@ -3896,7 +4002,10 @@ fn close_writes_pending_resume_signal() {
 
     let proj_dir = tmp.path().join(".wai/projects/myproject");
     let signal = proj_dir.join(".pending-resume");
-    assert!(signal.exists(), ".pending-resume should be written after close");
+    assert!(
+        signal.exists(),
+        ".pending-resume should be written after close"
+    );
 
     let content = fs::read_to_string(&signal).unwrap();
     let relative = content.trim();
@@ -3977,7 +4086,9 @@ fn prime_single_project_with_handoff() {
         .stdout(predicate::str::contains("wai prime"))
         .stdout(predicate::str::contains("Project: myproject"))
         .stdout(predicate::str::contains("Handoff: 2026-02-23"))
-        .stdout(predicate::str::contains("Completed the initial research phase."));
+        .stdout(predicate::str::contains(
+            "Completed the initial research phase.",
+        ));
 }
 
 #[test]
@@ -4113,10 +4224,22 @@ fn prime_shows_resuming_block_when_pending_resume_present_today() {
         .clone();
     let out = String::from_utf8(stdout).unwrap();
 
-    assert!(out.contains("RESUMING"), "expected RESUMING in output: {out}");
-    assert!(out.contains("Next Steps:"), "expected Next Steps: in output: {out}");
-    assert!(out.contains("Finish src/state.rs"), "expected step 1 in output: {out}");
-    assert!(!out.contains("• Handoff:"), "normal Handoff: line should be suppressed: {out}");
+    assert!(
+        out.contains("RESUMING"),
+        "expected RESUMING in output: {out}"
+    );
+    assert!(
+        out.contains("Next Steps:"),
+        "expected Next Steps: in output: {out}"
+    );
+    assert!(
+        out.contains("Finish src/state.rs"),
+        "expected step 1 in output: {out}"
+    );
+    assert!(
+        !out.contains("• Handoff:"),
+        "normal Handoff: line should be suppressed: {out}"
+    );
 }
 
 #[test]
@@ -4221,7 +4344,10 @@ fn prime_resuming_empty_next_steps_shows_only_header() {
     let out = String::from_utf8(stdout).unwrap();
 
     assert!(out.contains("RESUMING"), "expected RESUMING header: {out}");
-    assert!(!out.contains("Next Steps:"), "no Next Steps: label when section is empty: {out}");
+    assert!(
+        !out.contains("Next Steps:"),
+        "no Next Steps: label when section is empty: {out}"
+    );
 }
 
 #[test]
@@ -4238,7 +4364,10 @@ fn prime_close_prime_close_prime_end_to_end_resume_loop() {
 
     let proj_dir = tmp.path().join(".wai/projects/myproject");
     let signal1 = fs::read_to_string(proj_dir.join(".pending-resume")).unwrap();
-    assert!(!signal1.trim().is_empty(), ".pending-resume written after first close");
+    assert!(
+        !signal1.trim().is_empty(),
+        ".pending-resume written after first close"
+    );
 
     // prime should show RESUMING (handoff dated today by wai close)
     let out1 = wai_cmd(tmp.path())
@@ -4260,7 +4389,11 @@ fn prime_close_prime_close_prime_end_to_end_resume_loop() {
         .success();
 
     let signal2 = fs::read_to_string(proj_dir.join(".pending-resume")).unwrap();
-    assert_ne!(signal1.trim(), signal2.trim(), "second close should overwrite .pending-resume");
+    assert_ne!(
+        signal1.trim(),
+        signal2.trim(),
+        "second close should overwrite .pending-resume"
+    );
 
     // second prime should show RESUMING pointing to the new handoff
     let out2 = wai_cmd(tmp.path())
@@ -4424,7 +4557,13 @@ fn ls_depth_limits_recursion() {
 
     // With --depth 1, only the depth-1 workspace is found
     wai_cmd(root.path())
-        .args(["ls", "--root", root.path().to_str().unwrap(), "--depth", "1"])
+        .args([
+            "ls",
+            "--root",
+            root.path().to_str().unwrap(),
+            "--depth",
+            "1",
+        ])
         .env("NO_COLOR", "1")
         .assert()
         .success()
@@ -4433,7 +4572,13 @@ fn ls_depth_limits_recursion() {
 
     // With --depth 2, both are found
     wai_cmd(root.path())
-        .args(["ls", "--root", root.path().to_str().unwrap(), "--depth", "2"])
+        .args([
+            "ls",
+            "--root",
+            root.path().to_str().unwrap(),
+            "--depth",
+            "2",
+        ])
         .env("NO_COLOR", "1")
         .assert()
         .success()
@@ -4450,7 +4595,9 @@ fn ls_invalid_root_fails_with_diagnostic() {
         .env("NO_COLOR", "1")
         .assert()
         .failure()
-        .stderr(predicate::str::contains("/nonexistent-path-that-does-not-exist"));
+        .stderr(predicate::str::contains(
+            "/nonexistent-path-that-does-not-exist",
+        ));
 }
 
 // ─── wai reflect ─────────────────────────────────────────────────────────────
@@ -4503,8 +4650,7 @@ fn reflect_with_mock_llm_writes_claude_md_and_reflect_meta() {
     assert!(claude_md.contains("Use TDD always"));
 
     // .reflect-meta should be created.
-    let meta_path = tmp.path()
-        .join(".wai/projects/test-proj/.reflect-meta");
+    let meta_path = tmp.path().join(".wai/projects/test-proj/.reflect-meta");
     assert!(meta_path.exists(), ".reflect-meta should be created");
 }
 
@@ -4542,7 +4688,14 @@ fn reflect_empty_diff_skips_write() {
 
     // Target only claude.md so AGENTS.md (also created by init) doesn't interfere.
     wai_cmd(tmp.path())
-        .args(["reflect", "--project", "test-proj", "--output", "claude.md", "--yes"])
+        .args([
+            "reflect",
+            "--project",
+            "test-proj",
+            "--output",
+            "claude.md",
+            "--yes",
+        ])
         .env("WAI_REFLECT_MOCK_RESPONSE", MOCK_REFLECT_CONTENT)
         .env("NO_COLOR", "1")
         .assert()
@@ -4561,7 +4714,11 @@ fn reflect_diff_shown_for_existing_reflect_block() {
 
     // Pre-populate with old content.
     let old_block = "<!-- WAI:REFLECT:START -->\n## Old content\n<!-- WAI:REFLECT:END -->\n";
-    fs::write(tmp.path().join("CLAUDE.md"), format!("# Claude\n{}", old_block)).unwrap();
+    fs::write(
+        tmp.path().join("CLAUDE.md"),
+        format!("# Claude\n{}", old_block),
+    )
+    .unwrap();
 
     wai_cmd(tmp.path())
         .args(["reflect", "--project", "test-proj", "--dry-run"])
@@ -4709,10 +4866,11 @@ fn pipeline_create_and_list() {
         .stderr(predicate::str::contains("Created pipeline 'review'"));
 
     // Definition file must exist
-    assert!(tmp
-        .path()
-        .join(".wai/resources/pipelines/review.yml")
-        .exists());
+    assert!(
+        tmp.path()
+            .join(".wai/resources/pipelines/review.yml")
+            .exists()
+    );
 
     // List must show it
     wai_cmd(tmp.path())
@@ -4911,13 +5069,8 @@ fn pipeline_add_auto_tags_with_pipeline_run_env() {
         .success();
 
     // Find the created research file and verify it has the pipeline-run tag
-    let research_dir = tmp
-        .path()
-        .join(".wai/projects/myproject/research");
-    let entries: Vec<_> = fs::read_dir(&research_dir)
-        .unwrap()
-        .flatten()
-        .collect();
+    let research_dir = tmp.path().join(".wai/projects/myproject/research");
+    let entries: Vec<_> = fs::read_dir(&research_dir).unwrap().flatten().collect();
     assert_eq!(entries.len(), 1, "Expected exactly one research file");
 
     let content = fs::read_to_string(entries[0].path()).unwrap();
@@ -4945,13 +5098,8 @@ fn pipeline_add_merges_user_tags_and_pipeline_run_tag() {
         .assert()
         .success();
 
-    let research_dir = tmp
-        .path()
-        .join(".wai/projects/myproject/research");
-    let entries: Vec<_> = fs::read_dir(&research_dir)
-        .unwrap()
-        .flatten()
-        .collect();
+    let research_dir = tmp.path().join(".wai/projects/myproject/research");
+    let entries: Vec<_> = fs::read_dir(&research_dir).unwrap().flatten().collect();
     let content = fs::read_to_string(entries[0].path()).unwrap();
     assert!(
         content.contains("manual-tag"),
