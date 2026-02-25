@@ -49,6 +49,21 @@ pub fn run(status_only: bool, dry_run: bool) -> Result<()> {
         println!();
         println!("  {} Sync Status", "◆".cyan());
         for proj in &config.projections {
+            if proj.target == "claude-code" {
+                let cc_dir = project_root.join(".claude").join("commands");
+                let exists = cc_dir.exists();
+                let status = if exists {
+                    "synced".green().to_string()
+                } else {
+                    "not synced".yellow().to_string()
+                };
+                println!(
+                    "    {} [claude-code] → .claude/commands/ [{}]",
+                    "•".dimmed(),
+                    status
+                );
+                continue;
+            }
             let target_path = project_root.join(&proj.target);
             let exists = target_path.exists();
             let status = if exists {
@@ -72,6 +87,13 @@ pub fn run(status_only: bool, dry_run: bool) -> Result<()> {
         println!();
         println!("  {} Dry-run — no files will be modified", "◆".cyan());
         for proj in &config.projections {
+            if proj.target == "claude-code" {
+                println!(
+                    "    {} [claude-code] skills/ → .claude/commands/",
+                    "•".dimmed()
+                );
+                continue;
+            }
             println!(
                 "    {} [{}] {} → {}",
                 "•".dimmed(),
@@ -88,6 +110,11 @@ pub fn run(status_only: bool, dry_run: bool) -> Result<()> {
 
     // Execute projections
     for proj in &config.projections {
+        // Built-in targets are dispatched before strategy-based projections.
+        if proj.target == "claude-code" {
+            sync_core::execute_claude_code(&project_root, &config_dir)?;
+            continue;
+        }
         match proj.strategy.as_str() {
             "symlink" => sync_core::execute_symlink(&project_root, &config_dir, proj)?,
             "inline" => sync_core::execute_inline(&project_root, &config_dir, proj)?,

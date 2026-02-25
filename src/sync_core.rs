@@ -12,6 +12,7 @@ use std::path::Path;
 #[derive(Debug, Deserialize)]
 pub(crate) struct Projection {
     pub target: String,
+    #[serde(default)]
     pub strategy: String,
     #[serde(default)]
     pub sources: Vec<String>,
@@ -196,6 +197,186 @@ pub(crate) fn execute_copy(
     Ok(())
 }
 
+/// Translate a category and action segment (kebab-case) to a Claude Code skill name.
+///
+/// Capitalises the first letter of each hyphen-separated word and joins the two
+/// segments with `": "`.  For example:
+/// - `"issue"`, `"gather"` → `"Issue: Gather"`
+/// - `"my-cat"`, `"my-action"` → `"My Cat: My Action"`
+fn translate_skill_name(category: &str, action: &str) -> String {
+    let capitalise = |seg: &str| -> String {
+        seg.split('-')
+            .map(|word| {
+                let mut chars = word.chars();
+                match chars.next() {
+                    None => String::new(),
+                    Some(first) => first.to_uppercase().chain(chars).collect(),
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
+    };
+    format!("{}: {}", capitalise(category), capitalise(action))
+}
+
+/// Parse a SKILL.md and return `(name, description, body)`.
+///
+/// `body` is everything after the closing `---` frontmatter delimiter (may be empty).
+/// Returns `None` if the file cannot be read or the frontmatter is missing/invalid.
+fn parse_skill_for_projection(path: &Path) -> Option<(String, String, String)> {
+    let contents = std::fs::read_to_string(path).ok()?;
+    let mut lines = contents.lines();
+
+    // Expect opening ---
+    let first = lines.next()?.trim();
+    if first != "---" {
+        return None;
+    }
+
+    // Collect frontmatter lines until closing ---
+    let mut fm_lines = Vec::new();
+    for line in lines.by_ref() {
+        if line.trim() == "---" {
+            break;
+        }
+        fm_lines.push(line);
+    }
+    if fm_lines.is_empty() {
+        return None;
+    }
+
+    // Parse only the fields we need
+    #[derive(Deserialize)]
+    struct Fm {
+        name: String,
+        description: String,
+    }
+    let fm: Fm = serde_yaml::from_str(&fm_lines.join("\n")).ok()?;
+    if fm.name.trim().is_empty() || fm.description.trim().is_empty() {
+        return None;
+    }
+
+    // Body is whatever remains after the frontmatter
+    let body: Vec<&str> = lines.collect();
+    // Trim a single leading newline that separates frontmatter from body
+    let body_str = body.join("\n");
+    let body_str = body_str.trim_start_matches('\n').to_string();
+
+    Some((fm.name, fm.description, body_str))
+}
+
+/// Execute a claude-code projection: translate wai hierarchical skills to Claude Code commands.
+///
+/// Scans `config_dir/skills/<category>/<action>/SKILL.md` for all hierarchical skills
+/// and writes `.claude/commands/<category>/<action>.md` with translated frontmatter.
+/// Flat skills (where `SKILL.md` lives directly under `skills/<name>/`) are skipped.
+pub(crate) fn execute_claude_code(project_root: &Path, config_dir: &Path) -> Result<()> {
+    let skills_dir = config_dir.join("skills");
+    if !skills_dir.exists() {
+        log::info("No skills directory found; nothing to sync").into_diagnostic()?;
+        return Ok(());
+    }
+
+    let mut count = 0;
+
+    let mut cat_entries: Vec<_> = std::fs::read_dir(&skills_dir)
+        .into_diagnostic()?
+        .filter_map(|e| e.ok())
+        .collect();
+    cat_entries.sort_by_key(|e| e.file_name());
+
+    for cat_entry in cat_entries {
+        let cat_path = cat_entry.path();
+        if !cat_path.is_dir() {
+            continue;
+        }
+        // Skip flat skills (SKILL.md directly in category dir)
+        if cat_path.join("SKILL.md").exists() {
+            continue;
+        }
+
+        let category = cat_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_string();
+
+        let mut action_entries: Vec<_> = std::fs::read_dir(&cat_path)
+            .into_diagnostic()?
+            .filter_map(|e| e.ok())
+            .collect();
+        action_entries.sort_by_key(|e| e.file_name());
+
+        for action_entry in action_entries {
+            let action_path = action_entry.path();
+            if !action_path.is_dir() {
+                continue;
+            }
+
+            let action = action_path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("")
+                .to_string();
+
+            let skill_file = action_path.join("SKILL.md");
+            if !skill_file.exists() {
+                continue;
+            }
+
+            let Some((_name, description, body)) = parse_skill_for_projection(&skill_file) else {
+                log::warning(format!(
+                    "Skipping {}/{}: missing or invalid frontmatter",
+                    category, action
+                ))
+                .into_diagnostic()?;
+                continue;
+            };
+
+            let cc_name = translate_skill_name(&category, &action);
+            let output = format!(
+                "---\n\
+                 # Auto-generated by wai — do not edit directly\n\
+                 name: \"{}\"\n\
+                 description: \"{}\"\n\
+                 category: \"{}\"\n\
+                 ---\n\
+                 \n\
+                 {}",
+                cc_name, description, category, body
+            );
+
+            let target = project_root
+                .join(".claude")
+                .join("commands")
+                .join(&category)
+                .join(format!("{}.md", action));
+            ensure_parent_dirs(&target)?;
+            std::fs::write(&target, output).into_diagnostic()?;
+
+            log::info(format!(
+                "claude-code → .claude/commands/{}/{}.md",
+                category, action
+            ))
+            .into_diagnostic()?;
+            count += 1;
+        }
+    }
+
+    if count == 0 {
+        log::info("No hierarchical skills found to sync").into_diagnostic()?;
+    } else {
+        log::success(format!(
+            "Synced {} skill{} to .claude/commands/",
+            count,
+            if count == 1 { "" } else { "s" }
+        ))
+        .into_diagnostic()?;
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -376,5 +557,84 @@ mod tests {
 
         execute_inline(&root, &config, &proj).unwrap();
         assert!(root.join("deep/path/out.md").exists());
+    }
+
+    // ── claude-code projection tests ──────────────────────────────────────────
+
+    fn make_skill(config: &std::path::Path, category: &str, action: &str, body: &str) {
+        let skill_dir = config.join("skills").join(category).join(action);
+        fs::create_dir_all(&skill_dir).unwrap();
+        fs::write(skill_dir.join("SKILL.md"), body).unwrap();
+    }
+
+    #[test]
+    fn translate_skill_name_basic() {
+        assert_eq!(translate_skill_name("issue", "gather"), "Issue: Gather");
+        assert_eq!(translate_skill_name("my-cat", "my-action"), "My Cat: My Action");
+        assert_eq!(translate_skill_name("a", "b"), "A: B");
+    }
+
+    #[test]
+    fn claude_code_generates_command_file() {
+        let tmp = TempDir::new().unwrap();
+        let (root, config) = make_config_dir(&tmp);
+
+        make_skill(
+            &config,
+            "issue",
+            "gather",
+            "---\nname: issue/gather\ndescription: Search codebase\n---\n\n# Issue: Gather\n\nDo stuff.\n",
+        );
+
+        execute_claude_code(&root, &config).unwrap();
+
+        let out = root.join(".claude/commands/issue/gather.md");
+        assert!(out.exists(), "output file should be created");
+        let content = fs::read_to_string(&out).unwrap();
+        assert!(content.contains("name: \"Issue: Gather\""), "name should be translated");
+        assert!(content.contains("description: \"Search codebase\""), "description should be copied");
+        assert!(content.contains("category: \"issue\""), "category should be set");
+        assert!(content.contains("Auto-generated by wai"), "auto-generated header should be present");
+        assert!(content.contains("# Issue: Gather"), "body should be retained");
+    }
+
+    #[test]
+    fn claude_code_skips_flat_skills() {
+        let tmp = TempDir::new().unwrap();
+        let (root, config) = make_config_dir(&tmp);
+
+        // Flat skill: SKILL.md directly under skills/<name>/
+        let flat_dir = config.join("skills").join("my-skill");
+        fs::create_dir_all(&flat_dir).unwrap();
+        fs::write(
+            flat_dir.join("SKILL.md"),
+            "---\nname: my-skill\ndescription: A flat skill\n---\n\nBody.\n",
+        )
+        .unwrap();
+
+        execute_claude_code(&root, &config).unwrap();
+
+        // No .claude/commands/my-skill/ should be created
+        assert!(
+            !root.join(".claude/commands/my-skill").exists(),
+            "flat skill should not be synced"
+        );
+    }
+
+    #[test]
+    fn claude_code_creates_parent_dirs() {
+        let tmp = TempDir::new().unwrap();
+        let (root, config) = make_config_dir(&tmp);
+
+        make_skill(
+            &config,
+            "deep",
+            "nested",
+            "---\nname: deep/nested\ndescription: A nested skill\n---\n\nBody.\n",
+        );
+
+        execute_claude_code(&root, &config).unwrap();
+
+        assert!(root.join(".claude/commands/deep/nested.md").exists());
     }
 }

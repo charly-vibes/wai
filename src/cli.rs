@@ -86,7 +86,16 @@ pub enum Commands {
     #[command(subcommand)]
     Phase(PhaseCommands),
 
-    /// Sync agent configs to tool-specific locations
+    /// Sync agent configs to tool-specific locations.
+    ///
+    /// Reads projections from .wai/resources/agent-config/.projections.yml.
+    /// Each projection maps source files to a target location using a strategy
+    /// (symlink, inline, reference, copy).
+    ///
+    /// Built-in target: `claude-code` — translates hierarchical wai skills
+    /// (skills/<category>/<action>/SKILL.md) into Claude Code slash commands
+    /// (.claude/commands/<category>/<action>.md) with translated frontmatter.
+    /// No strategy or sources required for this target.
     Sync {
         /// Only show sync status without modifying files
         #[arg(long)]
