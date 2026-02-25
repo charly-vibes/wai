@@ -2335,12 +2335,15 @@ fn way_check_llm_txt_missing() {
 #[test]
 fn way_check_agent_skills_present() {
     let tmp = TempDir::new().unwrap();
-    fs::create_dir_all(tmp.path().join(".wai/resources/skills")).unwrap();
+    let skills_base = tmp.path().join(".wai/resources/agent-config/skills");
+    fs::create_dir_all(skills_base.join("rule-of-5-universal")).unwrap();
     fs::write(
-        tmp.path().join(".wai/resources/skills/test-SKILL.md"),
-        "# Test Skill",
+        skills_base.join("rule-of-5-universal/SKILL.md"),
+        "# Rule of 5 Universal",
     )
     .unwrap();
+    fs::create_dir_all(skills_base.join("commit")).unwrap();
+    fs::write(skills_base.join("commit/SKILL.md"), "# Commit").unwrap();
 
     wai_cmd(tmp.path())
         .args(["way", "--json"])
@@ -2348,7 +2351,7 @@ fn way_check_agent_skills_present() {
         .success()
         .stdout(
             predicate::str::contains("Agent skills")
-                .and(predicate::str::contains("1 skill(s) configured"))
+                .and(predicate::str::contains("2 skill(s) configured"))
                 .and(predicate::str::contains("\"pass\"")),
         );
 }
@@ -2356,7 +2359,11 @@ fn way_check_agent_skills_present() {
 #[test]
 fn way_check_agent_skills_empty_dir() {
     let tmp = TempDir::new().unwrap();
-    fs::create_dir_all(tmp.path().join(".wai/resources/skills")).unwrap();
+    fs::create_dir_all(
+        tmp.path()
+            .join(".wai/resources/agent-config/skills"),
+    )
+    .unwrap();
 
     wai_cmd(tmp.path())
         .args(["way", "--json"])
@@ -2381,7 +2388,7 @@ fn way_check_agent_skills_missing() {
         .success()
         .stdout(
             predicate::str::contains("Agent skills")
-                .and(predicate::str::contains("No skills directory detected"))
+                .and(predicate::str::contains("No skills configured"))
                 .and(predicate::str::contains("\"info\"")),
         );
 }
