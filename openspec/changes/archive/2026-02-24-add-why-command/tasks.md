@@ -58,8 +58,8 @@
 - [x] 7.4 Integration test with mock LLM (returns fixed response)
 - [x] 7.5 Integration test for fallback behavior (no LLM)
 - [x] 7.6 Integration test for git failure handling (non-git repo)
-- [ ] 7.7 Manual test with real Claude API
-- [ ] 7.8 Manual test with local Ollama
+- [~] 7.7 Manual test with real Claude API — skipped (requires live credentials)
+- [~] 7.8 Manual test with local Ollama — skipped (requires local install)
 
 ## Production Ready - Phase 8: Documentation
 - [x] 8.1 Update `CLAUDE.md` with `wai why` usage examples (all query types)
@@ -72,6 +72,6 @@
 
 ## Polish - Phase 9: Advanced Features
 - [x] 9.1 Integrate `wai why` with global verbosity levels (`-v`/`-vv`/`-vvv`) for prompt, cost, and timing output
-- [ ] 9.2 Add streaming response support (display as tokens arrive) - optional
-- [ ] 9.3 Add usage stats tracking (opt-in telemetry) - optional
-- [ ] 9.4 Consider caching recent queries (15min TTL) - only if latency becomes issue
+- [~] 9.2 Add streaming response support (display as tokens arrive) — skipped (optional)
+- [~] 9.3 Add usage stats tracking (opt-in telemetry) — skipped (optional)
+- [~] 9.4 Consider caching recent queries (15min TTL) — skipped (optional)
