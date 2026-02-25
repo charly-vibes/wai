@@ -65,6 +65,8 @@ pub fn run(cli: Cli) -> Result<()> {
             crate::cli::ResourceCommands::Add(add_cmd) => resource::run_add(add_cmd),
             crate::cli::ResourceCommands::List(list_cmd) => resource::run_list(list_cmd),
             crate::cli::ResourceCommands::Import(import_cmd) => resource::run_import(import_cmd),
+            crate::cli::ResourceCommands::Install(args) => resource::run_install(args),
+            crate::cli::ResourceCommands::Export(args) => resource::run_export(args),
         },
         Some(Commands::Close { project }) => close::run(project),
         Some(Commands::Prime { project }) => prime::run(project),

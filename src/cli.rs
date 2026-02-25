@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 use std::path::PathBuf;
 
 const VERSION: &str = concat!(
@@ -506,9 +506,25 @@ pub enum ResourceCommands {
     #[command(subcommand)]
     List(ResourceListCommands),
 
-    /// Import resources
+    /// Import resources from a directory or archive
     #[command(subcommand)]
     Import(ResourceImportCommands),
+
+    /// Install a skill globally or from another repository
+    ///
+    /// EXAMPLES
+    ///   wai resource install issue/gather --global
+    ///     Copies the skill from the current project into ~/.wai/resources/skills/
+    ///
+    ///   wai resource install issue/gather --from-repo ../other-project
+    ///     Copies the skill from another repository into the current project's skills directory
+    Install(ResourceInstallArgs),
+
+    /// Export skills to a tar.gz archive for sharing
+    ///
+    /// EXAMPLES
+    ///   wai resource export issue/gather impl/run --output skills.tar.gz
+    Export(ResourceExportArgs),
 }
 
 #[derive(Subcommand)]
@@ -554,4 +570,48 @@ pub enum ResourceImportCommands {
         #[arg(long)]
         from: Option<String>,
     },
+
+    /// Import skills from a tar.gz archive
+    ///
+    /// EXAMPLES
+    ///   wai resource import archive skills.tar.gz
+    ///   wai resource import archive skills.tar.gz --yes
+    Archive {
+        /// Path to the tar.gz archive to import
+        file: String,
+
+        /// Overwrite existing skills without prompting
+        #[arg(long)]
+        yes: bool,
+    },
+}
+
+#[derive(Args)]
+pub struct ResourceInstallArgs {
+    /// Skill name to install (e.g. "my-skill" or "issue/gather")
+    pub skill: String,
+
+    /// Install skill globally to ~/.wai/resources/skills/
+    ///
+    /// Copies the skill from the current project's skills directory into the
+    /// global library, making it available in all projects.
+    #[arg(long, conflicts_with = "from_repo")]
+    pub global: bool,
+
+    /// Copy skill from another repository into the current project
+    ///
+    /// Reads from <PATH>/.wai/resources/agent-config/skills/<skill>/SKILL.md
+    #[arg(long, value_name = "PATH", conflicts_with = "global")]
+    pub from_repo: Option<String>,
+}
+
+#[derive(Args)]
+pub struct ResourceExportArgs {
+    /// Skill names to export (e.g. "issue/gather" "impl/run")
+    #[arg(value_name = "SKILL", required = true)]
+    pub skills: Vec<String>,
+
+    /// Output archive file path (e.g. skills.tar.gz)
+    #[arg(long, value_name = "FILE")]
+    pub output: String,
 }
