@@ -2,23 +2,24 @@ version: 2
 project_name: wai
 
 builds:
-  - builder: rust
+  - builder: prebuilt
     binary: wai
-    # Each platform builds its own targets via goreleaser split jobs in CI.
+    # Binaries are built by platform-specific CI jobs and staged under bins/.
     # Linux (ubuntu): x86_64-unknown-linux-gnu + aarch64-unknown-linux-gnu (cross via gcc-aarch64-linux-gnu)
     # macOS (macos-latest): x86_64-apple-darwin + aarch64-apple-darwin
     # Windows (windows-latest): x86_64-pc-windows-msvc
-    targets:
-      - x86_64-unknown-linux-gnu
-      - aarch64-unknown-linux-gnu
-      - x86_64-apple-darwin
-      - aarch64-apple-darwin
-      - x86_64-pc-windows-msvc
-    flags:
-      - --release
-      - --locked
-    env:
-      - CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    prebuilt:
+      path: "bins/{{ .Os }}_{{ .Arch }}/{{ .Binary }}{{ .Ext }}"
 
 archives:
   - format: tar.gz

@@ -22,13 +22,11 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  goreleaser-linux:
+  build-linux:
     name: Build Linux
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -43,27 +41,31 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gcc-aarch64-linux-gnu
 
-      - uses: goreleaser/goreleaser-action@v6
-        with:
-          version: "~> v2"
-          args: release --split --clean
+      - name: Build x86_64 Linux
+        run: cargo build --release --locked --target x86_64-unknown-linux-gnu
+
+      - name: Build aarch64 Linux
+        run: cargo build --release --locked --target aarch64-unknown-linux-gnu
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GGOOS: linux
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+
+      - name: Stage binaries
+        run: |
+          mkdir -p bins/linux_amd64 bins/linux_arm64
+          cp target/x86_64-unknown-linux-gnu/release/wai bins/linux_amd64/wai
+          cp target/aarch64-unknown-linux-gnu/release/wai bins/linux_arm64/wai
 
       - uses: actions/upload-artifact@v4
         with:
-          name: dist-linux
-          path: dist/
+          name: bins-linux
+          path: bins/
           retention-days: 1
 
-  goreleaser-darwin:
+  build-darwin:
     name: Build macOS
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -73,27 +75,29 @@ jobs:
         with:
           key: darwin
 
-      - uses: goreleaser/goreleaser-action@v6
-        with:
-          version: "~> v2"
-          args: release --split --clean
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GGOOS: darwin
+      - name: Build x86_64 macOS
+        run: cargo build --release --locked --target x86_64-apple-darwin
+
+      - name: Build aarch64 macOS
+        run: cargo build --release --locked --target aarch64-apple-darwin
+
+      - name: Stage binaries
+        run: |
+          mkdir -p bins/darwin_amd64 bins/darwin_arm64
+          cp target/x86_64-apple-darwin/release/wai bins/darwin_amd64/wai
+          cp target/aarch64-apple-darwin/release/wai bins/darwin_arm64/wai
 
       - uses: actions/upload-artifact@v4
         with:
-          name: dist-darwin
-          path: dist/
+          name: bins-darwin
+          path: bins/
           retention-days: 1
 
-  goreleaser-windows:
+  build-windows:
     name: Build Windows
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -103,23 +107,24 @@ jobs:
         with:
           key: windows
 
-      - uses: goreleaser/goreleaser-action@v6
-        with:
-          version: "~> v2"
-          args: release --split --clean
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GGOOS: windows
+      - name: Build x86_64 Windows
+        run: cargo build --release --locked --target x86_64-pc-windows-msvc
+
+      - name: Stage binaries
+        shell: bash
+        run: |
+          mkdir -p bins/windows_amd64
+          cp target/x86_64-pc-windows-msvc/release/wai.exe bins/windows_amd64/wai.exe
 
       - uses: actions/upload-artifact@v4
         with:
-          name: dist-windows
-          path: dist/
+          name: bins-windows
+          path: bins/
           retention-days: 1
 
-  goreleaser-merge:
-    name: Merge & Publish
-    needs: [goreleaser-linux, goreleaser-darwin, goreleaser-windows]
+  publish:
+    name: Publish Release
+    needs: [build-linux, build-darwin, build-windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -128,14 +133,14 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          pattern: dist-*
-          path: dist/
+          pattern: bins-*
+          path: bins/
           merge-multiple: true
 
       - uses: goreleaser/goreleaser-action@v6
         with:
           version: "~> v2"
-          args: continue --merge
+          args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
