@@ -518,9 +518,21 @@ pub enum ResourceAddCommands {
     /// Skill names may be flat ("my-skill") or hierarchical ("category/action").
     /// Only one '/' separator is allowed; each segment must be lowercase
     /// letters, digits, and hyphens (no leading/trailing hyphens).
+    ///
+    /// Built-in templates: gather, create, tdd, rule-of-5
     Skill {
         /// Skill name (e.g. "my-skill" or "issue/gather")
         name: String,
+
+        /// Start from a built-in template.
+        ///
+        /// Valid templates:
+        ///   gather    — research stub: wai search, codebase exploration, wai add research
+        ///   create    — creation stub: retrieve plan, bd create items, wire dependencies
+        ///   tdd       — TDD stub: RED/GREEN/REFACTOR loop with cargo test and commits
+        ///   rule-of-5 — review stub: 5 passes with convergence check and APPROVED/NEEDS_CHANGES/NEEDS_HUMAN verdict
+        #[arg(long, value_name = "TEMPLATE")]
+        template: Option<String>,
     },
 }
 

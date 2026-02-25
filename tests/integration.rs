@@ -3207,6 +3207,62 @@ fn resource_add_hierarchical_skill_conflicts_with_flat_skill() {
         .stderr(predicate::str::contains("issue").and(predicate::str::contains("flat skill").or(predicate::str::contains("already exists"))));
 }
 
+// ── wai resource add skill --template ────────────────────────────────────────
+
+#[test]
+fn resource_add_skill_template_gather_contains_wai_search() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["resource", "add", "skill", "my-gather", "--template", "gather"])
+        .assert()
+        .success();
+
+    let skill_md = tmp
+        .path()
+        .join(".wai/resources/agent-config/skills/my-gather/SKILL.md");
+    let content = fs::read_to_string(&skill_md).unwrap();
+    assert!(content.contains("wai search"), "gather template should contain wai search");
+    assert!(content.contains("wai add research"), "gather template should contain wai add research");
+    assert!(content.contains("$ARGUMENTS"), "gather template should use $ARGUMENTS placeholder");
+    assert!(content.contains("$PROJECT"), "gather template should use $PROJECT placeholder");
+}
+
+#[test]
+fn resource_add_skill_template_unknown_fails_with_valid_names() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["resource", "add", "skill", "my-skill", "--template", "bogus"])
+        .assert()
+        .failure()
+        .stderr(
+            predicate::str::contains("gather")
+                .and(predicate::str::contains("tdd"))
+                .and(predicate::str::contains("rule-of-5")),
+        );
+}
+
+#[test]
+fn resource_add_skill_no_template_still_creates_bare_stub() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["resource", "add", "skill", "bare-skill"])
+        .assert()
+        .success();
+
+    let skill_md = tmp
+        .path()
+        .join(".wai/resources/agent-config/skills/bare-skill/SKILL.md");
+    let content = fs::read_to_string(&skill_md).unwrap();
+    assert!(content.contains("name: bare-skill"), "bare stub should have skill name");
+    assert!(!content.contains("$ARGUMENTS"), "bare stub should not use $ARGUMENTS");
+}
+
 // ── wai resource list skills ─────────────────────────────────────────────────
 
 #[test]

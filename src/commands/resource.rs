@@ -179,7 +179,7 @@ pub fn parse_skill_frontmatter(path: &Path) -> Option<SkillMetadata> {
 
 pub fn run_add(cmd: ResourceAddCommands) -> Result<()> {
     match cmd {
-        ResourceAddCommands::Skill { name } => add_skill(&name),
+        ResourceAddCommands::Skill { name, template } => add_skill(&name, template.as_deref()),
     }
 }
 
@@ -195,12 +195,18 @@ pub fn run_import(cmd: ResourceImportCommands) -> Result<()> {
     }
 }
 
-fn add_skill(name: &str) -> Result<()> {
+fn add_skill(name: &str, template_name: Option<&str>) -> Result<()> {
     let project_root = require_project()?;
     require_safe_mode("add skill")?;
 
     // Validate skill name
     validate_skill_name(name)?;
+
+    // Resolve template body
+    let body = match template_name {
+        Some(t) => skill_template_body(t)?,
+        None => "Instructions go here.\n".to_string(),
+    };
 
     // Build path to skills directory
     let skills_dir = agent_config_dir(&project_root).join(SKILLS_DIR);
@@ -239,28 +245,122 @@ fn add_skill(name: &str) -> Result<()> {
     // Create skill directory (create_dir_all handles intermediate category dirs)
     fs::create_dir_all(&skill_dir).into_diagnostic()?;
 
-    // Create SKILL.md with template
+    // Create SKILL.md with frontmatter + body
     let skill_file = skill_dir.join("SKILL.md");
     let title = kebab_to_title_case(name);
-    let template = format!(
-        r#"---
-name: {}
-description: ""
----
-
-# {}
-
-Instructions go here.
-"#,
-        name, title
+    let content = format!(
+        "---\nname: {}\ndescription: \"\"\n---\n\n# {}\n\n{}",
+        name, title, body
     );
 
-    fs::write(&skill_file, template).into_diagnostic()?;
+    fs::write(&skill_file, content).into_diagnostic()?;
 
     log::success(format!("Created skill '{}'", name)).into_diagnostic()?;
     log::info("Remember to run `wai sync` to update agent config").into_diagnostic()?;
 
     Ok(())
+}
+
+const VALID_TEMPLATES: &[&str] = &["gather", "create", "tdd", "rule-of-5"];
+
+fn skill_template_body(name: &str) -> Result<String> {
+    match name {
+        "gather" => Ok(r#"## Instructions
+
+Use this skill to research $ARGUMENTS in the $PROJECT project.
+Repository root: $REPO_ROOT
+
+1. Search existing artifacts:
+   ```
+   wai search "$ARGUMENTS"
+   ```
+2. Explore the codebase at $REPO_ROOT relevant to $ARGUMENTS.
+3. Gather findings and record them:
+   ```
+   wai add research "findings about $ARGUMENTS"
+   ```
+4. Summary: list key facts, open questions, and recommended next steps.
+"#
+        .to_string()),
+
+        "create" => Ok(r#"## Instructions
+
+Use this skill to create items for $ARGUMENTS in the $PROJECT project.
+Repository root: $REPO_ROOT
+
+1. Retrieve the latest plan:
+   ```
+   wai search "$ARGUMENTS" --type plan --latest
+   ```
+2. For each item in the plan:
+   - Create a tracking issue:
+     ```
+     bd create --title="..." --type=task
+     ```
+   - Wire dependencies with `bd dep add <blocked> <blocker>` as needed.
+3. Confirm all items are created and visible with `bd ready`.
+"#
+        .to_string()),
+
+        "tdd" => Ok(r#"## Instructions
+
+Use this skill to implement $ARGUMENTS in the $PROJECT project using TDD.
+Repository root: $REPO_ROOT
+
+### RED
+1. Write a failing test for the next behaviour.
+2. Run tests — confirm the new test fails:
+   ```
+   cd $REPO_ROOT && cargo test
+   ```
+
+### GREEN
+3. Write the minimum code to make the test pass.
+4. Run tests — confirm all tests pass.
+
+### REFACTOR
+5. Clean up without changing behaviour.
+6. Run tests — confirm all tests still pass.
+
+Commit after each GREEN/REFACTOR cycle:
+```
+git add <files>
+git commit -m "..."
+```
+"#
+        .to_string()),
+
+        "rule-of-5" => Ok(r#"## Instructions
+
+Use this skill to review $ARGUMENTS in the $PROJECT project using 5 passes.
+Repository root: $REPO_ROOT
+
+Run 5 independent review passes. After each pass, record findings.
+Check for convergence: if passes 4 and 5 agree, stop early.
+
+### Pass structure
+- What is the purpose of this component?
+- Does the implementation match the intent?
+- Are there edge cases, error paths, or missing tests?
+- Is the interface clear and consistent?
+
+### Verdict
+
+After all passes, output one of:
+- **APPROVED** — ready to merge/deploy
+- **NEEDS_CHANGES** — list specific required changes
+- **NEEDS_HUMAN** — ambiguous or high-risk; escalate to a human reviewer
+"#
+        .to_string()),
+
+        other => {
+            miette::bail!(
+                "Unknown template '{}'. Valid templates: {}",
+                other,
+                VALID_TEMPLATES.join(", ")
+            )
+        }
+    }
 }
 
 /// Converts a skill name to Title Case for use in templates.
