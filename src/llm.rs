@@ -208,6 +208,7 @@ impl ClaudeCliClient {
 /// Claude Code sets `CLAUDECODE` to a non-empty value when an agent is active.
 /// An empty string — used by [`ClaudeCliClient`] to bypass the nested-session
 /// guard — is treated as false.
+#[allow(dead_code)]
 pub fn in_agent_session() -> bool {
     std::env::var("CLAUDECODE")
         .map(|v| !v.is_empty())
