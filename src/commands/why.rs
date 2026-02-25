@@ -780,6 +780,26 @@ pub fn llm_error_hint(err: &LlmError) -> (String, Option<String>) {
     }
 }
 
+// ── Explicit-backend agent hint (7.1) ────────────────────────────────────────
+
+/// When an explicit backend (`[why] llm = "claude"` or `"ollama"`) fails and
+/// the system falls back to search inside a Claude Code session, return a hint
+/// suggesting agent mode as a zero-cost alternative.
+///
+/// Returns `None` when the hint is not applicable (auto-detect config, or not
+/// inside a Claude Code session).
+pub fn explicit_backend_agent_hint(cfg: &WhyConfig) -> Option<String> {
+    let is_explicit = matches!(cfg.llm.as_deref(), Some("claude") | Some("ollama"));
+    if is_explicit && crate::llm::in_agent_session() {
+        Some(
+            "You're in a Claude Code session — try `llm = \"agent\"` in [why] for zero-cost queries."
+                .to_string(),
+        )
+    } else {
+        None
+    }
+}
+
 // ── Fallback mode (6.4) ───────────────────────────────────────────────────────
 
 /// Controls behavior when no LLM is available or an LLM call fails.
@@ -1044,6 +1064,9 @@ pub fn run(query: String, no_llm: bool, json: bool, verbose: u8) -> Result<()> {
                     "○".dimmed()
                 );
             }
+            if let Some(hint) = explicit_backend_agent_hint(&why_cfg) {
+                eprintln!("  {} {}", "→".cyan(), hint);
+            }
             return super::search::run(query, None, None, false, None);
         }
     };
@@ -1088,6 +1111,9 @@ pub fn run(query: String, no_llm: bool, json: bool, verbose: u8) -> Result<()> {
             eprintln!("  {} {}. Falling back to search.", "⚠".yellow(), msg);
             if let Some(h) = hint {
                 eprintln!("  {} {}", "○".dimmed(), h);
+            }
+            if let Some(h) = explicit_backend_agent_hint(&why_cfg) {
+                eprintln!("  {} {}", "→".cyan(), h);
             }
             return super::search::run(query, None, None, false, None);
         }
@@ -1644,6 +1670,46 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(fallback_mode(&cfg), FallbackMode::Search);
+    }
+
+    // ── explicit_backend_agent_hint (7.1) ──
+
+    #[test]
+    fn explicit_backend_failure_in_claude_code_suggests_agent_mode() {
+        unsafe { std::env::set_var("CLAUDECODE", "1") };
+        let cfg = WhyConfig {
+            llm: Some("claude".to_string()),
+            ..Default::default()
+        };
+        let hint = explicit_backend_agent_hint(&cfg);
+        unsafe { std::env::remove_var("CLAUDECODE") };
+        let h = hint.expect("hint should be present for explicit claude + CLAUDECODE");
+        assert!(h.contains("agent"), "hint should mention agent mode");
+    }
+
+    #[test]
+    fn explicit_ollama_failure_in_claude_code_suggests_agent_mode() {
+        unsafe { std::env::set_var("CLAUDECODE", "1") };
+        let cfg = WhyConfig {
+            llm: Some("ollama".to_string()),
+            ..Default::default()
+        };
+        let hint = explicit_backend_agent_hint(&cfg);
+        unsafe { std::env::remove_var("CLAUDECODE") };
+        let h = hint.expect("hint should be present for explicit ollama + CLAUDECODE");
+        assert!(h.contains("agent"), "hint should mention agent mode");
+    }
+
+    #[test]
+    fn auto_detect_backend_in_claude_code_no_hint() {
+        unsafe { std::env::set_var("CLAUDECODE", "1") };
+        let cfg = WhyConfig::default(); // llm = None → auto-detect
+        let hint = explicit_backend_agent_hint(&cfg);
+        unsafe { std::env::remove_var("CLAUDECODE") };
+        assert!(
+            hint.is_none(),
+            "no hint for auto-detect config (agent is already preferred)"
+        );
     }
 
     // ── is_external_backend / privacy_notice_needed (6.5 / 6.6) ──
