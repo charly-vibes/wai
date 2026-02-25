@@ -38,6 +38,10 @@ pub struct PluginDef {
     #[serde(default)]
     pub description: String,
     #[serde(default)]
+    pub intent: Option<String>,
+    #[serde(default)]
+    pub success_criteria: Option<String>,
+    #[serde(default)]
     pub detector: Option<DetectorDef>,
     #[serde(default)]
     pub commands: Vec<PluginCommand>,
@@ -64,6 +68,8 @@ pub fn builtin_plugins() -> Vec<PluginDef> {
         PluginDef {
             name: "git".to_string(),
             description: "Git version control integration".to_string(),
+            intent: None,
+            success_criteria: None,
             detector: Some(DetectorDef {
                 detector_type: "directory".to_string(),
                 path: ".git".to_string(),
@@ -89,6 +95,8 @@ pub fn builtin_plugins() -> Vec<PluginDef> {
         PluginDef {
             name: "beads".to_string(),
             description: "Integration with beads issue tracker".to_string(),
+            intent: None,
+            success_criteria: None,
             detector: Some(DetectorDef {
                 detector_type: "directory".to_string(),
                 path: ".beads".to_string(),
@@ -133,6 +141,8 @@ pub fn builtin_plugins() -> Vec<PluginDef> {
         PluginDef {
             name: "openspec".to_string(),
             description: "OpenSpec specification management".to_string(),
+            intent: None,
+            success_criteria: None,
             detector: Some(DetectorDef {
                 detector_type: "directory".to_string(),
                 path: "openspec".to_string(),

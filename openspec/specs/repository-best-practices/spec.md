@@ -1,9 +1,15 @@
 # repository-best-practices Specification
 
 ## Purpose
-TBD - created by archiving change add-repo-best-practices. Update Purpose after archive.
+
+The `wai way` command reports on agnostic repository capabilities rather than specific tool implementations. Each capability check includes its intent and success criteria to provide context for both human users and AI agents. Verbose output (`-v`) shows intent and criteria; JSON output (`--json`) always includes them.
+
 ## Requirements
-### Requirement: Task Runner Check
+
+### Requirement: Command Standardization
+
+**Intent:** Provide a single, tool-agnostic entry point for common repository tasks (build, test, deploy).
+**Success Criteria:** A standard interface (justfile, Makefile, npm scripts) exists for common tasks.
 
 The system SHALL check for a task runner (justfile or Makefile) and recommend adoption if missing. When a justfile is found, the system SHALL parse it for useful recipes and display contextual suggestions to help users discover key workflows.
 
@@ -11,343 +17,340 @@ The system SHALL check for a task runner (justfile or Makefile) and recommend ad
 
 - **WHEN** `wai way` runs
 - **THEN** it checks for `justfile` or `Makefile` in current directory
-- **AND** reports WayStatus::Pass if either exists
-- **AND** includes message "Task runner: {filename} found"
+- **AND** reports pass if either exists
+- **AND** the capability name in output is "Command standardization"
 
 #### Scenario: Justfile with useful recipes
 
 - **WHEN** `wai way` runs and a `justfile` is found
 - **THEN** it parses the justfile for known useful recipe names
-- **AND** displays a "Useful recipes:" line listing matched recipes with short descriptions
-- **AND** the known recipe names and their descriptions are:
-  - `install` → "dogfood locally"
-  - `serve` → "start local server"
-  - `dev` → "start dev server"
-  - `start` → "start application"
-  - `setup` → "bootstrap dev environment"
-  - `docs` → "build documentation"
-  - `docs-serve` → "preview docs locally"
-  - `ci` → "run full CI pipeline"
-  - `test` → "run tests"
-  - `lint` → "run linter"
-  - `fmt` → "format code"
-  - `release` → "create a GitHub release (gh cli)"
-- **AND** only recipes that exist in the justfile are shown
-- **AND** recipes are displayed as `just {name}` with their description (e.g., "just install — dogfood locally")
-
-#### Scenario: Justfile with no recognized recipes
-
-- **WHEN** `wai way` runs and a `justfile` is found but contains none of the known recipe names
-- **THEN** it reports WayStatus::Pass with "Task runner: justfile found"
-- **AND** does not display a "Useful recipes:" line
+- **AND** displays a message listing matched recipes
 
 #### Scenario: No task runner
 
 - **WHEN** `wai way` runs and neither `justfile` nor `Makefile` exists
-- **THEN** it reports WayStatus::Info
-- **AND** includes message "Task runner: Not configured"
-- **AND** suggests "Create a justfile to standardize common development tasks (see: https://just.systems)"
+- **THEN** it reports info status
+- **AND** suggests adding a justfile
 
-### Requirement: Git Hook Manager Configuration Check
+### Requirement: Pre-commit Quality Gates
+
+**Intent:** Prevent low-quality commits by running automated checks before code is saved to history.
+**Success Criteria:** Automated checks (linters, tests) run automatically before code is committed.
 
 The system SHALL check for git hook manager configuration (prek or pre-commit) and recommend prek if missing.
 
 #### Scenario: Prek configured
 
-- **WHEN** `wai way` runs
-- **THEN** it checks for `.prek.toml` in current directory
-- **AND** reports WayStatus::Pass if file exists and parses as valid TOML
-- **AND** includes message "Git hooks: prek configured"
+- **WHEN** `wai way` runs and `.prek.toml` exists
+- **THEN** it reports pass
+- **AND** the capability name in output is "Pre-commit quality gates"
 
 #### Scenario: Pre-commit configured (legacy)
 
 - **WHEN** `wai way` runs and `.pre-commit-config.yaml` exists (but not `.prek.toml`)
-- **THEN** it reports WayStatus::Pass
-- **AND** includes message "Git hooks: pre-commit configured"
-- **AND** suggests "Consider migrating to prek for better performance (https://github.com/pcarrier/prek)"
-
-#### Scenario: Invalid prek config
-
-- **WHEN** `wai way` runs and `.prek.toml` exists but is invalid TOML
-- **THEN** it reports WayStatus::Info
-- **AND** includes message "Git hooks: prek config invalid"
-- **AND** suggests "Fix TOML syntax in .prek.toml"
+- **THEN** it reports pass
+- **AND** suggests migrating to prek
 
 #### Scenario: No hook manager config
 
 - **WHEN** `wai way` runs and neither `.prek.toml` nor `.pre-commit-config.yaml` exists
-- **THEN** it reports WayStatus::Info
-- **AND** includes message "Git hooks: Not configured"
-- **AND** suggests "Create .prek.toml to automate formatting and linting before commits (https://github.com/pcarrier/prek)"
+- **THEN** it reports info status
+- **AND** suggests adding prek
 
-### Requirement: EditorConfig Check
+### Requirement: Consistent Formatting
+
+**Intent:** Ensure consistent code formatting across different editors and IDEs.
+**Success Criteria:** Project-wide style rules are enforced by a shared configuration file.
 
 The system SHALL check for EditorConfig and recommend it for editor-agnostic formatting rules.
 
 #### Scenario: EditorConfig present
 
-- **WHEN** `wai way` runs
-- **THEN** it checks for `.editorconfig` in current directory
-- **AND** reports WayStatus::Pass if file exists
-- **AND** includes message "Editor config: .editorconfig found"
+- **WHEN** `wai way` runs and `.editorconfig` exists
+- **THEN** it reports pass
+- **AND** the capability name in output is "Consistent formatting"
 
 #### Scenario: No EditorConfig
 
 - **WHEN** `wai way` runs and `.editorconfig` doesn't exist
-- **THEN** it reports WayStatus::Info
-- **AND** includes message "Editor config: Not configured"
-- **AND** suggests "Create .editorconfig for consistent formatting across 40+ editors (https://editorconfig.org)"
+- **THEN** it reports info status
+- **AND** suggests adding .editorconfig
 
-### Requirement: Documentation Standards Check
+### Requirement: Project Documentation
+
+**Intent:** Provide essential project identity, onboarding, and legal/contribution guidance.
+**Success Criteria:** Essential files (README, .gitignore, LICENSE) provide project context and rules.
 
 The system SHALL check for essential documentation files (.gitignore, README.md, CONTRIBUTING.md, LICENSE) and recommend creating missing ones.
 
 #### Scenario: All documentation present
 
-- **WHEN** `wai way` runs
-- **THEN** it checks for `.gitignore`, `README.md`, `CONTRIBUTING.md`, and `LICENSE` in current directory
-- **AND** reports WayStatus::Pass if all four exist
-- **AND** includes message "Documentation: Complete (.gitignore, README, CONTRIBUTING, LICENSE)"
+- **WHEN** `wai way` runs and all four files exist
+- **THEN** it reports pass
+- **AND** the capability name in output is "Project documentation"
 
 #### Scenario: Missing critical files
 
 - **WHEN** `wai way` runs and `.gitignore` or `README.md` are missing
-- **THEN** it reports WayStatus::Info
-- **AND** includes message "Documentation: Missing critical files (.gitignore and/or README.md)"
-- **AND** suggests "Start with .gitignore and README.md (essential for any repository)"
-- **AND** displays with high priority marker (⚠️ critical) in output
+- **THEN** it reports info status with ⚠️ indicator
+- **AND** suggests adding the missing critical files
 
 #### Scenario: Partial documentation
 
-- **WHEN** `wai way` runs and some documentation files are missing (but .gitignore and README.md exist)
-- **THEN** it reports WayStatus::Info
-- **AND** lists missing files in message (comma-separated with "and" before last item)
-- **AND** suggests "Add CONTRIBUTING.md and/or LICENSE for better project documentation"
+- **WHEN** `wai way` runs and some files are present but not all
+- **THEN** it reports based on whether critical files exist
 
 #### Scenario: No documentation
 
 - **WHEN** `wai way` runs and none of the documentation files exist
-- **THEN** it reports WayStatus::Info
-- **AND** includes message "Documentation: Not configured"
-- **AND** suggests "Start with .gitignore and README.md, then add CONTRIBUTING.md and LICENSE"
+- **THEN** it reports info status
 
-### Requirement: AI Assistant Instructions Check
+### Requirement: AI-Agent Context
+
+**Intent:** Provide persistent "rules of the road" and project context for AI collaborators.
+**Success Criteria:** Persistent instructions define coding standards and context for AI assistants.
 
 The system SHALL check for AI assistant instructions file and recommend one if missing.
 
 #### Scenario: CLAUDE.md present
 
 - **WHEN** `wai way` runs and `CLAUDE.md` exists
-- **THEN** it reports WayStatus::Pass
-- **AND** includes message "AI assistant instructions found (CLAUDE.md)"
+- **THEN** it reports pass
+- **AND** the capability name in output is "AI-agent context"
+- **AND** if no WAI:REFLECT block is found, suggests running `wai reflect`
 
 #### Scenario: AGENTS.md present
 
 - **WHEN** `wai way` runs and `AGENTS.md` exists (but not CLAUDE.md)
-- **THEN** it reports WayStatus::Pass
-- **AND** includes message "AI instructions: AGENTS.md found"
-
-#### Scenario: Both files present
-
-- **WHEN** `wai way` runs and both `CLAUDE.md` and `AGENTS.md` exist
-- **THEN** it reports WayStatus::Pass
-- **AND** includes message "AI instructions: CLAUDE.md and AGENTS.md found"
+- **THEN** it reports pass
+- **AND** suggests adding CLAUDE.md for Claude Code compatibility
 
 #### Scenario: No AI instructions
 
 - **WHEN** `wai way` runs and neither `CLAUDE.md` nor `AGENTS.md` exists
-- **THEN** it reports WayStatus::Info
-- **AND** includes message "AI instructions: Not configured"
-- **AND** suggests "Create CLAUDE.md to provide project context and coding standards for AI assistants (also consider llm.txt for broader AI tool compatibility)"
+- **THEN** it reports info status
+- **AND** suggests creating CLAUDE.md
 
-### Requirement: CI/CD Configuration Check
+### Requirement: Automated Verification
+
+**Intent:** Ensure code quality and correctness through automated builds and tests on every change.
+**Success Criteria:** Every change is automatically validated by a remote build/test pipeline.
 
 The system SHALL check for CI/CD configuration and recommend setup if missing.
 
 #### Scenario: GitHub Actions configured
 
-- **WHEN** `wai way` runs
-- **THEN** it checks for `.github/workflows/` directory with at least one `.yml` or `.yaml` file
-- **AND** reports WayStatus::Pass if workflow files exist
-- **AND** includes message "CI/CD: GitHub Actions configured"
+- **WHEN** `wai way` runs and `.github/workflows/` contains at least one workflow file
+- **THEN** it reports pass
+- **AND** the capability name in output is "Automated verification"
 
 #### Scenario: Empty workflows directory
 
-- **WHEN** `wai way` runs and `.github/workflows/` exists but contains no `.yml` or `.yaml` files
-- **THEN** it reports WayStatus::Info
-- **AND** includes message "CI/CD: Workflows directory empty"
-- **AND** suggests "Add workflow files to .github/workflows/ for automated testing and checks"
+- **WHEN** `wai way` runs and `.github/workflows/` exists but is empty
+- **THEN** it reports info status
+
+#### Scenario: GitLab CI or CircleCI configured
+
+- **WHEN** `wai way` runs and `.gitlab-ci.yml` or `.circleci/config.yml` exists
+- **THEN** it reports pass
 
 #### Scenario: No CI/CD configuration
 
-- **WHEN** `wai way` runs and `.github/workflows/` doesn't exist
-- **THEN** it reports WayStatus::Info
-- **AND** includes message "CI/CD: Not configured"
-- **AND** suggests "Create .github/workflows/ with CI configuration for automated testing and checks"
+- **WHEN** `wai way` runs and no CI/CD config is found
+- **THEN** it reports info status
+- **AND** suggests setting up continuous integration
 
-### Requirement: Dev Container Check
+### Requirement: Reproducible Environments
+
+**Intent:** Provide a standardized, containerized environment for all contributors.
+**Success Criteria:** A configuration exists to spin up a consistent, reproducible dev environment.
 
 The system SHALL check for dev container configuration and recommend it for environment consistency.
 
 #### Scenario: Dev container directory exists
 
-- **WHEN** `wai way` runs and `.devcontainer/` directory exists with `devcontainer.json`
-- **THEN** it reports WayStatus::Pass
-- **AND** includes message "Dev container: Configured (.devcontainer/)"
+- **WHEN** `wai way` runs and `.devcontainer/` directory exists
+- **THEN** it reports pass
+- **AND** the capability name in output is "Reproducible environments"
 
 #### Scenario: Dev container file exists
 
-- **WHEN** `wai way` runs and `.devcontainer.json` exists in current directory
-- **THEN** it reports WayStatus::Pass
-- **AND** includes message "Dev container: Configured (.devcontainer.json)"
-
-#### Scenario: Empty devcontainer directory
-
-- **WHEN** `wai way` runs and `.devcontainer/` exists but contains no `devcontainer.json`
-- **THEN** it reports WayStatus::Info
-- **AND** includes message "Dev container: Directory exists but missing devcontainer.json"
-- **AND** suggests "Add devcontainer.json to .devcontainer/ directory"
+- **WHEN** `wai way` runs and `.devcontainer.json` exists
+- **THEN** it reports pass
 
 #### Scenario: No dev container
 
 - **WHEN** `wai way` runs and neither `.devcontainer/` nor `.devcontainer.json` exists
-- **THEN** it reports WayStatus::Info
-- **AND** includes message "Dev container: Not configured"
-- **AND** suggests "Create .devcontainer/devcontainer.json for consistent development environments (https://containers.dev)"
+- **THEN** it reports info status
+- **AND** suggests adding .devcontainer/
 
-### Requirement: LLM.txt Documentation Check
+### Requirement: LLM-Friendly Context
+
+**Intent:** Provide machine-readable project context and navigation for LLMs.
+**Success Criteria:** Machine-readable project documentation (llm.txt) exists for AI tools.
 
 The system SHALL check for llm.txt file and recommend it for AI-friendly project documentation.
 
 #### Scenario: llm.txt present
 
-- **WHEN** `wai way` runs and `llm.txt` exists in current directory
-- **THEN** it reports WayStatus::Pass
-- **AND** includes message "AI documentation: llm.txt found"
+- **WHEN** `wai way` runs and `llm.txt` exists
+- **THEN** it reports pass
+- **AND** the capability name in output is "LLM-friendly context"
 
 #### Scenario: No llm.txt
 
 - **WHEN** `wai way` runs and `llm.txt` doesn't exist
-- **THEN** it reports WayStatus::Info
-- **AND** includes message "AI documentation: llm.txt not found"
-- **AND** suggests "Create llm.txt to provide AI-friendly project context (similar to robots.txt for LLMs, see: https://llmstxt.org)"
+- **THEN** it reports info status
+- **AND** suggests adding llm.txt
 
-### Requirement: Agent Skills Check
+### Requirement: Extended Agent Capabilities
 
-The system SHALL check for agent skills documentation in `.wai/resources/agent-config/skills/` and recommend two skills for AI-assisted development workflows: `rule-of-5-universal` (iterative review) and `commit` (deliberate commits).
+**Intent:** Enhance agent functionality with specialized iterative review and commit workflows.
+**Success Criteria:** Specialized agent workflows (Rule of 5, Deliberate Commits) are active.
 
-Skill identity is resolved by directory name OR by `aliases` declared in SKILL.md frontmatter (e.g. `aliases: [ro5]`). This means a skill named `rule-of-5-universal` with `aliases: [ro5]` satisfies a check for either name.
+The system SHALL check for agent skills in `.wai/resources/agent-config/skills/` and recommend `rule-of-5-universal` and `commit`. Skill identity is resolved by directory name OR by `aliases` declared in SKILL.md frontmatter.
 
 #### Scenario: Both recommended skills present
 
-- **WHEN** `wai way` runs and `.wai/resources/agent-config/skills/` contains both `rule-of-5-universal` (or `ro5`) and `commit`
-- **THEN** it reports WayStatus::Pass
-- **AND** includes message "{count} skill(s) configured — includes rule-of-5-universal (ro5) and commit"
+- **WHEN** `wai way` runs and both `rule-of-5-universal` (or `ro5`) and `commit` exist
+- **THEN** it reports pass
+- **AND** the capability name in output is "Extended agent capabilities"
 
 #### Scenario: Skills present via alias (ro5)
 
-- **WHEN** `wai way` runs and a skill directory exists with `aliases: [ro5]` in its SKILL.md frontmatter
+- **WHEN** a skill directory exists with `aliases: [ro5]` in SKILL.md frontmatter
 - **THEN** that skill satisfies the `rule-of-5-universal` check
-- **AND** the check reports the same as if the directory were named `rule-of-5-universal`
 
 #### Scenario: Partial skills configuration
 
-- **WHEN** `wai way` runs and skills directory exists but one or both recommended skills are missing
-- **THEN** it reports WayStatus::Info
-- **AND** includes message "{count} skill(s) configured — missing recommended: {list}"
-- **AND** suggests "Add to .wai/resources/agent-config/skills/: {list}"
+- **WHEN** skills directory exists but one or both recommended skills are missing
+- **THEN** it reports info status and lists what's missing
 
 #### Scenario: No skills configured
 
-- **WHEN** `wai way` runs and `.wai/resources/agent-config/skills/` does not exist
-- **THEN** it reports WayStatus::Info
-- **AND** includes message "No skills configured"
-- **AND** suggests "Add rule-of-5-universal (ro5) and commit to .wai/resources/agent-config/skills/"
+- **WHEN** `.wai/resources/agent-config/skills/` does not exist
+- **THEN** it reports info status
 
 #### Scenario: Skills directory empty
 
-- **WHEN** `wai way` runs and `.wai/resources/agent-config/skills/` exists but contains no SKILL.md files
-- **THEN** it reports WayStatus::Info
-- **AND** includes message "Skills directory present but empty"
-- **AND** suggests "Add rule-of-5-universal (ro5) and commit to .wai/resources/agent-config/skills/"
+- **WHEN** `.wai/resources/agent-config/skills/` exists but contains no SKILL.md files
+- **THEN** it reports info status
 
 ### Requirement: Agent Skills Fix
 
-The system SHALL provide `wai way --fix skills` to scaffold missing recommended skills into the current project's agent-config skills directory.
+The system SHALL provide `wai way --fix skills` to scaffold missing recommended skills.
 
 #### Scenario: Fix scaffolds missing skills
 
 - **WHEN** user runs `wai way --fix skills`
-- **THEN** the system creates `.wai/resources/agent-config/skills/` if it does not exist
-- **AND** creates `rule-of-5-universal/SKILL.md` if not present, with full template content and `aliases: [ro5]` in frontmatter
-- **AND** creates `commit/SKILL.md` if not present, with full deliberate-commit template content
-- **AND** reports each created skill with a success indicator
-- **AND** reports a count of skills added
+- **THEN** the system creates the skills directory if it does not exist
+- **AND** creates `rule-of-5-universal/SKILL.md` if not present
+- **AND** creates `commit/SKILL.md` if not present
+- **AND** reports each created skill
 
 #### Scenario: Fix skips existing skills
 
 - **WHEN** user runs `wai way --fix skills` and a recommended skill already exists
 - **THEN** the system skips that skill and reports "already present"
-- **AND** does not overwrite existing skill content
-
-#### Scenario: Fix with all skills present
-
-- **WHEN** user runs `wai way --fix skills` and both recommended skills already exist
-- **THEN** the system reports "Recommended skills already present — nothing to do."
 
 #### Scenario: Unknown fix target
 
 - **WHEN** user runs `wai way --fix <unknown>`
 - **THEN** the system exits with an error: "Unknown fix target '{value}'. Available: skills"
 
-### Requirement: GitHub CLI Check
+### Requirement: Integration & Automation
 
-The system SHALL check for the GitHub CLI (`gh`) and recommend it for streamlined GitHub workflows (PRs, issues, releases, CI status).
+**Intent:** Streamline repository interactions (PRs, issues, releases) from the CLI.
+**Success Criteria:** CLI tools are configured for seamless integration with the hosting provider.
+
+The system SHALL check for the GitHub CLI (`gh`) and recommend it for streamlined GitHub workflows.
 
 #### Scenario: gh CLI available and authenticated
 
-- **WHEN** `wai way` runs and `gh` is found on PATH
-- **AND** `gh auth status` succeeds (exit code 0)
-- **THEN** it reports WayStatus::Pass
-- **AND** includes message "GitHub CLI: gh authenticated"
+- **WHEN** `wai way` runs and `gh` is on PATH and `gh auth status` succeeds
+- **THEN** it reports pass
+- **AND** the capability name in output is "Integration & automation"
 
 #### Scenario: gh CLI available but not authenticated
 
-- **WHEN** `wai way` runs and `gh` is found on PATH
-- **AND** `gh auth status` fails (exit code non-zero)
-- **THEN** it reports WayStatus::Info
-- **AND** includes message "GitHub CLI: gh installed but not authenticated"
-- **AND** suggests "Run `gh auth login` to enable PR, issue, and release workflows from the terminal"
+- **WHEN** `wai way` runs and `gh` is on PATH but `gh auth status` fails
+- **THEN** it reports info status
+- **AND** suggests running `gh auth login`
 
 #### Scenario: gh CLI not installed
 
-- **WHEN** `wai way` runs and `gh` is not found on PATH
-- **THEN** it reports WayStatus::Info
-- **AND** includes message "GitHub CLI: Not installed"
-- **AND** suggests "Install gh for streamlined GitHub workflows — PRs, issues, releases, CI status (https://cli.github.com)"
+- **WHEN** `wai way` runs and `gh` is not on PATH
+- **THEN** it reports info status
+- **AND** suggests installing gh
 
-### Requirement: Check Grouping and Output Format
+### Requirement: Automated Delivery
 
-The system SHALL group repository best practice checks under a "Repository Standards" or "The wai way" section in way command output with consistent formatting.
+**Intent:** Automate the process of building, packaging, and publishing software releases.
+**Success Criteria:** Software releases and distribution (packages, binaries) are fully automated.
 
-#### Scenario: Grouped output
+The system SHALL check for a release pipeline in binary projects and recommend setup if missing. Library projects are exempt.
 
-- **WHEN** `wai way` runs
-- **THEN** all repository best practice checks appear together under "The wai way" header
-- **AND** each check uses consistent format: "Category: Status (details)"
-- **AND** the summary counts include all check results
+#### Scenario: Library project
+
+- **WHEN** `wai way` runs and the project has no binary target
+- **THEN** it reports pass with "Library project — release pipeline not required"
+- **AND** the capability name in output is "Automated delivery"
+
+#### Scenario: Release tool detected
+
+- **WHEN** `wai way` runs and goreleaser, cargo-dist, or a release workflow is found
+- **THEN** it reports pass
+
+#### Scenario: No release pipeline
+
+- **WHEN** `wai way` runs, the project has a binary target, and no release tool is found
+- **THEN** it reports info status
+- **AND** suggests goreleaser or cargo-dist
+
+### Requirement: Verbose Output
+
+The system SHALL show `intent` and `success_criteria` for each capability when `--verbose` (`-v`) is used.
+
+#### Scenario: Verbose output includes agnostic context
+
+- **GIVEN** any project
+- **WHEN** user runs `wai way -v`
+- **THEN** each capability line is followed by an "Intent:" line and a "Success:" line
+- **AND** normal (non-verbose) output does not show these lines
+
+### Requirement: JSON Output
+
+The system SHALL include `intent` and `success_criteria` in JSON output. These fields are optional (`null` if not set) for backward compatibility.
+
+#### Scenario: JSON includes agnostic fields
+
+- **GIVEN** any project
+- **WHEN** user runs `wai way --json`
+- **THEN** the JSON payload includes `intent` and `success_criteria` for every check result
+
+### Requirement: Plugin Agnostic Context Support
+
+The plugin system SHALL allow YAML-defined plugins to define their own `intent` and `success_criteria`.
+
+#### Scenario: Plugin with custom context
+
+- **GIVEN** a plugin YAML with `intent` and `success_criteria` defined
+- **WHEN** the plugin definition is parsed
+- **THEN** these fields are available on the `PluginDef` struct
+- **AND** default to `None` if not present in the YAML
+
+### Requirement: Output Format
+
+The system SHALL format all checks consistently.
 
 #### Scenario: All checks pass
 
-- **WHEN** `wai way` runs and all 11 checks return WayStatus::Pass
-- **THEN** output shows 11/11 checkmarks (✓)
-- **AND** summary displays "11/11 best practices adopted - excellent!"
-- **AND** no suggestions are shown
+- **WHEN** `wai way` runs and all checks return pass
+- **THEN** output shows checkmarks (✓) for each
+- **AND** summary displays "excellent! All best practices adopted"
 
-#### Scenario: All checks info
+#### Scenario: Fresh repository
 
-- **WHEN** `wai way` runs and all 11 checks return WayStatus::Info (fresh repository)
-- **THEN** output shows 11 info markers (ℹ)
-- **AND** summary displays "0/11 best practices adopted"
-- **AND** quick-start guidance is shown: "Start with .gitignore, README.md, and justfile"
-
+- **WHEN** `wai way` runs on a fresh repository with no tools configured
+- **THEN** output shows info markers (ℹ) for each check
+- **AND** summary displays "0/{n} best practices adopted — quick-start: add README.md, justfile, .gitignore"
