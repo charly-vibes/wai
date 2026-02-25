@@ -203,6 +203,17 @@ impl ClaudeCliClient {
     }
 }
 
+/// Return `true` when running inside a Claude Code agent session.
+///
+/// Claude Code sets `CLAUDECODE` to a non-empty value when an agent is active.
+/// An empty string — used by [`ClaudeCliClient`] to bypass the nested-session
+/// guard — is treated as false.
+pub fn in_agent_session() -> bool {
+    std::env::var("CLAUDECODE")
+        .map(|v| !v.is_empty())
+        .unwrap_or(false)
+}
+
 /// Return `true` if the `claude` binary is on PATH.
 pub fn claude_binary_exists() -> bool {
     std::process::Command::new("claude")
@@ -444,6 +455,31 @@ pub fn estimate_cost(model: &str, input_chars: usize, output_chars: usize) -> Op
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── in_agent_session ──
+
+    #[test]
+    #[serial]
+    fn claudecode_set_to_one_returns_true() {
+        unsafe { std::env::set_var("CLAUDECODE", "1") };
+        assert!(in_agent_session());
+        unsafe { std::env::remove_var("CLAUDECODE") };
+    }
+
+    #[test]
+    #[serial]
+    fn claudecode_empty_string_returns_false() {
+        unsafe { std::env::set_var("CLAUDECODE", "") };
+        assert!(!in_agent_session());
+        unsafe { std::env::remove_var("CLAUDECODE") };
+    }
+
+    #[test]
+    #[serial]
+    fn claudecode_unset_returns_false() {
+        unsafe { std::env::remove_var("CLAUDECODE") };
+        assert!(!in_agent_session());
+    }
 
     // ── resolve_model_alias ──
 
