@@ -1,6 +1,7 @@
 use cliclack::log;
 use miette::{IntoDiagnostic, Result};
 use std::path::Path;
+use walkdir::WalkDir;
 
 use crate::config::agent_config_dir;
 use crate::context::require_safe_mode;
@@ -41,8 +42,7 @@ fn import_directory(source: &Path, config_dir: &Path) -> Result<()> {
     std::fs::create_dir_all(&context_dir).into_diagnostic()?;
     std::fs::create_dir_all(&skills_dir).into_diagnostic()?;
 
-    for entry in std::fs::read_dir(source).into_diagnostic()? {
-        let entry = entry.into_diagnostic()?;
+    for entry in WalkDir::new(source).min_depth(1).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
 
         if !path.is_file() {
@@ -61,7 +61,7 @@ fn import_directory(source: &Path, config_dir: &Path) -> Result<()> {
             &context_dir
         };
 
-        std::fs::copy(&path, target_dir.join(&filename)).into_diagnostic()?;
+        std::fs::copy(path, target_dir.join(filename)).into_diagnostic()?;
         log::info(format!("  Imported {}", name)).into_diagnostic()?;
     }
 

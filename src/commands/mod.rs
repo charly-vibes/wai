@@ -253,12 +253,21 @@ fn run_external(args: Vec<String>) -> Result<()> {
         );
     }
 
-    if let Some(suggestion) = engine.suggest_typo(plugin_name, valid_commands) {
-        miette::bail!(
-            "{}. {}",
-            suggestion.message(),
-            "Run 'wai --help' to see available commands."
-        );
+    // Skip typo detection if the first arg matches a detected plugin name.
+    let is_known_plugin = find_project_root().map_or(false, |root| {
+        crate::plugin::detect_plugins(&root)
+            .iter()
+            .any(|p| p.def.name == *plugin_name && p.detected)
+    });
+
+    if !is_known_plugin {
+        if let Some(suggestion) = engine.suggest_typo(plugin_name, valid_commands) {
+            miette::bail!(
+                "{}. {}",
+                suggestion.message(),
+                "Run 'wai --help' to see available commands."
+            );
+        }
     }
 
     // Typo/order checks passed — this looks like a genuine plugin or unknown command.

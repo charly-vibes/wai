@@ -161,8 +161,8 @@ pub fn ensure_workspace_current(project_root: &Path) -> Result<Vec<WorkspaceActi
     for filename in &agent_files {
         let path = project_root.join(filename);
 
-        // For AGENTS.md, always ensure it exists. For CLAUDE.md, only if it already exists.
-        if filename == &"AGENTS.md" || path.exists() {
+        // For AGENTS.md and CLAUDE.md, always ensure they exist.
+        if filename == &"AGENTS.md" || filename == &"CLAUDE.md" || path.exists() {
             match inject_managed_block(&path, &detected) {
                 Ok(result) => {
                     actions.push(WorkspaceAction::new(result.description(filename)));

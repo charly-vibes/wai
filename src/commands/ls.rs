@@ -3,6 +3,7 @@ use owo_colors::OwoColorize;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
+use std::sync::{Arc, Mutex};
 
 use crate::config::{STATE_FILE, projects_dir};
 use crate::state::ProjectState;
@@ -36,13 +37,30 @@ pub fn run(root: Option<PathBuf>, depth: Option<usize>) -> Result<()> {
     let mut rows: Vec<Row> = Vec::new();
     let mut any_beads = false;
 
+    // Fetch beads stats for all workspaces in parallel
+    let beads_results: HashMap<PathBuf, Option<(u64, u64)>> = {
+        let results = Arc::new(Mutex::new(HashMap::new()));
+        let handles: Vec<_> = workspaces
+            .iter()
+            .filter(|ws| ws.join(".beads").exists())
+            .map(|ws| {
+                let ws = ws.clone();
+                let results = Arc::clone(&results);
+                std::thread::spawn(move || {
+                    let counts = fetch_beads_counts(&ws);
+                    results.lock().unwrap().insert(ws, counts);
+                })
+            })
+            .collect();
+        for handle in handles {
+            let _ = handle.join();
+        }
+        Arc::try_unwrap(results).unwrap().into_inner().unwrap()
+    };
+
     for workspace in &workspaces {
-        // Task 3.1-3.2: beads integration — one invocation per workspace
-        let counts = if workspace.join(".beads").exists() {
-            fetch_beads_counts(workspace)
-        } else {
-            None
-        };
+        // Task 3.1-3.2: beads integration — use pre-fetched parallel results
+        let counts = beads_results.get(workspace).copied().flatten();
         if counts.is_some() {
             any_beads = true;
         }
