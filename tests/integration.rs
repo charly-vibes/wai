@@ -2604,6 +2604,22 @@ fn completely_unknown_command_shows_help_hint() {
 
 // ─── wai why ─────────────────────────────────────────────────────────────────
 
+/// Helper: write `privacy_notice_shown = true` into the [why] config section
+/// without overriding the `llm` setting. Used by tests that exercise the
+/// auto-detect backend path so the one-time notice does not interfere with
+/// stdout/stderr assertions.
+fn set_privacy_notice_shown(dir: &std::path::Path) {
+    let config_path = dir.join(".wai").join("config.toml");
+    let existing = fs::read_to_string(&config_path).unwrap_or_default();
+    let base = existing
+        .split("[why]")
+        .next()
+        .unwrap_or(&existing)
+        .trim_end();
+    let updated = format!("{}\n[why]\nprivacy_notice_shown = true\n", base);
+    fs::write(&config_path, updated).unwrap();
+}
+
 /// Helper: add a [why] section to .wai/config.toml forcing a specific backend.
 ///
 /// Setting `llm = "claude"` without an API key guarantees detect_backend()
@@ -2701,6 +2717,94 @@ fn why_file_query_in_non_git_repo_does_not_crash() {
         .env_remove("ANTHROPIC_API_KEY")
         .assert()
         .success(); // must not crash due to missing git
+}
+
+// ─── wai-96y9: Phase 8 — Agent Backend Integration Tests ────────────────────
+
+/// 8.1 — CLAUDECODE=1, no API key → auto-detect selects AgentBackend;
+/// wai why prints [AGENT CONTEXT] block to stdout and exits 0.
+#[test]
+fn why_agent_mode_autodetect_when_claudecode_set() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproj");
+    write_artifact(
+        tmp.path(),
+        "myproj",
+        "research",
+        "2024-01-01-notes.md",
+        "TOML was chosen because it is human-readable and well-supported.",
+    );
+
+    // Suppress the one-time privacy notice; no llm override (auto-detect path).
+    set_privacy_notice_shown(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["why", "TOML"])
+        .env("CLAUDECODE", "1")
+        .env_remove("ANTHROPIC_API_KEY")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("[AGENT CONTEXT]"));
+}
+
+/// 8.2 — CLAUDECODE unset, no API key, no claude/ollama binaries in PATH →
+/// auto-detect finds no backend; wai why falls back to wai search and exits 0.
+#[test]
+fn why_fallback_to_search_when_no_agent_no_api_key_no_cli() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproj");
+    write_artifact(
+        tmp.path(),
+        "myproj",
+        "research",
+        "2024-01-01-notes.md",
+        "TOML was chosen for its human-readable syntax.",
+    );
+
+    // Create an empty bin directory so that `claude` and `ollama` are not found.
+    let empty_bin = tmp.path().join("empty_bin");
+    fs::create_dir_all(&empty_bin).unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["why", "TOML"])
+        .env_remove("ANTHROPIC_API_KEY")
+        .env_remove("CLAUDECODE")
+        .env("PATH", &empty_bin)
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("No LLM available"));
+}
+
+/// 8.3 — Explicit `[why] llm = "agent"` selects AgentBackend regardless of
+/// whether CLAUDECODE is set; wai why prints [AGENT CONTEXT] to stdout and
+/// exits 0, and emits a warning that no Claude Code session is active.
+#[test]
+fn why_explicit_agent_backend_ignores_claudecode() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproj");
+    write_artifact(
+        tmp.path(),
+        "myproj",
+        "research",
+        "2024-01-01-notes.md",
+        "TOML was chosen because it is human-readable and well-supported.",
+    );
+
+    // Explicitly configure agent backend (also sets privacy_notice_shown = true).
+    force_why_llm(tmp.path(), "agent");
+
+    wai_cmd(tmp.path())
+        .args(["why", "TOML"])
+        .env_remove("CLAUDECODE") // no active Claude Code session
+        .env_remove("ANTHROPIC_API_KEY")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("[AGENT CONTEXT]"))
+        // A warning must be emitted because CLAUDECODE is not set.
+        .stderr(predicate::str::contains("agent mode requires"));
 }
 
 // ─── wai-44b: Conversational Error Tone ─────────────────────────────────────
