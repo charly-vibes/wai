@@ -42,10 +42,37 @@
 - [ ] 2.5 Unit test: section appears between "Capturing Work" and "Ending a
   Session" headings
 
-## Phase 3: Propagate to this repo
+## Phase 3: Pre-claim implementation check
 
-- [ ] 3.1 Run `wai reflect` (or manually update the WAI:START block in
-  `CLAUDE.md` and `AGENTS.md`) to include the new steps
-- [ ] 3.2 Verify `CLAUDE.md` WAI block now contains both the openspec checklist
-  step and the "Tracking Work Across Tools" section
-- [ ] 3.3 Commit the updated `CLAUDE.md` and `AGENTS.md`
+- [ ] 3.1 In `src/managed_block.rs`, add a note after the `bd ready` step in
+  "Starting a Session", gated on `has_beads`:
+  ```rust
+  if has_beads {
+      block.push_str(
+          "   Before claiming: read the relevant source files to confirm\n\
+           \x20  the issue is not already implemented.\n",
+      );
+  }
+  ```
+- [ ] 3.2 Unit test: `wai_block_content(&["beads"])` → output contains
+  "already implemented" near the `bd ready` line
+- [ ] 3.3 Unit test: `wai_block_content(&[])` → no "already implemented" text
+
+## Phase 4: Epic closure reminder
+
+- [ ] 4.1 In `src/managed_block.rs`, update the `bd close <id>` checklist line
+  (already gated on `has_beads`) to add a trailing comment:
+  ```rust
+  "[ ] bd close <id>                  # close completed issues; also close parent epic if last sub-task\n"
+  ```
+- [ ] 4.2 Unit test: `wai_block_content(&["beads"])` → `bd close` line contains
+  "epic" or "parent"
+- [ ] 4.3 Unit test: `wai_block_content(&[])` → no `bd close` line at all
+
+## Phase 5: Propagate to this repo
+
+- [ ] 5.1 Run `wai reflect` (or manually update the WAI:START block in
+  `CLAUDE.md` and `AGENTS.md`) to include all new steps
+- [ ] 5.2 Verify `CLAUDE.md` WAI block contains: openspec checklist step,
+  "Tracking Work Across Tools" section, pre-claim note, and epic reminder
+- [ ] 5.3 Commit the updated `CLAUDE.md` and `AGENTS.md`

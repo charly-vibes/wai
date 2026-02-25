@@ -49,3 +49,46 @@ The convention SHALL specify:
 - **WHEN** `wai init` or `wai reflect` runs
 - **AND** only one of beads or openspec is detected (not both)
 - **THEN** the "Tracking Work Across Tools" section is NOT included
+
+---
+
+### Requirement: Pre-claim implementation check
+
+The generated WAI block's "Starting a Session" section SHALL include a
+pre-claim guard (when beads is detected) reminding the agent to verify an issue
+is not already implemented before claiming it.
+
+#### Scenario: Beads detected — pre-claim note present
+
+- **WHEN** `wai init` or `wai reflect` runs
+- **AND** the beads plugin is detected
+- **THEN** the "Starting a Session" section includes a note after `bd ready`
+  that reads: before claiming an issue, read the relevant source files to
+  confirm the work is not already done
+
+#### Scenario: Beads not detected — no pre-claim note
+
+- **WHEN** `wai init` or `wai reflect` runs
+- **AND** the beads plugin is NOT detected
+- **THEN** no pre-claim note is included
+
+---
+
+### Requirement: Epic closure reminder in session-close checklist
+
+The generated WAI block's session-close checklist `bd close` step SHALL include
+a note (when beads is detected) to also close the parent epic when the last
+sub-task of a group is completed.
+
+#### Scenario: Beads detected — epic note on close step
+
+- **WHEN** `wai init` or `wai reflect` runs
+- **AND** the beads plugin is detected
+- **THEN** the `bd close <id>` checklist step includes an inline comment noting
+  that parent epics should be closed when their last sub-task is done
+
+#### Scenario: Beads not detected — no epic note
+
+- **WHEN** `wai init` or `wai reflect` runs
+- **AND** the beads plugin is NOT detected
+- **THEN** no epic closure reminder is included
