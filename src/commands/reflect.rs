@@ -57,14 +57,6 @@ pub fn write_reflect_meta(project_dir: &Path, meta: &ReflectMeta) -> Result<()> 
 
 // ── Output target detection ──────────────────────────────────────────────────
 
-/// Which files `wai reflect` should update.
-#[derive(Debug, Clone, PartialEq)]
-pub enum OutputTarget {
-    ClaudeMd,
-    AgentsMd,
-    Both,
-}
-
 /// Detect the output target(s) based on `--output` override and what files
 /// actually exist in `repo_root`.
 ///
