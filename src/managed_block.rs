@@ -91,6 +91,10 @@ pub fn wai_block_content(detected_plugins: &[&str]) -> String {
             "{}. Run `bd ready` to find available work items.\n",
             step
         ));
+        block.push_str(
+            "   Before claiming: read the relevant source files to confirm\n\
+             \x20  the issue is not already implemented.\n",
+        );
         step += 1;
     }
     if has_openspec {
@@ -135,6 +139,20 @@ pub fn wai_block_content(detected_plugins: &[&str]) -> String {
          Phases are a guide, not a gate. Use `wai phase show` / `wai phase next`.\n",
     );
 
+    // Tracking Work Across Tools (when both beads and openspec present)
+    if has_beads && has_openspec {
+        block.push_str(
+            "\n## Tracking Work Across Tools\n\
+             \n\
+             When beads and openspec are both active, keep them in sync:\n\
+             - When creating a beads ticket for an openspec task, include the task\n\
+             \x20 reference in the description (format: `<change-id>:<phase>.<task>`,\n\
+             \x20 e.g. `add-why-command:7.1`)\n\
+             - When closing a beads ticket linked to a task, also check the box\n\
+             \x20 (`[x]`) in the change's `tasks.md`\n",
+        );
+    }
+
     // Ending a Session (unified)
     block.push_str(
         "\n## Ending a Session\n\n\
@@ -144,8 +162,13 @@ pub fn wai_block_content(detected_plugins: &[&str]) -> String {
     );
     if has_beads {
         block.push_str(
-            "[ ] bd close <id>                  # mark completed issues\n\
+            "[ ] bd close <id>                  # close completed issues; also close parent epic if last sub-task\n\
              [ ] bd sync --from-main            # pull beads updates\n",
+        );
+    }
+    if has_openspec {
+        block.push_str(
+            "[ ] openspec tasks.md — mark completed tasks [x]\n",
         );
     }
     block.push_str(
@@ -364,6 +387,148 @@ pub fn inject_reflect_block(path: &Path, content: &str) -> Result<InjectResult, 
     } else {
         std::fs::write(path, &block)?;
         Ok(InjectResult::Created)
+    }
+}
+
+#[cfg(test)]
+mod wai_block_tests {
+    use super::*;
+
+    // Phase 1: session-close openspec checklist step
+
+    #[test]
+    fn openspec_checklist_step_present_when_openspec_detected() {
+        let output = wai_block_content(&["openspec"]);
+        assert!(
+            output.contains("openspec tasks.md"),
+            "expected 'openspec tasks.md' in output"
+        );
+    }
+
+    #[test]
+    fn openspec_checklist_step_absent_without_openspec() {
+        let output = wai_block_content(&[]);
+        assert!(
+            !output.contains("openspec tasks.md"),
+            "unexpected 'openspec tasks.md' in output without openspec"
+        );
+    }
+
+    #[test]
+    fn openspec_checklist_step_ordering() {
+        let output = wai_block_content(&["beads", "openspec"]);
+        let bd_sync_pos = output
+            .find("bd sync --from-main")
+            .expect("bd sync --from-main not found");
+        let openspec_pos = output
+            .find("openspec tasks.md")
+            .expect("openspec tasks.md not found");
+        let wai_reflect_pos = output
+            .find("wai reflect")
+            .expect("wai reflect not found");
+        assert!(
+            bd_sync_pos < openspec_pos,
+            "openspec tasks.md should appear after bd sync --from-main"
+        );
+        assert!(
+            openspec_pos < wai_reflect_pos,
+            "openspec tasks.md should appear before wai reflect"
+        );
+    }
+
+    // Phase 2: cross-tool tracking section
+
+    #[test]
+    fn tracking_section_present_when_both_beads_and_openspec() {
+        let output = wai_block_content(&["beads", "openspec"]);
+        assert!(
+            output.contains("Tracking Work Across Tools"),
+            "expected 'Tracking Work Across Tools' in output"
+        );
+    }
+
+    #[test]
+    fn tracking_section_absent_with_only_beads() {
+        let output = wai_block_content(&["beads"]);
+        assert!(
+            !output.contains("Tracking Work Across Tools"),
+            "unexpected 'Tracking Work Across Tools' with beads only"
+        );
+    }
+
+    #[test]
+    fn tracking_section_absent_with_only_openspec() {
+        let output = wai_block_content(&["openspec"]);
+        assert!(
+            !output.contains("Tracking Work Across Tools"),
+            "unexpected 'Tracking Work Across Tools' with openspec only"
+        );
+    }
+
+    #[test]
+    fn tracking_section_between_capturing_work_and_ending_session() {
+        let output = wai_block_content(&["beads", "openspec"]);
+        let capturing_pos = output
+            .find("## Capturing Work")
+            .expect("## Capturing Work not found");
+        let tracking_pos = output
+            .find("## Tracking Work Across Tools")
+            .expect("## Tracking Work Across Tools not found");
+        let ending_pos = output
+            .find("## Ending a Session")
+            .expect("## Ending a Session not found");
+        assert!(
+            capturing_pos < tracking_pos,
+            "Tracking section should appear after Capturing Work"
+        );
+        assert!(
+            tracking_pos < ending_pos,
+            "Tracking section should appear before Ending a Session"
+        );
+    }
+
+    // Phase 3: pre-claim implementation check
+
+    #[test]
+    fn pre_claim_note_present_with_beads() {
+        let output = wai_block_content(&["beads"]);
+        assert!(
+            output.contains("already implemented"),
+            "expected 'already implemented' near bd ready line"
+        );
+    }
+
+    #[test]
+    fn pre_claim_note_absent_without_beads() {
+        let output = wai_block_content(&[]);
+        assert!(
+            !output.contains("already implemented"),
+            "unexpected 'already implemented' without beads"
+        );
+    }
+
+    // Phase 4: epic closure reminder
+
+    #[test]
+    fn bd_close_line_mentions_epic_with_beads() {
+        let output = wai_block_content(&["beads"]);
+        let bd_close_line = output
+            .lines()
+            .find(|l| l.contains("bd close <id>"))
+            .expect("bd close line not found");
+        assert!(
+            bd_close_line.contains("epic") || bd_close_line.contains("parent"),
+            "bd close line should mention 'epic' or 'parent', got: {bd_close_line}"
+        );
+    }
+
+    #[test]
+    fn bd_close_line_absent_without_beads() {
+        let output = wai_block_content(&[]);
+        assert!(
+            !output.contains("bd close <id>"),
+            "unexpected 'bd close <id>' without beads"
+        );
     }
 }
 

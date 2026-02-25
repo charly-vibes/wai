@@ -49,6 +49,8 @@ Key distinction:
 
 1. Run `wai status` to see active projects, current phase, and suggestions.
 2. Run `bd ready` to find available work items.
+   Before claiming: read the relevant source files to confirm
+   the issue is not already implemented.
 3. Check `openspec list` for active change proposals.
 4. Check the phase — it tells you what kind of work is expected:
    - **research** → gather information, explore options
@@ -74,14 +76,25 @@ Use `--project <name>` if multiple projects exist. Otherwise wai picks the first
 
 Phases are a guide, not a gate. Use `wai phase show` / `wai phase next`.
 
+## Tracking Work Across Tools
+
+When beads and openspec are both active, keep them in sync:
+- When creating a beads ticket for an openspec task, include the task
+  reference in the description (format: `<change-id>:<phase>.<task>`,
+  e.g. `add-why-command:7.1`)
+- When closing a beads ticket linked to a task, also check the box
+  (`[x]`) in the change's `tasks.md`
+
 ## Ending a Session
 
 Before saying "done", run this checklist:
 
 ```
 [ ] wai handoff create <project>   # capture context for next session
-[ ] bd close <id>                  # mark completed issues
+[ ] bd close <id>                  # close completed issues; also close parent epic if last sub-task
 [ ] bd sync --from-main            # pull beads updates
+[ ] openspec tasks.md — mark completed tasks [x]
+[ ] wai reflect                    # update CLAUDE.md with project patterns (every ~5 sessions)
 [ ] git add <files> && git commit  # commit code + handoff
 ```
 
@@ -111,6 +124,7 @@ wai add design "design"       # Add design artifact
 wai search "query"            # Search across artifacts
 wai why "why use TOML?"       # Ask why (LLM-powered oracle)
 wai why src/config.rs         # Explain a file's history
+wai reflect                   # Synthesize project patterns into CLAUDE.md
 wai handoff create <project>  # Session handoff
 wai phase show                # Current phase
 wai doctor                    # Workspace health
