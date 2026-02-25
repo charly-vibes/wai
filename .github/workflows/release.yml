@@ -137,10 +137,69 @@ jobs:
           path: bins/
           merge-multiple: true
 
-      - uses: goreleaser/goreleaser-action@v6
-        with:
-          version: "~> v2"
-          args: release --clean
+      - name: Package archives and checksums
+        id: pkg
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          mkdir -p dist
+          tar -czf "dist/wai_${VERSION}_linux_amd64.tar.gz"  -C bins/linux_amd64  wai
+          tar -czf "dist/wai_${VERSION}_linux_arm64.tar.gz"  -C bins/linux_arm64  wai
+          tar -czf "dist/wai_${VERSION}_darwin_amd64.tar.gz" -C bins/darwin_amd64 wai
+          tar -czf "dist/wai_${VERSION}_darwin_arm64.tar.gz" -C bins/darwin_arm64 wai
+          (cd bins/windows_amd64 && zip "../../dist/wai_${VERSION}_windows_amd64.zip" wai.exe)
+          cd dist && sha256sum *.tar.gz *.zip > checksums.txt
+
+      - name: Create GitHub release
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${{ steps.pkg.outputs.version }}"
+          PRERELEASE=""
+          [[ "${TAG}" == *-* ]] && PRERELEASE="--prerelease"
+          gh release create "${TAG}" \
+            --title "${TAG}" \
+            --generate-notes \
+            $PRERELEASE \
+            dist/wai_${VERSION}_linux_amd64.tar.gz \
+            dist/wai_${VERSION}_linux_arm64.tar.gz \
+            dist/wai_${VERSION}_darwin_amd64.tar.gz \
+            dist/wai_${VERSION}_darwin_arm64.tar.gz \
+            dist/wai_${VERSION}_windows_amd64.zip \
+            dist/checksums.txt
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update Homebrew tap
+        env:
           TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${{ steps.pkg.outputs.version }}"
+          git clone "https://x-access-token:${TAP_GITHUB_TOKEN}@github.com/charly-vibes/homebrew-charly.git" /tmp/tap
+          python3 scripts/update-homebrew.py \
+            /tmp/tap/Formula/wai.rb \
+            "${VERSION}" "${TAG}" dist/checksums.txt
+          cd /tmp/tap
+          git config user.email "github-actions@github.com"
+          git config user.name "GitHub Actions"
+          git add Formula/wai.rb
+          git diff --staged --quiet || git commit -m "Update wai to ${VERSION}"
+          git push
+
+      - name: Update Scoop bucket
+        env:
+          TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${{ steps.pkg.outputs.version }}"
+          git clone "https://x-access-token:${TAP_GITHUB_TOKEN}@github.com/charly-vibes/scoop-charly.git" /tmp/scoop
+          python3 scripts/update-scoop.py \
+            /tmp/scoop/bucket/wai.json \
+            "${VERSION}" "${TAG}" dist/checksums.txt
+          cd /tmp/scoop
+          git config user.email "github-actions@github.com"
+          git config user.name "GitHub Actions"
+          git add bucket/wai.json
+          git diff --staged --quiet || git commit -m "Update wai to ${VERSION}"
+          git push
