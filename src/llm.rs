@@ -208,7 +208,6 @@ impl ClaudeCliClient {
 /// Claude Code sets `CLAUDECODE` to a non-empty value when an agent is active.
 /// An empty string — used by [`ClaudeCliClient`] to bypass the nested-session
 /// guard — is treated as false.
-#[allow(dead_code)]
 pub fn in_agent_session() -> bool {
     std::env::var("CLAUDECODE")
         .map(|v| !v.is_empty())
@@ -378,6 +377,40 @@ impl LlmClient for OllamaClient {
     }
 }
 
+// ── Agent backend ─────────────────────────────────────────────────────────────
+
+/// Sentinel returned by [`AgentBackend::complete`] so callers can route output
+/// through the agent channel rather than treating it as a normal LLM response.
+pub const AGENT_SENTINEL: &str = "wai::agent-mode";
+
+/// LLM backend that delegates to the enclosing Claude Code agent session.
+///
+/// When wai runs inside Claude Code, this backend writes context to stdout
+/// (where the agent reads it) instead of making a separate API call.
+/// The full output format is finalised in Phase 5; this implementation emits
+/// a minimal placeholder wrapper so the sentinel round-trip can be tested.
+pub struct AgentBackend;
+
+impl LlmClient for AgentBackend {
+    fn complete(&self, prompt: &str) -> Result<String, LlmError> {
+        // Minimal placeholder — full format is owned by Phase 5.
+        println!("[AGENT CONTEXT]\n{}\n[/AGENT CONTEXT]", prompt);
+        Ok(AGENT_SENTINEL.to_string())
+    }
+
+    fn is_available(&self) -> bool {
+        in_agent_session()
+    }
+
+    fn name(&self) -> &str {
+        "Agent"
+    }
+
+    fn model_id(&self) -> &str {
+        "agent"
+    }
+}
+
 // ── Backend selection ─────────────────────────────────────────────────────────
 
 /// Select the best available LLM backend given `WhyConfig`.
@@ -456,6 +489,32 @@ pub fn estimate_cost(model: &str, input_chars: usize, output_chars: usize) -> Op
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── AgentBackend ──
+
+    #[test]
+    #[serial]
+    fn agent_backend_complete_returns_sentinel() {
+        let backend = AgentBackend;
+        let result = backend.complete("test prompt").unwrap();
+        assert_eq!(result, AGENT_SENTINEL);
+    }
+
+    #[test]
+    #[serial]
+    fn agent_backend_is_available_matches_in_agent_session() {
+        unsafe { std::env::set_var("CLAUDECODE", "1") };
+        assert!(AgentBackend.is_available());
+        assert_eq!(AgentBackend.is_available(), in_agent_session());
+
+        unsafe { std::env::set_var("CLAUDECODE", "") };
+        assert!(!AgentBackend.is_available());
+        assert_eq!(AgentBackend.is_available(), in_agent_session());
+
+        unsafe { std::env::remove_var("CLAUDECODE") };
+        assert!(!AgentBackend.is_available());
+        assert_eq!(AgentBackend.is_available(), in_agent_session());
+    }
 
     // ── in_agent_session ──
 
