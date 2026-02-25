@@ -91,6 +91,10 @@ pub enum Commands {
         /// Only show sync status without modifying files
         #[arg(long)]
         status: bool,
+
+        /// Preview operations without making any changes
+        #[arg(long)]
+        dry_run: bool,
     },
 
     /// Manage agent configuration files

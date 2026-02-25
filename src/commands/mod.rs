@@ -39,7 +39,7 @@ pub fn run(cli: Cli) -> Result<()> {
         Some(Commands::Show { name }) => show::run(name),
         Some(Commands::Move(args)) => move_cmd::run(args),
         Some(Commands::Phase(sub)) => phase::run(sub),
-        Some(Commands::Sync { status }) => sync::run(status),
+        Some(Commands::Sync { status, dry_run }) => sync::run(status, dry_run),
         Some(Commands::Config(cmd)) => config_cmd::run(cmd),
         Some(Commands::Handoff(cmd)) => handoff::run(cmd),
         Some(Commands::Search {

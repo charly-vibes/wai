@@ -1,6 +1,6 @@
 //! Core sync execution functions for agent config projections.
 //!
-//! These functions implement the three projection strategies (symlink, inline, reference)
+//! These functions implement the four projection strategies (symlink, inline, reference, copy)
 //! without CLI-specific concerns like safe mode checks or user-facing output formatting.
 //! They can be used by both the `wai sync` command and `wai doctor --fix`.
 
@@ -17,7 +17,18 @@ pub(crate) struct Projection {
     pub sources: Vec<String>,
 }
 
-/// Execute a symlink projection: create target directory and symlink each source file into it.
+/// Ensure all parent directories of `path` exist (mkdir -p behaviour).
+pub(crate) fn ensure_parent_dirs(path: &Path) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).into_diagnostic()?;
+    }
+    Ok(())
+}
+
+/// Execute a symlink projection.
+///
+/// - File source → file symlink at target pointing to source.
+/// - Directory source → create target directory and symlink each entry inside it.
 pub(crate) fn execute_symlink(
     project_root: &Path,
     config_dir: &Path,
@@ -25,19 +36,38 @@ pub(crate) fn execute_symlink(
 ) -> Result<()> {
     let target = project_root.join(&proj.target);
 
-    if target.exists() {
-        std::fs::remove_dir_all(&target).into_diagnostic()?;
-    }
+    ensure_parent_dirs(&target)?;
 
-    // For directory targets, create parent and symlink each source
-    std::fs::create_dir_all(&target).into_diagnostic()?;
+    // Remove any existing target before recreating.
+    if target.symlink_metadata().is_ok() {
+        if target.is_dir() && !target.is_symlink() {
+            std::fs::remove_dir_all(&target).into_diagnostic()?;
+        } else {
+            std::fs::remove_file(&target).into_diagnostic()?;
+        }
+    }
 
     for source in &proj.sources {
         let source_path = config_dir.join(source);
-        if source_path.exists() && source_path.is_dir() {
+        if !source_path.exists() {
+            continue;
+        }
+
+        if source_path.is_file() {
+            // file→file: create a single symlink at target pointing to source.
+            #[cfg(unix)]
+            std::os::unix::fs::symlink(&source_path, &target).into_diagnostic()?;
+            #[cfg(not(unix))]
+            std::fs::copy(&source_path, &target).into_diagnostic()?;
+        } else if source_path.is_dir() {
+            // dir→dir: create target directory, symlink each entry inside.
+            std::fs::create_dir_all(&target).into_diagnostic()?;
             for entry in std::fs::read_dir(&source_path).into_diagnostic()? {
                 let entry = entry.into_diagnostic()?;
                 let link_path = target.join(entry.file_name());
+                if link_path.symlink_metadata().is_ok() {
+                    std::fs::remove_file(&link_path).into_diagnostic()?;
+                }
                 #[cfg(unix)]
                 std::os::unix::fs::symlink(entry.path(), &link_path).into_diagnostic()?;
                 #[cfg(not(unix))]
@@ -88,9 +118,7 @@ pub(crate) fn execute_inline(
         }
     }
 
-    if let Some(parent) = target.parent() {
-        std::fs::create_dir_all(parent).into_diagnostic()?;
-    }
+    ensure_parent_dirs(&target)?;
     std::fs::write(&target, content).into_diagnostic()?;
 
     log::info(format!("Inlined → {}", proj.target)).into_diagnostic()?;
@@ -127,11 +155,226 @@ pub(crate) fn execute_reference(
         }
     }
 
-    if let Some(parent) = target.parent() {
-        std::fs::create_dir_all(parent).into_diagnostic()?;
-    }
+    ensure_parent_dirs(&target)?;
     std::fs::write(&target, content).into_diagnostic()?;
 
     log::info(format!("Referenced → {}", proj.target)).into_diagnostic()?;
     Ok(())
+}
+
+/// Execute a copy projection: copy source files to the target location.
+///
+/// - File source → copy source file to target path (overwrites if present).
+/// - Directory source → create target directory and copy each entry inside.
+pub(crate) fn execute_copy(
+    project_root: &Path,
+    config_dir: &Path,
+    proj: &Projection,
+) -> Result<()> {
+    let target = project_root.join(&proj.target);
+
+    ensure_parent_dirs(&target)?;
+
+    for source in &proj.sources {
+        let source_path = config_dir.join(source);
+        if !source_path.exists() {
+            continue;
+        }
+
+        if source_path.is_file() {
+            std::fs::copy(&source_path, &target).into_diagnostic()?;
+        } else if source_path.is_dir() {
+            std::fs::create_dir_all(&target).into_diagnostic()?;
+            for entry in std::fs::read_dir(&source_path).into_diagnostic()? {
+                let entry = entry.into_diagnostic()?;
+                std::fs::copy(entry.path(), target.join(entry.file_name())).into_diagnostic()?;
+            }
+        }
+    }
+
+    log::info(format!("Copied → {}", proj.target)).into_diagnostic()?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    fn make_config_dir(tmp: &TempDir) -> (std::path::PathBuf, std::path::PathBuf) {
+        let project_root = tmp.path().to_path_buf();
+        let config_dir = project_root.join("agent-config");
+        fs::create_dir_all(&config_dir).unwrap();
+        (project_root, config_dir)
+    }
+
+    // ── symlink tests ─────────────────────────────────────────────────────────
+
+    #[test]
+    #[cfg(unix)]
+    fn symlink_file_to_file() {
+        let tmp = TempDir::new().unwrap();
+        let (root, config) = make_config_dir(&tmp);
+
+        fs::write(config.join("notes.md"), "hello").unwrap();
+
+        let proj = Projection {
+            target: "out/notes.md".into(),
+            strategy: "symlink".into(),
+            sources: vec!["notes.md".into()],
+        };
+
+        execute_symlink(&root, &config, &proj).unwrap();
+
+        let target = root.join("out/notes.md");
+        assert!(target.exists(), "symlink target should exist");
+        assert!(target.is_symlink(), "target should be a symlink");
+        assert_eq!(fs::read_to_string(&target).unwrap(), "hello");
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn symlink_directory_to_directory() {
+        let tmp = TempDir::new().unwrap();
+        let (root, config) = make_config_dir(&tmp);
+
+        let src_dir = config.join("skills");
+        fs::create_dir_all(&src_dir).unwrap();
+        fs::write(src_dir.join("a.md"), "skill-a").unwrap();
+        fs::write(src_dir.join("b.md"), "skill-b").unwrap();
+
+        let proj = Projection {
+            target: "out/skills".into(),
+            strategy: "symlink".into(),
+            sources: vec!["skills".into()],
+        };
+
+        execute_symlink(&root, &config, &proj).unwrap();
+
+        let out = root.join("out/skills");
+        assert!(out.is_dir());
+        assert!(out.join("a.md").is_symlink());
+        assert_eq!(fs::read_to_string(out.join("b.md")).unwrap(), "skill-b");
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn symlink_creates_missing_parent() {
+        let tmp = TempDir::new().unwrap();
+        let (root, config) = make_config_dir(&tmp);
+
+        fs::write(config.join("f.md"), "x").unwrap();
+
+        let proj = Projection {
+            target: "deep/nested/dir/f.md".into(),
+            strategy: "symlink".into(),
+            sources: vec!["f.md".into()],
+        };
+
+        execute_symlink(&root, &config, &proj).unwrap();
+        assert!(root.join("deep/nested/dir/f.md").exists());
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn symlink_overwrites_pre_existing_target() {
+        let tmp = TempDir::new().unwrap();
+        let (root, config) = make_config_dir(&tmp);
+
+        fs::write(config.join("f.md"), "new").unwrap();
+        // Pre-create the target as a plain file.
+        fs::write(root.join("f.md"), "old").unwrap();
+
+        let proj = Projection {
+            target: "f.md".into(),
+            strategy: "symlink".into(),
+            sources: vec!["f.md".into()],
+        };
+
+        execute_symlink(&root, &config, &proj).unwrap();
+        assert!(root.join("f.md").is_symlink());
+        assert_eq!(fs::read_to_string(root.join("f.md")).unwrap(), "new");
+    }
+
+    // ── copy tests ────────────────────────────────────────────────────────────
+
+    #[test]
+    fn copy_file_to_file() {
+        let tmp = TempDir::new().unwrap();
+        let (root, config) = make_config_dir(&tmp);
+
+        fs::write(config.join("notes.md"), "copy me").unwrap();
+
+        let proj = Projection {
+            target: "out/notes.md".into(),
+            strategy: "copy".into(),
+            sources: vec!["notes.md".into()],
+        };
+
+        execute_copy(&root, &config, &proj).unwrap();
+
+        let target = root.join("out/notes.md");
+        assert!(target.exists());
+        assert!(!target.is_symlink());
+        assert_eq!(fs::read_to_string(&target).unwrap(), "copy me");
+    }
+
+    #[test]
+    fn copy_directory_to_directory() {
+        let tmp = TempDir::new().unwrap();
+        let (root, config) = make_config_dir(&tmp);
+
+        let src_dir = config.join("rules");
+        fs::create_dir_all(&src_dir).unwrap();
+        fs::write(src_dir.join("r1.md"), "rule1").unwrap();
+
+        let proj = Projection {
+            target: "out/rules".into(),
+            strategy: "copy".into(),
+            sources: vec!["rules".into()],
+        };
+
+        execute_copy(&root, &config, &proj).unwrap();
+
+        let out = root.join("out/rules");
+        assert!(out.is_dir());
+        assert_eq!(fs::read_to_string(out.join("r1.md")).unwrap(), "rule1");
+    }
+
+    #[test]
+    fn copy_creates_missing_parent() {
+        let tmp = TempDir::new().unwrap();
+        let (root, config) = make_config_dir(&tmp);
+
+        fs::write(config.join("x.md"), "x").unwrap();
+
+        let proj = Projection {
+            target: "a/b/c/x.md".into(),
+            strategy: "copy".into(),
+            sources: vec!["x.md".into()],
+        };
+
+        execute_copy(&root, &config, &proj).unwrap();
+        assert!(root.join("a/b/c/x.md").exists());
+    }
+
+    // ── ensure_parent_dirs tests ──────────────────────────────────────────────
+
+    #[test]
+    fn inline_creates_missing_parent() {
+        let tmp = TempDir::new().unwrap();
+        let (root, config) = make_config_dir(&tmp);
+
+        fs::write(config.join("src.md"), "# content").unwrap();
+
+        let proj = Projection {
+            target: "deep/path/out.md".into(),
+            strategy: "inline".into(),
+            sources: vec!["src.md".into()],
+        };
+
+        execute_inline(&root, &config, &proj).unwrap();
+        assert!(root.join("deep/path/out.md").exists());
+    }
 }

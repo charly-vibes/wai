@@ -16,7 +16,7 @@ struct ProjectionsConfig {
     projections: Vec<Projection>,
 }
 
-pub fn run(status_only: bool) -> Result<()> {
+pub fn run(status_only: bool, dry_run: bool) -> Result<()> {
     let project_root = require_project()?;
     let config_dir = agent_config_dir(&project_root);
     let projections_path = config_dir.join(".projections.yml");
@@ -68,6 +68,22 @@ pub fn run(status_only: bool) -> Result<()> {
         return Ok(());
     }
 
+    if dry_run {
+        println!();
+        println!("  {} Dry-run — no files will be modified", "◆".cyan());
+        for proj in &config.projections {
+            println!(
+                "    {} [{}] {} → {}",
+                "•".dimmed(),
+                proj.strategy,
+                proj.sources.join(", "),
+                proj.target
+            );
+        }
+        println!();
+        return Ok(());
+    }
+
     require_safe_mode("sync agent configs")?;
 
     // Execute projections
@@ -76,6 +92,7 @@ pub fn run(status_only: bool) -> Result<()> {
             "symlink" => sync_core::execute_symlink(&project_root, &config_dir, proj)?,
             "inline" => sync_core::execute_inline(&project_root, &config_dir, proj)?,
             "reference" => sync_core::execute_reference(&project_root, &config_dir, proj)?,
+            "copy" => sync_core::execute_copy(&project_root, &config_dir, proj)?,
             other => {
                 log::warning(format!(
                     "Unknown strategy '{}' for target '{}'",

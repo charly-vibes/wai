@@ -4289,3 +4289,32 @@ fn close_nudge_does_not_fire_for_fewer_than_five_handoffs() {
         "nudge should not appear with only 3 handoffs"
     );
 }
+
+// ── wai sync --dry-run ────────────────────────────────────────────────────────
+
+#[test]
+fn sync_dry_run_does_not_create_files() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    // Set up a source file to sync.
+    let source_dir = tmp.path().join(".wai/resources/agent-config/docs");
+    fs::create_dir_all(&source_dir).unwrap();
+    fs::write(source_dir.join("guide.md"), "# Guide").unwrap();
+
+    write_projections_yml(
+        tmp.path(),
+        "projections:\n  - target: GUIDE.md\n    strategy: inline\n    sources: [docs]\n",
+    );
+
+    wai_cmd(tmp.path())
+        .args(["sync", "--dry-run"])
+        .assert()
+        .success();
+
+    // The target must not have been created.
+    assert!(
+        !tmp.path().join("GUIDE.md").exists(),
+        "dry-run must not create any files"
+    );
+}
