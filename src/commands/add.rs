@@ -1,6 +1,7 @@
 use chrono::Utc;
 use cliclack::log;
 use miette::{IntoDiagnostic, Result};
+use std::io::IsTerminal;
 
 use crate::cli::AddCommands;
 use crate::config::{DESIGNS_DIR, PLANS_DIR, RESEARCH_DIR, areas_dir, archives_dir, projects_dir, resources_dir};
@@ -189,7 +190,7 @@ fn resolve_project(
         1 => Ok(projects.remove(0)),
         _ => {
             let ctx = crate::context::current_context();
-            if ctx.no_input {
+            if ctx.no_input || !std::io::stdin().is_terminal() {
                 let names: Vec<_> = projects.iter().map(|(n, _)| n.as_str()).collect();
                 return Err(WaiError::NonInteractive {
                     message: format!(

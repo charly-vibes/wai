@@ -1,4 +1,5 @@
 use miette::{IntoDiagnostic, Result};
+use std::io::IsTerminal;
 use std::path::Path;
 
 use crate::config::projects_dir;
@@ -126,7 +127,7 @@ fn resolve_project(project_root: &Path, project: Option<String>) -> Result<Strin
         1 => Ok(projects.remove(0)),
         _ => {
             let ctx = current_context();
-            if ctx.no_input {
+            if ctx.no_input || !std::io::stdin().is_terminal() {
                 return Err(WaiError::NonInteractive {
                     message: format!(
                         "Multiple projects found ({}). Use --project <name> to specify one.",
