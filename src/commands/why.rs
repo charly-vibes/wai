@@ -7,7 +7,7 @@ use walkdir::WalkDir;
 
 use crate::config::{ProjectConfig, STATE_FILE, WhyConfig, wai_dir};
 use crate::error::WaiError;
-use crate::llm::{LlmError, claude_binary_exists, detect_backend, ollama_binary_exists};
+use crate::llm::{AGENT_SENTINEL, LlmError, claude_binary_exists, detect_backend, ollama_binary_exists};
 
 use super::require_project;
 
@@ -805,7 +805,7 @@ pub fn fallback_mode(cfg: &WhyConfig) -> FallbackMode {
 
 /// Return `true` if the backend sends data to an external API (e.g. Claude).
 pub fn is_external_backend(backend_name: &str) -> bool {
-    backend_name == "Claude" || backend_name == "Claude CLI"
+    backend_name == "Claude" || backend_name == "Claude CLI" || backend_name == "Agent"
 }
 
 /// Return `true` if the one-time privacy notice must be shown before this query.
@@ -1065,6 +1065,11 @@ pub fn run(query: String, no_llm: bool, json: bool, verbose: u8) -> Result<()> {
 
     let start = std::time::Instant::now();
     let raw_response = match backend.complete(&prompt) {
+        Ok(r) if r == AGENT_SENTINEL => {
+            // Agent backend wrote context to stdout; no further output needed.
+            println!("  {} Context sent to your agent", "○".dimmed());
+            return Ok(());
+        }
         Ok(r) => r,
         Err(e) => {
             if mode == FallbackMode::Error {
@@ -1686,6 +1691,26 @@ mod tests {
     fn privacy_notice_not_needed_for_ollama() {
         let cfg = WhyConfig::default();
         assert!(!privacy_notice_needed(&cfg, "Ollama"));
+    }
+
+    #[test]
+    fn agent_backend_is_external() {
+        assert!(is_external_backend("Agent"));
+    }
+
+    #[test]
+    fn privacy_notice_needed_for_agent_when_not_shown() {
+        let cfg = WhyConfig::default();
+        assert!(privacy_notice_needed(&cfg, "Agent"));
+    }
+
+    #[test]
+    fn privacy_notice_not_needed_for_agent_when_shown() {
+        let cfg = WhyConfig {
+            privacy_notice_shown: Some(true),
+            ..Default::default()
+        };
+        assert!(!privacy_notice_needed(&cfg, "Agent"));
     }
 
     // ── gather_context end-to-end (7.1 extended) ──

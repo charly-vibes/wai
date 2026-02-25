@@ -1,3 +1,4 @@
+use owo_colors::OwoColorize;
 use serde::Deserialize;
 
 use crate::config::WhyConfig;
@@ -391,10 +392,22 @@ pub const AGENT_SENTINEL: &str = "wai::agent-mode";
 /// a minimal placeholder wrapper so the sentinel round-trip can be tested.
 pub struct AgentBackend;
 
+/// Build the agent-mode output string: header, status line, and context block.
+///
+/// Separated from `complete()` so the format can be verified in unit tests
+/// without capturing stdout.
+pub fn format_agent_output(prompt: &str) -> String {
+    format!(
+        "\n  {} wai why — agent mode\n  {} Context prepared\n\n[AGENT CONTEXT]\n{}\n[/AGENT CONTEXT]\n",
+        "◆".cyan(),
+        "○".dimmed(),
+        prompt
+    )
+}
+
 impl LlmClient for AgentBackend {
     fn complete(&self, prompt: &str) -> Result<String, LlmError> {
-        // Minimal placeholder — full format is owned by Phase 5.
-        println!("[AGENT CONTEXT]\n{}\n[/AGENT CONTEXT]", prompt);
+        print!("{}", format_agent_output(prompt));
         Ok(AGENT_SENTINEL.to_string())
     }
 
@@ -415,10 +428,17 @@ impl LlmClient for AgentBackend {
 
 /// Select the best available LLM backend given `WhyConfig`.
 ///
-/// Priority:
-/// 1. Explicit `llm = "claude"` / `"claude-cli"` / `"ollama"` in config
-/// 2. Auto-detect: Claude API → Claude CLI → Ollama
-/// 3. `None` → caller should fall back to `wai search`
+/// Priority (explicit config):
+///   - `"claude"`     → Claude API (requires `ANTHROPIC_API_KEY`)
+///   - `"claude-cli"` → Claude CLI binary; warns if inside a Claude Code session
+///   - `"agent"`      → AgentBackend; warns if `CLAUDECODE` is unset/empty
+///   - `"ollama"`     → Ollama local model
+///
+/// Auto-detect priority:
+///   - Inside a Claude Code session (CLAUDECODE non-empty): API → Agent → Ollama
+///   - Otherwise:                                           API → Claude CLI → Ollama
+///
+/// Returns `None` → caller should fall back to `wai search`.
 pub fn detect_backend(cfg: &WhyConfig) -> Option<Box<dyn LlmClient>> {
     match cfg.llm.as_deref() {
         Some("claude") => {
@@ -426,12 +446,33 @@ pub fn detect_backend(cfg: &WhyConfig) -> Option<Box<dyn LlmClient>> {
             Some(Box::new(client))
         }
         Some("claude-cli") => {
+            // 3.9: Warn when inside an agent session — agent mode is more efficient.
+            if in_agent_session() {
+                eprintln!(
+                    "  {} claude-cli selected but a Claude Code session is active.",
+                    "⚠".yellow()
+                );
+                eprintln!(
+                    "  {} Consider `llm = \"agent\"` in [why] for zero-cost queries.",
+                    "→".cyan()
+                );
+            }
             let client = ClaudeCliClient::from_config(cfg);
             if client.is_available() {
                 Some(Box::new(client))
             } else {
                 None
             }
+        }
+        Some("agent") => {
+            // 3.7: Warn when not inside an agent session.
+            if !in_agent_session() {
+                eprintln!(
+                    "  {} agent mode requires an active Claude Code session; no synthesized answer will be produced.",
+                    "⚠".yellow()
+                );
+            }
+            Some(Box::new(AgentBackend))
         }
         Some("ollama") => {
             let client = OllamaClient::from_config(cfg);
@@ -447,7 +488,11 @@ pub fn detect_backend(cfg: &WhyConfig) -> Option<Box<dyn LlmClient>> {
             if let Some(client) = ClaudeClient::from_config(cfg) {
                 return Some(Box::new(client));
             }
-            // 2. Claude CLI (zero-config for Claude Code users)
+            // 2a. Inside Claude Code → prefer Agent (zero-cost, no subprocess)
+            if in_agent_session() {
+                return Some(Box::new(AgentBackend));
+            }
+            // 2b. Outside agent session → Claude CLI
             let cli = ClaudeCliClient::from_config(cfg);
             if cli.is_available() {
                 return Some(Box::new(cli));
@@ -514,6 +559,73 @@ mod tests {
         unsafe { std::env::remove_var("CLAUDECODE") };
         assert!(!AgentBackend.is_available());
         assert_eq!(AgentBackend.is_available(), in_agent_session());
+    }
+
+    // ── format_agent_output (Phase 5) ──
+
+    #[test]
+    fn agent_output_includes_delimiters() {
+        let out = format_agent_output("my prompt");
+        assert!(out.contains("[AGENT CONTEXT]"));
+        assert!(out.contains("[/AGENT CONTEXT]"));
+    }
+
+    #[test]
+    fn agent_output_includes_prompt_between_delimiters() {
+        let out = format_agent_output("why use TOML?");
+        let start = out.find("[AGENT CONTEXT]").unwrap() + "[AGENT CONTEXT]".len();
+        let end = out.find("[/AGENT CONTEXT]").unwrap();
+        let between = &out[start..end];
+        assert!(between.contains("why use TOML?"));
+    }
+
+    #[test]
+    fn agent_output_header_precedes_context_block() {
+        let out = format_agent_output("test");
+        let header_pos = out.find("wai why — agent mode").unwrap();
+        let block_pos = out.find("[AGENT CONTEXT]").unwrap();
+        assert!(header_pos < block_pos);
+    }
+
+    // ── detect_backend (Phase 3) ──
+
+    #[test]
+    #[serial]
+    fn claudecode_set_no_api_key_selects_agent() {
+        unsafe { std::env::set_var("CLAUDECODE", "1") };
+        unsafe { std::env::remove_var("ANTHROPIC_API_KEY") };
+        let cfg = WhyConfig::default();
+        let backend = detect_backend(&cfg);
+        assert!(backend.is_some());
+        assert_eq!(backend.unwrap().name(), "Agent");
+        unsafe { std::env::remove_var("CLAUDECODE") };
+    }
+
+    #[test]
+    #[serial]
+    fn claudecode_set_with_api_key_selects_claude_api() {
+        unsafe { std::env::set_var("CLAUDECODE", "1") };
+        unsafe { std::env::set_var("ANTHROPIC_API_KEY", "sk-test") };
+        let cfg = WhyConfig::default();
+        let backend = detect_backend(&cfg);
+        assert!(backend.is_some());
+        assert_eq!(backend.unwrap().name(), "Claude");
+        unsafe { std::env::remove_var("CLAUDECODE") };
+        unsafe { std::env::remove_var("ANTHROPIC_API_KEY") };
+    }
+
+    #[test]
+    #[serial]
+    fn explicit_agent_config_selects_agent_regardless_of_claudecode() {
+        unsafe { std::env::remove_var("CLAUDECODE") };
+        let cfg = WhyConfig {
+            llm: Some("agent".to_string()),
+            ..Default::default()
+        };
+        // Returns AgentBackend even outside an agent session (with a warning on stderr)
+        let backend = detect_backend(&cfg);
+        assert!(backend.is_some());
+        assert_eq!(backend.unwrap().name(), "Agent");
     }
 
     // ── in_agent_session ──
