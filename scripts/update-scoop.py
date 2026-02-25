@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Update a goreleaser-generated Scoop manifest with new version, URL, and SHA."""
+"""Create or update a Scoop manifest for wai."""
 import json
+import os
 import sys
 
 manifest_path = sys.argv[1]
@@ -20,19 +21,29 @@ if sha_win is None:
     print("ERROR: windows_amd64 checksum not found", file=sys.stderr)
     sys.exit(1)
 
-url_win = f"https://github.com/charly-vibes/wai/releases/download/{tag}/wai_{version}_windows_amd64.zip"
+url = f"https://github.com/charly-vibes/wai/releases/download/{tag}/wai_{version}_windows_amd64.zip"
 
-with open(manifest_path) as f:
-    manifest = json.load(f)
+manifest = {
+    "version": version,
+    "description": "Workflow manager for AI-driven development",
+    "homepage": "https://github.com/charly-vibes/wai",
+    "license": "MIT",
+    "url": url,
+    "hash": f"sha256:{sha_win}",
+    "bin": "wai.exe",
+    "checkver": {
+        "github": "https://github.com/charly-vibes/wai"
+    },
+    "autoupdate": {
+        "url": "https://github.com/charly-vibes/wai/releases/download/v$version/wai_$version_windows_amd64.zip"
+    }
+}
 
-manifest["version"] = version
-manifest["url"] = url_win
-manifest["hash"] = f"sha256:{sha_win}"
-
+os.makedirs(os.path.dirname(manifest_path), exist_ok=True)
 with open(manifest_path, "w") as f:
     json.dump(manifest, f, indent=4)
     f.write("\n")
 
-print(f"Updated {manifest_path} to version {version}")
-print(f"  url: {url_win}")
+print(f"Wrote {manifest_path} (version {version})")
+print(f"  url: {url}")
 print(f"  sha256: {sha_win[:16]}...")

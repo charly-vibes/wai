@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Update a goreleaser-generated Homebrew formula with new version, URLs, and SHAs."""
-import re
+"""Create or update a Homebrew formula for wai."""
 import sys
+import os
 
 formula_path = sys.argv[1]
 version = sys.argv[2]
@@ -18,33 +18,56 @@ with open(checksums_path) as f:
                 if platform in name:
                     shas[platform] = sha
 
-base_url = f"https://github.com/charly-vibes/wai/releases/download/{tag}"
+base = f"https://github.com/charly-vibes/wai/releases/download/{tag}"
 
-with open(formula_path) as f:
-    lines = f.readlines()
+formula = f"""\
+# typed: false
+# frozen_string_literal: true
 
-result = []
-prev_platform = None
-for line in lines:
-    # Track platform from URL lines
-    url_match = re.search(r'url "https://[^"]*?((?:darwin|linux)_(?:arm64|amd64))', line)
-    if url_match:
-        platform = url_match.group(1)
-        filename = f"wai_{version}_{platform}.tar.gz"
-        line = re.sub(r'url ".*?"', f'url "{base_url}/{filename}"', line)
-        prev_platform = platform
-    elif prev_platform and re.search(r'sha256 "', line):
-        if prev_platform in shas:
-            line = re.sub(r'sha256 ".*?"', f'sha256 "{shas[prev_platform]}"', line)
-        prev_platform = None
-    # Update version line
-    if re.search(r'^\s*version "', line):
-        line = re.sub(r'version ".*?"', f'version "{version}"', line)
-    result.append(line)
+class Wai < Formula
+  desc "Workflow manager for AI-driven development"
+  homepage "https://github.com/charly-vibes/wai"
+  version "{version}"
+  license "MIT"
 
+  on_macos do
+    on_arm do
+      url "{base}/wai_{version}_darwin_arm64.tar.gz"
+      sha256 "{shas['darwin_arm64']}"
+    end
+    on_intel do
+      url "{base}/wai_{version}_darwin_amd64.tar.gz"
+      sha256 "{shas['darwin_amd64']}"
+    end
+  end
+
+  on_linux do
+    on_arm do
+      if Hardware::CPU.is_64_bit?
+        url "{base}/wai_{version}_linux_arm64.tar.gz"
+        sha256 "{shas['linux_arm64']}"
+      end
+    end
+    on_intel do
+      url "{base}/wai_{version}_linux_amd64.tar.gz"
+      sha256 "{shas['linux_amd64']}"
+    end
+  end
+
+  def install
+    bin.install "wai"
+  end
+
+  test do
+    system "\#{{bin}}/wai", "--version"
+  end
+end
+"""
+
+os.makedirs(os.path.dirname(formula_path), exist_ok=True)
 with open(formula_path, "w") as f:
-    f.writelines(result)
+    f.write(formula)
 
-print(f"Updated {formula_path} to version {version}")
+print(f"Wrote {formula_path} (version {version})")
 for p, s in shas.items():
     print(f"  {p}: {s[:16]}...")
