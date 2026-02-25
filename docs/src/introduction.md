@@ -6,6 +6,15 @@ Most specs define *what* to build. Wai extends the workflow to also *inform* —
 
 It organizes artifacts using the PARA method (Projects, Areas, Resources, Archives) with project phase tracking, agent config sync, handoff generation, and plugin integration.
 
+## At a Glance
+
+`wai` bridges the gap between your thoughts and your codebase:
+
+1. **Capture:** Record research, designs, and decisions as you work.
+2. **Context:** Advance projects through defined phases (Research → Design → Plan → Implement).
+3. **Sync:** Keep AI instructions (`CLAUDE.md`, `.cursorrules`) automatically in sync with your latest project state.
+4. **Handoff:** Generate high-context session summaries for yourself or other agents.
+
 ## Design Principles
 
 - **Desire Path Alignment** — Pave the cowpaths, make common workflows shortest

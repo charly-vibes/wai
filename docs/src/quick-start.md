@@ -1,257 +1,83 @@
 # Quick Start
 
-## Interactive Tutorial
+Get up and running with `wai` in 5 minutes.
 
-Run the interactive tutorial for a guided introduction:
+## 1. Run the Interactive Tutorial
+
+The best way to learn is by doing. Run:
 
 ```bash
 wai tutorial
 ```
 
-The tutorial covers:
-- What is wai and why use it
-- PARA method organization
-- Project phase workflow
-- Core commands
-- Session handoffs
+This interactive guide covers the PARA method, project phases, and basic commands in a safe sandbox.
 
-## Initialize
+## 2. Initialize Your Workspace
 
-Set up wai in your project directory:
+Navigate to your project directory and initialize:
 
 ```bash
 wai init
 ```
 
-Or specify a custom project name:
+This creates a `.wai/` directory to store your artifacts and configuration.
+
+## 3. Create a Project
+
+In `wai`, a "Project" is an active work item with a specific goal. Create your first one:
 
 ```bash
-wai init --name my-project
+wai new project my-feature
 ```
 
-## Create a Project
+## 4. Capture Research
+
+Projects start in the **Research** phase. Record your initial thoughts or findings:
 
 ```bash
-wai new project my-app
+wai add research "Evaluated options A and B. Choosing A for performance."
 ```
 
-Projects are active work items with phases, timelines, and dated artifacts.
+## 5. Advance Through Phases
 
-## Check Status
+As your work progresses, advance the project's phase:
 
-Get an overview of your project with contextual suggestions:
+```bash
+# Advance: Research → Design
+wai phase next
+
+# Add a design artifact
+wai add design "New API will use standard REST patterns."
+```
+
+## 6. Check Your Progress
+
+Get a context-aware overview of your workspace:
 
 ```bash
 wai status
 ```
 
-Status shows:
-- All projects with current phases
-- Detected plugins and their status
-- OpenSpec changes if applicable
-- Context-aware suggestions for next steps
+Status shows your active projects, their current phases, and **smart suggestions** for what to do next.
 
-## Manage Phases
-
-Projects progress through phases — research, design, plan, implement, review, archive:
-
-```bash
-wai phase              # Show current phase with history
-wai phase next         # Advance to next phase
-wai phase back         # Go back to previous phase
-wai phase set design   # Jump to specific phase
-```
-
-## Add Artifacts
-
-Capture research, plans, and designs as you work:
-
-```bash
-# Add inline content
-wai add research "Initial API analysis"
-wai add plan "Implementation approach"
-wai add design "Component architecture"
-
-# Import from files
-wai add research --file notes.md
-
-# Add tags for organization
-wai add research "Security findings" --tags "security,api,auth"
-
-# Target specific project
-wai add research "Findings" --project other-project
-```
-
-## Search
-
-Find content across all artifacts:
-
-```bash
-# Basic search
-wai search "authentication"
-
-# Search with filters
-wai search --type research           # Only research artifacts
-wai search --in my-app                # Specific project
-wai search --regex "api.*error"       # Regex patterns
-wai search "config" -n 5              # Limit results
-```
-
-## View Timeline
-
-See a chronological view of project activity:
-
-```bash
-# Full timeline
-wai timeline my-app
-
-# Date range
-wai timeline my-app --from 2026-02-01 --to 2026-02-15
-
-# Reverse order (oldest first)
-wai timeline my-app --reverse
-```
-
-## Generate Handoffs
-
-Create a handoff document summarizing project state:
-
-```bash
-wai handoff create my-app
-```
-
-Handoffs include:
-- Current project phase
-- Recent artifacts
-- Plugin context (git status, open issues, etc.)
-
-Perfect for session transitions or knowledge transfer.
-
-## Agent Configuration
-
-### Sync Configs
-
-Push agent config files to their tool-specific locations:
-
-```bash
-# Check sync status
-wai sync --status
-
-# Apply sync
-wai sync
-```
-
-### Manage Configs
-
-```bash
-# List all configs
-wai config list
-
-# Add new config
-wai config add skill my-skill.md
-
-# Edit config
-wai config edit skills/my-skill.md
-```
-
-### Import Existing Configs
-
-```bash
-wai import .claude/
-wai import .cursorrules
-```
-
-## Workspace Health
-
-Check for issues and auto-fix when possible:
-
-```bash
-# Diagnose wai workspace issues
-wai doctor
-
-# Auto-repair wai workspace
-wai doctor --fix
-
-# Check repository best practices
-wai way
-
-# Get JSON output for CI integration
-wai way --json
-```
-
-**Doctor checks (wai-specific):**
-- Directory structure
-- Config file integrity
-- Plugin availability
-- Sync status
-- Project state consistency
-
-**Way checks (general repository - 10 checks):**
-- Task runner (justfile, Makefile)
-- Git hooks (prek, pre-commit)
-- Editor config (.editorconfig)
-- Documentation (README, LICENSE, CONTRIBUTING, .gitignore)
-- AI instructions (CLAUDE.md, AGENTS.md)
-- LLM documentation (llm.txt)
-- Agent skills (.wai/resources/skills/)
-- GitHub CLI (gh installed & authenticated)
-- CI/CD configuration
-- Dev container setup
-
-## Work with Plugins
-
-List and interact with detected plugins:
-
-```bash
-# List all plugins
-wai plugin list
-
-# Use plugin commands (pass-through)
-wai beads list
-wai beads ready
-wai beads show beads-123
-```
-
-## JSON Output
-
-Get machine-readable output for automation:
-
-```bash
-wai status --json
-wai search "config" --json
-wai plugin list --json
-wai timeline my-app --json
-```
-
-## Safe Mode
-
-Run commands in read-only mode:
-
-```bash
-wai status --safe
-wai search "query" --safe
-```
-
-Safe mode prevents any file modifications.
+---
 
 ## Next Steps
 
-### Learn Core Concepts
-- [PARA Method](./concepts/para-method.md) - Understand project organization
-- [Project Phases](./concepts/phases.md) - Master the workflow
-- [Plugin System](./concepts/plugins.md) - Extend wai's capabilities
-- [Agent Config Sync](./concepts/agent-config-sync.md) - Manage AI tool configs
+Now that you've got the basics down, explore the more powerful features of `wai`:
 
-### Reference Documentation
-- [Commands Reference](./commands.md) - Complete command list
-- [Troubleshooting](./troubleshooting.md) - Common problems and solutions
-- [FAQ](./faq.md) - Frequently asked questions
+- **[Commands Reference](./commands.md)** — Comprehensive list of all commands and flags.
+- **[PARA Method](./concepts/para-method.md)** — Learn how `wai` organizes your work.
+- **[Project Phases](./concepts/phases.md)** — Master the workflow from Research to Archive.
+- **[Agent Config Sync](./concepts/agent-config-sync.md)** — Keep your AI tools in sync.
+- **[Diagnostics & Health](./commands.md#diagnostics)** — Learn the difference between `wai doctor` and `wai way`.
 
-### Advanced Usage
-- [JSON Output](./advanced/json-output.md) - Automation and scripting
-- [Workflow Detection](./advanced/workflow-detection.md) - Context-aware suggestions
+---
 
-### Getting Help
-- Run `wai tutorial` for interactive guide
-- Run `wai doctor` to check workspace health
-- Check [GitHub Issues](https://github.com/charly-vibes/wai/issues) for known problems
+## Troubleshooting
+
+If you run into issues, check the **[Troubleshooting](./troubleshooting.md)** guide or run:
+
+```bash
+wai doctor  # Check workspace health
+```

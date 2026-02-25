@@ -47,14 +47,38 @@ Available for all commands:
 | `wai add design <content>` | Add a design document |
 | `wai add design --file <path>` | Import design from file |
 
-## Viewing & Navigating
+## Diagnostics
 
 | Command | Description |
 |---------|-------------|
-| `wai show [name]` | Show PARA overview or item details |
-| `wai move <item> <category>` | Move item between PARA categories |
-| `wai status` | Show project status with suggestions |
-| `wai ls [--root <dir>] [--depth <n>]` | List all wai projects across workspaces |
+| `wai doctor` | Diagnose **wai workspace** health (requires initialization) |
+| `wai doctor --fix` | Auto-repair detected workspace issues |
+| `wai way` | Check **repository best practices** for AI development |
+| `wai way --json` | Output best practices check as JSON |
+
+### Choosing the Right Tool
+
+- **Use `wai doctor`** when your `.wai/` directory is missing, a project phase is stuck, or a sync command is failing.
+- **Use `wai way`** when you want to improve your overall repository for AI friendliness (e.g., adding `CLAUDE.md`, `.editorconfig`, or `SKILL.md` files).
+
+---
+
+## Agent Configuration
+
+> **⚠️ WARNING:** `wai sync` is **destructive** to your target files. It will overwrite any manual changes in `.cursorrules`, `.claude/config.json`, and other tool-specific config files with the sources from your `.wai/` directory.
+
+| Command | Description |
+|---------|-------------|
+| `wai sync` | **Overwrite** agent configs to tool-specific locations |
+| `wai sync --status` | **Recommended:** Check sync status without modifying |
+| `wai config add <type> <file>` | Add agent config (skill/rule/context) |
+| `wai config list` | List all agent config files |
+| `wai config edit <path>` | **Safe:** Edit config file in $EDITOR |
+| `wai import <path>` | Import existing tool configs (.claude/, .cursorrules) |
+
+---
+
+## Viewing & Navigating
 
 ## Searching & Timeline
 
@@ -170,44 +194,6 @@ fallback = "search"       # On LLM unavailable: "search" (default) or "error"
 3. Research/design/plan artifacts — curated decisions
 
 Reuses the `[why]` LLM config — no separate setup required.
-
-## Diagnostics
-
-| Command | Description |
-|---------|-------------|
-| `wai doctor` | Diagnose workspace health |
-| `wai doctor --fix` | Auto-repair detected issues |
-| `wai way` | Check repository best practices |
-| `wai way --json` | Output best practices check as JSON |
-
-### Doctor Checks
-
-- Directory structure validation
-- Config file integrity
-- Plugin tool availability
-- Agent config sync status
-- Projection validity
-- Project state consistency
-- Agent instruction files (CLAUDE.md, AGENTS.md)
-
-### Way Checks
-
-The `wai way` command validates repository best practices for AI-friendly development (10 checks total):
-
-1. **Task runner** — `justfile` or `Makefile` for standardized commands (build, test, deploy)
-2. **Git hooks** — `.prek.toml` or `.pre-commit-config.yaml` for automated quality checks
-3. **Editor config** — `.editorconfig` for consistent formatting across editors
-4. **Documentation** — `README.md`, `LICENSE`, `CONTRIBUTING.md`, `.gitignore` (checks for all 4 files)
-5. **AI instructions** — `CLAUDE.md` or `AGENTS.md` for providing context to AI assistants
-6. **LLM documentation** — `llm.txt` for AI-friendly project documentation (https://llmstxt.org)
-7. **Agent skills** — `.wai/resources/skills/` directory with `SKILL.md` files for Claude Code
-8. **GitHub CLI** — `gh` CLI installed and authenticated for better GitHub integration
-9. **CI/CD** — GitHub Actions, GitLab CI, or CircleCI configuration for automation
-10. **Dev container** — `.devcontainer/` for reproducible development environments
-
-**Key Differences:**
-- `wai doctor` checks wai-specific workspace health (requires wai initialization)
-- `wai way` checks general repository best practices (works in any directory)
 
 ## Examples
 

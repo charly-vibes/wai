@@ -46,22 +46,28 @@ Error: wai::error::not_initialized
 
 ## Sync Issues
 
+> **⚠️ WARNING:** `wai sync` is **destructive** to your target files (e.g., `.cursorrules`, `.claude/config.json`). It will overwrite any manual changes in these files with the versions from your `.wai/resources/agent-config/` source directory.
+
 ### Sync conflicts - target file manually edited
 
-**Problem:** You edited a synced file (e.g., `.cursorrules`) directly and wai overwrote it.
+**Problem:** You edited a synced file directly and `wai sync` overwrote your changes, or you want to keep manual changes before syncing.
 
 **Solution:**
+1. **Always edit source files**, not targets. Use `wai config list` to find sources.
+2. If you've already edited the target, **back up your changes** before running `wai sync`.
+3. Use `wai sync --status` to see what will be changed before applying.
+
 ```bash
-# Always edit source files, not targets
+# Recommended workflow:
+# 1. Check status
+wai sync --status
+
+# 2. Edit the source file correctly
 wai config edit rules/my-rule.md
 
-# If you accidentally edited the target, copy changes to source first
-cp .cursorrules .wai/resources/agent-config/rules/backup.md
-# Then edit the source and re-sync
+# 3. Apply sync
 wai sync
 ```
-
-**Prevention:** Never edit synced target files. Edit sources in `.wai/resources/agent-config/` instead.
 
 ### Symlinks not working on Windows
 
