@@ -44,7 +44,7 @@ regex = "1"
 strsim = "0.11"
 
 # HTTP client for Claude API (blocking, JSON)
-reqwest = { version = "0.12", features = ["blocking", "json"] }
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
 
 # Async runtime (optional, for future use)
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs"], optional = true }

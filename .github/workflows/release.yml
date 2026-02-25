@@ -38,9 +38,8 @@ jobs:
 
       - name: Install aarch64 cross-compile toolchain
         run: |
-          sudo dpkg --add-architecture arm64
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu libssl-dev:arm64
+          sudo apt-get install -y gcc-aarch64-linux-gnu
 
       - name: Build x86_64 Linux
         run: cargo build --release --locked --target x86_64-unknown-linux-gnu
@@ -49,8 +48,6 @@ jobs:
         run: cargo build --release --locked --target aarch64-unknown-linux-gnu
         env:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
-          PKG_CONFIG_ALLOW_CROSS: "1"
-          PKG_CONFIG_PATH: /usr/lib/aarch64-linux-gnu/pkgconfig
 
       - name: Stage binaries
         run: |
