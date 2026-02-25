@@ -74,12 +74,19 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
             advanced_options: &[
                 "-f, --file <PATH>       Import content from a file",
                 "-p, --project <NAME>    Associate with a specific project",
-                "-t, --tags <TAGS>       Add tags (research only)",
+                "-t, --tags <TAGS>       Comma-separated tags (merged with pipeline-run tag)",
             ],
-            env_vars: &[("NO_COLOR", "Disable colored output")],
+            env_vars: &[
+                ("NO_COLOR", "Disable colored output"),
+                (
+                    "WAI_PIPELINE_RUN",
+                    "Auto-tag artifact with pipeline-run:<id> when set",
+                ),
+            ],
             internals: &[
                 "Stores artifacts as timestamped files under project directories",
                 "Tags are stored in YAML frontmatter",
+                "WAI_PIPELINE_RUN tag is merged with any --tags value",
             ],
         }),
         "phase" => Some(HelpContent {
@@ -256,6 +263,42 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 "Detects config type from file structure",
             ],
         }),
+        "pipeline" => Some(HelpContent {
+            about: "Manage pipelines (ordered multi-skill workflows)",
+            examples: &[
+                (
+                    "wai pipeline create review --stages=\"gather:research,run:plan\"",
+                    "Define a 2-stage pipeline",
+                ),
+                (
+                    "wai pipeline run review --topic=my-feature",
+                    "Start a pipeline run",
+                ),
+                (
+                    "wai pipeline advance review-2026-02-25-my-feature",
+                    "Advance to next stage",
+                ),
+                ("wai pipeline status review", "Show per-stage run status"),
+                ("wai pipeline list", "List all pipelines"),
+            ],
+            advanced_options: &[
+                "create --stages <STAGES>    Comma-separated skill:artifact pairs",
+                "run    --topic <SLUG>       Topic slug used in the run ID",
+                "status --run <RUN-ID>       Filter status to a single run",
+            ],
+            env_vars: &[
+                ("NO_COLOR", "Disable colored output"),
+                (
+                    "WAI_PIPELINE_RUN",
+                    "Set by `wai pipeline run`; causes `wai add` to auto-tag artifacts",
+                ),
+            ],
+            internals: &[
+                "Pipeline definitions stored in .wai/resources/pipelines/<name>.yml",
+                "Run state stored in .wai/resources/pipelines/<name>/runs/<id>.yml",
+                "Artifact lookup uses pipeline-run:<id> frontmatter tag",
+            ],
+        }),
         _ => None,
     }
 }
@@ -286,6 +329,7 @@ pub fn render_main_help(verbose: u8) -> String {
     out.push_str("  move      Move items between PARA categories\n");
     out.push_str("  new       Create a new project, area, or resource\n");
     out.push_str("  phase     Show or change the current project phase\n");
+    out.push_str("  pipeline  Manage pipelines (ordered multi-skill workflows)\n");
     out.push_str("  plugin    Manage plugins\n");
     out.push_str("  prime     Orient yourself at session start\n");
     out.push_str("  reflect   Synthesize session context into AI guidance\n");
@@ -316,9 +360,10 @@ pub fn render_main_help(verbose: u8) -> String {
 
     if verbose >= 2 {
         out.push_str("\nENVIRONMENT:\n");
-        out.push_str("  NO_COLOR    Disable colored output\n");
-        out.push_str("  WAI_LOG     Set log level (trace, debug, info, warn, error)\n");
-        out.push_str("  EDITOR      Editor for interactive editing commands\n");
+        out.push_str("  NO_COLOR          Disable colored output\n");
+        out.push_str("  WAI_LOG           Set log level (trace, debug, info, warn, error)\n");
+        out.push_str("  EDITOR            Editor for interactive editing commands\n");
+        out.push_str("  WAI_PIPELINE_RUN  Auto-tag `wai add` artifacts with pipeline-run:<id>\n");
     }
 
     if verbose >= 3 {

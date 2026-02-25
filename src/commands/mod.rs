@@ -243,6 +243,11 @@ fn run_external(args: Vec<String>) -> Result<()> {
         ("config", "add"),
         ("config", "list"),
         ("config", "edit"),
+        ("pipeline", "create"),
+        ("pipeline", "run"),
+        ("pipeline", "advance"),
+        ("pipeline", "status"),
+        ("pipeline", "list"),
     ];
     let engine = SuggestionEngine::new();
 
