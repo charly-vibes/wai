@@ -3128,6 +3128,85 @@ fn resource_add_skill_refuses_in_safe_mode() {
         .stderr(predicate::str::contains("add skill").or(predicate::str::contains("Safe mode")));
 }
 
+// ── wai resource add skill (hierarchical) ────────────────────────────────────
+
+#[test]
+fn resource_add_hierarchical_skill_creates_nested_directory() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["resource", "add", "skill", "issue/gather"])
+        .assert()
+        .success();
+
+    let skill_dir = tmp
+        .path()
+        .join(".wai/resources/agent-config/skills/issue/gather");
+    assert!(skill_dir.is_dir(), "nested skill directory should be created");
+
+    let skill_md = skill_dir.join("SKILL.md");
+    assert!(skill_md.is_file(), "SKILL.md should be created in nested directory");
+
+    let content = fs::read_to_string(&skill_md).unwrap();
+    assert!(content.contains("name: issue/gather"), "SKILL.md should include full hierarchical name");
+}
+
+#[test]
+fn resource_list_skills_shows_hierarchical_and_flat() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["resource", "add", "skill", "issue/gather"])
+        .assert()
+        .success();
+
+    wai_cmd(tmp.path())
+        .args(["resource", "add", "skill", "plain-skill"])
+        .assert()
+        .success();
+
+    let output = wai_cmd(tmp.path())
+        .args(["resource", "list", "skills"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let stdout = String::from_utf8_lossy(&output);
+
+    assert!(
+        stdout.contains("issue/gather") || stdout.contains("gather"),
+        "list should show hierarchical skill; got: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("plain-skill"),
+        "list should show flat skill; got: {}",
+        stdout
+    );
+}
+
+#[test]
+fn resource_add_hierarchical_skill_conflicts_with_flat_skill() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    // Create a flat skill named "issue"
+    wai_cmd(tmp.path())
+        .args(["resource", "add", "skill", "issue"])
+        .assert()
+        .success();
+
+    // Attempting to create "issue/gather" should fail with a conflict message
+    wai_cmd(tmp.path())
+        .args(["resource", "add", "skill", "issue/gather"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("issue").and(predicate::str::contains("flat skill").or(predicate::str::contains("already exists"))));
+}
+
 // ── wai resource list skills ─────────────────────────────────────────────────
 
 #[test]

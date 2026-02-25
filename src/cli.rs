@@ -505,8 +505,12 @@ pub enum ResourceCommands {
 #[derive(Subcommand)]
 pub enum ResourceAddCommands {
     /// Add a skill
+    ///
+    /// Skill names may be flat ("my-skill") or hierarchical ("category/action").
+    /// Only one '/' separator is allowed; each segment must be lowercase
+    /// letters, digits, and hyphens (no leading/trailing hyphens).
     Skill {
-        /// Skill name
+        /// Skill name (e.g. "my-skill" or "issue/gather")
         name: String,
     },
 }

@@ -13,10 +13,11 @@ use crate::error::WaiError;
 use super::require_project;
 
 /// Validates a skill name according to the following rules:
-/// - Only lowercase a-z, digits 0-9, and hyphens allowed
-/// - No leading, trailing, or consecutive hyphens
-/// - Maximum 64 characters
-/// - Cannot be empty, ".", "..", or start with "."
+/// - Only lowercase a-z, digits 0-9, hyphens, and at most one '/' allowed
+/// - '/' separates category from action (e.g. "issue/gather")
+/// - Neither segment may be empty, start/end with a hyphen, or contain invalid characters
+/// - No leading, trailing, or consecutive hyphens within each segment
+/// - Maximum 64 characters (total, including '/')
 pub fn validate_skill_name(name: &str) -> Result<(), WaiError> {
     // Check for empty string
     if name.is_empty() {
@@ -25,17 +26,12 @@ pub fn validate_skill_name(name: &str) -> Result<(), WaiError> {
         });
     }
 
-    // Check for special names
-    if name == "." || name == ".." {
+    // At most one '/' allowed
+    let slash_count = name.chars().filter(|&c| c == '/').count();
+    if slash_count > 1 {
         return Err(WaiError::InvalidSkillName {
-            message: format!("'{}' is not a valid skill name", name),
-        });
-    }
-
-    // Check for names starting with "."
-    if name.starts_with('.') {
-        return Err(WaiError::InvalidSkillName {
-            message: "Skill name cannot start with '.'".to_string(),
+            message: "Skill name can contain at most one '/' separator (e.g. category/action)"
+                .to_string(),
         });
     }
 
@@ -46,29 +42,54 @@ pub fn validate_skill_name(name: &str) -> Result<(), WaiError> {
         });
     }
 
-    // Check for leading hyphen
-    if name.starts_with('-') {
+    // Validate each segment individually
+    for segment in name.splitn(2, '/') {
+        validate_skill_name_segment(segment)?;
+    }
+
+    Ok(())
+}
+
+/// Validates a single segment of a skill name (the part before or after '/').
+fn validate_skill_name_segment(segment: &str) -> Result<(), WaiError> {
+    if segment.is_empty() {
+        return Err(WaiError::InvalidSkillName {
+            message: "Skill name segments cannot be empty (check for leading or trailing '/')"
+                .to_string(),
+        });
+    }
+
+    if segment == "." || segment == ".." {
+        return Err(WaiError::InvalidSkillName {
+            message: format!("'{}' is not a valid skill name segment", segment),
+        });
+    }
+
+    if segment.starts_with('.') {
+        return Err(WaiError::InvalidSkillName {
+            message: "Skill name cannot start with '.'".to_string(),
+        });
+    }
+
+    if segment.starts_with('-') {
         return Err(WaiError::InvalidSkillName {
             message: "Skill name cannot start with a hyphen".to_string(),
         });
     }
 
-    // Check for trailing hyphen
-    if name.ends_with('-') {
+    if segment.ends_with('-') {
         return Err(WaiError::InvalidSkillName {
             message: "Skill name cannot end with a hyphen".to_string(),
         });
     }
 
-    // Check for consecutive hyphens
-    if name.contains("--") {
+    if segment.contains("--") {
         return Err(WaiError::InvalidSkillName {
             message: "Skill name cannot contain consecutive hyphens".to_string(),
         });
     }
 
-    // Check for valid characters (lowercase a-z, digits 0-9, hyphens)
-    for (idx, ch) in name.chars().enumerate() {
+    for (idx, ch) in segment.chars().enumerate() {
         if !ch.is_ascii_lowercase() && !ch.is_ascii_digit() && ch != '-' {
             return Err(WaiError::InvalidSkillName {
                 message: format!(
@@ -95,6 +116,8 @@ pub struct SkillMetadata {
 #[derive(Debug, Clone, Serialize)]
 struct SkillEntry {
     name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    category: Option<String>,
     description: String,
     path: String,
 }
@@ -181,6 +204,7 @@ fn add_skill(name: &str) -> Result<()> {
 
     // Build path to skills directory
     let skills_dir = agent_config_dir(&project_root).join(SKILLS_DIR);
+    // Path::join handles the '/' in hierarchical names correctly on all platforms
     let skill_dir = skills_dir.join(name);
 
     // Check if skill already exists
@@ -188,7 +212,31 @@ fn add_skill(name: &str) -> Result<()> {
         miette::bail!("Skill '{}' already exists at {}", name, skill_dir.display());
     }
 
-    // Create skill directory
+    // Conflict detection for hierarchical names
+    if name.contains('/') {
+        // Hierarchical: check that the category segment isn't already a flat skill
+        let category = name.split('/').next().unwrap();
+        let category_dir = skills_dir.join(category);
+        if category_dir.join("SKILL.md").exists() {
+            miette::bail!(
+                "Cannot create '{}': '{}' already exists as a flat skill",
+                name,
+                category
+            );
+        }
+    } else {
+        // Flat: check that the name isn't already used as a category directory
+        let candidate = skills_dir.join(name);
+        if candidate.is_dir() && !candidate.join("SKILL.md").exists() {
+            miette::bail!(
+                "Cannot create '{}': it is already used as a category. Use a hierarchical name like '{}/...' instead.",
+                name,
+                name
+            );
+        }
+    }
+
+    // Create skill directory (create_dir_all handles intermediate category dirs)
     fs::create_dir_all(&skill_dir).into_diagnostic()?;
 
     // Create SKILL.md with template
@@ -215,19 +263,27 @@ Instructions go here.
     Ok(())
 }
 
-/// Converts kebab-case to Title Case
-/// Example: "my-cool-skill" -> "My Cool Skill"
+/// Converts a skill name to Title Case for use in templates.
+/// Handles both flat ("my-cool-skill" -> "My Cool Skill") and
+/// hierarchical ("issue/gather" -> "Issue / Gather") names.
 fn kebab_to_title_case(s: &str) -> String {
-    s.split('-')
-        .map(|word| {
-            let mut chars = word.chars();
-            match chars.next() {
-                None => String::new(),
-                Some(first) => first.to_uppercase().chain(chars).collect(),
-            }
-        })
+    let title_segment = |seg: &str| -> String {
+        seg.split('-')
+            .map(|word| {
+                let mut chars = word.chars();
+                match chars.next() {
+                    None => String::new(),
+                    Some(first) => first.to_uppercase().chain(chars).collect(),
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
+    };
+
+    s.splitn(2, '/')
+        .map(title_segment)
         .collect::<Vec<_>>()
-        .join(" ")
+        .join(" / ")
 }
 
 fn list_skills(json: bool) -> Result<()> {
@@ -251,7 +307,7 @@ fn list_skills(json: bool) -> Result<()> {
         return Ok(());
     }
 
-    // Scan skills directory
+    // Scan skills directory (flat skills and one level of category subdirectories)
     let mut entries = Vec::new();
     for entry in fs::read_dir(&skills_dir).into_diagnostic()? {
         let entry = entry.into_diagnostic()?;
@@ -262,33 +318,76 @@ fn list_skills(json: bool) -> Result<()> {
             continue;
         }
 
-        let skill_name = path
+        let dir_name = path
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("unknown")
             .to_string();
 
         let skill_file = path.join("SKILL.md");
-        let relative_path = path
-            .strip_prefix(&project_root)
-            .unwrap_or(&path)
-            .display()
-            .to_string();
 
-        // Try to parse metadata
-        if let Some(metadata) = parse_skill_frontmatter(&skill_file) {
-            entries.push(SkillEntry {
-                name: metadata.name,
-                description: metadata.description,
-                path: relative_path,
-            });
+        if skill_file.exists() {
+            // Flat skill: directory contains SKILL.md directly
+            let relative_path = path
+                .strip_prefix(&project_root)
+                .unwrap_or(&path)
+                .display()
+                .to_string();
+            if let Some(metadata) = parse_skill_frontmatter(&skill_file) {
+                entries.push(SkillEntry {
+                    name: metadata.name,
+                    category: None,
+                    description: metadata.description,
+                    path: relative_path,
+                });
+            } else {
+                entries.push(SkillEntry {
+                    name: dir_name,
+                    category: None,
+                    description: "(no metadata)".to_string(),
+                    path: relative_path,
+                });
+            }
         } else {
-            // No metadata or bad frontmatter
-            entries.push(SkillEntry {
-                name: skill_name,
-                description: "(no metadata)".to_string(),
-                path: relative_path,
-            });
+            // Category directory: recurse one level for hierarchical skills
+            for sub_entry in fs::read_dir(&path).into_diagnostic()? {
+                let sub_entry = sub_entry.into_diagnostic()?;
+                let sub_path = sub_entry.path();
+
+                if !sub_path.is_dir() {
+                    continue;
+                }
+
+                let sub_name = sub_path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("unknown")
+                    .to_string();
+
+                let sub_skill_file = sub_path.join("SKILL.md");
+                let hierarchical_name = format!("{}/{}", dir_name, sub_name);
+                let relative_path = sub_path
+                    .strip_prefix(&project_root)
+                    .unwrap_or(&sub_path)
+                    .display()
+                    .to_string();
+
+                if let Some(metadata) = parse_skill_frontmatter(&sub_skill_file) {
+                    entries.push(SkillEntry {
+                        name: metadata.name,
+                        category: Some(dir_name.clone()),
+                        description: metadata.description,
+                        path: relative_path,
+                    });
+                } else {
+                    entries.push(SkillEntry {
+                        name: hierarchical_name,
+                        category: Some(dir_name.clone()),
+                        description: "(no metadata)".to_string(),
+                        path: relative_path,
+                    });
+                }
+            }
         }
     }
 
@@ -460,12 +559,30 @@ mod tests {
 
     #[test]
     fn test_valid_skill_names() {
-        // Valid names should pass
+        // Valid flat names should pass
         assert!(validate_skill_name("my-skill").is_ok());
         assert!(validate_skill_name("skill123").is_ok());
         assert!(validate_skill_name("a").is_ok());
         assert!(validate_skill_name("my-cool-skill-2").is_ok());
         assert!(validate_skill_name("abc-123-xyz").is_ok());
+        // Valid hierarchical names
+        assert!(validate_skill_name("issue/gather").is_ok());
+        assert!(validate_skill_name("impl/run").is_ok());
+        assert!(validate_skill_name("my-cat/my-action").is_ok());
+    }
+
+    #[test]
+    fn test_hierarchical_invalid() {
+        // Two slashes: invalid
+        assert!(validate_skill_name("a/b/c").is_err());
+        // Leading slash: empty first segment
+        assert!(validate_skill_name("/gather").is_err());
+        // Trailing slash: empty second segment
+        assert!(validate_skill_name("issue/").is_err());
+        // Hyphen rules apply to segments too
+        assert!(validate_skill_name("issue/-gather").is_err());
+        assert!(validate_skill_name("issue/gather-").is_err());
+        assert!(validate_skill_name("-cat/gather").is_err());
     }
 
     #[test]
@@ -749,5 +866,8 @@ description: "  "
         assert_eq!(kebab_to_title_case("a-b-c"), "A B C");
         assert_eq!(kebab_to_title_case("my-cool-skill-2"), "My Cool Skill 2");
         assert_eq!(kebab_to_title_case(""), "");
+        // Hierarchical names
+        assert_eq!(kebab_to_title_case("issue/gather"), "Issue / Gather");
+        assert_eq!(kebab_to_title_case("my-cat/my-action"), "My Cat / My Action");
     }
 }
