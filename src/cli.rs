@@ -233,13 +233,18 @@ pub enum Commands {
                 wai why ./src/commands/why.rs\n\n\
             CONFIGURATION (.wai/config.toml)\n\
               [why]\n\
-              llm     = \"claude\"       # Backend: \"claude\" or \"ollama\" (auto-detected if omitted)\n\
+              llm     = \"claude\"       # \"claude\"|\"claude-cli\"|\"agent\"|\"ollama\" (auto-detect)\n\
               model   = \"haiku\"        # Claude: \"haiku\"/\"sonnet\"; Ollama: \"llama3.1:8b\"\n\
               api_key = \"sk-ant-...\"   # Claude API key (or use ANTHROPIC_API_KEY env var)\n\
               fallback = \"search\"      # On LLM unavailable: \"search\" (default) or \"error\"\n\n\
             LLM BACKENDS\n\
-              Claude  — set ANTHROPIC_API_KEY or add api_key to [why] in .wai/config.toml\n\
-              Ollama  — install from https://ollama.com and run a local model\n\n\
+              Claude     — set ANTHROPIC_API_KEY or add api_key to [why] in .wai/config.toml\n\
+              Claude CLI — install Claude Code; use llm = \"claude-cli\"\n\
+              Agent      — inside Claude Code sessions; use llm = \"agent\" or let auto-detect pick it\n\
+              Ollama     — install from https://ollama.com and run a local model\n\n\
+            DETECTION PRIORITY\n\
+              Inside a Claude Code session (CLAUDECODE set):   API → Agent → Ollama\n\
+              Outside a Claude Code session:                   API → Claude CLI → Ollama\n\n\
             ERROR CODES\n\
               wai::llm::invalid_api_key  — API key missing or rejected\n\
               wai::llm::rate_limit       — Rate limit hit; wait 60s or use Ollama\n\
