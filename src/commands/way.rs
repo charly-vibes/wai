@@ -32,6 +32,9 @@ struct CheckResult {
     status: Status,
     message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    intent: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    success_criteria: Option<String>,
     suggestion: Option<String>,
 }
 
@@ -84,7 +87,7 @@ pub fn run(fix: Option<String>) -> Result<()> {
         let payload = WayPayload { checks, summary };
         print_json(&payload)?;
     } else {
-        render_human(&checks, &summary)?;
+        render_human(&checks, &summary, context.verbose)?;
     }
 
     // Always exit 0 - these are recommendations, not requirements
@@ -124,7 +127,7 @@ fn fix_skills(repo_root: &Path) -> Result<()> {
     Ok(())
 }
 
-fn render_human(checks: &[CheckResult], summary: &Summary) -> Result<()> {
+fn render_human(checks: &[CheckResult], summary: &Summary, verbose: u8) -> Result<()> {
     use cliclack::outro;
     use miette::IntoDiagnostic;
 
@@ -138,6 +141,14 @@ fn render_human(checks: &[CheckResult], summary: &Summary) -> Result<()> {
             Status::Info => "ℹ".cyan().to_string(),
         };
         println!("  {} {}: {}", icon, check.name.bold(), check.message);
+        if verbose > 0 {
+            if let Some(ref intent) = check.intent {
+                println!("    {} Intent: {}", "·".dimmed(), intent.dimmed());
+            }
+            if let Some(ref criteria) = check.success_criteria {
+                println!("    {} Success: {}", "·".dimmed(), criteria.dimmed());
+            }
+        }
         if let Some(ref suggestion) = check.suggestion {
             println!("    {} {}", "→".dimmed(), suggestion.dimmed());
         }
@@ -166,6 +177,10 @@ fn render_human(checks: &[CheckResult], summary: &Summary) -> Result<()> {
 }
 
 fn check_task_runner(repo_root: &Path) -> CheckResult {
+    let name = "Command standardization";
+    let intent = Some("Provide a single, tool-agnostic entry point for common repository tasks (build, test, deploy).".to_string());
+    let success_criteria = Some("A standard interface (justfile, Makefile, npm scripts) exists for common tasks.".to_string());
+
     let justfile = repo_root.join("justfile");
     let makefile = repo_root.join("Makefile");
 
@@ -178,16 +193,20 @@ fn check_task_runner(repo_root: &Path) -> CheckResult {
         };
 
         CheckResult {
-            name: "Task runner".to_string(),
+            name: name.to_string(),
             status: Status::Pass,
             message,
+            intent,
+            success_criteria,
             suggestion: None,
         }
     } else if makefile.exists() {
         CheckResult {
-            name: "Task runner".to_string(),
+            name: name.to_string(),
             status: Status::Pass,
             message: "Makefile detected".to_string(),
+            intent,
+            success_criteria,
             suggestion: Some(
                 "Consider migrating to justfile for better ergonomics — https://just.systems"
                     .to_string(),
@@ -195,9 +214,11 @@ fn check_task_runner(repo_root: &Path) -> CheckResult {
         }
     } else {
         CheckResult {
-            name: "Task runner".to_string(),
+            name: name.to_string(),
             status: Status::Info,
             message: "No task runner detected".to_string(),
+            intent,
+            success_criteria,
             suggestion: Some(
                 "Add a justfile to standardize common tasks — https://just.systems".to_string(),
             ),
@@ -240,21 +261,29 @@ fn parse_justfile_recipes(justfile_path: &Path) -> Vec<String> {
 }
 
 fn check_git_hooks(repo_root: &Path) -> CheckResult {
+    let name = "Pre-commit quality gates";
+    let intent = Some("Prevent low-quality commits by running automated checks before code is saved to history.".to_string());
+    let success_criteria = Some("Automated checks (linters, tests) run automatically before code is committed.".to_string());
+
     let prek_config = repo_root.join(".prek.toml");
     let precommit_config = repo_root.join(".pre-commit-config.yaml");
 
     if prek_config.exists() {
         CheckResult {
-            name: "Git hooks".to_string(),
+            name: name.to_string(),
             status: Status::Pass,
             message: "prek detected (recommended)".to_string(),
+            intent,
+            success_criteria,
             suggestion: None,
         }
     } else if precommit_config.exists() {
         CheckResult {
-            name: "Git hooks".to_string(),
+            name: name.to_string(),
             status: Status::Pass,
             message: "pre-commit detected".to_string(),
+            intent,
+            success_criteria,
             suggestion: Some(
                 "Consider prek for simpler hook management — https://github.com/chshersh/prek"
                     .to_string(),
@@ -262,9 +291,11 @@ fn check_git_hooks(repo_root: &Path) -> CheckResult {
         }
     } else {
         CheckResult {
-            name: "Git hooks".to_string(),
+            name: name.to_string(),
             status: Status::Info,
             message: "No git hook manager detected".to_string(),
+            intent,
+            success_criteria,
             suggestion: Some(
                 "Add prek to manage git hooks — https://github.com/chshersh/prek".to_string(),
             ),
@@ -273,20 +304,28 @@ fn check_git_hooks(repo_root: &Path) -> CheckResult {
 }
 
 fn check_editorconfig(repo_root: &Path) -> CheckResult {
+    let name = "Consistent formatting";
+    let intent = Some("Ensure consistent code formatting across different editors and IDEs.".to_string());
+    let success_criteria = Some("Project-wide style rules are enforced by a shared configuration file.".to_string());
+
     let editorconfig = repo_root.join(".editorconfig");
 
     if editorconfig.exists() {
         CheckResult {
-            name: "Editor config".to_string(),
+            name: name.to_string(),
             status: Status::Pass,
             message: ".editorconfig detected".to_string(),
+            intent,
+            success_criteria,
             suggestion: None,
         }
     } else {
         CheckResult {
-            name: "Editor config".to_string(),
+            name: name.to_string(),
             status: Status::Info,
             message: "No .editorconfig detected".to_string(),
+            intent,
+            success_criteria,
             suggestion: Some(
                 "Add .editorconfig to standardize formatting — https://editorconfig.org"
                     .to_string(),
@@ -296,6 +335,10 @@ fn check_editorconfig(repo_root: &Path) -> CheckResult {
 }
 
 fn check_documentation(repo_root: &Path) -> CheckResult {
+    let name = "Project documentation";
+    let intent = Some("Provide essential project identity, onboarding, and legal/contribution guidance.".to_string());
+    let success_criteria = Some("Essential files (README, .gitignore, LICENSE) provide project context and rules.".to_string());
+
     let readme = repo_root.join("README.md").exists();
     let license = repo_root.join("LICENSE").exists() || repo_root.join("LICENSE.md").exists();
     let contributing = repo_root.join("CONTRIBUTING.md").exists();
@@ -308,15 +351,19 @@ fn check_documentation(repo_root: &Path) -> CheckResult {
 
     match count {
         4 => CheckResult {
-            name: "Documentation".to_string(),
+            name: name.to_string(),
             status: Status::Pass,
             message: "Complete".to_string(),
+            intent,
+            success_criteria,
             suggestion: None,
         },
         0 => CheckResult {
-            name: "Documentation".to_string(),
+            name: name.to_string(),
             status: Status::Info,
             message: "Not configured".to_string(),
+            intent,
+            success_criteria,
             suggestion: Some(
                 "Add README.md and .gitignore at minimum, plus LICENSE and CONTRIBUTING.md"
                     .to_string(),
@@ -333,16 +380,20 @@ fn check_documentation(repo_root: &Path) -> CheckResult {
                     missing.push(".gitignore");
                 }
                 CheckResult {
-                    name: "Documentation".to_string(),
+                    name: name.to_string(),
                     status: Status::Info,
                     message: format!("⚠️  Missing critical files: {}", missing.join(", ")),
+                    intent,
+                    success_criteria,
                     suggestion: Some("Add missing critical documentation files".to_string()),
                 }
             } else {
                 CheckResult {
-                    name: "Documentation".to_string(),
+                    name: name.to_string(),
                     status: Status::Pass,
                     message: format!("Partial documentation ({}/4 files)", count),
+                    intent,
+                    success_criteria,
                     suggestion: Some("Consider adding LICENSE and CONTRIBUTING.md".to_string()),
                 }
             }
@@ -352,6 +403,10 @@ fn check_documentation(repo_root: &Path) -> CheckResult {
 
 fn check_ai_instructions(repo_root: &Path) -> CheckResult {
     use crate::managed_block::has_reflect_block;
+
+    let name = "AI-agent context";
+    let intent = Some("Provide persistent \"rules of the road\" and project context for AI collaborators.".to_string());
+    let success_criteria = Some("Persistent instructions define coding standards and context for AI assistants.".to_string());
 
     let claude_md = repo_root.join("CLAUDE.md");
     let agents_md = repo_root.join("AGENTS.md");
@@ -366,23 +421,29 @@ fn check_ai_instructions(repo_root: &Path) -> CheckResult {
             None
         };
         CheckResult {
-            name: "AI instructions".to_string(),
+            name: name.to_string(),
             status: Status::Pass,
             message: "CLAUDE.md detected (recommended for Claude Code)".to_string(),
+            intent,
+            success_criteria,
             suggestion,
         }
     } else if agents_md.exists() {
         CheckResult {
-            name: "AI instructions".to_string(),
+            name: name.to_string(),
             status: Status::Pass,
             message: "AGENTS.md detected".to_string(),
+            intent,
+            success_criteria,
             suggestion: Some("Consider adding CLAUDE.md for Claude Code compatibility".to_string()),
         }
     } else {
         CheckResult {
-            name: "AI instructions".to_string(),
+            name: name.to_string(),
             status: Status::Info,
             message: "No AI instruction files detected".to_string(),
+            intent,
+            success_criteria,
             suggestion: Some("Create CLAUDE.md to provide context to AI assistants".to_string()),
         }
     }
@@ -404,6 +465,8 @@ fn check_ci_cd(repo_root: &Path) -> CheckResult {
                 name: "CI/CD".to_string(),
                 status: Status::Pass,
                 message: format!("GitHub Actions configured ({} workflow(s))", workflow_count),
+                intent: None,
+                success_criteria: None,
                 suggestion: None,
             }
         } else {
@@ -411,6 +474,8 @@ fn check_ci_cd(repo_root: &Path) -> CheckResult {
                 name: "CI/CD".to_string(),
                 status: Status::Info,
                 message: "GitHub Actions directory present but empty".to_string(),
+                intent: None,
+                success_criteria: None,
                 suggestion: Some("Add workflow files to .github/workflows/".to_string()),
             }
         }
@@ -419,6 +484,8 @@ fn check_ci_cd(repo_root: &Path) -> CheckResult {
             name: "CI/CD".to_string(),
             status: Status::Pass,
             message: "GitLab CI configured".to_string(),
+            intent: None,
+            success_criteria: None,
             suggestion: None,
         }
     } else if circleci.exists() {
@@ -426,6 +493,8 @@ fn check_ci_cd(repo_root: &Path) -> CheckResult {
             name: "CI/CD".to_string(),
             status: Status::Pass,
             message: "CircleCI configured".to_string(),
+            intent: None,
+            success_criteria: None,
             suggestion: None,
         }
     } else {
@@ -433,6 +502,8 @@ fn check_ci_cd(repo_root: &Path) -> CheckResult {
             name: "CI/CD".to_string(),
             status: Status::Info,
             message: "No CI/CD configuration detected".to_string(),
+            intent: None,
+            success_criteria: None,
             suggestion: Some("Set up continuous integration to automate testing".to_string()),
         }
     }
@@ -447,6 +518,8 @@ fn check_devcontainer(repo_root: &Path) -> CheckResult {
             name: "Dev container".to_string(),
             status: Status::Pass,
             message: ".devcontainer/ directory detected".to_string(),
+            intent: None,
+            success_criteria: None,
             suggestion: None,
         }
     } else if devcontainer_json.exists() {
@@ -454,6 +527,8 @@ fn check_devcontainer(repo_root: &Path) -> CheckResult {
             name: "Dev container".to_string(),
             status: Status::Pass,
             message: ".devcontainer.json detected".to_string(),
+            intent: None,
+            success_criteria: None,
             suggestion: None,
         }
     } else {
@@ -461,6 +536,8 @@ fn check_devcontainer(repo_root: &Path) -> CheckResult {
             name: "Dev container".to_string(),
             status: Status::Info,
             message: "No dev container configuration detected".to_string(),
+            intent: None,
+            success_criteria: None,
             suggestion: Some(
                 "Consider adding .devcontainer/ for reproducible development environments"
                     .to_string(),
@@ -477,6 +554,8 @@ fn check_llm_txt(repo_root: &Path) -> CheckResult {
             name: "LLM documentation".to_string(),
             status: Status::Pass,
             message: "llm.txt detected".to_string(),
+            intent: None,
+            success_criteria: None,
             suggestion: None,
         }
     } else {
@@ -484,6 +563,8 @@ fn check_llm_txt(repo_root: &Path) -> CheckResult {
             name: "LLM documentation".to_string(),
             status: Status::Info,
             message: "No llm.txt detected".to_string(),
+            intent: None,
+            success_criteria: None,
             suggestion: Some(
                 "Add llm.txt for AI-friendly project documentation — https://llmstxt.org"
                     .to_string(),
@@ -500,6 +581,8 @@ fn check_agent_skills(repo_root: &Path) -> CheckResult {
             name: "Agent skills".to_string(),
             status: Status::Info,
             message: "No skills configured".to_string(),
+            intent: None,
+            success_criteria: None,
             suggestion: Some(
                 "Add rule-of-5-universal (ro5) and commit to .wai/resources/agent-config/skills/"
                     .to_string(),
@@ -533,6 +616,8 @@ fn check_agent_skills(repo_root: &Path) -> CheckResult {
             name: "Agent skills".to_string(),
             status: Status::Info,
             message: "Skills directory present but empty".to_string(),
+            intent: None,
+            success_criteria: None,
             suggestion: Some(
                 "Add rule-of-5-universal (ro5) and commit to .wai/resources/agent-config/skills/"
                     .to_string(),
@@ -560,6 +645,8 @@ fn check_agent_skills(repo_root: &Path) -> CheckResult {
                 "{} skill(s) configured — includes rule-of-5-universal (ro5) and commit",
                 skill_count
             ),
+            intent: None,
+            success_criteria: None,
             suggestion: None,
         }
     } else {
@@ -571,6 +658,8 @@ fn check_agent_skills(repo_root: &Path) -> CheckResult {
                 skill_count,
                 missing.join(", ")
             ),
+            intent: None,
+            success_criteria: None,
             suggestion: Some(format!(
                 "Add to .wai/resources/agent-config/skills/: {}",
                 missing.join(", ")
@@ -585,6 +674,8 @@ fn check_release_pipeline(repo_root: &Path) -> CheckResult {
             name: "Release pipeline".to_string(),
             status: Status::Pass,
             message: "Library project — release pipeline not required".to_string(),
+            intent: None,
+            success_criteria: None,
             suggestion: None,
         };
     }
@@ -594,6 +685,8 @@ fn check_release_pipeline(repo_root: &Path) -> CheckResult {
             name: "Release pipeline".to_string(),
             status: Status::Pass,
             message: "goreleaser detected".to_string(),
+            intent: None,
+            success_criteria: None,
             suggestion: None,
         };
     }
@@ -603,6 +696,8 @@ fn check_release_pipeline(repo_root: &Path) -> CheckResult {
             name: "Release pipeline".to_string(),
             status: Status::Pass,
             message: "cargo-dist detected".to_string(),
+            intent: None,
+            success_criteria: None,
             suggestion: None,
         };
     }
@@ -612,6 +707,8 @@ fn check_release_pipeline(repo_root: &Path) -> CheckResult {
             name: "Release pipeline".to_string(),
             status: Status::Pass,
             message: "GitHub Actions release workflow detected".to_string(),
+            intent: None,
+            success_criteria: None,
             suggestion: None,
         };
     }
@@ -620,6 +717,8 @@ fn check_release_pipeline(repo_root: &Path) -> CheckResult {
         name: "Release pipeline".to_string(),
         status: Status::Info,
         message: "No release pipeline found".to_string(),
+        intent: None,
+        success_criteria: None,
         suggestion: Some(
             "Consider goreleaser (Go/Rust/any) or cargo-dist (Rust) to automate GitHub releases and publish to Homebrew/Scoop".to_string(),
         ),
@@ -711,6 +810,8 @@ fn check_gh_cli() -> CheckResult {
             name: "GitHub CLI".to_string(),
             status: Status::Info,
             message: "gh not installed".to_string(),
+            intent: None,
+            success_criteria: None,
             suggestion: Some(
                 "Install gh CLI for better GitHub integration — https://cli.github.com".to_string(),
             ),
@@ -726,12 +827,16 @@ fn check_gh_cli() -> CheckResult {
             name: "GitHub CLI".to_string(),
             status: Status::Pass,
             message: "gh installed and authenticated".to_string(),
+            intent: None,
+            success_criteria: None,
             suggestion: None,
         },
         _ => CheckResult {
             name: "GitHub CLI".to_string(),
             status: Status::Info,
             message: "gh installed but not authenticated".to_string(),
+            intent: None,
+            success_criteria: None,
             suggestion: Some("Run 'gh auth login' to authenticate".to_string()),
         },
     }
