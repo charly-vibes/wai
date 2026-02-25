@@ -4,6 +4,28 @@ use predicates::prelude::*;
 use std::fs;
 use tempfile::TempDir;
 
+/// Strip ANSI escape sequences from a string.
+fn strip_ansi(s: &str) -> String {
+    let mut result = String::new();
+    let mut chars = s.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch == '\x1b' {
+            // Skip escape sequence: ESC [ ... final-byte
+            if chars.peek() == Some(&'[') {
+                chars.next();
+                for c in chars.by_ref() {
+                    if c.is_ascii_alphabetic() {
+                        break;
+                    }
+                }
+            }
+        } else {
+            result.push(ch);
+        }
+    }
+    result
+}
+
 /// Helper: create a wai command that runs in the given directory.
 #[allow(deprecated)]
 fn wai_cmd(dir: &std::path::Path) -> Command {
@@ -4632,4 +4654,348 @@ fn sync_dry_run_does_not_create_files() {
         !tmp.path().join("GUIDE.md").exists(),
         "dry-run must not create any files"
     );
+}
+
+// ─── wai pipeline ─────────────────────────────────────────────────────────────
+
+/// Create a skill directory + SKILL.md so pipeline create validation passes.
+fn create_skill(dir: &std::path::Path, skill: &str) {
+    let skill_dir = dir
+        .join(".wai")
+        .join("resources")
+        .join("agent-config")
+        .join("skills")
+        .join(skill);
+    fs::create_dir_all(&skill_dir).unwrap();
+    let skill_file = skill_dir.join("SKILL.md");
+    fs::write(
+        skill_file,
+        format!(
+            "---\nname: {}\ndescription: Test skill\n---\n\n# {}\n\nTest.\n",
+            skill, skill
+        ),
+    )
+    .unwrap();
+}
+
+#[test]
+fn pipeline_list_empty() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No pipelines defined"));
+}
+
+#[test]
+fn pipeline_create_and_list() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_skill(tmp.path(), "issue/gather");
+    create_skill(tmp.path(), "impl/run");
+
+    wai_cmd(tmp.path())
+        .args([
+            "pipeline",
+            "create",
+            "review",
+            "--stages=issue/gather:research,impl/run:plan",
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Created pipeline 'review'"));
+
+    // Definition file must exist
+    assert!(tmp
+        .path()
+        .join(".wai/resources/pipelines/review.yml")
+        .exists());
+
+    // List must show it
+    wai_cmd(tmp.path())
+        .args(["pipeline", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("review"))
+        .stdout(predicate::str::contains("2 stages"));
+}
+
+#[test]
+fn pipeline_create_duplicate_fails() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_skill(tmp.path(), "issue/gather");
+
+    wai_cmd(tmp.path())
+        .args([
+            "pipeline",
+            "create",
+            "mypipe",
+            "--stages=issue/gather:research",
+        ])
+        .assert()
+        .success();
+
+    // Second create must fail
+    wai_cmd(tmp.path())
+        .args([
+            "pipeline",
+            "create",
+            "mypipe",
+            "--stages=issue/gather:research",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("already exists"));
+}
+
+#[test]
+fn pipeline_create_unknown_skill_fails() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args([
+            "pipeline",
+            "create",
+            "mypipe",
+            "--stages=nonexistent-skill:research",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("not found"));
+}
+
+#[test]
+fn pipeline_create_malformed_stages_fails() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "create", "mypipe", "--stages=nocolon"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("missing ':'"));
+}
+
+#[test]
+fn pipeline_run_and_status() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_skill(tmp.path(), "issue/gather");
+    create_skill(tmp.path(), "impl/run");
+    create_project(tmp.path(), "myproject");
+
+    wai_cmd(tmp.path())
+        .args([
+            "pipeline",
+            "create",
+            "review",
+            "--stages=issue/gather:research,impl/run:plan",
+        ])
+        .assert()
+        .success();
+
+    let out = wai_cmd(tmp.path())
+        .args(["pipeline", "run", "review", "--topic=my-feature"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let output_str = std::str::from_utf8(&out).unwrap();
+
+    // Run ID must appear in output
+    assert!(
+        output_str.contains("review-"),
+        "run ID not in output: {}",
+        output_str
+    );
+    assert!(output_str.contains("WAI_PIPELINE_RUN"));
+
+    // status must list the run
+    wai_cmd(tmp.path())
+        .args(["pipeline", "status", "review"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("review-"))
+        .stdout(predicate::str::contains("my-feature"));
+}
+
+#[test]
+fn pipeline_advance_through_stages() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_skill(tmp.path(), "issue/gather");
+    create_skill(tmp.path(), "impl/run");
+    create_project(tmp.path(), "myproject");
+
+    wai_cmd(tmp.path())
+        .args([
+            "pipeline",
+            "create",
+            "pipe",
+            "--stages=issue/gather:research,impl/run:plan",
+        ])
+        .assert()
+        .success();
+
+    // Start a run and capture the run ID
+    let out = wai_cmd(tmp.path())
+        .args(["pipeline", "run", "pipe", "--topic=test-topic"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let output_str = std::str::from_utf8(&out).unwrap();
+
+    // Extract run ID from "Run ID: <id>" line, stripping any ANSI escape codes
+    let run_id_raw = output_str
+        .lines()
+        .find(|l| l.trim().starts_with("Run ID:"))
+        .map(|l| l.trim().strip_prefix("Run ID:").unwrap().trim().to_string())
+        .expect("Run ID line not found in output");
+    // Strip ANSI escape sequences (e.g. bold: \x1b[1m...\x1b[0m)
+    let run_id = strip_ansi(&run_id_raw);
+
+    // Advance stage 1
+    wai_cmd(tmp.path())
+        .args(["pipeline", "advance", &run_id])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Stage 1 complete"));
+
+    // Advance stage 2 (final)
+    wai_cmd(tmp.path())
+        .args(["pipeline", "advance", &run_id])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Stage 2 complete"))
+        .stdout(predicate::str::contains("All stages complete"));
+
+    // Advancing past the end must fail
+    wai_cmd(tmp.path())
+        .args(["pipeline", "advance", &run_id])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("already completed all"));
+}
+
+#[test]
+fn pipeline_advance_unknown_run_id_fails() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "advance", "nonexistent-run-id"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("not found"));
+}
+
+#[test]
+fn pipeline_add_auto_tags_with_pipeline_run_env() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproject");
+
+    // Add research with WAI_PIPELINE_RUN set
+    wai_cmd(tmp.path())
+        .env("WAI_PIPELINE_RUN", "my-pipe-2026-02-25-feature")
+        .args(["add", "research", "test content for pipeline tagging"])
+        .assert()
+        .success();
+
+    // Find the created research file and verify it has the pipeline-run tag
+    let research_dir = tmp
+        .path()
+        .join(".wai/projects/myproject/research");
+    let entries: Vec<_> = fs::read_dir(&research_dir)
+        .unwrap()
+        .flatten()
+        .collect();
+    assert_eq!(entries.len(), 1, "Expected exactly one research file");
+
+    let content = fs::read_to_string(entries[0].path()).unwrap();
+    assert!(
+        content.contains("pipeline-run:my-pipe-2026-02-25-feature"),
+        "Expected pipeline-run tag in content: {}",
+        content
+    );
+}
+
+#[test]
+fn pipeline_add_merges_user_tags_and_pipeline_run_tag() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproject");
+
+    wai_cmd(tmp.path())
+        .env("WAI_PIPELINE_RUN", "test-run-id")
+        .args([
+            "add",
+            "research",
+            "--tags=manual-tag",
+            "content with both tags",
+        ])
+        .assert()
+        .success();
+
+    let research_dir = tmp
+        .path()
+        .join(".wai/projects/myproject/research");
+    let entries: Vec<_> = fs::read_dir(&research_dir)
+        .unwrap()
+        .flatten()
+        .collect();
+    let content = fs::read_to_string(entries[0].path()).unwrap();
+    assert!(
+        content.contains("manual-tag"),
+        "Expected manual-tag in: {}",
+        content
+    );
+    assert!(
+        content.contains("pipeline-run:test-run-id"),
+        "Expected pipeline-run tag in: {}",
+        content
+    );
+}
+
+#[test]
+fn pipeline_status_no_runs() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_skill(tmp.path(), "issue/gather");
+
+    wai_cmd(tmp.path())
+        .args([
+            "pipeline",
+            "create",
+            "empty-pipe",
+            "--stages=issue/gather:research",
+        ])
+        .assert()
+        .success();
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "status", "empty-pipe"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No runs found"));
+}
+
+#[test]
+fn pipeline_status_unknown_pipeline_fails() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "status", "does-not-exist"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("not found"));
 }

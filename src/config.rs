@@ -23,6 +23,9 @@ pub const SKILLS_DIR: &str = "skills";
 pub const RULES_DIR: &str = "rules";
 pub const CONTEXT_DIR: &str = "context";
 
+/// Pipeline definitions and run state within resources/
+pub const PIPELINES_DIR: &str = "pipelines";
+
 /// Per-project subdirectories
 pub const RESEARCH_DIR: &str = "research";
 pub const PLANS_DIR: &str = "plans";
@@ -164,6 +167,11 @@ pub fn plugins_dir(project_root: &Path) -> PathBuf {
 /// Get the agent-config directory path.
 pub fn agent_config_dir(project_root: &Path) -> PathBuf {
     resources_dir(project_root).join(AGENT_CONFIG_DIR)
+}
+
+/// Get the pipelines directory path (.wai/resources/pipelines/).
+pub fn pipelines_dir(project_root: &Path) -> PathBuf {
+    resources_dir(project_root).join(PIPELINES_DIR)
 }
 
 /// Get a specific project's directory path.

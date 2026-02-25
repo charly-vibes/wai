@@ -334,6 +334,26 @@ pub enum Commands {
         yes: bool,
     },
 
+    /// Manage pipelines (ordered multi-skill workflows)
+    #[command(
+        about = "Manage pipelines (ordered multi-skill workflows)",
+        long_about = "Pipelines chain skills into ordered stages, tracking run state and\n\
+            auto-tagging artifacts with the run ID.\n\n\
+            EXAMPLES\n\
+              wai pipeline create review --stages=\"issue/gather:research,impl/run:plan\"\n\
+              wai pipeline run review --topic=my-feature\n\
+              wai pipeline advance <run-id>\n\
+              wai pipeline status review\n\n\
+            ENVIRONMENT\n\
+              WAI_PIPELINE_RUN  When set, `wai add` commands automatically tag the\n\
+                                artifact with pipeline-run:<run-id>. Set this to the\n\
+                                run ID output by `wai pipeline run`.\n\n\
+              Example:\n\
+                export WAI_PIPELINE_RUN=review-2026-02-25-my-feature"
+    )]
+    #[command(subcommand)]
+    Pipeline(PipelineCommands),
+
     /// Pass-through to plugin commands (e.g., wai beads list)
     #[command(external_subcommand)]
     External(Vec<String>),
@@ -614,4 +634,72 @@ pub struct ResourceExportArgs {
     /// Output archive file path (e.g. skills.tar.gz)
     #[arg(long, value_name = "FILE")]
     pub output: String,
+}
+
+#[derive(Subcommand)]
+pub enum PipelineCommands {
+    /// Create a new pipeline with ordered stages
+    ///
+    /// Each stage is specified as "skill:artifact-type". The skill name must
+    /// exist in the project's skills directory. Artifact type is a label for
+    /// the expected output (e.g. research, plan, design).
+    ///
+    /// EXAMPLE
+    ///   wai pipeline create review \
+    ///     --stages="issue/gather:research,impl/run:plan,impl/review:design"
+    Create {
+        /// Pipeline name
+        name: String,
+
+        /// Ordered stages as "skill:artifact-type,..." pairs
+        ///
+        /// Each pair is "skill-name:artifact-type" separated by commas.
+        /// Example: "issue/gather:research,impl/run:plan"
+        #[arg(long)]
+        stages: String,
+    },
+
+    /// Start a new pipeline run
+    ///
+    /// Generates a run ID of the form "<pipeline>-<date>-<topic>" and persists
+    /// initial run state. Outputs the run ID and a hint to set WAI_PIPELINE_RUN.
+    ///
+    /// ENVIRONMENT
+    ///   After running, set WAI_PIPELINE_RUN to enable automatic artifact tagging:
+    ///     export WAI_PIPELINE_RUN=<run-id>
+    ///   Then use `wai add research/plan/design` — artifacts are tagged automatically.
+    Run {
+        /// Pipeline name
+        name: String,
+
+        /// Topic slug for this run (used in the run ID)
+        #[arg(long)]
+        topic: String,
+    },
+
+    /// Advance to the next stage of a pipeline run
+    ///
+    /// Marks the current stage complete (recording the artifact path if a
+    /// pipeline-run-tagged artifact is found), then outputs a hint for the
+    /// next stage. Errors if the run ID is unknown or all stages are already done.
+    Advance {
+        /// Run ID (e.g., review-2026-02-25-my-feature)
+        run_id: String,
+    },
+
+    /// Show status of a pipeline's runs
+    ///
+    /// Lists all runs with per-stage completion status and artifact paths.
+    /// Use --run to filter to a single run.
+    Status {
+        /// Pipeline name
+        name: String,
+
+        /// Show detail for a single run
+        #[arg(long)]
+        run: Option<String>,
+    },
+
+    /// List all pipelines
+    List,
 }

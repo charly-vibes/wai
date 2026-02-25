@@ -34,16 +34,11 @@ pub fn run(cmd: AddCommands) -> Result<()> {
 
             let mut file_content = String::new();
 
-            // Add frontmatter if tags provided
-            if let Some(tags) = tags {
+            // Build combined tags: user-supplied + pipeline-run auto-tag
+            let all_tags = build_tags(tags.as_deref());
+            if !all_tags.is_empty() {
                 file_content.push_str("---\n");
-                file_content.push_str(&format!(
-                    "tags: [{}]\n",
-                    tags.split(',')
-                        .map(|t| t.trim().to_string())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                ));
+                file_content.push_str(&format!("tags: [{}]\n", all_tags.join(", ")));
                 file_content.push_str("---\n\n");
             }
 
@@ -113,15 +108,10 @@ pub fn run(cmd: AddCommands) -> Result<()> {
 
             let mut file_content = String::new();
 
-            if let Some(tags) = tags {
+            let all_tags = build_tags(tags.as_deref());
+            if !all_tags.is_empty() {
                 file_content.push_str("---\n");
-                file_content.push_str(&format!(
-                    "tags: [{}]\n",
-                    tags.split(',')
-                        .map(|t| t.trim().to_string())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                ));
+                file_content.push_str(&format!("tags: [{}]\n", all_tags.join(", ")));
                 file_content.push_str("---\n\n");
             }
 
@@ -149,15 +139,10 @@ pub fn run(cmd: AddCommands) -> Result<()> {
 
             let mut file_content = String::new();
 
-            if let Some(tags) = tags {
+            let all_tags = build_tags(tags.as_deref());
+            if !all_tags.is_empty() {
                 file_content.push_str("---\n");
-                file_content.push_str(&format!(
-                    "tags: [{}]\n",
-                    tags.split(',')
-                        .map(|t| t.trim().to_string())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                ));
+                file_content.push_str(&format!("tags: [{}]\n", all_tags.join(", ")));
                 file_content.push_str("---\n\n");
             }
 
@@ -254,4 +239,23 @@ fn get_content(content: Option<&str>, file: Option<&str>) -> Result<String> {
     Err(miette::miette!(
         "Provide content or use --file to import from a file"
     ))
+}
+
+/// Build the final tags list: user-supplied tags merged with the auto-injected
+/// `pipeline-run:<id>` tag when `WAI_PIPELINE_RUN` is set in the environment.
+fn build_tags(user_tags: Option<&str>) -> Vec<String> {
+    let mut tags: Vec<String> = Vec::new();
+
+    if let Some(t) = user_tags {
+        tags.extend(t.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()));
+    }
+
+    if let Ok(run_id) = std::env::var("WAI_PIPELINE_RUN") {
+        let run_id = run_id.trim().to_string();
+        if !run_id.is_empty() {
+            tags.push(format!("pipeline-run:{}", run_id));
+        }
+    }
+
+    tags
 }

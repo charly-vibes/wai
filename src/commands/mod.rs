@@ -11,6 +11,7 @@ mod add;
 mod close;
 mod config_cmd;
 mod ls;
+mod pipeline;
 mod prime;
 mod doctor;
 mod handoff;
@@ -68,6 +69,7 @@ pub fn run(cli: Cli) -> Result<()> {
             crate::cli::ResourceCommands::Install(args) => resource::run_install(args),
             crate::cli::ResourceCommands::Export(args) => resource::run_export(args),
         },
+        Some(Commands::Pipeline(cmd)) => pipeline::run(cmd),
         Some(Commands::Close { project }) => close::run(project),
         Some(Commands::Prime { project }) => prime::run(project),
         Some(Commands::Ls { root, depth }) => ls::run(root, depth),
@@ -217,7 +219,7 @@ fn run_external(args: Vec<String>) -> Result<()> {
     let valid_commands = &[
         "new", "add", "show", "move", "init", "status", "phase", "sync", "config", "handoff",
         "search", "timeline", "plugin", "doctor", "way", "why", "import", "resource", "tutorial",
-        "close", "prime", "ls", "reflect",
+        "close", "prime", "ls", "reflect", "pipeline",
     ];
     // Valid (verb, noun) subcommand patterns for wrong-order detection
     let valid_patterns = &[
