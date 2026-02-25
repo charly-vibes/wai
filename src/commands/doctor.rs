@@ -400,6 +400,54 @@ fn check_version(project_root: &Path) -> CheckResult {
     match ProjectConfig::load(project_root) {
         Ok(config) => {
             let current_version = env!("CARGO_PKG_VERSION");
+            let current_commit = env!("WAI_GIT_COMMIT");
+            let has_commit_tracking = !current_commit.starts_with("unknown");
+
+            // Commit-based check: fires on every rebuild after a new commit.
+            // Takes priority over the version check when commit info is available.
+            if has_commit_tracking {
+                if config.project.tool_commit.is_empty() {
+                    // Old workspace: was initialized before commit tracking was added.
+                    return CheckResult {
+                        name: "Version".to_string(),
+                        status: Status::Warn,
+                        message: format!(
+                            "Workspace not yet synced to commit tracking (binary: {} {})",
+                            current_version, current_commit
+                        ),
+                        fix: Some("Run: wai init (to sync workspace)".to_string()),
+                        fix_fn: Some(Box::new(move |project_root| {
+                            ensure_workspace_current(project_root)?;
+                            Ok(())
+                        })),
+                    };
+                }
+                if config.project.tool_commit != current_commit {
+                    return CheckResult {
+                        name: "Version".to_string(),
+                        status: Status::Warn,
+                        message: format!(
+                            "Workspace synced at commit {}, binary is at {} — workspace may be stale",
+                            config.project.tool_commit, current_commit
+                        ),
+                        fix: Some("Run: wai init (or wai doctor --fix)".to_string()),
+                        fix_fn: Some(Box::new(move |project_root| {
+                            ensure_workspace_current(project_root)?;
+                            Ok(())
+                        })),
+                    };
+                }
+                // Commit matches — workspace is current.
+                return CheckResult {
+                    name: "Version".to_string(),
+                    status: Status::Pass,
+                    message: format!("Up to date ({} {})", current_version, current_commit),
+                    fix: None,
+                    fix_fn: None,
+                };
+            }
+
+            // Fallback: no commit info in binary, compare version strings.
             if config.project.version == current_version {
                 CheckResult {
                     name: "Version".to_string(),

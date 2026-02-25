@@ -450,6 +450,10 @@ fn check_ai_instructions(repo_root: &Path) -> CheckResult {
 }
 
 fn check_ci_cd(repo_root: &Path) -> CheckResult {
+    let name = "Automated verification";
+    let intent = Some("Ensure code quality and correctness through automated builds and tests on every change.".to_string());
+    let success_criteria = Some("Every change is automatically validated by a remote build/test pipeline.".to_string());
+
     let github_workflows = repo_root.join(".github/workflows");
     let gitlab_ci = repo_root.join(".gitlab-ci.yml");
     let circleci = repo_root.join(".circleci/config.yml");
@@ -462,82 +466,86 @@ fn check_ci_cd(repo_root: &Path) -> CheckResult {
 
         if workflow_count > 0 {
             CheckResult {
-                name: "CI/CD".to_string(),
+                name: name.to_string(),
                 status: Status::Pass,
                 message: format!("GitHub Actions configured ({} workflow(s))", workflow_count),
-                intent: None,
-                success_criteria: None,
+                intent,
+                success_criteria,
                 suggestion: None,
             }
         } else {
             CheckResult {
-                name: "CI/CD".to_string(),
+                name: name.to_string(),
                 status: Status::Info,
                 message: "GitHub Actions directory present but empty".to_string(),
-                intent: None,
-                success_criteria: None,
+                intent,
+                success_criteria,
                 suggestion: Some("Add workflow files to .github/workflows/".to_string()),
             }
         }
     } else if gitlab_ci.exists() {
         CheckResult {
-            name: "CI/CD".to_string(),
+            name: name.to_string(),
             status: Status::Pass,
             message: "GitLab CI configured".to_string(),
-            intent: None,
-            success_criteria: None,
+            intent,
+            success_criteria,
             suggestion: None,
         }
     } else if circleci.exists() {
         CheckResult {
-            name: "CI/CD".to_string(),
+            name: name.to_string(),
             status: Status::Pass,
             message: "CircleCI configured".to_string(),
-            intent: None,
-            success_criteria: None,
+            intent,
+            success_criteria,
             suggestion: None,
         }
     } else {
         CheckResult {
-            name: "CI/CD".to_string(),
+            name: name.to_string(),
             status: Status::Info,
             message: "No CI/CD configuration detected".to_string(),
-            intent: None,
-            success_criteria: None,
+            intent,
+            success_criteria,
             suggestion: Some("Set up continuous integration to automate testing".to_string()),
         }
     }
 }
 
 fn check_devcontainer(repo_root: &Path) -> CheckResult {
+    let name = "Reproducible environments";
+    let intent = Some("Provide a standardized, containerized environment for all contributors.".to_string());
+    let success_criteria = Some("A configuration exists to spin up a consistent, reproducible dev environment.".to_string());
+
     let devcontainer_dir = repo_root.join(".devcontainer");
     let devcontainer_json = repo_root.join(".devcontainer.json");
 
     if devcontainer_dir.exists() && devcontainer_dir.is_dir() {
         CheckResult {
-            name: "Dev container".to_string(),
+            name: name.to_string(),
             status: Status::Pass,
             message: ".devcontainer/ directory detected".to_string(),
-            intent: None,
-            success_criteria: None,
+            intent,
+            success_criteria,
             suggestion: None,
         }
     } else if devcontainer_json.exists() {
         CheckResult {
-            name: "Dev container".to_string(),
+            name: name.to_string(),
             status: Status::Pass,
             message: ".devcontainer.json detected".to_string(),
-            intent: None,
-            success_criteria: None,
+            intent,
+            success_criteria,
             suggestion: None,
         }
     } else {
         CheckResult {
-            name: "Dev container".to_string(),
+            name: name.to_string(),
             status: Status::Info,
             message: "No dev container configuration detected".to_string(),
-            intent: None,
-            success_criteria: None,
+            intent,
+            success_criteria,
             suggestion: Some(
                 "Consider adding .devcontainer/ for reproducible development environments"
                     .to_string(),
@@ -547,24 +555,28 @@ fn check_devcontainer(repo_root: &Path) -> CheckResult {
 }
 
 fn check_llm_txt(repo_root: &Path) -> CheckResult {
+    let name = "LLM-friendly context";
+    let intent = Some("Provide machine-readable project context and navigation for LLMs.".to_string());
+    let success_criteria = Some("Machine-readable project documentation (llm.txt) exists for AI tools.".to_string());
+
     let llm_txt = repo_root.join("llm.txt");
 
     if llm_txt.exists() {
         CheckResult {
-            name: "LLM documentation".to_string(),
+            name: name.to_string(),
             status: Status::Pass,
             message: "llm.txt detected".to_string(),
-            intent: None,
-            success_criteria: None,
+            intent,
+            success_criteria,
             suggestion: None,
         }
     } else {
         CheckResult {
-            name: "LLM documentation".to_string(),
+            name: name.to_string(),
             status: Status::Info,
             message: "No llm.txt detected".to_string(),
-            intent: None,
-            success_criteria: None,
+            intent,
+            success_criteria,
             suggestion: Some(
                 "Add llm.txt for AI-friendly project documentation — https://llmstxt.org"
                     .to_string(),
@@ -574,15 +586,19 @@ fn check_llm_txt(repo_root: &Path) -> CheckResult {
 }
 
 fn check_agent_skills(repo_root: &Path) -> CheckResult {
+    let name = "Extended agent capabilities";
+    let intent = Some("Enhance agent functionality with specialized iterative review and commit workflows.".to_string());
+    let success_criteria = Some("Specialized agent workflows (Rule of 5, Deliberate Commits) are active.".to_string());
+
     let skills_dir = agent_config_dir(repo_root).join(SKILLS_DIR);
 
     if !skills_dir.exists() {
         return CheckResult {
-            name: "Agent skills".to_string(),
+            name: name.to_string(),
             status: Status::Info,
             message: "No skills configured".to_string(),
-            intent: None,
-            success_criteria: None,
+            intent,
+            success_criteria,
             suggestion: Some(
                 "Add rule-of-5-universal (ro5) and commit to .wai/resources/agent-config/skills/"
                     .to_string(),
@@ -613,11 +629,11 @@ fn check_agent_skills(repo_root: &Path) -> CheckResult {
 
     if skill_count == 0 {
         return CheckResult {
-            name: "Agent skills".to_string(),
+            name: name.to_string(),
             status: Status::Info,
             message: "Skills directory present but empty".to_string(),
-            intent: None,
-            success_criteria: None,
+            intent,
+            success_criteria,
             suggestion: Some(
                 "Add rule-of-5-universal (ro5) and commit to .wai/resources/agent-config/skills/"
                     .to_string(),
@@ -639,27 +655,27 @@ fn check_agent_skills(repo_root: &Path) -> CheckResult {
 
     if missing.is_empty() {
         CheckResult {
-            name: "Agent skills".to_string(),
+            name: name.to_string(),
             status: Status::Pass,
             message: format!(
                 "{} skill(s) configured — includes rule-of-5-universal (ro5) and commit",
                 skill_count
             ),
-            intent: None,
-            success_criteria: None,
+            intent,
+            success_criteria,
             suggestion: None,
         }
     } else {
         CheckResult {
-            name: "Agent skills".to_string(),
+            name: name.to_string(),
             status: Status::Info,
             message: format!(
                 "{} skill(s) configured — missing recommended: {}",
                 skill_count,
                 missing.join(", ")
             ),
-            intent: None,
-            success_criteria: None,
+            intent,
+            success_criteria,
             suggestion: Some(format!(
                 "Add to .wai/resources/agent-config/skills/: {}",
                 missing.join(", ")
@@ -669,56 +685,60 @@ fn check_agent_skills(repo_root: &Path) -> CheckResult {
 }
 
 fn check_release_pipeline(repo_root: &Path) -> CheckResult {
+    let name = "Automated delivery";
+    let intent = Some("Automate the process of building, packaging, and publishing software releases.".to_string());
+    let success_criteria = Some("Software releases and distribution (packages, binaries) are fully automated.".to_string());
+
     if !has_binary_target(repo_root) {
         return CheckResult {
-            name: "Release pipeline".to_string(),
+            name: name.to_string(),
             status: Status::Pass,
             message: "Library project — release pipeline not required".to_string(),
-            intent: None,
-            success_criteria: None,
+            intent,
+            success_criteria,
             suggestion: None,
         };
     }
 
     if repo_root.join(".goreleaser.yml").exists() || repo_root.join(".goreleaser.yaml").exists() {
         return CheckResult {
-            name: "Release pipeline".to_string(),
+            name: name.to_string(),
             status: Status::Pass,
             message: "goreleaser detected".to_string(),
-            intent: None,
-            success_criteria: None,
+            intent,
+            success_criteria,
             suggestion: None,
         };
     }
 
     if repo_root.join("dist.toml").exists() || has_cargo_dist_in_toml(repo_root) {
         return CheckResult {
-            name: "Release pipeline".to_string(),
+            name: name.to_string(),
             status: Status::Pass,
             message: "cargo-dist detected".to_string(),
-            intent: None,
-            success_criteria: None,
+            intent,
+            success_criteria,
             suggestion: None,
         };
     }
 
     if has_release_workflow(repo_root) {
         return CheckResult {
-            name: "Release pipeline".to_string(),
+            name: name.to_string(),
             status: Status::Pass,
             message: "GitHub Actions release workflow detected".to_string(),
-            intent: None,
-            success_criteria: None,
+            intent,
+            success_criteria,
             suggestion: None,
         };
     }
 
     CheckResult {
-        name: "Release pipeline".to_string(),
+        name: name.to_string(),
         status: Status::Info,
         message: "No release pipeline found".to_string(),
-        intent: None,
-        success_criteria: None,
+        intent,
+        success_criteria,
         suggestion: Some(
             "Consider goreleaser (Go/Rust/any) or cargo-dist (Rust) to automate GitHub releases and publish to Homebrew/Scoop".to_string(),
         ),
@@ -800,6 +820,10 @@ fn has_release_workflow(repo_root: &Path) -> bool {
 }
 
 fn check_gh_cli() -> CheckResult {
+    let name = "Integration & automation";
+    let intent = Some("Streamline repository interactions (PRs, issues, releases) from the CLI.".to_string());
+    let success_criteria = Some("CLI tools are configured for seamless integration with the hosting provider.".to_string());
+
     let gh_installed = std::process::Command::new("gh")
         .arg("--version")
         .output()
@@ -807,11 +831,11 @@ fn check_gh_cli() -> CheckResult {
 
     if !gh_installed {
         return CheckResult {
-            name: "GitHub CLI".to_string(),
+            name: name.to_string(),
             status: Status::Info,
             message: "gh not installed".to_string(),
-            intent: None,
-            success_criteria: None,
+            intent,
+            success_criteria,
             suggestion: Some(
                 "Install gh CLI for better GitHub integration — https://cli.github.com".to_string(),
             ),
@@ -824,19 +848,19 @@ fn check_gh_cli() -> CheckResult {
 
     match auth_status {
         Ok(output) if output.status.success() => CheckResult {
-            name: "GitHub CLI".to_string(),
+            name: name.to_string(),
             status: Status::Pass,
             message: "gh installed and authenticated".to_string(),
-            intent: None,
-            success_criteria: None,
+            intent,
+            success_criteria,
             suggestion: None,
         },
         _ => CheckResult {
-            name: "GitHub CLI".to_string(),
+            name: name.to_string(),
             status: Status::Info,
             message: "gh installed but not authenticated".to_string(),
-            intent: None,
-            success_criteria: None,
+            intent,
+            success_criteria,
             suggestion: Some("Run 'gh auth login' to authenticate".to_string()),
         },
     }

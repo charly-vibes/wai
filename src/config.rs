@@ -70,6 +70,10 @@ pub struct ProjectSettings {
     pub version: String,
     #[serde(default)]
     pub description: String,
+    /// Git commit hash of the wai binary when workspace was last synced.
+    /// Empty on old workspaces (pre-commit tracking).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub tool_commit: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

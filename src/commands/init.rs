@@ -95,11 +95,17 @@ pub fn run(name: Option<String>) -> Result<()> {
     };
 
     // Create config
+    let tool_commit = env!("WAI_GIT_COMMIT");
     let config = ProjectConfig {
         project: ProjectSettings {
             name: project_name.clone(),
             version: env!("CARGO_PKG_VERSION").to_string(),
             description: String::new(),
+            tool_commit: if tool_commit.starts_with("unknown") {
+                String::new()
+            } else {
+                tool_commit.to_string()
+            },
         },
         plugins: vec![],
         why: Some(WhyConfig::default()),

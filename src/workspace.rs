@@ -102,18 +102,25 @@ pub fn ensure_workspace_current(project_root: &Path) -> Result<Vec<WorkspaceActi
         actions.push(WorkspaceAction::new("Created .wai/.gitignore".to_string()));
     }
 
-    // Update config.toml version if it exists
+    // Update config.toml version and tool_commit if they differ from the current binary
     let config_path = wai_dir.join("config.toml");
     if config_path.exists() {
         match ProjectConfig::load(project_root) {
             Ok(mut config) => {
                 let current_version = env!("CARGO_PKG_VERSION");
-                if config.project.version != current_version {
+                let current_commit = env!("WAI_GIT_COMMIT");
+                let version_changed = config.project.version != current_version;
+                let commit_changed = !current_commit.starts_with("unknown")
+                    && config.project.tool_commit != current_commit;
+                if version_changed || commit_changed {
                     config.project.version = current_version.to_string();
+                    if !current_commit.starts_with("unknown") {
+                        config.project.tool_commit = current_commit.to_string();
+                    }
                     config.save(project_root)?;
                     actions.push(WorkspaceAction::new(format!(
-                        "Updated config.toml version to {}",
-                        current_version
+                        "Updated workspace to wai {} ({})",
+                        current_version, current_commit
                     )));
                 }
             }
