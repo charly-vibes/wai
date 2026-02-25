@@ -108,10 +108,14 @@ fn doctor_detects_version_mismatch_and_fix_repairs_it() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
 
-    // Write a config.toml with a stale version to simulate version mismatch
+    // Write a config.toml with a stale commit to simulate version mismatch.
+    // Doctor now uses tool_commit for version checking (takes priority over version string),
+    // so we must stale the commit hash, not just the version.
     let config_path = tmp.path().join(".wai/config.toml");
     let config = fs::read_to_string(&config_path).unwrap();
-    let stale_config = config.replace(env!("CARGO_PKG_VERSION"), "0.0.0-stale");
+    let stale_config = config
+        .replace(env!("CARGO_PKG_VERSION"), "0.0.0-stale")
+        .replace(env!("WAI_GIT_COMMIT"), "deadbeef-stale");
     fs::write(&config_path, stale_config).unwrap();
 
     // Doctor should detect the mismatch (Warn status) — exits 0 with warnings
@@ -119,7 +123,11 @@ fn doctor_detects_version_mismatch_and_fix_repairs_it() {
         .args(["doctor"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("0.0.0-stale").or(predicate::str::contains("differs")));
+        .stdout(
+            predicate::str::contains("deadbeef-stale")
+                .or(predicate::str::contains("stale"))
+                .or(predicate::str::contains("differs")),
+        );
 
     // Fix should update the version
     wai_cmd(tmp.path())
@@ -2103,7 +2111,7 @@ fn way_check_task_runner_justfile() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("Task runner")
+            predicate::str::contains("Command standardization")
                 .and(predicate::str::contains("justfile detected"))
                 .and(predicate::str::contains("\"pass\"")),
         );
@@ -2119,7 +2127,7 @@ fn way_check_task_runner_makefile() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("Task runner")
+            predicate::str::contains("Command standardization")
                 .and(predicate::str::contains("Makefile detected"))
                 .and(predicate::str::contains("\"pass\"")),
         );
@@ -2134,7 +2142,7 @@ fn way_check_task_runner_missing() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("Task runner")
+            predicate::str::contains("Command standardization")
                 .and(predicate::str::contains("No task runner detected"))
                 .and(predicate::str::contains("\"info\"")),
         );
@@ -2150,7 +2158,7 @@ fn way_check_git_hooks_prek() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("Git hooks")
+            predicate::str::contains("Pre-commit quality gates")
                 .and(predicate::str::contains("prek detected"))
                 .and(predicate::str::contains("\"pass\"")),
         );
@@ -2166,7 +2174,7 @@ fn way_check_git_hooks_precommit() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("Git hooks")
+            predicate::str::contains("Pre-commit quality gates")
                 .and(predicate::str::contains("pre-commit detected"))
                 .and(predicate::str::contains("\"pass\"")),
         );
@@ -2181,7 +2189,7 @@ fn way_check_git_hooks_missing() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("Git hooks")
+            predicate::str::contains("Pre-commit quality gates")
                 .and(predicate::str::contains("No git hook manager detected"))
                 .and(predicate::str::contains("\"info\"")),
         );
@@ -2197,7 +2205,7 @@ fn way_check_editorconfig_present() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("Editor config")
+            predicate::str::contains("Consistent formatting")
                 .and(predicate::str::contains(".editorconfig detected"))
                 .and(predicate::str::contains("\"pass\"")),
         );
@@ -2212,7 +2220,7 @@ fn way_check_editorconfig_missing() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("Editor config")
+            predicate::str::contains("Consistent formatting")
                 .and(predicate::str::contains("No .editorconfig detected"))
                 .and(predicate::str::contains("\"info\"")),
         );
@@ -2231,7 +2239,7 @@ fn way_check_documentation_complete() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("Documentation")
+            predicate::str::contains("Project documentation")
                 .and(predicate::str::contains("Complete"))
                 .and(predicate::str::contains("\"pass\"")),
         );
@@ -2246,7 +2254,7 @@ fn way_check_documentation_not_configured() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("Documentation")
+            predicate::str::contains("Project documentation")
                 .and(predicate::str::contains("Not configured"))
                 .and(predicate::str::contains("\"info\"")),
         );
@@ -2264,7 +2272,7 @@ fn way_check_documentation_missing_critical() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("Documentation")
+            predicate::str::contains("Project documentation")
                 .and(predicate::str::contains("Missing critical files"))
                 .and(predicate::str::contains("\"info\"")),
         );
@@ -2282,7 +2290,7 @@ fn way_check_documentation_partial() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("Documentation")
+            predicate::str::contains("Project documentation")
                 .and(predicate::str::contains("Partial documentation"))
                 .and(predicate::str::contains("\"pass\"")),
         );
@@ -2301,7 +2309,7 @@ fn way_check_documentation_license_md_variant() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("Documentation")
+            predicate::str::contains("Project documentation")
                 .and(predicate::str::contains("Complete"))
                 .and(predicate::str::contains("\"pass\"")),
         );
@@ -2317,7 +2325,7 @@ fn way_check_ai_instructions_claude_md() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("AI instructions")
+            predicate::str::contains("AI-agent context")
                 .and(predicate::str::contains("CLAUDE.md detected"))
                 .and(predicate::str::contains("\"pass\"")),
         );
@@ -2333,7 +2341,7 @@ fn way_check_ai_instructions_agents_md() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("AI instructions")
+            predicate::str::contains("AI-agent context")
                 .and(predicate::str::contains("AGENTS.md detected"))
                 .and(predicate::str::contains("\"pass\"")),
         );
@@ -2348,7 +2356,7 @@ fn way_check_ai_instructions_missing() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("AI instructions")
+            predicate::str::contains("AI-agent context")
                 .and(predicate::str::contains("No AI instruction files detected"))
                 .and(predicate::str::contains("\"info\"")),
         );
@@ -2365,7 +2373,7 @@ fn way_check_cicd_github_actions() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("CI/CD")
+            predicate::str::contains("Automated verification")
                 .and(predicate::str::contains("GitHub Actions configured"))
                 .and(predicate::str::contains("\"pass\"")),
         );
@@ -2381,7 +2389,7 @@ fn way_check_cicd_gitlab() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("CI/CD")
+            predicate::str::contains("Automated verification")
                 .and(predicate::str::contains("GitLab CI configured"))
                 .and(predicate::str::contains("\"pass\"")),
         );
@@ -2398,7 +2406,7 @@ fn way_check_cicd_circleci() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("CI/CD")
+            predicate::str::contains("Automated verification")
                 .and(predicate::str::contains("CircleCI configured"))
                 .and(predicate::str::contains("\"pass\"")),
         );
@@ -2413,7 +2421,7 @@ fn way_check_cicd_missing() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("CI/CD")
+            predicate::str::contains("Automated verification")
                 .and(predicate::str::contains("No CI/CD configuration detected"))
                 .and(predicate::str::contains("\"info\"")),
         );
@@ -2429,7 +2437,7 @@ fn way_check_devcontainer_dir() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("Dev container")
+            predicate::str::contains("Reproducible environments")
                 .and(predicate::str::contains(
                     ".devcontainer/ directory detected",
                 ))
@@ -2447,7 +2455,7 @@ fn way_check_devcontainer_json() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("Dev container")
+            predicate::str::contains("Reproducible environments")
                 .and(predicate::str::contains(".devcontainer.json detected"))
                 .and(predicate::str::contains("\"pass\"")),
         );
@@ -2462,7 +2470,7 @@ fn way_check_devcontainer_missing() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("Dev container")
+            predicate::str::contains("Reproducible environments")
                 .and(predicate::str::contains(
                     "No dev container configuration detected",
                 ))
@@ -2482,7 +2490,7 @@ fn way_check_llm_txt_present() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("LLM documentation")
+            predicate::str::contains("LLM-friendly context")
                 .and(predicate::str::contains("llm.txt detected"))
                 .and(predicate::str::contains("\"pass\"")),
         );
@@ -2497,7 +2505,7 @@ fn way_check_llm_txt_missing() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("LLM documentation")
+            predicate::str::contains("LLM-friendly context")
                 .and(predicate::str::contains("No llm.txt detected"))
                 .and(predicate::str::contains("llmstxt.org"))
                 .and(predicate::str::contains("\"info\"")),
@@ -2522,7 +2530,7 @@ fn way_check_agent_skills_present() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("Agent skills")
+            predicate::str::contains("Extended agent capabilities")
                 .and(predicate::str::contains("2 skill(s) configured"))
                 .and(predicate::str::contains("\"pass\"")),
         );
@@ -2542,7 +2550,7 @@ fn way_check_agent_skills_empty_dir() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("Agent skills")
+            predicate::str::contains("Extended agent capabilities")
                 .and(predicate::str::contains(
                     "Skills directory present but empty",
                 ))
@@ -2559,7 +2567,7 @@ fn way_check_agent_skills_missing() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("Agent skills")
+            predicate::str::contains("Extended agent capabilities")
                 .and(predicate::str::contains("No skills configured"))
                 .and(predicate::str::contains("\"info\"")),
         );
@@ -2579,7 +2587,7 @@ fn way_check_justfile_recipes() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("Task runner")
+            predicate::str::contains("Command standardization")
                 .and(predicate::str::contains("recipes:"))
                 .and(predicate::str::contains("\"pass\"")),
         );

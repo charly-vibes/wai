@@ -175,8 +175,8 @@ fn resolve_project(
     project_root: &std::path::Path,
     explicit: Option<&str>,
 ) -> Result<(String, std::path::PathBuf)> {
-    // All PARA category directories to search
-    let search_dirs = [
+    // All PARA category directories to search (explicit lookup)
+    let all_dirs = [
         projects_dir(project_root),
         areas_dir(project_root),
         resources_dir(project_root),
@@ -184,7 +184,7 @@ fn resolve_project(
     ];
 
     if let Some(name) = explicit {
-        for base in &search_dirs {
+        for base in &all_dirs {
             let dir = base.join(name);
             if dir.exists() {
                 return Ok((name.to_string(), dir));
@@ -196,9 +196,14 @@ fn resolve_project(
         .into());
     }
 
+    // Auto-discovery: only search active work (projects + areas).
+    // Resources and archives contain infrastructure dirs that would pollute
+    // the count and cause false "multiple projects" errors.
+    let auto_dirs = [projects_dir(project_root), areas_dir(project_root)];
+
     // Collect all project directories across PARA categories
     let mut projects: Vec<(String, std::path::PathBuf)> = Vec::new();
-    for base in &search_dirs {
+    for base in &auto_dirs {
         if !base.exists() {
             continue;
         }

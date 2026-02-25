@@ -752,6 +752,23 @@ fn check_symlink_strategy(
         }
     }
 
+    // Also scan the target directory for any broken symlinks (e.g. source file deleted
+    // after sync, leaving a dangling symlink with no corresponding source entry).
+    #[cfg(unix)]
+    if target_path.exists() {
+        if let Ok(entries) = std::fs::read_dir(target_path) {
+            for entry in entries.filter_map(|e| e.ok()) {
+                let link_path = entry.path();
+                if let Ok(meta) = std::fs::symlink_metadata(&link_path) {
+                    if meta.file_type().is_symlink() && !link_path.exists() {
+                        broken_count += 1;
+                        has_issues = true;
+                    }
+                }
+            }
+        }
+    }
+
     if broken_count > 0 || has_issues {
         let config_dir_clone = config_dir.to_path_buf();
         let sync_proj = crate::sync_core::Projection {
