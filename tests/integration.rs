@@ -771,6 +771,178 @@ fn search_invalid_regex_fails() {
         .stderr(predicate::str::contains("Invalid regex"));
 }
 
+// ─── add plan/design with --tags ─────────────────────────────────────────────
+
+#[test]
+fn add_plan_with_tags_includes_frontmatter() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+
+    wai_cmd(tmp.path())
+        .args([
+            "add", "plan", "My plan content",
+            "--project", "my-app",
+            "--tags", "backend,api",
+        ])
+        .assert()
+        .success();
+
+    let plans_dir = tmp.path().join(".wai/projects/my-app/plans");
+    let files: Vec<_> = fs::read_dir(&plans_dir).unwrap().filter_map(|e| e.ok()).collect();
+    assert_eq!(files.len(), 1);
+    let content = fs::read_to_string(files[0].path()).unwrap();
+    assert!(content.contains("---"), "plan should have frontmatter");
+    assert!(content.contains("tags:"), "plan should have tags key");
+    assert!(content.contains("backend"), "plan should have backend tag");
+    assert!(content.contains("api"), "plan should have api tag");
+    assert!(content.contains("My plan content"), "plan body should be present");
+}
+
+#[test]
+fn add_design_with_tags_includes_frontmatter() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+
+    wai_cmd(tmp.path())
+        .args([
+            "add", "design", "My design content",
+            "--project", "my-app",
+            "--tags", "ux",
+        ])
+        .assert()
+        .success();
+
+    let designs_dir = tmp.path().join(".wai/projects/my-app/designs");
+    let files: Vec<_> = fs::read_dir(&designs_dir).unwrap().filter_map(|e| e.ok()).collect();
+    assert_eq!(files.len(), 1);
+    let content = fs::read_to_string(files[0].path()).unwrap();
+    assert!(content.contains("---"), "design should have frontmatter");
+    assert!(content.contains("ux"), "design should have ux tag");
+}
+
+// ─── search --tag and --latest ────────────────────────────────────────────────
+
+#[test]
+fn search_tag_filter_returns_only_tagged_files() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+
+    // Write one tagged and one untagged research file.
+    write_artifact(
+        tmp.path(), "my-app", "research", "2026-01-10-tagged.md",
+        "---\ntags: [rust, perf]\n---\n\nfoo bar baz",
+    );
+    write_artifact(
+        tmp.path(), "my-app", "research", "2026-01-11-untagged.md",
+        "foo bar baz",
+    );
+
+    let output = wai_cmd(tmp.path())
+        .args(["search", "foo", "--tag", "rust"])
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(stdout.contains("tagged"), "should match the tagged file");
+    assert!(!stdout.contains("untagged"), "should not match the untagged file");
+}
+
+#[test]
+fn search_tag_filter_no_match_returns_no_results() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+
+    write_artifact(
+        tmp.path(), "my-app", "research", "2026-01-10-file.md",
+        "---\ntags: [rust]\n---\n\ncontent",
+    );
+
+    let output = wai_cmd(tmp.path())
+        .args(["search", "content", "--tag", "nonexistent-tag"])
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("No results"), "should report no results");
+}
+
+#[test]
+fn search_malformed_frontmatter_does_not_abort_tag_search() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+
+    write_artifact(
+        tmp.path(), "my-app", "research", "2026-01-10-bad.md",
+        "---\n[[ invalid\n---\ncontent",
+    );
+
+    // Should succeed (not panic / not fail), even with malformed frontmatter.
+    wai_cmd(tmp.path())
+        .args(["search", "content", "--tag", "anything"])
+        .assert()
+        .success();
+}
+
+#[test]
+fn search_latest_returns_only_most_recent_file() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+
+    write_artifact(
+        tmp.path(), "my-app", "research", "2026-01-10-older.md",
+        "needle content",
+    );
+    write_artifact(
+        tmp.path(), "my-app", "research", "2026-02-20-newer.md",
+        "needle content",
+    );
+
+    let output = wai_cmd(tmp.path())
+        .args(["search", "needle", "--latest"])
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(stdout.contains("newer"), "should contain the newer file");
+    assert!(!stdout.contains("older"), "should not contain the older file");
+}
+
+#[test]
+fn search_tag_and_type_and_latest_combined() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+
+    write_artifact(
+        tmp.path(), "my-app", "research", "2026-01-01-r1.md",
+        "---\ntags: [perf]\n---\n\ndata",
+    );
+    write_artifact(
+        tmp.path(), "my-app", "research", "2026-02-01-r2.md",
+        "---\ntags: [perf]\n---\n\ndata",
+    );
+    // plan with same tag — should be excluded by --type research
+    write_artifact(
+        tmp.path(), "my-app", "plans", "2026-03-01-p1.md",
+        "---\ntags: [perf]\n---\n\ndata",
+    );
+
+    let output = wai_cmd(tmp.path())
+        .args(["search", "data", "--tag", "perf", "--type", "research", "--latest"])
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(stdout.contains("r2"), "should match the latest research file");
+    assert!(!stdout.contains("r1"), "should exclude older research file");
+    assert!(!stdout.contains("p1"), "should exclude the plan file");
+}
+
 // ─── wai timeline ───────────────────────────────────────────────────────────
 
 #[test]

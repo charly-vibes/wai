@@ -48,7 +48,9 @@ pub fn run(cli: Cli) -> Result<()> {
             project,
             regex,
             limit,
-        }) => search::run(query, type_filter, project, regex, limit),
+            tag,
+            latest,
+        }) => search::run(query, type_filter, project, regex, limit, tag, latest),
         Some(Commands::Timeline {
             project,
             from,

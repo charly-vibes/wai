@@ -125,6 +125,14 @@ pub enum Commands {
         /// Limit number of results shown
         #[arg(short = 'n', long)]
         limit: Option<usize>,
+
+        /// Filter by tag (frontmatter-based; repeatable)
+        #[arg(long)]
+        tag: Vec<String>,
+
+        /// Return only the most recently dated match
+        #[arg(long)]
+        latest: bool,
     },
 
     /// View chronological timeline of artifacts
@@ -379,6 +387,10 @@ pub enum AddCommands {
         /// Associate with a project
         #[arg(long)]
         project: Option<String>,
+
+        /// Comma-separated tags written as YAML frontmatter
+        #[arg(short, long)]
+        tags: Option<String>,
     },
 
     /// Add a design document
@@ -393,6 +405,10 @@ pub enum AddCommands {
         /// Associate with a project
         #[arg(long)]
         project: Option<String>,
+
+        /// Comma-separated tags written as YAML frontmatter
+        #[arg(short, long)]
+        tags: Option<String>,
     },
 }
 

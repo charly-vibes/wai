@@ -100,6 +100,7 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             content,
             file,
             project,
+            tags,
         } => {
             require_safe_mode("add plan")?;
             let (target_project, project_dir) = resolve_project(&project_root, project.as_deref())?;
@@ -111,6 +112,19 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             let filename = format!("{}-{}.md", date, slug);
 
             let mut file_content = String::new();
+
+            if let Some(tags) = tags {
+                file_content.push_str("---\n");
+                file_content.push_str(&format!(
+                    "tags: [{}]\n",
+                    tags.split(',')
+                        .map(|t| t.trim().to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ));
+                file_content.push_str("---\n\n");
+            }
+
             file_content.push_str(&body);
             file_content.push('\n');
 
@@ -122,6 +136,7 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             content,
             file,
             project,
+            tags,
         } => {
             require_safe_mode("add design")?;
             let (target_project, project_dir) = resolve_project(&project_root, project.as_deref())?;
@@ -133,6 +148,19 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             let filename = format!("{}-{}.md", date, slug);
 
             let mut file_content = String::new();
+
+            if let Some(tags) = tags {
+                file_content.push_str("---\n");
+                file_content.push_str(&format!(
+                    "tags: [{}]\n",
+                    tags.split(',')
+                        .map(|t| t.trim().to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ));
+                file_content.push_str("---\n\n");
+            }
+
             file_content.push_str(&body);
             file_content.push('\n');
 
