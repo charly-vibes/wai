@@ -15,7 +15,27 @@ Organizes artifacts using the PARA method (Projects, Areas, Resources, Archives)
 
 ## Installation
 
-**Requirements:** Rust 1.70+ and Cargo
+### Homebrew (macOS & Linux)
+
+```bash
+brew tap charly-vibes/charly
+brew install wai
+```
+
+### Scoop (Windows)
+
+```powershell
+scoop bucket add charly https://github.com/charly-vibes/scoop-charly.git
+scoop install wai
+```
+
+### From Binary
+
+Download the latest pre-compiled binary from the [GitHub Releases](https://github.com/charly-vibes/wai/releases) page, unpack, and move `wai` to a directory in your PATH.
+
+### From Source
+
+Requires [Rust](https://www.rust-lang.org/tools/install) (stable toolchain):
 
 ```bash
 cargo install --path .
