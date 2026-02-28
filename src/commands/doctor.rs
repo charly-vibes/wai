@@ -1461,17 +1461,28 @@ fn check_agent_tool_coverage(project_root: &Path) -> Vec<CheckResult> {
         return vec![];
     }
 
-    // Load projections (empty if file missing / parse error)
-    let projections: Vec<ProjectionEntry> = projections_path
-        .exists()
-        .then(|| {
-            std::fs::read_to_string(&projections_path)
-                .ok()
-                .and_then(|c| serde_yml::from_str::<ProjectionsConfig>(&c).ok())
-                .map(|cfg| cfg.projections)
-        })
-        .flatten()
-        .unwrap_or_default();
+    // Load projections, distinguishing three cases:
+    //   None  → file missing or unreadable/unparseable (coverage check should warn)
+    //   Some(vec) with items → projections configured (coverage check applies)
+    //   Some(empty vec) → user explicitly set projections: [] (suppress coverage warnings)
+    let projections_opt: Option<Vec<ProjectionEntry>> = if projections_path.exists() {
+        std::fs::read_to_string(&projections_path)
+            .ok()
+            .and_then(|c| serde_yml::from_str::<ProjectionsConfig>(&c).ok())
+            .map(|cfg| cfg.projections)
+    } else {
+        None
+    };
+
+    // If the projections file exists and is explicitly empty, the user has intentionally
+    // opted out of projections — skip the per-directory coverage warnings entirely.
+    if let Some(ref p) = projections_opt {
+        if p.is_empty() {
+            return vec![];
+        }
+    }
+
+    let projections = projections_opt.unwrap_or_default();
 
     let mut results = Vec::new();
 
