@@ -1,8 +1,10 @@
 use miette::{IntoDiagnostic, Result};
 use owo_colors::OwoColorize;
+use std::io::IsTerminal;
+use std::path::{Path, PathBuf};
 
 use crate::cli::{Cli, Commands};
-use crate::config::{UserConfig, find_project_root};
+use crate::config::{UserConfig, find_project_root, projects_dir};
 use crate::context::current_context;
 use crate::error::WaiError;
 use crate::suggestions::SuggestionEngine;
@@ -338,8 +340,106 @@ fn run_external(args: Vec<String>) -> Result<()> {
     }
 }
 
-pub fn require_project() -> Result<std::path::PathBuf> {
+pub fn require_project() -> Result<PathBuf> {
     find_project_root().ok_or_else(|| WaiError::NotInitialized.into())
+}
+
+/// Parse `bd stats` output and return a compact one-liner like "3 open issues (2 ready)".
+///
+/// Returns `None` when the content does not contain the expected fields.
+pub(crate) fn beads_summary(content: &str) -> Option<String> {
+    let mut open: Option<u64> = None;
+    let mut ready: Option<u64> = None;
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if let Some(val) = trimmed.strip_prefix("Open:") {
+            open = val.trim().parse().ok();
+        } else if let Some(val) = trimmed.strip_prefix("Ready to Work:") {
+            ready = val.trim().parse().ok();
+        }
+    }
+    if let (Some(o), Some(r)) = (open, ready) {
+        Some(format!("{} open issues ({} ready)", o, r))
+    } else {
+        None
+    }
+}
+
+/// Resolve a project name within `.wai/projects/`.
+///
+/// When `project` is `Some`, validates that the named project directory exists.
+/// When `project` is `None` and exactly one project is found, returns it
+/// automatically. When multiple projects exist in a non-interactive context,
+/// returns a [`WaiError::NonInteractive`] error carrying `command_hint` so the
+/// caller's error message names the appropriate `--project` flag.
+///
+/// `command_hint` is embedded in the non-interactive error message, e.g.
+/// `"wai close --project <name>"`.
+pub(crate) fn resolve_project_named(
+    project_root: &Path,
+    project: Option<String>,
+    command_hint: &str,
+) -> Result<String> {
+    if let Some(name) = project {
+        let proj_dir = projects_dir(project_root).join(&name);
+        if !proj_dir.exists() {
+            let available = list_projects(project_root);
+            let available_str = if available.is_empty() {
+                "none".to_string()
+            } else {
+                available.join(", ")
+            };
+            miette::bail!(
+                "Project '{}' not found. Available projects: {}",
+                name,
+                available_str
+            );
+        }
+        return Ok(name);
+    }
+
+    let mut projects = list_projects(project_root);
+    projects.sort();
+
+    match projects.len() {
+        0 => miette::bail!("No projects found. Create one with `wai new project <name>`."),
+        1 => Ok(projects.remove(0)),
+        _ => {
+            let ctx = current_context();
+            if ctx.no_input || !std::io::stdin().is_terminal() {
+                return Err(WaiError::NonInteractive {
+                    message: format!(
+                        "Multiple projects found ({}). Use `{}` to specify one.",
+                        projects.join(", "),
+                        command_hint
+                    ),
+                }
+                .into());
+            }
+            let mut sel = cliclack::select("Multiple projects found — which one?");
+            for name in &projects {
+                sel = sel.item(name.clone(), name.as_str(), "");
+            }
+            let selected: String = sel.interact().into_diagnostic()?;
+            Ok(selected)
+        }
+    }
+}
+
+/// List project directory names under `.wai/projects/`.
+pub(crate) fn list_projects(project_root: &Path) -> Vec<String> {
+    let dir = projects_dir(project_root);
+    if !dir.exists() {
+        return Vec::new();
+    }
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        return Vec::new();
+    };
+    entries
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().is_dir())
+        .filter_map(|e| e.file_name().into_string().ok())
+        .collect()
 }
 
 /// Print workflow suggestions after a command completes.

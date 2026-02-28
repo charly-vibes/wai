@@ -15,6 +15,8 @@ use crate::plugin;
 use crate::state::{Phase, ProjectState};
 use crate::workflows;
 
+use super::beads_summary;
+
 pub fn run(verbose: u8) -> Result<()> {
     let project_root = find_project_root().ok_or(WaiError::NotInitialized)?;
     let config = ProjectConfig::load(&project_root)?;
@@ -340,24 +342,5 @@ fn format_phase(phase: Phase) -> String {
         Phase::Implement => "implement".green().to_string(),
         Phase::Review => "review".cyan().to_string(),
         Phase::Archive => "archive".dimmed().to_string(),
-    }
-}
-
-/// Parse `bd stats` output and return a compact one-liner like "3 open issues (2 ready)".
-fn beads_summary(content: &str) -> Option<String> {
-    let mut open: Option<u64> = None;
-    let mut ready: Option<u64> = None;
-    for line in content.lines() {
-        let trimmed = line.trim();
-        if let Some(val) = trimmed.strip_prefix("Open:") {
-            open = val.trim().parse().ok();
-        } else if let Some(val) = trimmed.strip_prefix("Ready to Work:") {
-            ready = val.trim().parse().ok();
-        }
-    }
-    if let (Some(o), Some(r)) = (open, ready) {
-        Some(format!("{} open issues ({} ready)", o, r))
-    } else {
-        None
     }
 }

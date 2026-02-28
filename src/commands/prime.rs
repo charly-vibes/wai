@@ -1,18 +1,15 @@
 use chrono::{Local, NaiveDate};
 use miette::{IntoDiagnostic, Result};
 use owo_colors::OwoColorize;
-use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
 use crate::config::{HANDOFFS_DIR, STATE_FILE, projects_dir};
-use crate::context::current_context;
-use crate::error::WaiError;
 use crate::openspec;
 use crate::plugin;
 use crate::state::ProjectState;
 
-use super::require_project;
+use super::{beads_summary, list_projects, require_project, resolve_project_named};
 
 /// Maximum age of a `.pending-resume` file before it is considered stale.
 const RESUME_WINDOW: Duration = Duration::from_secs(12 * 60 * 60);
@@ -32,7 +29,8 @@ pub fn run(project: Option<String>) -> Result<()> {
         return Ok(());
     }
 
-    let project_name = resolve_project(&project_root, project)?;
+    let project_name =
+        resolve_project_named(&project_root, project, "wai prime --project <name>")?;
 
     // Read phase
     let proj_dir = projects_dir(&project_root).join(&project_name);
@@ -309,25 +307,6 @@ fn find_first_paragraph(body: &str) -> String {
     "no summary yet".to_string()
 }
 
-/// Parse `bd stats` output and return a compact one-liner like "3 open issues (2 ready)".
-fn beads_summary(content: &str) -> Option<String> {
-    let mut open: Option<u64> = None;
-    let mut ready: Option<u64> = None;
-    for line in content.lines() {
-        let trimmed = line.trim();
-        if let Some(val) = trimmed.strip_prefix("Open:") {
-            open = val.trim().parse().ok();
-        } else if let Some(val) = trimmed.strip_prefix("Ready to Work:") {
-            ready = val.trim().parse().ok();
-        }
-    }
-    if let (Some(o), Some(r)) = (open, ready) {
-        Some(format!("{} open issues ({} ready)", o, r))
-    } else {
-        None
-    }
-}
-
 /// Invoke `bd ready --json` and return the first issue's `id`, or `None` on any error.
 fn suggested_next(project_root: &Path) -> Option<String> {
     let output = std::process::Command::new("bd")
@@ -343,65 +322,4 @@ fn suggested_next(project_root: &Path) -> Option<String> {
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).ok()?;
     let first = json.as_array()?.first()?;
     first.get("id")?.as_str().map(|s| s.to_string())
-}
-
-fn resolve_project(project_root: &Path, project: Option<String>) -> Result<String> {
-    if let Some(name) = project {
-        let proj_dir = projects_dir(project_root).join(&name);
-        if !proj_dir.exists() {
-            let available = list_projects(project_root);
-            let available_str = if available.is_empty() {
-                "none".to_string()
-            } else {
-                available.join(", ")
-            };
-            miette::bail!(
-                "Project '{}' not found. Available projects: {}",
-                name,
-                available_str
-            );
-        }
-        return Ok(name);
-    }
-
-    let mut projects = list_projects(project_root);
-    projects.sort();
-
-    match projects.len() {
-        0 => miette::bail!("No projects found. Create one with `wai new project <name>`."),
-        1 => Ok(projects.remove(0)),
-        _ => {
-            let ctx = current_context();
-            if ctx.no_input || !std::io::stdin().is_terminal() {
-                return Err(WaiError::NonInteractive {
-                    message: format!(
-                        "Multiple projects found ({}). Use `wai prime --project <name>` to specify one.",
-                        projects.join(", ")
-                    ),
-                }
-                .into());
-            }
-            let mut sel = cliclack::select("Multiple projects found — which one?");
-            for name in &projects {
-                sel = sel.item(name.clone(), name.as_str(), "");
-            }
-            let selected: String = sel.interact().into_diagnostic()?;
-            Ok(selected)
-        }
-    }
-}
-
-fn list_projects(project_root: &Path) -> Vec<String> {
-    let dir = projects_dir(project_root);
-    if !dir.exists() {
-        return Vec::new();
-    }
-    let Ok(entries) = std::fs::read_dir(&dir) else {
-        return Vec::new();
-    };
-    entries
-        .filter_map(|e| e.ok())
-        .filter(|e| e.path().is_dir())
-        .filter_map(|e| e.file_name().into_string().ok())
-        .collect()
 }
