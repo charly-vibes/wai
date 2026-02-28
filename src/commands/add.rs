@@ -55,6 +55,7 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             file_content.push_str(&body);
             file_content.push('\n');
 
+            std::fs::create_dir_all(&dir).into_diagnostic()?;
             std::fs::write(dir.join(&filename), &file_content).into_diagnostic()?;
             let ctx = current_context();
             if !ctx.quiet {
@@ -142,6 +143,7 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             file_content.push_str(&body);
             file_content.push('\n');
 
+            std::fs::create_dir_all(&dir).into_diagnostic()?;
             std::fs::write(dir.join(&filename), &file_content).into_diagnostic()?;
             if !current_context().quiet {
                 log::success(format!("Added plan to '{}'", target_project)).into_diagnostic()?;
@@ -183,6 +185,7 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             file_content.push_str(&body);
             file_content.push('\n');
 
+            std::fs::create_dir_all(&dir).into_diagnostic()?;
             std::fs::write(dir.join(&filename), &file_content).into_diagnostic()?;
             if !current_context().quiet {
                 log::success(format!("Added design to '{}'", target_project)).into_diagnostic()?;
