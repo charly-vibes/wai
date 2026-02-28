@@ -41,89 +41,34 @@ Requires [Rust](https://www.rust-lang.org/tools/install) (stable toolchain):
 cargo install --path .
 ```
 
-### Quick Start in 5 Minutes
-
-```bash
-# 1. Initialize wai (30 seconds)
-wai init
-
-# 2. Create your first project (30 seconds)
-wai new project my-feature
-
-# 3. Add research findings (1 minute)
-wai add research "Evaluated approach X vs Y - chose X for performance"
-
-# 4. Check status and get suggestions (30 seconds)
-wai status
-
-# 5. Move through phases (2 minutes)
-wai phase next                              # → design
-wai add design "Using microservices pattern"
-wai phase next                              # → plan
-wai add plan "Phase 1: API, Phase 2: UI"
-wai phase next                              # → implement
-
-# 6. Create handoff when done (30 seconds)
-wai handoff create my-feature
-```
-
-**Result:** You now have a project with documented research, designs, and plans - ready for implementation!
-
 ## Quick Start
 
 ```bash
 # Initialize wai in current directory
 wai init
 
-# Or run the interactive tutorial
+# Or run the interactive tutorial (recommended for first-time users)
 wai tutorial
 
 # Create a project
-wai new project my-app
+wai new project my-feature
 
-# Check status and get suggestions
+# Add research findings
+wai add research "Evaluated approach X vs Y - chose X for performance"
+wai add research --file notes.md --tags "api,research"
+
+# Check status and get next-step suggestions
 wai status
 
-# Manage project phases
-wai phase              # Show current phase with history
-wai phase next         # Advance to next phase
+# Move through phases: research → design → plan → implement → review → archive
+wai phase next                                # advance to next phase
+wai add design "Using microservices pattern"
+wai phase next
+wai add plan "Phase 1: API, Phase 2: UI"
+wai phase next                                # → implement
 
-# Add artifacts
-wai add research "Initial API analysis"
-wai add research --file notes.md --tags "api,research"
-wai add plan "Implementation approach"
-wai add design "Component architecture"
-
-# Search and explore
-wai search "authentication"
-wai search --type research --regex "api.*auth"
-wai timeline my-app --from 2026-02-01
-
-# Session management
-wai prime              # Orient at session start (detects in-progress work)
-wai close              # Wrap up session: create handoff + show next steps
-wai handoff create my-app  # Generate handoff manually
-
-# AI-powered features
-wai why "why this approach?"        # LLM-powered reasoning oracle
-wai why src/config.rs               # Explain a file's history
-wai reflect                         # Synthesize context into CLAUDE.md
-
-# List projects across workspaces
-wai ls                 # Scan $HOME for wai projects
-wai ls --root ~/dev    # Scan a custom root directory
-
-# Sync agent configs to tool-specific locations
-wai sync --status      # Check sync status
-wai sync               # Apply syncs
-
-# Check workspace health
-wai doctor             # Diagnose issues
-wai doctor --fix       # Auto-repair problems
-
-# Work with plugins
-wai plugin list
-wai beads list         # Pass-through to beads plugin
+# Wrap up session: create handoff + show next steps
+wai close
 ```
 
 ## Project Structure
@@ -651,7 +596,10 @@ wai timeline feature-auth
 # Search for previous decisions
 wai search "database" --in feature-auth
 
-# Create handoff for next session
+# Wrap up session: create handoff + set resume signal
+wai close
+
+# Or generate a handoff document manually without ending the session
 wai handoff create feature-auth
 
 # Handoff includes: phase, recent artifacts, plugin context (git status, open issues)
