@@ -3,7 +3,7 @@ use std::path::Path;
 
 use crate::config::{
     AGENT_CONFIG_DIR, ARCHIVES_DIR, AREAS_DIR, CONFIG_DIR, CONTEXT_DIR, PLUGINS_DIR, PROJECTS_DIR,
-    ProjectConfig, RESOURCES_DIR, RULES_DIR, SKILLS_DIR,
+    ProjectConfig, RESOURCES_DIR, RULES_DIR, SKILLS_DIR, agent_config_dir,
 };
 use crate::managed_block::inject_managed_block;
 use crate::plugin;
@@ -64,6 +64,23 @@ pub fn sync_tool_commit(project_root: &Path) -> Result<Option<WorkspaceAction>> 
             Ok(None)
         }
     }
+}
+
+/// Returns the names of skills installed in the project's agent-config skills directory.
+/// Scans `.wai/resources/agent-config/skills/` for subdirectories containing a `SKILL.md`.
+pub fn detect_installed_skill_names(project_root: &Path) -> Vec<String> {
+    let skills_dir = agent_config_dir(project_root).join(SKILLS_DIR);
+    if !skills_dir.exists() {
+        return Vec::new();
+    }
+    let Ok(entries) = std::fs::read_dir(&skills_dir) else {
+        return Vec::new();
+    };
+    entries
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().is_dir() && e.path().join("SKILL.md").exists())
+        .filter_map(|e| e.file_name().to_str().map(|s| s.to_string()))
+        .collect()
 }
 
 /// Ensures the workspace is current by creating/repairing all expected artifacts:
@@ -157,6 +174,10 @@ pub fn ensure_workspace_current(project_root: &Path) -> Result<Vec<WorkspaceActi
         .map(|p| p.def.name.as_str())
         .collect();
 
+    // Detect installed skills for managed block injection
+    let skill_names = detect_installed_skill_names(project_root);
+    let skill_name_refs: Vec<&str> = skill_names.iter().map(|s| s.as_str()).collect();
+
     // Create/update PLUGINS.md
     if !detected.is_empty() {
         let plugins_md = create_plugins_readme(&detected);
@@ -190,7 +211,7 @@ pub fn ensure_workspace_current(project_root: &Path) -> Result<Vec<WorkspaceActi
 
         // For AGENTS.md and CLAUDE.md, always ensure they exist.
         if filename == &"AGENTS.md" || filename == &"CLAUDE.md" || path.exists() {
-            match inject_managed_block(&path, &detected) {
+            match inject_managed_block(&path, &detected, &skill_name_refs) {
                 Ok(result) => {
                     actions.push(WorkspaceAction::new(result.description(filename)));
                 }

@@ -3,10 +3,13 @@ use std::path::Path;
 const WAI_START: &str = "<!-- WAI:START -->";
 const WAI_END: &str = "<!-- WAI:END -->";
 
-pub fn wai_block_content(detected_plugins: &[&str]) -> String {
+pub fn wai_block_content(detected_plugins: &[&str], installed_skills: &[&str]) -> String {
     let has_beads = detected_plugins.contains(&"beads");
     let has_openspec = detected_plugins.contains(&"openspec");
     let has_companions = has_beads || has_openspec;
+    let has_ro5 = installed_skills
+        .iter()
+        .any(|s| *s == "ro5" || *s == "rule-of-5" || *s == "rule-of-5-universal");
 
     let mut block = String::new();
     block.push_str(WAI_START);
@@ -39,6 +42,12 @@ pub fn wai_block_content(detected_plugins: &[&str]) -> String {
             "\n\
              > **CRITICAL**: Use TDD (write tests first) and Tidy First (separate refactoring \
              commits from feature commits) when implementing changes.\n",
+        );
+    }
+    if has_ro5 {
+        block.push_str(
+            "> **Ro5**: The Rule of 5 skill is installed. Run `/ro5` after key phase transitions \
+             — implement, research, design — for iterative quality review.\n",
         );
     }
 
@@ -269,8 +278,9 @@ pub fn wai_block_content(detected_plugins: &[&str]) -> String {
 pub fn inject_managed_block(
     path: &Path,
     detected_plugins: &[&str],
+    installed_skills: &[&str],
 ) -> Result<InjectResult, std::io::Error> {
-    let block = wai_block_content(detected_plugins);
+    let block = wai_block_content(detected_plugins, installed_skills);
 
     if path.exists() {
         let content = std::fs::read_to_string(path)?;
@@ -406,7 +416,7 @@ mod wai_block_tests {
 
     #[test]
     fn openspec_checklist_step_present_when_openspec_detected() {
-        let output = wai_block_content(&["openspec"]);
+        let output = wai_block_content(&["openspec"], &[]);
         assert!(
             output.contains("openspec tasks.md"),
             "expected 'openspec tasks.md' in output"
@@ -415,7 +425,7 @@ mod wai_block_tests {
 
     #[test]
     fn openspec_checklist_step_absent_without_openspec() {
-        let output = wai_block_content(&[]);
+        let output = wai_block_content(&[], &[]);
         assert!(
             !output.contains("openspec tasks.md"),
             "unexpected 'openspec tasks.md' in output without openspec"
@@ -424,7 +434,7 @@ mod wai_block_tests {
 
     #[test]
     fn openspec_checklist_step_ordering() {
-        let output = wai_block_content(&["beads", "openspec"]);
+        let output = wai_block_content(&["beads", "openspec"], &[]);
         let bd_sync_pos = output
             .find("bd sync --from-main")
             .expect("bd sync --from-main not found");
@@ -446,7 +456,7 @@ mod wai_block_tests {
 
     #[test]
     fn tracking_section_present_when_both_beads_and_openspec() {
-        let output = wai_block_content(&["beads", "openspec"]);
+        let output = wai_block_content(&["beads", "openspec"], &[]);
         assert!(
             output.contains("Tracking Work Across Tools"),
             "expected 'Tracking Work Across Tools' in output"
@@ -455,7 +465,7 @@ mod wai_block_tests {
 
     #[test]
     fn tracking_section_absent_with_only_beads() {
-        let output = wai_block_content(&["beads"]);
+        let output = wai_block_content(&["beads"], &[]);
         assert!(
             !output.contains("Tracking Work Across Tools"),
             "unexpected 'Tracking Work Across Tools' with beads only"
@@ -464,7 +474,7 @@ mod wai_block_tests {
 
     #[test]
     fn tracking_section_absent_with_only_openspec() {
-        let output = wai_block_content(&["openspec"]);
+        let output = wai_block_content(&["openspec"], &[]);
         assert!(
             !output.contains("Tracking Work Across Tools"),
             "unexpected 'Tracking Work Across Tools' with openspec only"
@@ -473,7 +483,7 @@ mod wai_block_tests {
 
     #[test]
     fn tracking_section_between_capturing_work_and_ending_session() {
-        let output = wai_block_content(&["beads", "openspec"]);
+        let output = wai_block_content(&["beads", "openspec"], &[]);
         let capturing_pos = output
             .find("## Capturing Work")
             .expect("## Capturing Work not found");
@@ -497,7 +507,7 @@ mod wai_block_tests {
 
     #[test]
     fn pre_claim_note_present_with_beads() {
-        let output = wai_block_content(&["beads"]);
+        let output = wai_block_content(&["beads"], &[]);
         assert!(
             output.contains("already implemented"),
             "expected 'already implemented' near bd ready line"
@@ -506,7 +516,7 @@ mod wai_block_tests {
 
     #[test]
     fn pre_claim_note_absent_without_beads() {
-        let output = wai_block_content(&[]);
+        let output = wai_block_content(&[], &[]);
         assert!(
             !output.contains("already implemented"),
             "unexpected 'already implemented' without beads"
@@ -517,7 +527,7 @@ mod wai_block_tests {
 
     #[test]
     fn bd_close_line_mentions_epic_with_beads() {
-        let output = wai_block_content(&["beads"]);
+        let output = wai_block_content(&["beads"], &[]);
         let bd_close_line = output
             .lines()
             .find(|l| l.contains("bd close <id>"))
@@ -530,7 +540,7 @@ mod wai_block_tests {
 
     #[test]
     fn bd_close_line_absent_without_beads() {
-        let output = wai_block_content(&[]);
+        let output = wai_block_content(&[], &[]);
         assert!(
             !output.contains("bd close <id>"),
             "unexpected 'bd close <id>' without beads"
@@ -541,7 +551,7 @@ mod wai_block_tests {
 
     #[test]
     fn tdd_disclaimer_present_with_companion_tools() {
-        let output = wai_block_content(&["beads", "openspec"]);
+        let output = wai_block_content(&["beads", "openspec"], &[]);
         assert!(
             output.contains("CRITICAL"),
             "expected CRITICAL disclaimer in output with companion tools"
@@ -558,7 +568,7 @@ mod wai_block_tests {
 
     #[test]
     fn tdd_disclaimer_present_with_beads_only() {
-        let output = wai_block_content(&["beads"]);
+        let output = wai_block_content(&["beads"], &[]);
         assert!(
             output.contains("CRITICAL"),
             "expected CRITICAL disclaimer in output with beads"
@@ -567,7 +577,7 @@ mod wai_block_tests {
 
     #[test]
     fn tdd_disclaimer_absent_without_companion_tools() {
-        let output = wai_block_content(&[]);
+        let output = wai_block_content(&[], &[]);
         assert!(
             !output.contains("Tidy First"),
             "unexpected 'Tidy First' in output without companion tools"
@@ -576,7 +586,7 @@ mod wai_block_tests {
 
     #[test]
     fn tdd_disclaimer_before_when_to_use_what() {
-        let output = wai_block_content(&["beads"]);
+        let output = wai_block_content(&["beads"], &[]);
         let critical_pos = output
             .find("CRITICAL")
             .expect("CRITICAL not found in output");
@@ -586,6 +596,32 @@ mod wai_block_tests {
         assert!(
             critical_pos < when_pos,
             "CRITICAL disclaimer should appear before '## When to Use What'"
+        );
+    }
+
+    // ro5 skill reminder
+
+    #[test]
+    fn ro5_reminder_present_when_skill_installed() {
+        for name in &["ro5", "rule-of-5", "rule-of-5-universal"] {
+            let output = wai_block_content(&[], &[name]);
+            assert!(
+                output.contains("/ro5"),
+                "expected '/ro5' in output when skill '{name}' installed"
+            );
+            assert!(
+                output.contains("Rule of 5"),
+                "expected 'Rule of 5' in output when skill '{name}' installed"
+            );
+        }
+    }
+
+    #[test]
+    fn ro5_reminder_absent_without_skill() {
+        let output = wai_block_content(&["beads", "openspec"], &[]);
+        assert!(
+            !output.contains("/ro5"),
+            "unexpected '/ro5' in output without ro5 skill"
         );
     }
 }

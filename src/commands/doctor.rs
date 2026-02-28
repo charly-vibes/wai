@@ -418,6 +418,7 @@ fn check_version(project_root: &Path) -> CheckResult {
                         fix: Some("Run: wai init (to sync workspace)".to_string()),
                         fix_fn: Some(Box::new(move |project_root| {
                             ensure_workspace_current(project_root)?;
+                            crate::workspace::sync_tool_commit(project_root)?;
                             Ok(())
                         })),
                     };
@@ -433,6 +434,7 @@ fn check_version(project_root: &Path) -> CheckResult {
                         fix: Some("Run: wai init (or wai doctor --fix)".to_string()),
                         fix_fn: Some(Box::new(move |project_root| {
                             ensure_workspace_current(project_root)?;
+                            crate::workspace::sync_tool_commit(project_root)?;
                             Ok(())
                         })),
                     };
@@ -1550,10 +1552,31 @@ fn check_agent_tool_coverage(project_root: &Path) -> Vec<CheckResult> {
     results
 }
 
+/// Returns true if the WAI managed block in `path` already mentions the ro5 skill.
+/// Used to detect a stale block when the ro5 skill was installed after the last `wai init`.
+fn managed_block_mentions_ro5(path: &std::path::Path) -> bool {
+    let Ok(content) = std::fs::read_to_string(path) else {
+        return false;
+    };
+    let wai_start = "<!-- WAI:START -->";
+    let wai_end = "<!-- WAI:END -->";
+    if let (Some(start), Some(end)) = (content.find(wai_start), content.find(wai_end)) {
+        content[start..end].contains("/ro5")
+    } else {
+        false
+    }
+}
+
 fn check_agent_instructions(project_root: &Path) -> Vec<CheckResult> {
     use crate::managed_block::has_managed_block;
+    use crate::workspace::detect_installed_skill_names;
 
     let mut results = Vec::new();
+
+    let skill_names = detect_installed_skill_names(project_root);
+    let has_ro5_skill = skill_names.iter().any(|s| {
+        s == "ro5" || s == "rule-of-5" || s == "rule-of-5-universal"
+    });
 
     // Check AGENTS.md
     let agents_md = project_root.join("AGENTS.md");
@@ -1572,18 +1595,50 @@ fn check_agent_instructions(project_root: &Path) -> Vec<CheckResult> {
                     .filter(|p| p.detected)
                     .map(|p| p.def.name.as_str())
                     .collect();
-                inject_managed_block(&agents_md, &plugin_names).into_diagnostic()?;
+                let skill_names = detect_installed_skill_names(project_root);
+                let skill_name_refs: Vec<&str> =
+                    skill_names.iter().map(|s| s.as_str()).collect();
+                inject_managed_block(&agents_md, &plugin_names, &skill_name_refs)
+                    .into_diagnostic()?;
                 Ok(())
             })),
         });
     } else if has_managed_block(&agents_md) {
-        results.push(CheckResult {
-            name: "Agent instructions: AGENTS.md".to_string(),
-            status: Status::Pass,
-            message: "Contains wai managed block".to_string(),
-            fix: None,
-            fix_fn: None,
-        });
+        if has_ro5_skill && !managed_block_mentions_ro5(&agents_md) {
+            results.push(CheckResult {
+                name: "Agent instructions: AGENTS.md".to_string(),
+                status: Status::Warn,
+                message: "Managed block is stale: ro5 skill installed but not reflected"
+                    .to_string(),
+                fix: Some(
+                    "Run: wai init (to regenerate managed block with ro5 reminders)".to_string(),
+                ),
+                fix_fn: Some(Box::new(move |project_root| {
+                    use crate::managed_block::inject_managed_block;
+                    let agents_md = project_root.join("AGENTS.md");
+                    let plugins = plugin::detect_plugins(project_root);
+                    let plugin_names: Vec<&str> = plugins
+                        .iter()
+                        .filter(|p| p.detected)
+                        .map(|p| p.def.name.as_str())
+                        .collect();
+                    let skill_names = detect_installed_skill_names(project_root);
+                    let skill_name_refs: Vec<&str> =
+                        skill_names.iter().map(|s| s.as_str()).collect();
+                    inject_managed_block(&agents_md, &plugin_names, &skill_name_refs)
+                        .into_diagnostic()?;
+                    Ok(())
+                })),
+            });
+        } else {
+            results.push(CheckResult {
+                name: "Agent instructions: AGENTS.md".to_string(),
+                status: Status::Pass,
+                message: "Contains wai managed block".to_string(),
+                fix: None,
+                fix_fn: None,
+            });
+        }
     } else {
         results.push(CheckResult {
             name: "Agent instructions: AGENTS.md".to_string(),
@@ -1599,7 +1654,11 @@ fn check_agent_instructions(project_root: &Path) -> Vec<CheckResult> {
                     .filter(|p| p.detected)
                     .map(|p| p.def.name.as_str())
                     .collect();
-                inject_managed_block(&agents_md, &plugin_names).into_diagnostic()?;
+                let skill_names = detect_installed_skill_names(project_root);
+                let skill_name_refs: Vec<&str> =
+                    skill_names.iter().map(|s| s.as_str()).collect();
+                inject_managed_block(&agents_md, &plugin_names, &skill_name_refs)
+                    .into_diagnostic()?;
                 Ok(())
             })),
         });
@@ -1622,18 +1681,50 @@ fn check_agent_instructions(project_root: &Path) -> Vec<CheckResult> {
                     .filter(|p| p.detected)
                     .map(|p| p.def.name.as_str())
                     .collect();
-                inject_managed_block(&claude_md, &plugin_names).into_diagnostic()?;
+                let skill_names = detect_installed_skill_names(project_root);
+                let skill_name_refs: Vec<&str> =
+                    skill_names.iter().map(|s| s.as_str()).collect();
+                inject_managed_block(&claude_md, &plugin_names, &skill_name_refs)
+                    .into_diagnostic()?;
                 Ok(())
             })),
         });
     } else if has_managed_block(&claude_md) {
-        results.push(CheckResult {
-            name: "Agent instructions: CLAUDE.md".to_string(),
-            status: Status::Pass,
-            message: "Contains wai managed block".to_string(),
-            fix: None,
-            fix_fn: None,
-        });
+        if has_ro5_skill && !managed_block_mentions_ro5(&claude_md) {
+            results.push(CheckResult {
+                name: "Agent instructions: CLAUDE.md".to_string(),
+                status: Status::Warn,
+                message: "Managed block is stale: ro5 skill installed but not reflected"
+                    .to_string(),
+                fix: Some(
+                    "Run: wai init (to regenerate managed block with ro5 reminders)".to_string(),
+                ),
+                fix_fn: Some(Box::new(move |project_root| {
+                    use crate::managed_block::inject_managed_block;
+                    let claude_md = project_root.join("CLAUDE.md");
+                    let plugins = plugin::detect_plugins(project_root);
+                    let plugin_names: Vec<&str> = plugins
+                        .iter()
+                        .filter(|p| p.detected)
+                        .map(|p| p.def.name.as_str())
+                        .collect();
+                    let skill_names = detect_installed_skill_names(project_root);
+                    let skill_name_refs: Vec<&str> =
+                        skill_names.iter().map(|s| s.as_str()).collect();
+                    inject_managed_block(&claude_md, &plugin_names, &skill_name_refs)
+                        .into_diagnostic()?;
+                    Ok(())
+                })),
+            });
+        } else {
+            results.push(CheckResult {
+                name: "Agent instructions: CLAUDE.md".to_string(),
+                status: Status::Pass,
+                message: "Contains wai managed block".to_string(),
+                fix: None,
+                fix_fn: None,
+            });
+        }
     } else {
         results.push(CheckResult {
             name: "Agent instructions: CLAUDE.md".to_string(),
@@ -1649,7 +1740,11 @@ fn check_agent_instructions(project_root: &Path) -> Vec<CheckResult> {
                     .filter(|p| p.detected)
                     .map(|p| p.def.name.as_str())
                     .collect();
-                inject_managed_block(&claude_md, &plugin_names).into_diagnostic()?;
+                let skill_names = detect_installed_skill_names(project_root);
+                let skill_name_refs: Vec<&str> =
+                    skill_names.iter().map(|s| s.as_str()).collect();
+                inject_managed_block(&claude_md, &plugin_names, &skill_name_refs)
+                    .into_diagnostic()?;
                 Ok(())
             })),
         });

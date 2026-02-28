@@ -1684,7 +1684,7 @@ fn doctor_uninitialised_directory_errors() {
         .args(["doctor"])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("no project initialized"));
+        .stderr(predicate::str::contains("No project initialized"));
 }
 
 #[test]
@@ -1932,13 +1932,13 @@ fn commands_fail_without_init() {
         .args(["status"])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("no project initialized"));
+        .stderr(predicate::str::contains("No project initialized"));
 
     wai_cmd(tmp.path())
         .args(["show"])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("no project initialized"));
+        .stderr(predicate::str::contains("No project initialized"));
 }
 
 // ─── First-Run Detection ────────────────────────────────────────────────────
@@ -3179,7 +3179,7 @@ fn error_not_initialized_is_conversational() {
         .args(["status"])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("no project initialized"));
+        .stderr(predicate::str::contains("No project initialized"));
 }
 
 #[test]
