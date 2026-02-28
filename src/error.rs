@@ -125,7 +125,7 @@ pub enum WaiError {
     #[diagnostic(
         code(wai::llm::invalid_api_key),
         help(
-            "Set ANTHROPIC_API_KEY environment variable or add `api_key` to the [why] section in .wai/config.toml"
+            "Set ANTHROPIC_API_KEY environment variable or add `api_key` to the [llm] section in .wai/config.toml"
         )
     )]
     LlmInvalidApiKey,

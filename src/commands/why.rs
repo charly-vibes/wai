@@ -5,7 +5,7 @@ use miette::Result;
 use owo_colors::OwoColorize;
 use walkdir::WalkDir;
 
-use crate::config::{ProjectConfig, STATE_FILE, WhyConfig, wai_dir};
+use crate::config::{LlmConfig, ProjectConfig, STATE_FILE, wai_dir};
 use crate::error::WaiError;
 use crate::llm::{
     AGENT_SENTINEL, LlmError, claude_binary_exists, detect_backend, ollama_binary_exists,
@@ -759,7 +759,7 @@ pub fn llm_error_hint(err: &LlmError) -> (String, Option<String>) {
     match err {
         LlmError::InvalidApiKey => (
             "API key is invalid or missing".to_string(),
-            Some("Set ANTHROPIC_API_KEY or add `api_key` to [why] in .wai/config.toml".to_string()),
+            Some("Set ANTHROPIC_API_KEY or add `api_key` to [llm] in .wai/config.toml".to_string()),
         ),
         LlmError::RateLimit => (
             "Rate limit exceeded".to_string(),
@@ -781,17 +781,17 @@ pub fn llm_error_hint(err: &LlmError) -> (String, Option<String>) {
 
 // ── Explicit-backend agent hint (7.1) ────────────────────────────────────────
 
-/// When an explicit backend (`[why] llm = "claude"` or `"ollama"`) fails and
+/// When an explicit backend (`[llm] llm = "claude"` or `"ollama"`) fails and
 /// the system falls back to search inside a Claude Code session, return a hint
 /// suggesting agent mode as a zero-cost alternative.
 ///
 /// Returns `None` when the hint is not applicable (auto-detect config, or not
 /// inside a Claude Code session).
-pub fn explicit_backend_agent_hint(cfg: &WhyConfig) -> Option<String> {
+pub fn explicit_backend_agent_hint(cfg: &LlmConfig) -> Option<String> {
     let is_explicit = matches!(cfg.llm.as_deref(), Some("claude") | Some("ollama"));
     if is_explicit && crate::llm::in_agent_session() {
         Some(
-            "You're in a Claude Code session — try `llm = \"agent\"` in [why] for zero-cost queries."
+            "You're in a Claude Code session — try `llm = \"agent\"` in [llm] for zero-cost queries."
                 .to_string(),
         )
     } else {
@@ -813,7 +813,7 @@ pub enum FallbackMode {
 /// Determine fallback behavior from config.
 ///
 /// `fallback = "error"` → propagate errors; anything else → fall back to search.
-pub fn fallback_mode(cfg: &WhyConfig) -> FallbackMode {
+pub fn fallback_mode(cfg: &LlmConfig) -> FallbackMode {
     match cfg.fallback.as_deref() {
         Some("error") => FallbackMode::Error,
         _ => FallbackMode::Search,
@@ -828,7 +828,7 @@ pub fn is_external_backend(backend_name: &str) -> bool {
 }
 
 /// Return `true` if the one-time privacy notice must be shown before this query.
-pub fn privacy_notice_needed(why_cfg: &WhyConfig, backend_name: &str) -> bool {
+pub fn privacy_notice_needed(why_cfg: &LlmConfig, backend_name: &str) -> bool {
     is_external_backend(backend_name) && why_cfg.privacy_notice_shown != Some(true)
 }
 
@@ -842,7 +842,7 @@ fn show_privacy_notice() {
         "→".cyan()
     );
     eprintln!(
-        "  {} Set privacy_notice_shown = true in the [why] section of",
+        "  {} Set privacy_notice_shown = true in the [llm] section of",
         "○".dimmed()
     );
     eprintln!("     .wai/config.toml to suppress this notice in future.");
@@ -855,8 +855,16 @@ fn show_privacy_notice() {
 /// blocks the query from proceeding.
 pub fn mark_privacy_notice_shown(project_root: &std::path::Path) {
     if let Ok(mut config) = ProjectConfig::load(project_root) {
-        let why_cfg = config.why.get_or_insert_with(WhyConfig::default);
-        why_cfg.privacy_notice_shown = Some(true);
+        // Write to whichever section is present. If only the legacy `[why]`
+        // section exists, update it in place so we don't silently migrate the
+        // config format. Otherwise use (or create) the canonical `[llm]` section.
+        if config.llm.is_none() && config.why.is_some() {
+            let why_cfg = config.why.get_or_insert_with(LlmConfig::default);
+            why_cfg.privacy_notice_shown = Some(true);
+        } else {
+            let llm_cfg = config.llm.get_or_insert_with(LlmConfig::default);
+            llm_cfg.privacy_notice_shown = Some(true);
+        }
         let _ = config.save(project_root);
     }
 }
@@ -1015,8 +1023,7 @@ pub fn run(query: String, no_llm: bool, json: bool, verbose: u8) -> Result<()> {
 
     // Load config for LLM backend selection
     let why_cfg = ProjectConfig::load(&project_root)
-        .ok()
-        .and_then(|c| c.why)
+        .map(|c| c.llm_config().into_owned())
         .unwrap_or_default();
 
     let mode = fallback_mode(&why_cfg);
@@ -1048,7 +1055,7 @@ pub fn run(query: String, no_llm: bool, json: bool, verbose: u8) -> Result<()> {
                     "⚠".yellow()
                 );
                 eprintln!(
-                    "  {} Set ANTHROPIC_API_KEY or configure `[why] llm = \"claude-cli\"` in .wai/config.toml",
+                    "  {} Set ANTHROPIC_API_KEY or configure `[llm] llm = \"claude-cli\"` in .wai/config.toml",
                     "○".dimmed()
                 );
             } else {
@@ -1642,13 +1649,13 @@ mod tests {
 
     #[test]
     fn fallback_mode_default_is_search() {
-        let cfg = WhyConfig::default();
+        let cfg = LlmConfig::default();
         assert_eq!(fallback_mode(&cfg), FallbackMode::Search);
     }
 
     #[test]
     fn fallback_mode_explicit_search() {
-        let cfg = WhyConfig {
+        let cfg = LlmConfig {
             fallback: Some("search".to_string()),
             ..Default::default()
         };
@@ -1657,7 +1664,7 @@ mod tests {
 
     #[test]
     fn fallback_mode_explicit_error() {
-        let cfg = WhyConfig {
+        let cfg = LlmConfig {
             fallback: Some("error".to_string()),
             ..Default::default()
         };
@@ -1666,7 +1673,7 @@ mod tests {
 
     #[test]
     fn fallback_mode_unknown_value_defaults_to_search() {
-        let cfg = WhyConfig {
+        let cfg = LlmConfig {
             fallback: Some("unknown".to_string()),
             ..Default::default()
         };
@@ -1678,7 +1685,7 @@ mod tests {
     #[test]
     fn explicit_backend_failure_in_claude_code_suggests_agent_mode() {
         unsafe { std::env::set_var("CLAUDECODE", "1") };
-        let cfg = WhyConfig {
+        let cfg = LlmConfig {
             llm: Some("claude".to_string()),
             ..Default::default()
         };
@@ -1691,7 +1698,7 @@ mod tests {
     #[test]
     fn explicit_ollama_failure_in_claude_code_suggests_agent_mode() {
         unsafe { std::env::set_var("CLAUDECODE", "1") };
-        let cfg = WhyConfig {
+        let cfg = LlmConfig {
             llm: Some("ollama".to_string()),
             ..Default::default()
         };
@@ -1704,7 +1711,7 @@ mod tests {
     #[test]
     fn auto_detect_backend_in_claude_code_no_hint() {
         unsafe { std::env::set_var("CLAUDECODE", "1") };
-        let cfg = WhyConfig::default(); // llm = None → auto-detect
+        let cfg = LlmConfig::default(); // llm = None → auto-detect
         let hint = explicit_backend_agent_hint(&cfg);
         unsafe { std::env::remove_var("CLAUDECODE") };
         assert!(
@@ -1732,13 +1739,13 @@ mod tests {
 
     #[test]
     fn privacy_notice_needed_when_not_shown_and_claude() {
-        let cfg = WhyConfig::default();
+        let cfg = LlmConfig::default();
         assert!(privacy_notice_needed(&cfg, "Claude"));
     }
 
     #[test]
     fn privacy_notice_not_needed_when_shown_true() {
-        let cfg = WhyConfig {
+        let cfg = LlmConfig {
             privacy_notice_shown: Some(true),
             ..Default::default()
         };
@@ -1747,7 +1754,7 @@ mod tests {
 
     #[test]
     fn privacy_notice_still_needed_when_shown_false() {
-        let cfg = WhyConfig {
+        let cfg = LlmConfig {
             privacy_notice_shown: Some(false),
             ..Default::default()
         };
@@ -1756,7 +1763,7 @@ mod tests {
 
     #[test]
     fn privacy_notice_not_needed_for_ollama() {
-        let cfg = WhyConfig::default();
+        let cfg = LlmConfig::default();
         assert!(!privacy_notice_needed(&cfg, "Ollama"));
     }
 
@@ -1767,13 +1774,13 @@ mod tests {
 
     #[test]
     fn privacy_notice_needed_for_agent_when_not_shown() {
-        let cfg = WhyConfig::default();
+        let cfg = LlmConfig::default();
         assert!(privacy_notice_needed(&cfg, "Agent"));
     }
 
     #[test]
     fn privacy_notice_not_needed_for_agent_when_shown() {
-        let cfg = WhyConfig {
+        let cfg = LlmConfig {
             privacy_notice_shown: Some(true),
             ..Default::default()
         };
@@ -1878,7 +1885,11 @@ Research → Design → Implementation\n\
         mark_privacy_notice_shown(tmp.path());
 
         let config = crate::config::ProjectConfig::load(tmp.path()).unwrap();
-        assert_eq!(config.why.and_then(|w| w.privacy_notice_shown), Some(true));
+        // mark_privacy_notice_shown writes to [llm] on fresh configs (no legacy [why]).
+        assert_eq!(
+            config.llm_config().privacy_notice_shown,
+            Some(true)
+        );
     }
 
     #[test]

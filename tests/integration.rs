@@ -2960,23 +2960,30 @@ fn completely_unknown_command_shows_help_hint() {
 
 // ─── wai why ─────────────────────────────────────────────────────────────────
 
-/// Helper: write `privacy_notice_shown = true` into the [why] config section
+/// Helper: write `privacy_notice_shown = true` into the [llm] config section
 /// without overriding the `llm` setting. Used by tests that exercise the
 /// auto-detect backend path so the one-time notice does not interfere with
 /// stdout/stderr assertions.
 fn set_privacy_notice_shown(dir: &std::path::Path) {
     let config_path = dir.join(".wai").join("config.toml");
     let existing = fs::read_to_string(&config_path).unwrap_or_default();
+    // Strip any existing [llm] or legacy [why] section before appending a
+    // fresh one to avoid duplicate-section TOML errors.
     let base = existing
-        .split("[why]")
+        .split("[llm]")
         .next()
+        .and_then(|s| {
+            // Also strip a trailing [why] that may be present in workspaces
+            // initialised by an older version of wai.
+            Some(s.split("[why]").next().unwrap_or(s))
+        })
         .unwrap_or(&existing)
         .trim_end();
-    let updated = format!("{}\n[why]\nprivacy_notice_shown = true\n", base);
+    let updated = format!("{}\n[llm]\nprivacy_notice_shown = true\n", base);
     fs::write(&config_path, updated).unwrap();
 }
 
-/// Helper: add a [why] section to .wai/config.toml forcing a specific backend.
+/// Helper: add an [llm] section to .wai/config.toml forcing a specific backend.
 ///
 /// Setting `llm = "claude"` without an API key guarantees detect_backend()
 /// returns None regardless of whether Ollama is installed, so fallback tests
@@ -2984,15 +2991,16 @@ fn set_privacy_notice_shown(dir: &std::path::Path) {
 fn force_why_llm(dir: &std::path::Path, llm: &str) {
     let config_path = dir.join(".wai").join("config.toml");
     let existing = fs::read_to_string(&config_path).unwrap_or_default();
-    // Strip any existing [why] section (always the last section in wai config)
-    // before appending to avoid duplicate-section TOML errors.
+    // Strip any existing [llm] or legacy [why] section before appending to
+    // avoid duplicate-section TOML errors.
     let base = existing
-        .split("[why]")
+        .split("[llm]")
         .next()
+        .and_then(|s| Some(s.split("[why]").next().unwrap_or(s)))
         .unwrap_or(&existing)
         .trim_end();
     let updated = format!(
-        "{}\n[why]\nllm = \"{}\"\nprivacy_notice_shown = true\n",
+        "{}\n[llm]\nllm = \"{}\"\nprivacy_notice_shown = true\n",
         base, llm
     );
     fs::write(&config_path, updated).unwrap();
@@ -3134,7 +3142,7 @@ fn why_fallback_to_search_when_no_agent_no_api_key_no_cli() {
         .stderr(predicate::str::contains("No LLM available"));
 }
 
-/// 8.3 — Explicit `[why] llm = "agent"` selects AgentBackend regardless of
+/// 8.3 — Explicit `[llm] llm = "agent"` selects AgentBackend regardless of
 /// whether CLAUDECODE is set; wai why prints [AGENT CONTEXT] to stdout and
 /// exits 0, and emits a warning that no Claude Code session is active.
 #[test]

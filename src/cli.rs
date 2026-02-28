@@ -257,13 +257,13 @@ pub enum Commands {
                 wai why src/config.rs\n\
                 wai why ./src/commands/why.rs\n\n\
             CONFIGURATION (.wai/config.toml)\n\
-              [why]\n\
+              [llm]\n\
               llm     = \"claude\"       # \"claude\"|\"claude-cli\"|\"agent\"|\"ollama\" (auto-detect)\n\
               model   = \"haiku\"        # Claude: \"haiku\"/\"sonnet\"; Ollama: \"llama3.1:8b\"\n\
               api_key = \"sk-ant-...\"   # Claude API key (or use ANTHROPIC_API_KEY env var)\n\
               fallback = \"search\"      # On LLM unavailable: \"search\" (default) or \"error\"\n\n\
             LLM BACKENDS\n\
-              Claude     — set ANTHROPIC_API_KEY or add api_key to [why] in .wai/config.toml\n\
+              Claude     — set ANTHROPIC_API_KEY or add api_key to [llm] in .wai/config.toml\n\
               Claude CLI — install Claude Code; use llm = \"claude-cli\"\n\
               Agent      — inside Claude Code sessions; use llm = \"agent\" or let auto-detect pick it\n\
               Ollama     — install from https://ollama.com and run a local model\n\n\
@@ -314,7 +314,7 @@ pub enum Commands {
               1. Conversation transcript (--conversation <file>) — raw session detail\n\
               2. Handoff artifacts — session summaries and next steps\n\
               3. Research/design/plan artifacts — curated decisions\n\n\
-            Reuses the [why] LLM config from .wai/config.toml — no separate setup."
+            Reuses the [llm] config from .wai/config.toml — no separate setup."
     )]
     Reflect {
         /// Project name (auto-detected when only one project exists)

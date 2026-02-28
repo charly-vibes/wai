@@ -549,7 +549,7 @@ pub fn extract_reflect_content(response: &str) -> String {
 
 /// Call the LLM backend with the given prompt and return the raw response.
 ///
-/// Reuses `WhyConfig` and `detect_backend` from `src/llm.rs` (task 3.1).
+/// Reuses `LlmConfig` and `detect_backend` from `src/llm.rs` (task 3.1).
 /// Returns an error if no backend is available.
 ///
 /// If the env var `WAI_REFLECT_MOCK_RESPONSE` is set, its value is returned
@@ -560,13 +560,12 @@ pub fn call_llm(project_root: &Path, prompt: &str) -> Result<String> {
     }
 
     let why_cfg = ProjectConfig::load(project_root)
-        .ok()
-        .and_then(|c| c.why)
+        .map(|c| c.llm_config().into_owned())
         .unwrap_or_default();
 
     let backend = detect_backend(&why_cfg).ok_or_else(|| {
         miette::miette!(
-            "No LLM available. Configure one in .wai/config.toml under [why], \
+            "No LLM available. Configure one in .wai/config.toml under [llm], \
              or set ANTHROPIC_API_KEY."
         )
     })?;

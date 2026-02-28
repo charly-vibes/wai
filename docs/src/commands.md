@@ -169,15 +169,17 @@ Available phases: `research`, `design`, `plan`, `implement`, `review`, `archive`
 
 **Configuration** (`.wai/config.toml`):
 ```toml
-[why]
+[llm]
 llm     = "claude"        # Backend: "claude" or "ollama" (auto-detected if omitted)
 model   = "haiku"         # Claude: "haiku"/"sonnet"; Ollama: "llama3.1:8b"
 api_key = "sk-ant-..."    # Claude API key (or ANTHROPIC_API_KEY env var)
 fallback = "search"       # On LLM unavailable: "search" (default) or "error"
 ```
 
+The legacy `[why]` section name is still accepted for backwards compatibility.
+
 **LLM Backends:**
-- **Claude** — set `ANTHROPIC_API_KEY` or add `api_key` to `[why]` config
+- **Claude** — set `ANTHROPIC_API_KEY` or add `api_key` to `[llm]` config
 - **Ollama** — install from https://ollama.com and run a local model
 
 ### Reflect — CLAUDE.md Synthesis
@@ -197,7 +199,7 @@ fallback = "search"       # On LLM unavailable: "search" (default) or "error"
 2. Handoff artifacts — session summaries and next steps
 3. Research/design/plan artifacts — curated decisions
 
-Reuses the `[why]` LLM config — no separate setup required.
+Reuses the `[llm]` config — no separate setup required.
 
 ---
 

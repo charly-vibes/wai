@@ -463,12 +463,14 @@ wai why --no-llm "auth approach"     # Force fallback to search (offline/testing
 Configure the LLM backend in `.wai/config.toml`:
 
 ```toml
-[why]
+[llm]
 llm      = "claude"       # "claude" or "ollama" (auto-detected if omitted)
 model    = "haiku"        # Claude: "haiku"/"sonnet"; Ollama: "llama3.1:8b"
 api_key  = "sk-ant-..."   # Or set ANTHROPIC_API_KEY env var
 fallback = "search"       # "search" (default) or "error" when LLM unavailable
 ```
+
+The legacy `[why]` section name is still accepted for backwards compatibility.
 
 Both Claude (via API key or `claude` CLI) and Ollama (local models) are supported. Falls back to `wai search` when no LLM is available.
 

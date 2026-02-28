@@ -1,7 +1,7 @@
 use owo_colors::OwoColorize;
 use serde::Deserialize;
 
-use crate::config::WhyConfig;
+use crate::config::LlmConfig;
 
 #[cfg(test)]
 use serial_test::serial;
@@ -81,10 +81,10 @@ impl ClaudeClient {
         ClaudeClient { api_key, model }
     }
 
-    /// Build from `WhyConfig`, falling back to `ANTHROPIC_API_KEY` env var.
+    /// Build from `LlmConfig`, falling back to `ANTHROPIC_API_KEY` env var.
     ///
     /// Returns `None` if no API key is available.
-    pub fn from_config(cfg: &WhyConfig) -> Option<Self> {
+    pub fn from_config(cfg: &LlmConfig) -> Option<Self> {
         let api_key = cfg
             .api_key
             .clone()
@@ -199,7 +199,7 @@ impl LlmClient for ClaudeClient {
 pub struct ClaudeCliClient;
 
 impl ClaudeCliClient {
-    pub fn from_config(_cfg: &WhyConfig) -> Self {
+    pub fn from_config(_cfg: &LlmConfig) -> Self {
         ClaudeCliClient
     }
 }
@@ -290,8 +290,8 @@ impl OllamaClient {
         OllamaClient { model }
     }
 
-    /// Build from `WhyConfig`.
-    pub fn from_config(cfg: &WhyConfig) -> Self {
+    /// Build from `LlmConfig`.
+    pub fn from_config(cfg: &LlmConfig) -> Self {
         let model = cfg
             .model
             .clone()
@@ -426,7 +426,7 @@ impl LlmClient for AgentBackend {
 
 // ── Backend selection ─────────────────────────────────────────────────────────
 
-/// Select the best available LLM backend given `WhyConfig`.
+/// Select the best available LLM backend given `LlmConfig`.
 ///
 /// Priority (explicit config):
 ///   - `"claude"`     → Claude API (requires `ANTHROPIC_API_KEY`)
@@ -439,7 +439,7 @@ impl LlmClient for AgentBackend {
 ///   - Otherwise:                                           API → Claude CLI → Ollama
 ///
 /// Returns `None` → caller should fall back to `wai search`.
-pub fn detect_backend(cfg: &WhyConfig) -> Option<Box<dyn LlmClient>> {
+pub fn detect_backend(cfg: &LlmConfig) -> Option<Box<dyn LlmClient>> {
     match cfg.llm.as_deref() {
         Some("claude") => {
             let client = ClaudeClient::from_config(cfg)?;
@@ -453,7 +453,7 @@ pub fn detect_backend(cfg: &WhyConfig) -> Option<Box<dyn LlmClient>> {
                     "⚠".yellow()
                 );
                 eprintln!(
-                    "  {} Consider `llm = \"agent\"` in [why] for zero-cost queries.",
+                    "  {} Consider `llm = \"agent\"` in [llm] for zero-cost queries.",
                     "→".cyan()
                 );
             }
@@ -594,7 +594,7 @@ mod tests {
     fn claudecode_set_no_api_key_selects_agent() {
         unsafe { std::env::set_var("CLAUDECODE", "1") };
         unsafe { std::env::remove_var("ANTHROPIC_API_KEY") };
-        let cfg = WhyConfig::default();
+        let cfg = LlmConfig::default();
         let backend = detect_backend(&cfg);
         assert!(backend.is_some());
         assert_eq!(backend.unwrap().name(), "Agent");
@@ -606,7 +606,7 @@ mod tests {
     fn claudecode_set_with_api_key_selects_claude_api() {
         unsafe { std::env::set_var("CLAUDECODE", "1") };
         unsafe { std::env::set_var("ANTHROPIC_API_KEY", "sk-test") };
-        let cfg = WhyConfig::default();
+        let cfg = LlmConfig::default();
         let backend = detect_backend(&cfg);
         assert!(backend.is_some());
         assert_eq!(backend.unwrap().name(), "Claude");
@@ -618,7 +618,7 @@ mod tests {
     #[serial]
     fn explicit_agent_config_selects_agent_regardless_of_claudecode() {
         unsafe { std::env::remove_var("CLAUDECODE") };
-        let cfg = WhyConfig {
+        let cfg = LlmConfig {
             llm: Some("agent".to_string()),
             ..Default::default()
         };
@@ -801,13 +801,13 @@ mod tests {
     #[serial]
     fn no_config_no_env_returns_none() {
         unsafe { std::env::remove_var("ANTHROPIC_API_KEY") };
-        let cfg = WhyConfig::default();
+        let cfg = LlmConfig::default();
         let _ = detect_backend(&cfg); // must not panic
     }
 
     #[test]
     fn explicit_claude_with_key_returns_claude_client() {
-        let cfg = WhyConfig {
+        let cfg = LlmConfig {
             llm: Some("claude".to_string()),
             api_key: Some("sk-test-key".to_string()),
             ..Default::default()
@@ -821,7 +821,7 @@ mod tests {
     #[serial]
     fn explicit_claude_without_key_returns_none() {
         unsafe { std::env::remove_var("ANTHROPIC_API_KEY") };
-        let cfg = WhyConfig {
+        let cfg = LlmConfig {
             llm: Some("claude".to_string()),
             api_key: None,
             ..Default::default()
@@ -833,7 +833,7 @@ mod tests {
     #[serial]
     fn env_var_api_key_enables_claude() {
         unsafe { std::env::set_var("ANTHROPIC_API_KEY", "sk-env-key") };
-        let cfg = WhyConfig::default();
+        let cfg = LlmConfig::default();
         let backend = detect_backend(&cfg);
         assert!(backend.is_some());
         assert_eq!(backend.unwrap().name(), "Claude");
@@ -856,7 +856,7 @@ mod tests {
 
     #[test]
     fn claude_from_config_uses_api_key_field() {
-        let cfg = WhyConfig {
+        let cfg = LlmConfig {
             api_key: Some("sk-cfg".to_string()),
             ..Default::default()
         };
@@ -868,7 +868,7 @@ mod tests {
     #[serial]
     fn claude_from_config_falls_back_to_env_var() {
         unsafe { std::env::set_var("ANTHROPIC_API_KEY", "sk-env") };
-        let cfg = WhyConfig::default();
+        let cfg = LlmConfig::default();
         let client = ClaudeClient::from_config(&cfg).unwrap();
         assert!(client.is_available());
         unsafe { std::env::remove_var("ANTHROPIC_API_KEY") };
@@ -878,13 +878,13 @@ mod tests {
     #[serial]
     fn claude_from_config_returns_none_without_key() {
         unsafe { std::env::remove_var("ANTHROPIC_API_KEY") };
-        let cfg = WhyConfig::default();
+        let cfg = LlmConfig::default();
         assert!(ClaudeClient::from_config(&cfg).is_none());
     }
 
     #[test]
     fn claude_model_alias_resolved_in_from_config() {
-        let cfg = WhyConfig {
+        let cfg = LlmConfig {
             api_key: Some("key".to_string()),
             model: Some("haiku".to_string()),
             ..Default::default()

@@ -38,13 +38,45 @@ pub struct ProjectConfig {
     pub project: ProjectSettings,
     #[serde(default)]
     pub plugins: Vec<PluginConfig>,
+    /// New canonical LLM configuration section (`[llm]`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub why: Option<WhyConfig>,
+    pub llm: Option<LlmConfig>,
+    /// Legacy `[why]` section kept for backwards-compatible deserialisation.
+    ///
+    /// New code should always write to `llm`. This field is only populated
+    /// when loading a config that was written by an older version of wai.
+    /// Use [`ProjectConfig::llm_config`] to access the effective settings.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub why: Option<LlmConfig>,
 }
 
-/// Configuration for the `wai why` LLM reasoning oracle.
+impl ProjectConfig {
+    /// Return the effective LLM configuration.
+    ///
+    /// Prefers `[llm]` when present. Falls back to `[why]` (legacy) with a
+    /// one-time deprecation warning printed to stderr.
+    pub fn llm_config(&self) -> std::borrow::Cow<'_, LlmConfig> {
+        if let Some(llm) = &self.llm {
+            return std::borrow::Cow::Borrowed(llm);
+        }
+        if self.why.is_some() {
+            eprintln!(
+                "  [wai] Deprecation: rename [why] to [llm] in .wai/config.toml"
+            );
+        }
+        match &self.why {
+            Some(why) => std::borrow::Cow::Borrowed(why),
+            None => std::borrow::Cow::Owned(LlmConfig::default()),
+        }
+    }
+}
+
+/// Configuration for the LLM backend used by `wai why` and `wai reflect`.
+///
+/// Stored under `[llm]` in `.wai/config.toml`. The legacy `[why]` section is
+/// still accepted for backwards compatibility.
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
-pub struct WhyConfig {
+pub struct LlmConfig {
     /// LLM backend to use: "claude" or "ollama". Omit for auto-detection.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub llm: Option<String>,
@@ -65,6 +97,14 @@ pub struct WhyConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub privacy_notice_shown: Option<bool>,
 }
+
+/// `WhyConfig` is a deprecated alias for [`LlmConfig`].
+///
+/// Kept so that any external code compiled against this crate continues to
+/// build. New code should use `LlmConfig` directly.
+#[deprecated(since = "0.0.0", note = "Use LlmConfig instead")]
+#[allow(dead_code)]
+pub type WhyConfig = LlmConfig;
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct ProjectSettings {

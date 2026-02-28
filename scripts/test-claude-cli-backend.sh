@@ -26,12 +26,13 @@ cd "$TMP"
   --project myproj >/dev/null
 
 echo "=== Configuring claude-cli backend ==="
-# Replace the [why] section wai init writes (strip it and append a fresh one)
+# Replace the [llm] section wai init writes (strip it and append a fresh one).
+# Also strip the legacy [why] section in case this is an older workspace.
 python3 -c "
 import sys
 content = open('.wai/config.toml').read()
-base = content.split('[why]')[0].rstrip()
-print(base + '\n[why]\nllm = \"claude-cli\"\nprivacy_notice_shown = true\n')
+base = content.split('[llm]')[0].split('[why]')[0].rstrip()
+print(base + '\n[llm]\nllm = \"claude-cli\"\nprivacy_notice_shown = true\n')
 " > .wai/config.toml.tmp && mv .wai/config.toml.tmp .wai/config.toml
 
 echo "=== Running: wai why 'why TOML' ==="
