@@ -157,6 +157,7 @@ pub fn run(name: Option<String>) -> Result<()> {
         println!("●  Next steps:");
         println!("  → wai new project \"my-app\"    Create your first project");
         println!("  → wai status                   Check project status");
+        println!("  → wai way                      See workflow conventions and available skills");
         if !detected.is_empty() {
             println!("  → wai plugin list              View detected plugins");
         }
