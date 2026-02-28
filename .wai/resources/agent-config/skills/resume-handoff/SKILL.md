@@ -11,25 +11,23 @@ Resume work from a handoff document through analysis and verification.
 
 **If given a handoff path:**
 ```bash
-# Read the handoff file
-cat handoffs/2026-01-12_14-30-00_oauth-integration.md
+# Read the handoff file (handoffs live under the active project)
+cat .wai/projects/<name>/handoffs/2026-01-12-session-end.md
 ```
 
 **If given an issue ID:**
 ```bash
 # Find handoffs for this issue
-ls handoffs/*issue-123* | sort -r | head -1
-
-# Or search in handoff content
-grep -l "issue: issue-123" handoffs/*.md | sort -r | head -1
+find .wai/projects -path "*/handoffs/*.md" | xargs grep -l "issue: issue-123" | sort -r | head -1
 ```
 
 **If no parameter provided:**
 ```bash
-# List recent handoffs
-ls -lt handoffs/ | head -10
+# List recent handoffs across all projects
+find .wai/projects -path "*/handoffs/*.md" | sort -r | head -10
 
-# Ask user which to resume
+# Or run wai prime — it shows the pending-resume handoff at session start
+wai prime
 ```
 
 ## Step 2: Extract Key Information

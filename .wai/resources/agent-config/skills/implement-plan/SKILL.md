@@ -291,11 +291,11 @@ If using an issue tracker (GitHub Issues, Jira, etc.):
 ## Integration with Other Workflows
 
 **After implementation:**
-- Use `prompt-workflow-deliberate-commits.md` to commit changes thoughtfully
-- Use `prompt-task-describe-pr.md` to create comprehensive PR descriptions
-- Use `prompt-task-iterative-code-review.md` to self-review before committing
+- Use `/commit` skill to commit changes thoughtfully
+- Use `/describe-pr` skill to create comprehensive PR descriptions
+- Use `/code-review` skill to self-review before committing
 
 **If need to pause:**
-- Use `prompt-workflow-create-handoff.md` to document progress
+- Use `wai close` (or `/create-handoff` skill) to document progress
 - Mark current phase status in todo list
 - Note what's complete vs in-progress

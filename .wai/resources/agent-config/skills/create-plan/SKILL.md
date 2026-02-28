@@ -48,7 +48,8 @@ If multiple approaches are viable:
 
 ### Step 4: Write the Plan
 
-Save to `plans/YYYY-MM-DD-description.md`:
+Save to `.wai/projects/<name>/plans/YYYY-MM-DD-description.md`
+(use `wai add plan --file <file>` to import, or write directly to that path):
 
 ```markdown
 # [Feature Name] Implementation Plan
@@ -182,7 +183,7 @@ Phase 1: JWT token validation
 Phase 2: Authentication middleware
 Phase 3: Protected route integration
 
-[Creates plan file at plans/2026-01-12-user-authentication.md]
+[Creates plan file at .wai/projects/<name>/plans/2026-01-12-user-authentication.md]
 
 Here's the plan I've created: [summarizes key points]
 

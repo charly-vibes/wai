@@ -22,11 +22,13 @@ pwd
 
 ### Step 2: Determine Filepath
 
-Create file at `handoffs/YYYY-MM-DD_HH-MM-SS_description.md`
+Use `wai close` to create the handoff automatically. It writes to:
+`.wai/projects/<name>/handoffs/YYYY-MM-DD-session-end.md`
 
-**Naming patterns:**
-- With issue tracking: `handoffs/2026-01-12_14-30-00_issue-123_add-oauth.md`
-- Without issues: `handoffs/2026-01-12_14-30-00_refactor-auth-system.md`
+If a file with that name already exists for today, wai appends a counter:
+`.wai/projects/<name>/handoffs/YYYY-MM-DD-session-end-1.md`
+
+To create manually, write to the same path pattern under the active project directory.
 
 ### Step 3: Write Handoff Document
 
@@ -155,19 +157,19 @@ status: handoff
 ### Step 4: Commit the Handoff
 
 ```bash
-git add handoffs/YYYY-MM-DD_HH-MM-SS_description.md
+git add .wai/projects/<name>/handoffs/YYYY-MM-DD-session-end.md
 git commit -m "docs(handoff): add handoff for [brief description]"
 ```
 
 ### Step 5: Inform User
 
 ```
-Handoff created at: handoffs/2026-01-12_14-30-00_oauth-integration.md
+Handoff created at: .wai/projects/<name>/handoffs/2026-01-12-session-end.md
 
 To resume in a new session:
 1. Start fresh AI session
-2. Provide the prompt: "Resume work from handoffs/2026-01-12_14-30-00_oauth-integration.md"
-3. Or use: /resume_handoff handoffs/2026-01-12_14-30-00_oauth-integration.md
+2. Run: wai prime  (detects the pending-resume signal written by wai close)
+3. Or use: /resume-handoff
 
 The handoff captures:
 - Current task status

@@ -2042,6 +2042,8 @@ fn way_always_exits_zero_all_passing() {
     // All checks passing
     fs::write(tmp.path().join("justfile"), "test:\n\techo test").unwrap();
     fs::write(tmp.path().join("prek.toml"), "[hooks]").unwrap();
+    fs::create_dir_all(tmp.path().join(".git/hooks")).unwrap();
+    fs::write(tmp.path().join(".git/hooks/pre-commit"), "#!/bin/sh\nprek run").unwrap();
     fs::write(tmp.path().join(".editorconfig"), "root = true").unwrap();
     fs::write(tmp.path().join("README.md"), "# Test").unwrap();
     fs::write(tmp.path().join("LICENSE"), "MIT").unwrap();
@@ -2135,6 +2137,8 @@ fn way_complete_repository_all_pass() {
     // Set up all best practices
     fs::write(tmp.path().join("justfile"), "test:\n\techo test").unwrap();
     fs::write(tmp.path().join("prek.toml"), "[hooks]").unwrap();
+    fs::create_dir_all(tmp.path().join(".git/hooks")).unwrap();
+    fs::write(tmp.path().join(".git/hooks/pre-commit"), "#!/bin/sh\nprek run").unwrap();
     fs::write(tmp.path().join(".editorconfig"), "root = true").unwrap();
     fs::write(tmp.path().join("README.md"), "# Test").unwrap();
     fs::write(tmp.path().join("LICENSE"), "MIT").unwrap();
@@ -2161,6 +2165,8 @@ fn way_complete_repository_minimal_suggestions() {
     // Set up all best practices
     fs::write(tmp.path().join("justfile"), "test:\n\techo test").unwrap();
     fs::write(tmp.path().join("prek.toml"), "[hooks]").unwrap();
+    fs::create_dir_all(tmp.path().join(".git/hooks")).unwrap();
+    fs::write(tmp.path().join(".git/hooks/pre-commit"), "#!/bin/sh\nprek run").unwrap();
     fs::write(tmp.path().join(".editorconfig"), "root = true").unwrap();
     fs::write(tmp.path().join("README.md"), "# Test").unwrap();
     fs::write(tmp.path().join("LICENSE"), "MIT").unwrap();
@@ -2231,6 +2237,12 @@ fn way_check_task_runner_missing() {
 fn way_check_git_hooks_prek() {
     let tmp = TempDir::new().unwrap();
     fs::write(tmp.path().join("prek.toml"), "[hooks]").unwrap();
+    fs::create_dir_all(tmp.path().join(".git/hooks")).unwrap();
+    fs::write(
+        tmp.path().join(".git/hooks/pre-commit"),
+        "#!/bin/sh\nprek run",
+    )
+    .unwrap();
 
     wai_cmd(tmp.path())
         .args(["way", "--json"])
@@ -2238,8 +2250,25 @@ fn way_check_git_hooks_prek() {
         .success()
         .stdout(
             predicate::str::contains("Pre-commit quality gates")
-                .and(predicate::str::contains("prek detected"))
+                .and(predicate::str::contains("prek detected and installed"))
                 .and(predicate::str::contains("\"pass\"")),
+        );
+}
+
+#[test]
+fn way_check_git_hooks_prek_not_installed() {
+    let tmp = TempDir::new().unwrap();
+    fs::write(tmp.path().join("prek.toml"), "[hooks]").unwrap();
+    // No .git/hooks/pre-commit — hooks not installed
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Pre-commit quality gates")
+                .and(predicate::str::contains("prek.toml found but hooks not installed"))
+                .and(predicate::str::contains("\"info\"")),
         );
 }
 
@@ -2247,6 +2276,12 @@ fn way_check_git_hooks_prek() {
 fn way_check_git_hooks_precommit() {
     let tmp = TempDir::new().unwrap();
     fs::write(tmp.path().join(".pre-commit-config.yaml"), "repos: []").unwrap();
+    fs::create_dir_all(tmp.path().join(".git/hooks")).unwrap();
+    fs::write(
+        tmp.path().join(".git/hooks/pre-commit"),
+        "#!/bin/sh\npre-commit run",
+    )
+    .unwrap();
 
     wai_cmd(tmp.path())
         .args(["way", "--json"])
@@ -2254,8 +2289,67 @@ fn way_check_git_hooks_precommit() {
         .success()
         .stdout(
             predicate::str::contains("Pre-commit quality gates")
-                .and(predicate::str::contains("pre-commit detected"))
+                .and(predicate::str::contains("pre-commit detected and installed"))
                 .and(predicate::str::contains("\"pass\"")),
+        );
+}
+
+#[test]
+fn way_check_git_hooks_precommit_not_installed() {
+    let tmp = TempDir::new().unwrap();
+    fs::write(tmp.path().join(".pre-commit-config.yaml"), "repos: []").unwrap();
+    // No .git/hooks/pre-commit
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Pre-commit quality gates")
+                .and(predicate::str::contains(
+                    ".pre-commit-config.yaml found but hooks not installed",
+                ))
+                .and(predicate::str::contains("\"info\"")),
+        );
+}
+
+#[test]
+fn way_check_git_hooks_lefthook_installed() {
+    let tmp = TempDir::new().unwrap();
+    fs::write(tmp.path().join("lefthook.yml"), "pre-commit:\n  commands: {}").unwrap();
+    fs::create_dir_all(tmp.path().join(".git/hooks")).unwrap();
+    fs::write(
+        tmp.path().join(".git/hooks/pre-commit"),
+        "#!/bin/sh\nlefthook run pre-commit",
+    )
+    .unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Pre-commit quality gates")
+                .and(predicate::str::contains("lefthook detected and installed"))
+                .and(predicate::str::contains("\"pass\"")),
+        );
+}
+
+#[test]
+fn way_check_git_hooks_lefthook_not_installed() {
+    let tmp = TempDir::new().unwrap();
+    fs::write(tmp.path().join("lefthook.yml"), "pre-commit:\n  commands: {}").unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Pre-commit quality gates")
+                .and(predicate::str::contains(
+                    "lefthook.yml found but hooks not installed",
+                ))
+                .and(predicate::str::contains("\"info\"")),
         );
 }
 

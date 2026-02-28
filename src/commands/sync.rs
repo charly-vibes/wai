@@ -16,6 +16,82 @@ struct ProjectionsConfig {
     projections: Vec<Projection>,
 }
 
+/// Return `true` if `.claude/commands/` is out of date with `config_dir/skills/`.
+///
+/// Mirrors the traversal logic in `sync_core::execute_claude_code`: scans for
+/// hierarchical skills (`<category>/<action>/SKILL.md` where the category dir
+/// itself does not contain a `SKILL.md`) and checks whether each expected
+/// destination file exists and is not older than its source.
+fn claude_code_needs_sync(config_dir: &std::path::Path, cc_dir: &std::path::Path) -> bool {
+    let skills_dir = config_dir.join("skills");
+    if !skills_dir.exists() {
+        return false; // Nothing to sync
+    }
+
+    let cat_entries = match std::fs::read_dir(&skills_dir) {
+        Ok(rd) => rd.filter_map(|e| e.ok()).collect::<Vec<_>>(),
+        Err(_) => return true, // Unreadable source → conservative
+    };
+
+    for cat_entry in cat_entries {
+        let cat_path = cat_entry.path();
+        if !cat_path.is_dir() {
+            continue;
+        }
+        if cat_path.join("SKILL.md").exists() {
+            continue; // Flat skill, skipped by execute_claude_code
+        }
+
+        let category = match cat_path.file_name().and_then(|n| n.to_str()) {
+            Some(s) => s.to_string(),
+            None => continue,
+        };
+
+        let action_entries = match std::fs::read_dir(&cat_path) {
+            Ok(rd) => rd.filter_map(|e| e.ok()).collect::<Vec<_>>(),
+            Err(_) => return true,
+        };
+
+        for action_entry in action_entries {
+            let action_path = action_entry.path();
+            if !action_path.is_dir() {
+                continue;
+            }
+            let skill_file = action_path.join("SKILL.md");
+            if !skill_file.exists() {
+                continue;
+            }
+
+            let action = match action_path.file_name().and_then(|n| n.to_str()) {
+                Some(s) => s.to_string(),
+                None => continue,
+            };
+
+            let dest = cc_dir.join(&category).join(format!("{}.md", action));
+            if !dest.exists() {
+                return true; // Missing destination
+            }
+
+            // Compare mtimes: stale destination means needs sync
+            if let Ok(src_meta) = std::fs::metadata(&skill_file) {
+                if let Ok(dst_meta) = std::fs::metadata(&dest) {
+                    if let (Ok(src_mtime), Ok(dst_mtime)) =
+                        (src_meta.modified(), dst_meta.modified())
+                    {
+                        if src_mtime > dst_mtime {
+                            return true; // Source newer than destination
+                        }
+                    }
+                } else {
+                    return true; // Can't read dest metadata → conservative
+                }
+            }
+        }
+    }
+
+    false
+}
+
 pub fn run(status_only: bool, dry_run: bool) -> Result<()> {
     let project_root = require_project()?;
     let config_dir = agent_config_dir(&project_root);
@@ -56,11 +132,12 @@ pub fn run(status_only: bool, dry_run: bool) -> Result<()> {
             for proj in &config.projections {
                 if proj.target == "claude-code" {
                     let cc_dir = project_root.join(".claude").join("commands");
-                    let exists = cc_dir.exists();
-                    let status = if exists {
-                        "synced".green().to_string()
-                    } else {
+                    let status = if !cc_dir.exists() {
                         "not synced".yellow().to_string()
+                    } else if claude_code_needs_sync(&config_dir, &cc_dir) {
+                        "needs sync".yellow().to_string()
+                    } else {
+                        "synced".green().to_string()
                     };
                     println!(
                         "    {} [claude-code] → .claude/commands/ [{}]",

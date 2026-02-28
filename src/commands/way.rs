@@ -263,6 +263,25 @@ fn parse_justfile_recipes(justfile_path: &Path) -> Vec<String> {
     found_recipes
 }
 
+/// Read `.git/hooks/pre-commit` contents, or `None` if absent/unreadable.
+fn read_precommit_hook(repo_root: &Path) -> Option<String> {
+    let hook_path = repo_root.join(".git/hooks/pre-commit");
+    if !hook_path.exists() || hook_path.is_dir() {
+        return None;
+    }
+    std::fs::read_to_string(&hook_path).ok()
+}
+
+/// Return `true` if the pre-commit hook file contains `needle`.
+fn hook_contains(repo_root: &Path, needle: &str) -> bool {
+    read_precommit_hook(repo_root).is_some_and(|c| c.contains(needle))
+}
+
+/// Return `true` if the pre-commit hook file exists and is non-empty.
+fn hook_exists_nonempty(repo_root: &Path) -> bool {
+    read_precommit_hook(repo_root).is_some_and(|c| !c.trim().is_empty())
+}
+
 fn check_git_hooks(repo_root: &Path) -> CheckResult {
     let name = "Pre-commit quality gates";
     let intent = Some(
@@ -280,43 +299,92 @@ fn check_git_hooks(repo_root: &Path) -> CheckResult {
     let husky_dir = repo_root.join(".husky");
 
     if prek_config.exists() {
-        CheckResult {
-            name: name.to_string(),
-            status: Status::Pass,
-            message: "prek detected (recommended)".to_string(),
-            intent,
-            success_criteria,
-            suggestion: None,
+        if hook_contains(repo_root, "prek") {
+            CheckResult {
+                name: name.to_string(),
+                status: Status::Pass,
+                message: "prek detected and installed".to_string(),
+                intent,
+                success_criteria,
+                suggestion: None,
+            }
+        } else {
+            CheckResult {
+                name: name.to_string(),
+                status: Status::Info,
+                message: "prek.toml found but hooks not installed — run: prek install".to_string(),
+                intent,
+                success_criteria,
+                suggestion: None,
+            }
         }
     } else if lefthook_config.exists() || lefthook_config_yaml.exists() {
-        CheckResult {
-            name: name.to_string(),
-            status: Status::Pass,
-            message: "lefthook detected".to_string(),
-            intent,
-            success_criteria,
-            suggestion: None,
+        if hook_contains(repo_root, "lefthook") {
+            CheckResult {
+                name: name.to_string(),
+                status: Status::Pass,
+                message: "lefthook detected and installed".to_string(),
+                intent,
+                success_criteria,
+                suggestion: None,
+            }
+        } else {
+            CheckResult {
+                name: name.to_string(),
+                status: Status::Info,
+                message: "lefthook.yml found but hooks not installed — run: lefthook install"
+                    .to_string(),
+                intent,
+                success_criteria,
+                suggestion: None,
+            }
         }
     } else if husky_dir.exists() && husky_dir.is_dir() {
-        CheckResult {
-            name: name.to_string(),
-            status: Status::Pass,
-            message: "husky detected".to_string(),
-            intent,
-            success_criteria,
-            suggestion: None,
+        if hook_exists_nonempty(repo_root) {
+            CheckResult {
+                name: name.to_string(),
+                status: Status::Pass,
+                message: "husky detected and installed".to_string(),
+                intent,
+                success_criteria,
+                suggestion: None,
+            }
+        } else {
+            CheckResult {
+                name: name.to_string(),
+                status: Status::Info,
+                message: ".husky/ found but hooks not installed — run: npx husky install"
+                    .to_string(),
+                intent,
+                success_criteria,
+                suggestion: None,
+            }
         }
     } else if precommit_config.exists() {
-        CheckResult {
-            name: name.to_string(),
-            status: Status::Pass,
-            message: "pre-commit detected".to_string(),
-            intent,
-            success_criteria,
-            suggestion: Some(
-                "Consider prek for simpler hook management — https://github.com/chshersh/prek"
-                    .to_string(),
-            ),
+        if hook_contains(repo_root, "pre-commit") {
+            CheckResult {
+                name: name.to_string(),
+                status: Status::Pass,
+                message: "pre-commit detected and installed".to_string(),
+                intent,
+                success_criteria,
+                suggestion: Some(
+                    "Consider prek for simpler hook management — https://github.com/chshersh/prek"
+                        .to_string(),
+                ),
+            }
+        } else {
+            CheckResult {
+                name: name.to_string(),
+                status: Status::Info,
+                message: ".pre-commit-config.yaml found but hooks not installed — run: pre-commit install".to_string(),
+                intent,
+                success_criteria,
+                suggestion: Some(
+                    "Consider prek for simpler hook management — https://github.com/chshersh/prek"
+                        .to_string(),
+                ),
+            }
         }
     } else {
         CheckResult {
