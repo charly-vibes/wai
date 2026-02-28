@@ -44,8 +44,10 @@ Available for all commands:
 | `wai add research --project <name>` | Add to specific project |
 | `wai add plan <content>` | Add a plan document |
 | `wai add plan --file <path>` | Import plan from file |
+| `wai add plan --tags <tags>` | Add tagged plan document |
 | `wai add design <content>` | Add a design document |
 | `wai add design --file <path>` | Import design from file |
+| `wai add design --tags <tags>` | Add tagged design document |
 
 ## Diagnostics
 
@@ -82,6 +84,14 @@ Available for all commands:
 
 ## Viewing & Navigating
 
+| Command | Description |
+|---------|-------------|
+| `wai status [--json]` | Check project status and suggest next steps |
+| `wai show` | Show overview of all PARA categories (projects, areas, resources, archives) |
+| `wai show <name>` | Show details for a specific project, area, or resource |
+| `wai ls [--root <dir>] [--depth <n>]` | List all wai workspaces under a root directory with phase and beads counts |
+| `wai move <item> <category>` | Move an item between PARA categories (projects, areas, resources, archives) |
+
 ## Searching & Timeline
 
 | Command | Description |
@@ -93,6 +103,7 @@ Available for all commands:
 | `wai search -n <limit>` | Limit number of results |
 | `wai search --tag <tag>` | Filter by tag (repeatable: `--tag foo --tag bar`) |
 | `wai search --latest` | Return only the most recently dated match |
+| `wai search -C <n>` | Show N lines of context around each match |
 | `wai timeline <project>` | View chronological project timeline |
 | `wai timeline --from <date>` | Show entries from date onward (YYYY-MM-DD) |
 | `wai timeline --to <date>` | Show entries up to date (YYYY-MM-DD) |
@@ -109,18 +120,6 @@ Available for all commands:
 | `wai phase set <phase>` | Jump to specific phase |
 
 Available phases: `research`, `design`, `plan`, `implement`, `review`, `archive`
-
-## Agent Configuration
-
-| Command | Description |
-|---------|-------------|
-| `wai sync` | Sync agent configs to tool-specific locations |
-| `wai sync --status` | Show sync status without modifying |
-| `wai sync --dry-run` | Preview operations without making any changes |
-| `wai config add <type> <file>` | Add agent config (skill/rule/context) |
-| `wai config list` | List all agent config files |
-| `wai config edit <path>` | Edit config file in $EDITOR |
-| `wai import <path>` | Import existing tool configs (.claude/, .cursorrules) |
 
 ## Resources
 
