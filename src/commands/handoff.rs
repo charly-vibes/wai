@@ -1,4 +1,4 @@
-use chrono::Utc;
+use chrono::Local;
 use cliclack::log;
 use miette::{IntoDiagnostic, Result};
 use std::path::{Path, PathBuf};
@@ -51,7 +51,7 @@ pub fn create_handoff(project_root: &Path, project: &str) -> Result<PathBuf> {
     let state_path = proj_dir.join(STATE_FILE);
     let state = ProjectState::load(&state_path)?;
 
-    let now = Utc::now();
+    let now = Local::now();
     let date = now.format("%Y-%m-%d");
     let filename = format!("{}-session-end.md", date);
 
