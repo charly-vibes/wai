@@ -7,9 +7,11 @@ The initial model tied each stage to a `skill` reference and `artifact` type,
 which was good for tracking but left the agent without instructions. Every
 session boundary required a human to re-explain what step to do next.
 
-The new model inverts this: the prompt IS the instruction. The schema becomes
-minimal (id + prompt), loop logic lives inside prompt text, and wai's job is
-to surface the right prompt at the right time — especially after context loss.
+The new model makes the step prompt a navigation hint: a one-line task summary
+plus wai commands (record artifact, advance). HOW to do the work stays in skill
+files. The schema becomes minimal (id + prompt), wai's job is to surface the
+right prompt at the right time — especially after context loss — and to track
+position across sessions so the agent never has to re-orient manually.
 
 ## Goals / Non-Goals
 
@@ -27,6 +29,8 @@ to surface the right prompt at the right time — especially after context loss.
 
 ## Decisions
 
+### Schema decisions
+
 **Decision: Steps are (id, prompt) only — no skill/artifact fields**
 
 Skill references were load-bearing when wai validated that each stage pointed
@@ -39,6 +43,35 @@ Alternatives considered:
 - Keep `skill` as optional field: adds complexity for no runtime benefit
 - Add `type` field (action/review/fix): type is already implied by prompt content
 
+**Decision: Step prompts are navigation hints, not skill-level instructions**
+
+Skills (SKILL.md files) already define detailed HOW-to instructions for each
+type of work. Pipeline step prompts must not duplicate that content. A step
+prompt should contain: (1) a one-line task summary (what phase, optional skill
+name hint), (2) the `wai add` command for capturing artifacts, and (3) the
+`wai pipeline next` advancement command. Nothing more.
+
+This keeps pipelines and skills non-overlapping. If a step's prompt is growing
+toward a full how-to, that content belongs in a skill file instead.
+
+✓ Correct step prompt:
+```
+Research {topic} — use skill `research-codebase` if installed.
+Record: `wai add research "..."`
+Next: `wai pipeline next`
+```
+
+✗ Wrong (instruction content that belongs in a skill, not a pipeline step):
+```
+Research {topic}. Find relevant files and understand existing patterns.
+Look at tests to understand conventions. Read config files. Check the
+existing implementation. Record your findings...
+```
+
+Alternatives considered:
+- Allow rich prompts as tutorials: creates drift between skill and pipeline content
+- Require skill field: reintroduces validation coupling we removed
+
 **Decision: TOML format for definitions; YAML definitions are gone**
 
 The project already uses TOML for `config.toml`. Consistency reduces friction.
@@ -50,6 +83,8 @@ Alternatives considered:
 - Keep YAML: inconsistent with project conventions
 - Markdown with frontmatter: good for human reading but harder to parse
 
+### State decisions
+
 **Decision: `.last-run` pointer file for session recovery**
 
 `WAI_PIPELINE_RUN` is set via `export` and lives in the shell session.
@@ -58,6 +93,10 @@ After `/clear` or a new terminal, it's gone. A pointer file at
 `pipeline next`/`current` a fallback that survives session boundaries.
 `pipeline start` writes it; `pipeline next` reads it when the env var
 is absent.
+
+If `.last-run` points to a run file that no longer exists (e.g., manually
+deleted), commands that read it treat the pointer as absent and fall back
+gracefully (no error, as if no run is active).
 
 Alternatives considered:
 - Require explicit `--run-id` argument: defeats the "no typing" goal
@@ -69,6 +108,8 @@ A single variable covers the most common case (what are we working on?)
 without introducing a template engine. The topic is the slug passed to
 `pipeline start --topic=<slug>`. At render time, `{topic}` in the prompt
 is replaced with the topic value. No other variables in v1.
+
+### Behavioral decisions
 
 **Decision: Loop logic lives in prompt text, not pipeline schema**
 
@@ -83,12 +124,55 @@ during iteration. `wai pipeline status` shows "step 3/5" which is accurate
 (the agent is still working on step 3). This is acceptable — wai is a guide,
 not a finite state machine.
 
+### Command decisions
+
 **Decision: `pipeline init <name>` scaffolds a starter TOML template**
 
 Dropping a TOML file manually is simple, but `pipeline init` lowers the
 barrier to discovery. It writes a minimal two-step template to
 `.wai/resources/pipelines/<name>.toml` and fails if the file already exists.
 The directory is created if it doesn't exist.
+
+**Decision: `pipeline suggest [description]` for conversation-start discovery**
+
+Pipelines add value at the start of a conversation, not just during an active
+run. The agent needs a way to discover which pipeline fits the current task
+without manual inspection of TOML files. `pipeline suggest` lists all defined
+pipelines with name, description, and step count. When an optional description
+string is provided, results are ranked by keyword overlap (case-insensitive,
+stop words not filtered in v1). Score is used for sorting only — it is not
+printed. Ties are broken alphabetically by pipeline name. When all pipelines
+score 0, output is alphabetical. An empty description string is treated as
+absent (no scoring).
+
+This enables the conversation-start workflow:
+```
+wai pipeline suggest "small regression in auth module"
+→ quick-fix  (2 steps)  Quick bug diagnosis and fix
+→ feature    (5 steps)  Full feature workflow: research → design → implement → review
+Start: wai pipeline start quick-fix --topic=auth-regression
+```
+
+Alternatives considered:
+- Leave discovery to `pipeline list`: list shows names only, no ranking
+- LLM-based matching: out of scope for v1; keyword overlap is sufficient
+
+**Decision: `wai status` shows available pipelines when no run is active**
+
+The most valuable moment for pipeline selection is *before* starting — at the
+beginning of a conversation. When no run is active and at least one pipeline
+definition exists, `wai status` emits an "Available pipelines" section with
+name and description. Malformed TOML files are skipped with a warning rather
+than causing status to fail. This makes pipeline-assisted workflows a natural
+first step rather than an afterthought.
+
+When a run is active, status shows the active step. If `.last-run` points to
+a missing run file, status treats it as no active run (stale pointer silently
+ignored, falls back to idle state).
+
+Alternatives considered:
+- Only surface in `wai prime`: prime is session-recovery focused; status is broader
+- Require explicit `wai pipeline list`: too much friction to discover organically
 
 ## Data Model Changes
 
@@ -101,23 +185,43 @@ The directory is created if it doesn't exist.
 **Pipeline definition** (TOML):
 ```toml
 [pipeline]
-name = "tdd"
-description = "Test-driven feature implementation"
+name = "feature"
+description = "Full feature workflow: research → design → implement → review"
 
 [[steps]]
 id = "research"
 prompt = """
-Research {topic}. Find relevant files and understand existing patterns.
-Record findings: `wai add research "..."`
-When done: `wai pipeline next`
+Research {topic} — use skill `research-codebase` if installed.
+Record: `wai add research "..."`
+Next: `wai pipeline next`
+"""
+
+[[steps]]
+id = "design"
+prompt = """
+Design {topic} — use skill `design-practice` if installed.
+Record: `wai add design "..."`
+Next: `wai pipeline next`
+"""
+
+[[steps]]
+id = "implement"
+prompt = """
+Implement {topic} — use skill `tdd` if installed.
+Next: `wai pipeline next`
 """
 
 [[steps]]
 id = "close"
 prompt = """
-Close the beads issue and run `wai close` to capture a handoff.
+Close completed beads issues. Run `wai close` to capture handoff.
+Next: `wai pipeline next`
 """
 ```
+
+Step prompts follow the convention: one-line task summary (with optional skill
+hint), `wai add` for artifacts, `wai pipeline next` to advance. No how-to
+instructions — those live in the referenced skill files.
 
 **Run state** (`current_stage: usize` renamed to `current_step: usize`):
 - Integer index is sufficient; step ID is resolved at print time from the definition

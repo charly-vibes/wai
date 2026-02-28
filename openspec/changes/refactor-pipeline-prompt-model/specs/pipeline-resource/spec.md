@@ -1,5 +1,27 @@
 ## ADDED Requirements
 
+### Requirement: Step Prompt Convention
+
+The `pipeline init` starter template SHALL use the thin prompt style and
+SHALL include an inline comment explaining the convention. Pipeline step prompts
+SHOULD be navigation hints, not skill-level instructions. A compliant step
+prompt contains: (1) a one-line task summary with an optional skill name hint,
+(2) the `wai add` command for capturing the step's artifact, and (3) the
+`wai pipeline next` advancement command. Step prompts SHOULD NOT reproduce
+how-to guidance that belongs in a skill file.
+
+This convention is enforced by documentation and the init template, not by
+runtime validation. `load_pipeline_toml()` validates only structural correctness
+(non-empty prompts, unique IDs); prompt style is not machine-checked.
+
+#### Scenario: Valid thin step prompt
+
+- **GIVEN** a pipeline TOML file where a step's prompt contains only a one-line
+  task summary, a `wai add` command, and a `wai pipeline next` command
+- **WHEN** `wai pipeline start <name>` loads that file
+- **THEN** the step loads without error or warning
+- **AND** the rendered prompt is printed as written (no modification)
+
 ### Requirement: Pipeline Step Format
 
 A pipeline definition SHALL be a TOML file at
@@ -137,3 +159,86 @@ is present.
 - **AND** a run matching `.last-run` or `WAI_PIPELINE_RUN` is in the list
 - **THEN** that run is visually marked as active
 - **AND** the current step's prompt is shown at the bottom
+
+### Requirement: Pipeline Discovery
+
+The CLI SHALL provide a `pipeline suggest [description]` command that helps the
+agent choose the right pipeline for the current task.
+
+#### Scenario: List all pipelines without description
+
+- **WHEN** user runs `wai pipeline suggest`
+- **AND** at least one TOML pipeline definition exists
+- **THEN** the system prints each pipeline's name, description, and step count
+  sorted alphabetically
+- **AND** prints a `wai pipeline start <name> --topic=<slug>` hint for the first result
+
+#### Scenario: Rank pipelines by keyword match
+
+- **WHEN** user runs `wai pipeline suggest "fix regression in auth module"`
+- **THEN** the system scores each pipeline by keyword overlap (case-insensitive)
+  against its name and description fields
+- **AND** prints results sorted by score descending (highest relevance first)
+- **AND** ties in score are broken alphabetically by pipeline name
+- **AND** prints a `wai pipeline start` hint for the top-ranked result
+
+#### Scenario: No keyword matches (all score zero)
+
+- **WHEN** user runs `wai pipeline suggest "xyz123"`
+- **AND** no pipeline name or description contains any of the query words
+- **THEN** all pipelines score 0 and are printed sorted alphabetically by name
+- **AND** a `wai pipeline start` hint is printed for the first (alphabetical) result
+
+#### Scenario: Empty description treated as absent
+
+- **WHEN** user runs `wai pipeline suggest ""`
+- **THEN** the system treats the empty string as no description provided
+- **AND** prints all pipelines sorted alphabetically (no scoring applied)
+
+#### Scenario: No pipelines defined
+
+- **WHEN** user runs `wai pipeline suggest`
+- **AND** no TOML definitions exist in `.wai/resources/pipelines/`
+- **THEN** the system prints "No pipelines defined" with a hint to run
+  `wai pipeline init <name>`
+
+### Requirement: Pipeline Discovery in `wai status`
+
+`wai status` SHALL surface pipeline information appropriate to the current state:
+- When a run is active (`.last-run` or `WAI_PIPELINE_RUN` set): show the active
+  pipeline name and current step position.
+- When no run is active but pipeline definitions exist: show an "Available
+  pipelines" section listing each pipeline's name and description, and add
+  `wai pipeline suggest` to the suggestions block.
+
+#### Scenario: Status shows available pipelines when idle
+
+- **WHEN** user runs `wai status`
+- **AND** no pipeline run is active
+- **AND** at least one `.toml` definition exists in `.wai/resources/pipelines/`
+- **THEN** the status output includes an "Available pipelines" section
+- **AND** the suggestions block includes `wai pipeline suggest`
+
+#### Scenario: Status shows active run when pipeline is running
+
+- **WHEN** user runs `wai status`
+- **AND** a pipeline run is active (`.last-run` resolves or `WAI_PIPELINE_RUN` set)
+- **THEN** the status output shows "⚡ PIPELINE ACTIVE: <name> step N/M"
+- **AND** the suggestions block includes `wai pipeline current`
+
+#### Scenario: Stale .last-run pointer falls back to idle state
+
+- **WHEN** user runs `wai status`
+- **AND** `.wai/resources/pipelines/.last-run` exists
+- **AND** the run file it references has been deleted
+- **THEN** the system silently treats the pointer as absent (no error)
+- **AND** the status output shows the idle-state pipeline section (available pipelines)
+  as if no run were active
+
+#### Scenario: Malformed TOML file skipped in idle section
+
+- **WHEN** user runs `wai status` in idle state
+- **AND** one `.toml` file in `.wai/resources/pipelines/` has invalid syntax
+- **THEN** the malformed file is skipped with an inline warning
+  (e.g., "⚠ pipeline <name>: invalid TOML, skipped")
+- **AND** all valid pipeline definitions are still listed
