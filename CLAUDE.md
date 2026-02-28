@@ -34,7 +34,7 @@ Detected workflow tools:
 | Record reasoning/research | wai | `wai add research "findings"` |
 | Capture design decisions | wai | `wai add design "architecture choice"` |
 | Session context transfer | wai | `wai close` |
-| Track work items/bugs | beads | `bd create --title="..." --type=task` |
+| Track work items/bugs | beads | `bd create "title"` |
 | Find available work | beads | `bd ready` |
 | Manage dependencies | beads | `bd dep add <blocked> <blocker>` |
 | Propose system changes | openspec | Read `openspec/AGENTS.md` |
@@ -138,7 +138,7 @@ wai pipeline advance <run-id> # Mark stage done, get next hint
 ```bash
 bd ready                     # Available work
 bd show <id>                 # Issue details
-bd create --title="..."      # New issue
+bd create "title"            # New issue
 bd update <id> --status=in_progress
 bd close <id>                # Complete work
 ```
