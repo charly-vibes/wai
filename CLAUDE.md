@@ -27,6 +27,8 @@ Detected workflow tools:
 - **beads (bd)** — issue tracking (tasks, bugs, dependencies)
 - **openspec** — specifications and change proposals (see `openspec/AGENTS.md`)
 
+> **CRITICAL**: Use TDD (write tests first) and Tidy First (separate refactoring commits from feature commits) when implementing changes.
+
 ## When to Use What
 
 | Need | Tool | Example |

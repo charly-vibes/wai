@@ -35,6 +35,11 @@ pub fn wai_block_content(detected_plugins: &[&str]) -> String {
                 "- **openspec** — specifications and change proposals (see `openspec/AGENTS.md`)\n",
             );
         }
+        block.push_str(
+            "\n\
+             > **CRITICAL**: Use TDD (write tests first) and Tidy First (separate refactoring \
+             commits from feature commits) when implementing changes.\n",
+        );
     }
 
     // When to Use What (only when companion tools detected)
@@ -529,6 +534,58 @@ mod wai_block_tests {
         assert!(
             !output.contains("bd close <id>"),
             "unexpected 'bd close <id>' without beads"
+        );
+    }
+
+    // TDD/Tidy First disclaimer
+
+    #[test]
+    fn tdd_disclaimer_present_with_companion_tools() {
+        let output = wai_block_content(&["beads", "openspec"]);
+        assert!(
+            output.contains("CRITICAL"),
+            "expected CRITICAL disclaimer in output with companion tools"
+        );
+        assert!(
+            output.contains("TDD"),
+            "expected 'TDD' in output with companion tools"
+        );
+        assert!(
+            output.contains("Tidy First"),
+            "expected 'Tidy First' in output with companion tools"
+        );
+    }
+
+    #[test]
+    fn tdd_disclaimer_present_with_beads_only() {
+        let output = wai_block_content(&["beads"]);
+        assert!(
+            output.contains("CRITICAL"),
+            "expected CRITICAL disclaimer in output with beads"
+        );
+    }
+
+    #[test]
+    fn tdd_disclaimer_absent_without_companion_tools() {
+        let output = wai_block_content(&[]);
+        assert!(
+            !output.contains("Tidy First"),
+            "unexpected 'Tidy First' in output without companion tools"
+        );
+    }
+
+    #[test]
+    fn tdd_disclaimer_before_when_to_use_what() {
+        let output = wai_block_content(&["beads"]);
+        let critical_pos = output
+            .find("CRITICAL")
+            .expect("CRITICAL not found in output");
+        let when_pos = output
+            .find("## When to Use What")
+            .expect("## When to Use What not found");
+        assert!(
+            critical_pos < when_pos,
+            "CRITICAL disclaimer should appear before '## When to Use What'"
         );
     }
 }
