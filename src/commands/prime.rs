@@ -16,6 +16,18 @@ use super::require_project;
 pub fn run(project: Option<String>) -> Result<()> {
     let project_root = require_project()?;
 
+    // Graceful empty state: if no projects exist at all, show a helpful prompt
+    // rather than crashing with "No projects found."
+    if project.is_none() && list_projects(&project_root).is_empty() {
+        let today = Local::now().format("%Y-%m-%d");
+        println!("{} wai prime — {}", "◆".cyan(), today);
+        println!(
+            "{} No active projects. Create one with `wai new project <name>`.",
+            "→".cyan()
+        );
+        return Ok(());
+    }
+
     let project_name = resolve_project(&project_root, project)?;
 
     // Read phase

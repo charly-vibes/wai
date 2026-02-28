@@ -4121,15 +4121,15 @@ fn prime_project_flag_selects_correct_project() {
 }
 
 #[test]
-fn prime_zero_projects_fails_with_suggestion() {
+fn prime_zero_projects_shows_suggestion() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
 
     wai_cmd(tmp.path())
         .args(["prime", "--no-input"])
         .assert()
-        .failure()
-        .stderr(predicate::str::contains("wai new project"));
+        .success()
+        .stdout(predicate::str::contains("wai new project"));
 }
 
 #[test]

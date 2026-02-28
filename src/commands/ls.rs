@@ -17,6 +17,7 @@ struct Row {
 
 pub fn run(root: Option<PathBuf>, depth: Option<usize>) -> Result<()> {
     // Task 4.2: Resolve root
+    let explicit_root = root.is_some();
     let root = match root {
         Some(r) => {
             if !r.exists() {
@@ -33,7 +34,19 @@ pub fn run(root: Option<PathBuf>, depth: Option<usize>) -> Result<()> {
     let max_depth = depth.unwrap_or(3);
 
     // Task 4.4: Run workspace discovery
-    let workspaces = discover_workspaces(&root, max_depth);
+    let mut workspaces = discover_workspaces(&root, max_depth);
+
+    // When using default root, also check ancestor directories of cwd so workspaces
+    // deeper than max_depth are never silently omitted.
+    if !explicit_root {
+        if let Ok(cwd) = std::env::current_dir() {
+            for ancestor in find_ancestor_workspaces(&cwd) {
+                if !workspaces.contains(&ancestor) {
+                    workspaces.push(ancestor);
+                }
+            }
+        }
+    }
 
     let mut rows: Vec<Row> = Vec::new();
     let mut any_beads = false;
@@ -196,6 +209,22 @@ fn discover_workspaces(root: &Path, max_depth: usize) -> Vec<PathBuf> {
     }
 
     workspaces
+}
+
+/// Walk up from `cwd` and collect every ancestor directory that contains `.wai/config.toml`.
+fn find_ancestor_workspaces(cwd: &Path) -> Vec<PathBuf> {
+    let mut result = Vec::new();
+    let mut dir: &Path = cwd;
+    loop {
+        if dir.join(".wai").join("config.toml").exists() {
+            result.push(dir.to_path_buf());
+        }
+        match dir.parent() {
+            Some(parent) => dir = parent,
+            None => break,
+        }
+    }
+    result
 }
 
 /// Invoke `bd stats --json` in `workspace` and parse open/ready counts.

@@ -255,7 +255,7 @@ fn render_human(checks: &[CheckResult], summary: &Summary) -> Result<()> {
     for check in checks {
         let icon = match check.status {
             Status::Pass => "✓".green().to_string(),
-            Status::Warn => "!".yellow().to_string(),
+            Status::Warn => "⚠".yellow().to_string(),
             Status::Fail => "✗".red().to_string(),
         };
         println!("  {} {}: {}", icon, check.name.bold(), check.message);
