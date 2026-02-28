@@ -55,6 +55,9 @@ dirs = "6"
 # Slug generation for filenames
 slug = "0.1"
 
+# Shell-word splitting (handles quoted arguments in plugin hook commands)
+shell-words = "1"
+
 # Tar archive support (for skill export/import)
 tar = "0.4"
 flate2 = "1"

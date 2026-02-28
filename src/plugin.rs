@@ -198,12 +198,12 @@ pub fn detect_plugins(project_root: &Path) -> Vec<ActivePlugin> {
 
 /// Execute a plugin hook and return its output.
 pub fn execute_hook(project_root: &Path, hook: &HookDef) -> Option<HookOutput> {
-    let parts: Vec<&str> = hook.command.split_whitespace().collect();
+    let parts = shell_words::split(&hook.command).ok()?;
     if parts.is_empty() {
         return None;
     }
 
-    let output = Command::new(parts[0])
+    let output = Command::new(&parts[0])
         .args(&parts[1..])
         .current_dir(project_root)
         .output()
@@ -263,7 +263,9 @@ pub fn execute_passthrough(
     extra_args: &[String],
 ) -> std::io::Result<std::process::ExitStatus> {
     let context = current_context();
-    let parts: Vec<&str> = passthrough.split_whitespace().collect();
+    let parts = shell_words::split(passthrough).map_err(|e| {
+        std::io::Error::new(std::io::ErrorKind::InvalidInput, e.to_string())
+    })?;
     if parts.is_empty() {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
@@ -283,7 +285,7 @@ pub fn execute_passthrough(
         }));
     }
 
-    let mut cmd = Command::new(parts[0]);
+    let mut cmd = Command::new(&parts[0]);
     cmd.args(&parts[1..]);
     cmd.args(extra_args);
     cmd.current_dir(project_root);
