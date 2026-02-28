@@ -42,9 +42,64 @@ pub fn run(args: MoveArgs) -> Result<()> {
     }
 
     std::fs::create_dir_all(&target_parent).into_diagnostic()?;
-    std::fs::rename(&source, &destination).into_diagnostic()?;
+    move_item(&source, &destination).into_diagnostic()?;
 
     log::success(format!("Moved '{}' to {}", item_name, target)).into_diagnostic()?;
+    Ok(())
+}
+
+/// Move `src` to `dst`, falling back to copy+delete when a cross-device rename
+/// is attempted (EXDEV / io::ErrorKind::CrossesDevices).
+///
+/// PARA items are directories, so the fallback performs a full recursive copy.
+/// If the copy fails partway through, the partially-written destination is
+/// removed before the error is returned so the workspace is never left in a
+/// corrupt state.
+fn move_item(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
+    match std::fs::rename(src, dst) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::CrossesDevices => {
+            // Cross-device: fall back to recursive copy then delete.
+            match copy_dir_all(src, dst) {
+                Ok(()) => {
+                    // Copy succeeded; remove the original tree.
+                    std::fs::remove_dir_all(src)
+                }
+                Err(copy_err) => {
+                    // Clean up the partial destination before surfacing the error.
+                    let _ = std::fs::remove_dir_all(dst);
+                    Err(copy_err)
+                }
+            }
+        }
+        Err(e) => Err(e),
+    }
+}
+
+/// Recursively copy the directory tree rooted at `src` into `dst`.
+fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
+    use walkdir::WalkDir;
+
+    std::fs::create_dir_all(dst)?;
+
+    for entry in WalkDir::new(src) {
+        let entry = entry?;
+        let relative = entry
+            .path()
+            .strip_prefix(src)
+            .expect("walkdir always yields paths under src");
+        let target = dst.join(relative);
+
+        if entry.file_type().is_dir() {
+            std::fs::create_dir_all(&target)?;
+        } else {
+            if let Some(parent) = target.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            std::fs::copy(entry.path(), &target)?;
+        }
+    }
+
     Ok(())
 }
 
