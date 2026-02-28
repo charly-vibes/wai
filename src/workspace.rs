@@ -163,7 +163,8 @@ pub fn ensure_workspace_current(project_root: &Path) -> Result<Vec<WorkspaceActi
         let plugins_path = wai_dir.join("PLUGINS.md");
 
         // Only write if it doesn't exist or content has changed
-        let should_write = if plugins_path.exists() {
+        let already_existed = plugins_path.exists();
+        let should_write = if already_existed {
             match std::fs::read_to_string(&plugins_path) {
                 Ok(existing) => existing != plugins_md,
                 Err(_) => true,
@@ -174,7 +175,7 @@ pub fn ensure_workspace_current(project_root: &Path) -> Result<Vec<WorkspaceActi
 
         if should_write {
             std::fs::write(&plugins_path, &plugins_md).into_diagnostic()?;
-            if plugins_path.exists() {
+            if already_existed {
                 actions.push(WorkspaceAction::new("Updated .wai/PLUGINS.md".to_string()));
             } else {
                 actions.push(WorkspaceAction::new("Created .wai/PLUGINS.md".to_string()));
