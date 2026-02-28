@@ -214,13 +214,19 @@ pub struct UserConfig {
 }
 
 impl UserConfig {
-    /// Load user config from ~/.config/wai/config.toml
-    /// Returns default config if file doesn't exist
+    /// Load user config from ~/.config/wai/config.toml.
+    ///
+    /// If the file does not exist, writes a default config and returns it.
+    /// This ensures the config file is always initialized on first use,
+    /// so callers never need to save a freshly-loaded default themselves.
     pub fn load() -> Result<Self, WaiError> {
         let config_path = user_config_path();
 
         if !config_path.exists() {
-            return Ok(Self::default());
+            let default = Self::default();
+            // Best-effort: ignore save errors so read-only callers still work.
+            let _ = default.save();
+            return Ok(default);
         }
 
         let content = std::fs::read_to_string(&config_path)?;

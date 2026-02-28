@@ -95,15 +95,11 @@ pub fn run(cli: Cli) -> Result<()> {
 fn show_welcome() -> Result<()> {
     use cliclack::{intro, outro};
 
-    // Ensure user config exists (creates on first run)
-    // If load fails (corrupt config), treat as first-run with default config
+    // Load user config; first-run initialization (writing the default config
+    // file) is handled inside UserConfig::load, keeping show_welcome read-only.
+    // If load fails (corrupt config), treat as first-run with default config.
     let user_config = UserConfig::load().unwrap_or_default();
-    let config_path = crate::config::user_config_path();
     let is_first_run = !user_config.seen_tutorial;
-    if !config_path.exists() {
-        // Only save if config doesn't exist to avoid unnecessary I/O
-        let _ = user_config.save(); // Best effort - don't fail welcome if save fails
-    }
 
     let context = current_context();
 
