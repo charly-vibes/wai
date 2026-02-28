@@ -227,6 +227,18 @@ wai beads list         # Pass-through to beads plugin
 | `wai close [--project <name>]` | Wrap up session: create handoff and show next steps |
 | `wai handoff create <project>` | Generate handoff document |
 
+### Pipelines
+
+Pipelines chain skills into ordered stages. `WAI_PIPELINE_RUN` (set after `wai pipeline run`) causes `wai add` to tag every artifact with the run ID automatically.
+
+| Command | Description |
+|---------|-------------|
+| `wai pipeline create <name> --stages="skill:type,..."` | Define a pipeline |
+| `wai pipeline run <name> --topic=<slug>` | Start a run; prints the run ID |
+| `wai pipeline advance <run-id>` | Mark stage done, get next stage hint |
+| `wai pipeline status <name>` | Show runs with per-stage completion |
+| `wai pipeline list` | List all pipelines |
+
 ### Plugin Management
 
 | Command | Description |

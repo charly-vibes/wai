@@ -195,6 +195,43 @@ fallback = "search"       # On LLM unavailable: "search" (default) or "error"
 
 Reuses the `[why]` LLM config — no separate setup required.
 
+---
+
+## Pipelines
+
+Pipelines chain skills into ordered stages, tracking run state and automatically tagging artifacts.
+
+| Command | Description |
+|---------|-------------|
+| `wai pipeline create <name> --stages="..."` | Define a new pipeline with ordered skill:artifact-type stages |
+| `wai pipeline run <name> --topic=<slug>` | Start a run; prints the run ID |
+| `wai pipeline advance <run-id>` | Mark current stage done and get the next stage hint |
+| `wai pipeline status <name>` | Show all runs with per-stage completion and artifact paths |
+| `wai pipeline status <name> --run <run-id>` | Show detail for a single run |
+| `wai pipeline list` | List all defined pipelines |
+
+**Stages** are defined as comma-separated `skill:artifact-type` pairs:
+
+```
+wai pipeline create review \
+  --stages="issue/gather:research,impl/run:plan,impl/review:design"
+```
+
+**Run IDs** are generated as `<pipeline>-<date>-<topic>` (e.g. `review-2026-02-28-auth-refactor`).
+
+### WAI_PIPELINE_RUN
+
+After starting a run, set `WAI_PIPELINE_RUN` to enable automatic artifact tagging:
+
+```bash
+export WAI_PIPELINE_RUN=$(wai pipeline run review --topic=auth-refactor | head -1)
+# All subsequent `wai add` calls tag the artifact with pipeline-run:<run-id>
+wai add research "Findings from auth review"
+wai pipeline advance review-2026-02-28-auth-refactor
+```
+
+When `WAI_PIPELINE_RUN` is set, every `wai add research/plan/design` call automatically adds a `pipeline-run:<run-id>` tag to the artifact.
+
 ## Examples
 
 ### Basic Workflow

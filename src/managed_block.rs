@@ -205,9 +205,12 @@ pub fn wai_block_content(detected_plugins: &[&str]) -> String {
          wai why \"why use TOML?\"       # Ask why (LLM-powered oracle)\n\
          wai why src/config.rs         # Explain a file's history\n\
          wai reflect                   # Synthesize project patterns into CLAUDE.md\n\
-         wai handoff create <project>  # Session handoff\n\
+         wai close                     # Session handoff + pending-resume signal\n\
          wai phase show                # Current phase\n\
          wai doctor                    # Workspace health\n\
+         wai pipeline list             # List pipelines\n\
+         wai pipeline run <n> --topic=<t>  # Start a run; set WAI_PIPELINE_RUN=<id>\n\
+         wai pipeline advance <run-id> # Mark stage done, get next hint\n\
          ```\n",
     );
     if has_beads {

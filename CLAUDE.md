@@ -127,6 +127,9 @@ wai reflect                   # Synthesize project patterns into CLAUDE.md
 wai close                     # Session handoff + pending-resume signal
 wai phase show                # Current phase
 wai doctor                    # Workspace health
+wai pipeline list             # List pipelines
+wai pipeline run <n> --topic=<t>  # Start a run; set WAI_PIPELINE_RUN=<id>
+wai pipeline advance <run-id> # Mark stage done, get next hint
 ```
 
 ### beads
