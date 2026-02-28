@@ -231,7 +231,8 @@ pub enum Commands {
             EXAMPLES\n\
               wai ls                    Scan $HOME (default, depth 3)\n\
               wai ls --root ~/dev       Scan a custom root directory\n\
-              wai ls --depth 2          Limit scan to 2 levels deep"
+              wai ls --depth 2          Limit scan to 2 levels deep\n\
+              wai ls --timeout 5        Stop scanning after 5 seconds"
     )]
     Ls {
         /// Root directory to scan (default: $HOME)
@@ -241,6 +242,10 @@ pub enum Commands {
         /// Maximum scan depth (default: 3)
         #[arg(short, long)]
         depth: Option<usize>,
+
+        /// Stop scanning after this many seconds and show results found so far (default: 10)
+        #[arg(short, long, default_value_t = 10)]
+        timeout: u64,
     },
 
     /// Ask why a decision was made (LLM-powered reasoning oracle)

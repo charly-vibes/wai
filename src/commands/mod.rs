@@ -75,7 +75,7 @@ pub fn run(cli: Cli) -> Result<()> {
         Some(Commands::Pipeline(cmd)) => pipeline::run(cmd),
         Some(Commands::Close { project }) => close::run(project),
         Some(Commands::Prime { project }) => prime::run(project),
-        Some(Commands::Ls { root, depth }) => ls::run(root, depth),
+        Some(Commands::Ls { root, depth, timeout }) => ls::run(root, depth, timeout),
         Some(Commands::Tutorial) => crate::tutorial::run(),
         Some(Commands::Why {
             query,
