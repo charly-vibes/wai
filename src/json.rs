@@ -120,6 +120,38 @@ pub struct PluginCommandInfo {
     pub read_only: bool,
 }
 
+#[derive(Debug, Serialize)]
+pub struct ShowEntry {
+    pub name: String,
+    pub phase: Option<String>,
+    pub artifact_count: usize,
+    pub path: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ShowPayload {
+    pub projects: Vec<ShowEntry>,
+    pub areas: Vec<ShowEntry>,
+    pub resources: Vec<ShowEntry>,
+    pub archives: Vec<ShowEntry>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ShowItemPayload {
+    pub name: String,
+    pub category: String,
+    pub phase: Option<String>,
+    pub path: String,
+    pub contents: Vec<ShowItemEntry>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ShowItemEntry {
+    pub name: String,
+    pub kind: String,
+    pub item_count: Option<usize>,
+}
+
 #[allow(dead_code)]
 pub fn sanitize_path(path: &std::path::Path, project_root: &std::path::Path) -> String {
     if let Ok(relative) = path.strip_prefix(project_root) {
