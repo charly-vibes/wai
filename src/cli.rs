@@ -371,12 +371,14 @@ pub enum Commands {
               wai pipeline run review --topic=my-feature\n\
               wai pipeline advance <run-id>\n\
               wai pipeline status review\n\n\
-            ENVIRONMENT\n\
-              WAI_PIPELINE_RUN  When set, `wai add` commands automatically tag the\n\
-                                artifact with pipeline-run:<run-id>. Set this to the\n\
-                                run ID output by `wai pipeline run`.\n\n\
-              Example:\n\
-                export WAI_PIPELINE_RUN=review-2026-02-25-my-feature"
+            STATE FILE\n\
+              `wai pipeline run` writes the active run ID to .wai/.pipeline-run so\n\
+              `wai add` picks it up automatically — no export needed. The file is\n\
+              removed when `wai pipeline advance` completes the last stage.\n\n\
+            ENVIRONMENT (optional override)\n\
+              WAI_PIPELINE_RUN  When set, overrides the state file. Useful for running\n\
+                                `wai add` from a subshell or script:\n\
+                                  export WAI_PIPELINE_RUN=review-2026-02-25-my-feature"
     )]
     #[command(subcommand)]
     Pipeline(PipelineCommands),

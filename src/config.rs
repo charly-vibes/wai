@@ -26,6 +26,13 @@ pub const CONTEXT_DIR: &str = "context";
 /// Pipeline definitions and run state within resources/
 pub const PIPELINES_DIR: &str = "pipelines";
 
+/// Active pipeline run state file (`.wai/.pipeline-run`).
+///
+/// Written by `wai pipeline run` and removed by `wai pipeline advance` when
+/// the last stage completes. Similar to `.git/HEAD` — a single-line file
+/// containing just the run ID. Not committed (listed in `.wai/.gitignore`).
+pub const PIPELINE_RUN_FILE: &str = ".pipeline-run";
+
 /// Per-project subdirectories
 pub const RESEARCH_DIR: &str = "research";
 pub const PLANS_DIR: &str = "plans";
@@ -322,4 +329,41 @@ pub fn mark_tutorial_seen() -> Result<(), WaiError> {
     let mut config = UserConfig::load()?;
     config.mark_tutorial_seen();
     config.save()
+}
+
+/// Get the path to the active pipeline run state file (`.wai/.pipeline-run`).
+pub fn pipeline_run_file(project_root: &Path) -> PathBuf {
+    wai_dir(project_root).join(PIPELINE_RUN_FILE)
+}
+
+/// Write a run ID to the active pipeline run state file.
+///
+/// Creates or overwrites `.wai/.pipeline-run` with just the run ID (no trailing newline).
+/// This mirrors how `.git/HEAD` stores a simple reference string.
+pub fn write_pipeline_run_state(project_root: &Path, run_id: &str) -> Result<(), WaiError> {
+    let path = pipeline_run_file(project_root);
+    std::fs::write(&path, run_id)?;
+    Ok(())
+}
+
+/// Remove the active pipeline run state file, if it exists.
+///
+/// Called when `wai pipeline advance` completes the last stage.
+/// Silently succeeds if the file is already absent.
+pub fn clear_pipeline_run_state(project_root: &Path) -> Result<(), WaiError> {
+    let path = pipeline_run_file(project_root);
+    if path.exists() {
+        std::fs::remove_file(&path)?;
+    }
+    Ok(())
+}
+
+/// Read the active pipeline run ID from the state file, if present.
+///
+/// Returns `None` when the file does not exist or its contents are empty.
+pub fn read_pipeline_run_state(project_root: &Path) -> Option<String> {
+    let path = pipeline_run_file(project_root);
+    let content = std::fs::read_to_string(&path).ok()?;
+    let trimmed = content.trim().to_string();
+    if trimmed.is_empty() { None } else { Some(trimmed) }
 }

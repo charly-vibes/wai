@@ -5,7 +5,8 @@ use std::io::IsTerminal;
 
 use crate::cli::AddCommands;
 use crate::config::{
-    DESIGNS_DIR, PLANS_DIR, RESEARCH_DIR, archives_dir, areas_dir, projects_dir, resources_dir,
+    DESIGNS_DIR, PLANS_DIR, RESEARCH_DIR, archives_dir, areas_dir, projects_dir,
+    read_pipeline_run_state, resources_dir,
 };
 use crate::context::{current_context, require_safe_mode};
 use crate::error::WaiError;
@@ -45,7 +46,7 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             let mut file_content = String::new();
 
             // Build combined tags: user-supplied + pipeline-run auto-tag
-            let all_tags = build_tags(tags.as_deref());
+            let all_tags = build_tags(tags.as_deref(), &project_root);
             if !all_tags.is_empty() {
                 file_content.push_str("---\n");
                 file_content.push_str(&format!("tags: [{}]\n", all_tags.join(", ")));
@@ -133,7 +134,7 @@ pub fn run(cmd: AddCommands) -> Result<()> {
 
             let mut file_content = String::new();
 
-            let all_tags = build_tags(tags.as_deref());
+            let all_tags = build_tags(tags.as_deref(), &project_root);
             if !all_tags.is_empty() {
                 file_content.push_str("---\n");
                 file_content.push_str(&format!("tags: [{}]\n", all_tags.join(", ")));
@@ -175,7 +176,7 @@ pub fn run(cmd: AddCommands) -> Result<()> {
 
             let mut file_content = String::new();
 
-            let all_tags = build_tags(tags.as_deref());
+            let all_tags = build_tags(tags.as_deref(), &project_root);
             if !all_tags.is_empty() {
                 file_content.push_str("---\n");
                 file_content.push_str(&format!("tags: [{}]\n", all_tags.join(", ")));
@@ -281,8 +282,12 @@ fn get_content(content: Option<&str>, file: Option<&str>) -> Result<String> {
 }
 
 /// Build the final tags list: user-supplied tags merged with the auto-injected
-/// `pipeline-run:<id>` tag when `WAI_PIPELINE_RUN` is set in the environment.
-fn build_tags(user_tags: Option<&str>) -> Vec<String> {
+/// `pipeline-run:<id>` tag when an active pipeline run can be resolved.
+///
+/// Resolution order (first non-empty value wins):
+///   1. `WAI_PIPELINE_RUN` environment variable (backwards-compatible).
+///   2. `.wai/.pipeline-run` state file (written by `wai pipeline run`).
+fn build_tags(user_tags: Option<&str>, project_root: &std::path::Path) -> Vec<String> {
     let mut tags: Vec<String> = Vec::new();
 
     if let Some(t) = user_tags {
@@ -293,11 +298,15 @@ fn build_tags(user_tags: Option<&str>) -> Vec<String> {
         );
     }
 
-    if let Ok(run_id) = std::env::var("WAI_PIPELINE_RUN") {
-        let run_id = run_id.trim().to_string();
-        if !run_id.is_empty() {
-            tags.push(format!("pipeline-run:{}", run_id));
-        }
+    // Resolve active pipeline run: env var first (backwards compat), then state file.
+    let active_run = std::env::var("WAI_PIPELINE_RUN")
+        .ok()
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+        .or_else(|| read_pipeline_run_state(project_root));
+
+    if let Some(run_id) = active_run {
+        tags.push(format!("pipeline-run:{}", run_id));
     }
 
     tags

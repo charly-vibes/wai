@@ -7,7 +7,10 @@ use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
 use crate::cli::PipelineCommands;
-use crate::config::{SKILLS_DIR, agent_config_dir, pipelines_dir, wai_dir};
+use crate::config::{
+    SKILLS_DIR, agent_config_dir, clear_pipeline_run_state, pipelines_dir, wai_dir,
+    write_pipeline_run_state,
+};
 use crate::context::require_safe_mode;
 
 use super::require_project;
@@ -152,13 +155,21 @@ fn cmd_run(name: &str, topic: &str) -> Result<()> {
         .map_err(|e| miette::miette!("Failed to serialize run: {}", e))?;
     fs::write(&run_path, yaml).into_diagnostic()?;
 
+    // Store active run ID in .wai/.pipeline-run so `wai add` picks it up
+    // without requiring the user to export WAI_PIPELINE_RUN manually.
+    write_pipeline_run_state(&project_root, &run_id)
+        .map_err(|e| miette::miette!("Failed to write pipeline run state: {}", e))?;
+
     // Output
     println!();
     println!("  {} Pipeline run started", "◆".cyan());
     println!();
     println!("  Run ID: {}", run_id.bold());
+    println!(
+        "  Active run stored in .wai/.pipeline-run — `wai add` will auto-tag artifacts."
+    );
     println!();
-    println!("  Set the environment variable so `wai add` auto-tags artifacts:");
+    println!("  (Optional) Also export for subshells:");
     println!("    export WAI_PIPELINE_RUN={}", run_id);
     println!();
     print_stage_hint(&run, 0);
@@ -206,6 +217,10 @@ fn cmd_advance(run_id: &str) -> Result<()> {
     }
 
     if run.current_stage >= run.stages.len() {
+        // Clear the active run state file — the pipeline is done.
+        clear_pipeline_run_state(&project_root)
+            .map_err(|e| miette::miette!("Failed to clear pipeline run state: {}", e))?;
+
         println!();
         println!("  {} All stages complete!", "◆".green());
         println!(
@@ -592,7 +607,10 @@ fn print_stage_hint(run: &PipelineRun, stage_idx: usize) {
         stage.skill.bold(),
         stage.artifact.dimmed()
     );
-    println!("    Set env:   export WAI_PIPELINE_RUN={}", run.run_id);
+    println!(
+        "    Run ID:    {}  (auto-tagged via .wai/.pipeline-run)",
+        run.run_id
+    );
     println!("    When done: wai pipeline advance {}", run.run_id);
     println!();
 }
