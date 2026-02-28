@@ -786,7 +786,9 @@ fn search_with_limit() {
         .args(["search", "match", "-n", "2"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("2+ matches"));
+        // header shows total count; truncation notice goes to stderr
+        .stdout(predicate::str::contains("4 matches"))
+        .stderr(predicate::str::contains("Showing first 2 of 4"));
 }
 
 #[test]
@@ -2948,7 +2950,8 @@ fn why_auto_fallback_to_search_when_no_llm_available() {
         .assert()
         .success()
         // warning goes to stderr; fallback search results go to stdout
-        .stderr(predicate::str::contains("No LLM available"));
+        // message varies based on whether Ollama/claude is installed
+        .stderr(predicate::str::contains("Falling back to"));
 }
 
 /// 7.6 — A file-path query in a non-git repository does not crash.

@@ -179,6 +179,15 @@ fn check_pending_resume(
     // Fresh: resolve the handoff path from the file contents.
     let hp = read_pending_resume(project_dir)?;
     let date = parse_handoff_date_strict(&hp)?;
+
+    // A pending-resume from a previous day is stale even if the file is
+    // recently written (e.g. during tests or clock skew).
+    let today = Local::now().date_naive();
+    if date < today {
+        let _ = std::fs::remove_file(pending_path);
+        return None;
+    }
+
     let (_, snippet) = read_handoff_summary(&hp);
     if snippet.is_empty() {
         return None;

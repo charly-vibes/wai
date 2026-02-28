@@ -424,9 +424,9 @@ Add tags to research artifacts for better organization:
 wai add research "API findings" --tags "api,security,authentication"
 ```
 
-**Tag Format:** Comma-separated alphanumeric strings. Avoid spaces around commas.
+**Tag Format:** Comma-separated alphanumeric strings. Spaces around commas are trimmed automatically.
 - ✅ Good: `"api,security,v2"`
-- ❌ Bad: `"api, security, v2"` (extra spaces)
+- ✅ Good: `"api, security, v2"` (spaces trimmed)
 - ❌ Bad: `"api security"` (use comma separator)
 
 Tags are stored in YAML frontmatter and searchable via `wai search`.

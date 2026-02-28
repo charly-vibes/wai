@@ -56,7 +56,7 @@ pub enum LlmError {
 pub fn resolve_model_alias(alias: &str) -> &str {
     match alias {
         "haiku" => "claude-haiku-3-5-20251001",
-        "sonnet" => "claude-sonnet-4-5",
+        "sonnet" => "claude-sonnet-4-6",
         other => other,
     }
 }
@@ -662,7 +662,7 @@ mod tests {
 
     #[test]
     fn alias_sonnet_resolves_to_canonical_id() {
-        assert_eq!(resolve_model_alias("sonnet"), "claude-sonnet-4-5");
+        assert_eq!(resolve_model_alias("sonnet"), "claude-sonnet-4-6");
     }
 
     #[test]

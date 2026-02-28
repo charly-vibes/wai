@@ -33,7 +33,7 @@ Detected workflow tools:
 |------|------|---------|
 | Record reasoning/research | wai | `wai add research "findings"` |
 | Capture design decisions | wai | `wai add design "architecture choice"` |
-| Session context transfer | wai | `wai handoff create <project>` |
+| Session context transfer | wai | `wai close` |
 | Track work items/bugs | beads | `bd create --title="..." --type=task` |
 | Find available work | beads | `bd ready` |
 | Manage dependencies | beads | `bd dep add <blocked> <blocker>` |
@@ -90,7 +90,7 @@ When beads and openspec are both active, keep them in sync:
 Before saying "done", run this checklist:
 
 ```
-[ ] wai handoff create <project>   # capture context for next session
+[ ] wai close                      # create handoff + set pending-resume signal
 [ ] bd close <id>                  # close completed issues; also close parent epic if last sub-task
 [ ] bd sync --from-main            # pull beads updates
 [ ] openspec tasks.md — mark completed tasks [x]
@@ -98,20 +98,19 @@ Before saying "done", run this checklist:
 [ ] git add <files> && git commit  # commit code + handoff
 ```
 
-### Autonomous Loop
+`wai close` (not `wai handoff create`) is the canonical end-of-session command — it both
+creates the handoff file and writes the `.pending-resume` signal that makes `wai prime`
+show ⚡ RESUMING next session.
 
-One task per session. The resume loop:
+### Context Cycling (Autonomous Loop)
 
-1. `wai prime` — orient (shows ⚡ RESUMING if mid-task)
-2. Work on the single task
-3. `wai close` — capture state (run this before every `/clear`)
-4. `git add <files> && git commit`
-5. `/clear` — fresh context
+When context reaches ~40%, cycle with `/clear` rather than starting a new session:
 
-→ Next session: `wai prime` shows RESUMING with exact next steps.
+1. `wai close` — capture state before clearing
+2. `git add <files> && git commit`
+3. `/clear` — fresh context
 
-When context reaches ~40%: run `wai close`, then `/clear`.
-Do NOT skip `wai close` — it enables resume detection.
+→ Next run: `wai prime` detects the pending-resume and shows RESUMING with exact next steps.
 
 ## Quick Reference
 
@@ -125,7 +124,7 @@ wai search "query"            # Search across artifacts
 wai why "why use TOML?"       # Ask why (LLM-powered oracle)
 wai why src/config.rs         # Explain a file's history
 wai reflect                   # Synthesize project patterns into CLAUDE.md
-wai handoff create <project>  # Session handoff
+wai close                     # Session handoff + pending-resume signal
 wai phase show                # Current phase
 wai doctor                    # Workspace health
 ```

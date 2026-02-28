@@ -46,9 +46,22 @@ pub fn run(
         let query_lower = query.to_lowercase();
         Box::new(move |line: &str| {
             let lower = line.to_lowercase();
-            lower
-                .find(&query_lower)
-                .map(|pos| (pos, pos + query_lower.len()))
+            let lower_start = lower.find(&query_lower)?;
+            let lower_end = lower_start + query_lower.len();
+            // lower_start/lower_end are byte offsets in the *lowercased* string.
+            // Some chars change byte length when lowercased (e.g. 'İ' 2 bytes → 'i' 1 byte),
+            // so convert via char count to get valid byte offsets in the original line.
+            let char_start = lower[..lower_start].chars().count();
+            let char_end = lower[..lower_end].chars().count();
+            let byte_start = line
+                .char_indices()
+                .nth(char_start)
+                .map_or(line.len(), |(i, _)| i);
+            let byte_end = line
+                .char_indices()
+                .nth(char_end)
+                .map_or(line.len(), |(i, _)| i);
+            Some((byte_start, byte_end))
         })
     };
 
@@ -261,7 +274,11 @@ fn extract_context_lines(content: &str, line_num: usize, context: usize) -> Vec<
 }
 
 fn highlight_match(line: &str, start: usize, end: usize) -> String {
-    if start < line.len() && end <= line.len() {
+    if start <= line.len()
+        && end <= line.len()
+        && line.is_char_boundary(start)
+        && line.is_char_boundary(end)
+    {
         let before = &line[..start];
         let matched = &line[start..end];
         let after = &line[end..];
@@ -293,6 +310,22 @@ mod tests {
         let content = "---\nnot: valid yaml: [[\n---\ncontent";
         // Should not panic, just return empty or whatever was parseable
         let _ = parse_frontmatter_tags(content);
+    }
+
+    #[test]
+    fn highlight_match_multibyte_no_panic() {
+        // 'İ' (U+0130) is 2 bytes but lowercases to 'i' (1 byte),
+        // so byte offsets from the lowercased string are wrong for the original.
+        // This must not panic.
+        let line = "İstanbul";
+        let result = highlight_match(line, 0, 1);
+        // Falls back to plain line when boundaries are invalid
+        assert!(!result.is_empty());
+
+        // ASCII still highlights correctly
+        let line2 = "hello world";
+        let result2 = highlight_match(line2, 6, 11);
+        assert!(result2.contains("world"));
     }
 
     #[test]
