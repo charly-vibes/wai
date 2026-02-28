@@ -420,7 +420,7 @@ pub enum AddCommands {
         file: Option<String>,
 
         /// Associate with a project
-        #[arg(long)]
+        #[arg(short, long)]
         project: Option<String>,
 
         /// Comma-separated tags written as YAML frontmatter
@@ -438,7 +438,7 @@ pub enum AddCommands {
         file: Option<String>,
 
         /// Associate with a project
-        #[arg(long)]
+        #[arg(short, long)]
         project: Option<String>,
 
         /// Comma-separated tags written as YAML frontmatter
