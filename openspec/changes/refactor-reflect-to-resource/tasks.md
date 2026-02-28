@@ -10,10 +10,16 @@
 
 ## Phase 2: Write to Resource File
 
-- [ ] 2.1 Rename `inject_reflect_block()` in `src/managed_block.rs` to
-  `write_reflect_resource()` — write to the resource file path, not a target file
+- [ ] 2.1 Add `write_reflect_resource(project_root, project_name, content, handoff_count)`
+  to `src/commands/reflect.rs` (NOT managed_block.rs — this writes a filesystem
+  resource file, not a managed block; project_name is the dir name string already
+  available in run())
 - [ ] 2.2 Add suffix logic: if `<date>-<project>.md` already exists, try `-2`, `-3`, etc.
-- [ ] 2.3 Add YAML front-matter writer: `date`, `project`, `sessions_analyzed`, `type: reflection`
+- [ ] 2.3 Extend `ReflectContext` struct with `handoff_count: usize` (count of handoff
+  files loaded); populate in `gather_reflect_context()`
+- [ ] 2.3a Add YAML front-matter writer: `date`, `project`, `sessions_analyzed` (=
+  handoff_count from 2.3), `type: reflection` — note: sessions_analyzed is for
+  human inspection only; no wai command reads it back
 - [ ] 2.4 Update `run()` in `src/commands/reflect.rs` to call `write_reflect_resource()`
   instead of `inject_reflect_block()` — remove all writes to CLAUDE.md/AGENTS.md
 - [ ] 2.5 Update `--dry-run` path to show the resource file path that would be written
@@ -21,14 +27,15 @@
 
 ## Phase 3: Migration
 
-- [ ] 3.1 In `run()`, detect existing `WAI:REFLECT:START/END` block in CLAUDE.md/AGENTS.md
-- [ ] 3.2 If detected and `.wai/resources/reflections/` does not exist:
-  - extract block content
-  - write to `<today>-<project>-migrated.md` with front-matter `type: reflection-migrated`
-  - replace the old block with the slim `WAI:REFLECT:REF:START/END` block
-  - print migration notice
-- [ ] 3.3 If detected but reflections dir already exists: remove the old block and
-  replace with REF block (already migrated previously)
+- [ ] 3.1 In `run()`, scan all target files (CLAUDE.md, AGENTS.md if present) for
+  existing `WAI:REFLECT:START/END` blocks
+- [ ] 3.2 Apply unified migration rule when any old block is detected:
+  - If no `*-migrated.md` exists in `.wai/resources/reflections/`: extract
+    content from the first file that has the block, write to
+    `<today>-<project>-migrated.md` with front-matter `type: reflection-migrated`
+  - Replace `WAI:REFLECT:START/END` block in ALL target files that have it with
+    the slim `WAI:REFLECT:REF:START/END` block
+  - Print migration notice once regardless of how many files were migrated
 
 ## Phase 4: Managed Block Updates
 
@@ -37,8 +44,8 @@
 - [ ] 4.2 Add `wai_reflect_ref_content()` function that returns the slim reference block text
 - [ ] 4.3 Add search-before-research instruction to `wai_block_content()` in
   `src/managed_block.rs` — gated on `has_companions`, placed after TDD disclaimer
-- [ ] 4.4 Update `wai init` to call `inject_managed_block()` (which now handles both
-  `WAI:START/END` and `WAI:REFLECT:REF:START/END`)
+- [ ] 4.4 No change needed at wai init call site — `inject_managed_block()` is already
+  called by `wai init`; extending it internally (4.1) is sufficient
 - [ ] 4.5 Update this repo's own `CLAUDE.md` by running `wai init` (or manually) after
   implementing 4.1–4.4
 
@@ -70,3 +77,7 @@
   by gather_reflect_context; adapt as needed)
 - [ ] 7.3 Update `docs/src/commands.md` — reflect section now describes resource output
 - [ ] 7.4 Update `README.md` if it mentions the REFLECT block injection behavior
+- [ ] 7.5 Run `wai init` on this repo to inject `WAI:REFLECT:REF` block into
+  CLAUDE.md/AGENTS.md, then run `wai reflect` to migrate the existing
+  `WAI:REFLECT` block (committed earlier this session) to
+  `.wai/resources/reflections/`

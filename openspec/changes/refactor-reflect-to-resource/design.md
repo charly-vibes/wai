@@ -51,14 +51,19 @@ separate.
 ### D4: Backwards compatibility for existing WAI:REFLECT blocks
 
 Existing repos have `<!-- WAI:REFLECT:START -->` content in their CLAUDE.md.
-On the next `wai reflect` run, the tool:
-1. Detects the old block
-2. Migrates its content to a dated resource file (`...-migrated.md`)
-3. Replaces the block with the slim REF block
-4. Prints a one-time migration notice
+On the next `wai reflect` run, the tool applies this unified migration rule:
 
-This migration runs only once (when the old block is present but no
-`.wai/resources/reflections/` directory exists yet).
+**If a `WAI:REFLECT:START/END` block is detected in any target file:**
+1. If no migrated resource file exists yet: extract the block content and write
+   it to `.wai/resources/reflections/<today>-<project>-migrated.md`
+2. If multiple target files have old blocks (e.g. both CLAUDE.md and AGENTS.md),
+   migrate content from the first detected file only (content is identical)
+3. Always replace the old `WAI:REFLECT:START/END` block in ALL target files
+   with the slim `WAI:REFLECT:REF:START/END` block
+4. Print a migration notice
+
+The REF block is always injected regardless of whether the reflections dir
+already existed — the important thing is removing the old embedded block.
 
 ### D5: Where the "search before researching" instruction lives
 
@@ -99,10 +104,11 @@ context before starting research or creating tickets.
 
 | Function | Change |
 |---|---|
-| `run()` | Write to resource file instead of target file; detect+migrate old block |
-| `gather_reflect_context()` | Also read `.wai/resources/reflections/` files as additional context tier |
-| `inject_reflect_block()` | Rename/repurpose to `write_reflect_resource()` |
-| `read_reflect_block()` | Read from resource dir (latest file) instead of target file |
+| `run()` | Write to resource file instead of target file; detect+migrate old block; pass project_name to write_reflect_resource() |
+| `gather_reflect_context()` | Also read `.wai/resources/reflections/` files as additional context tier; extend ReflectContext with handoff_count: usize |
+| `inject_reflect_block()` (in managed_block.rs) | Remove; replaced by `write_reflect_resource()` in reflect.rs |
+| `read_reflect_block()` (in managed_block.rs) | Keep only if needed for migration detection; adapt for gather_reflect_context |
+| `write_reflect_resource()` (new, in reflect.rs) | Write dated resource file with YAML front-matter; project_name: &str parameter derived from project dir name |
 
 ## Impact on `src/managed_block.rs`
 

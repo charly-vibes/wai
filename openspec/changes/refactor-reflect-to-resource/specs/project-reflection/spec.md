@@ -26,10 +26,17 @@ or `AGENTS.md`.
 
 #### Scenario: Resource file is searchable
 
-- **WHEN** user runs `wai search "<topic>"`
+- **WHEN** user runs `wai search "<topic>"` (without `--project`)
 - **THEN** reflection files in `.wai/resources/reflections/` are included in
-  search results alongside project artifacts
-- **AND** results display the reflection date and project name as context
+  search results alongside project artifacts (wai search without --project
+  scans the entire `.wai/` tree, which includes resources/)
+- **AND** results display the reflection date and project name via the file path
+
+- **WHEN** user runs `wai search "<topic>" --project <name>`
+- **THEN** search is scoped to that project's artifact directories only
+- **AND** reflection files in `.wai/resources/reflections/` are NOT included
+- **NOTE** The WAI:REFLECT:REF block instructs agents to use bare
+  `wai search "<topic>"` (without --project) to ensure reflections are found
 
 #### Scenario: Previous reflections included as context
 
@@ -75,13 +82,17 @@ mandatory search instruction.
 
 - **WHEN** user runs `wai reflect`
 - **AND** `CLAUDE.md` or `AGENTS.md` contains an existing `WAI:REFLECT:START/END` block
-- **AND** no `.wai/resources/reflections/` directory exists yet
-- **THEN** the system reads the existing block content
-- **AND** writes it to `.wai/resources/reflections/<today>-<project>-migrated.md`
-- **AND** replaces the `WAI:REFLECT:START/END` block in the target file with the
-  slim `WAI:REFLECT:REF:START/END` block (same content as `wai init` would inject)
+- **THEN** the system applies this unified rule:
+  - If no `<project>-migrated.md` resource file exists yet: read the block
+    content from the first target file that has it and write it to
+    `.wai/resources/reflections/<today>-<project>-migrated.md`
+  - If multiple target files have old blocks (e.g. both CLAUDE.md and AGENTS.md),
+    only the first detected file's content is migrated (content is expected to
+    be identical)
+  - Replace the `WAI:REFLECT:START/END` block in ALL target files that have it
+    with the slim `WAI:REFLECT:REF:START/END` block
 - **AND** prints: "Migrated existing REFLECT block to .wai/resources/reflections/"
-- **AND** proceeds with the normal reflect run (writing a new resource file)
+- **AND** proceeds with the normal reflect run (writing a new dated resource file)
 
 ### Requirement: Search-Before-Research Instruction in Managed Block
 
