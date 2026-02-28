@@ -317,6 +317,156 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 "Artifact lookup uses pipeline-run:<id> frontmatter tag",
             ],
         }),
+        "close" => Some(HelpContent {
+            about: "Wrap up a session: create a handoff and show next steps",
+            examples: &[
+                ("wai close", "Close current session (auto-detects project)"),
+                ("wai close --project my-app", "Close a specific project's session"),
+            ],
+            options: &[],
+            advanced_options: &["-p, --project <NAME>    Project name (auto-detected when only one exists)"],
+            env_vars: &[("NO_COLOR", "Disable colored output")],
+            internals: &[
+                "Creates a handoff artifact under .wai/projects/<name>/",
+                "Writes .wai/.pending-resume signal for wai prime to detect",
+            ],
+        }),
+        "prime" => Some(HelpContent {
+            about: "Orient yourself at session start: project, phase, last handoff, and suggested next step",
+            examples: &[
+                ("wai prime", "Orient for current session (auto-detects project)"),
+                ("wai prime --project my-app", "Orient for a specific project"),
+            ],
+            options: &[],
+            advanced_options: &["-p, --project <NAME>    Project name (auto-detected when only one exists)"],
+            env_vars: &[("NO_COLOR", "Disable colored output")],
+            internals: &[
+                "Detects .wai/.pending-resume and shows RESUMING banner when present",
+                "Reads the most recent handoff artifact for next-step suggestions",
+            ],
+        }),
+        "why" => Some(HelpContent {
+            about: "Ask why a decision was made (LLM-powered reasoning oracle)",
+            examples: &[
+                ("wai why \"why use TOML for config?\"", "Ask a natural language question"),
+                ("wai why src/config.rs", "Explain a specific file's history"),
+                ("wai why --no-llm \"auth design\"", "Force fallback to wai search"),
+            ],
+            options: &[],
+            advanced_options: &[
+                "--no-llm    Skip LLM and fall back to wai search",
+                "--json      Output machine-readable JSON",
+            ],
+            env_vars: &[
+                ("NO_COLOR", "Disable colored output"),
+                ("ANTHROPIC_API_KEY", "API key for Claude LLM backend"),
+            ],
+            internals: &[
+                "LLM backend configured via [llm] section in .wai/config.toml",
+                "Backends: claude, claude-cli, agent (auto-detect), ollama",
+                "Falls back to wai search when no LLM is available",
+            ],
+        }),
+        "reflect" => Some(HelpContent {
+            about: "Synthesize session context into project-specific AI guidance",
+            examples: &[
+                ("wai reflect", "Synthesize and inject into CLAUDE.md/AGENTS.md"),
+                ("wai reflect --dry-run", "Preview changes without writing"),
+                ("wai reflect --conversation chat.md", "Include conversation transcript"),
+                ("wai reflect --output agents.md", "Write only to AGENTS.md"),
+            ],
+            options: &[],
+            advanced_options: &[
+                "-p, --project <NAME>         Project name (auto-detected when only one exists)",
+                "-c, --conversation <FILE>    Path to conversation transcript (richest context)",
+                "-o, --output <TARGET>        Output target: claude.md, agents.md, or both",
+                "    --dry-run                Show what would change without writing",
+                "-y, --yes                    Skip confirmation prompt",
+            ],
+            env_vars: &[
+                ("NO_COLOR", "Disable colored output"),
+                ("ANTHROPIC_API_KEY", "API key for Claude LLM backend"),
+            ],
+            internals: &[
+                "Injects result into CLAUDE.md/AGENTS.md as a WAI:REFLECT block",
+                "Context sources (ranked): conversation > handoffs > research/design/plan",
+                "Reuses [llm] config from .wai/config.toml",
+            ],
+        }),
+        "ls" => Some(HelpContent {
+            about: "List all wai projects across workspaces",
+            examples: &[
+                ("wai ls", "Scan $HOME for wai workspaces (default depth 3)"),
+                ("wai ls --root ~/dev", "Scan a custom root directory"),
+                ("wai ls --depth 2", "Limit scan to 2 levels deep"),
+                ("wai ls --timeout 5", "Stop scanning after 5 seconds"),
+            ],
+            options: &[],
+            advanced_options: &[
+                "-r, --root <PATH>    Root directory to scan (default: $HOME)",
+                "-d, --depth <N>      Maximum scan depth (default: 3)",
+                "-t, --timeout <S>    Stop scanning after this many seconds (default: 10)",
+            ],
+            env_vars: &[("NO_COLOR", "Disable colored output")],
+            internals: &[
+                "Walks the filesystem looking for .wai/ directories",
+                "Reads phase and beads issue counts from each workspace",
+            ],
+        }),
+        "tutorial" => Some(HelpContent {
+            about: "Run the interactive quickstart tutorial",
+            examples: &[("wai tutorial", "Start the interactive quickstart tutorial")],
+            options: &[],
+            advanced_options: &[],
+            env_vars: &[("NO_COLOR", "Disable colored output")],
+            internals: &["Guides through init, new project, add artifact, and phase commands"],
+        }),
+        "resource" => Some(HelpContent {
+            about: "Manage resources (skills, rules, context)",
+            examples: &[
+                ("wai resource add skill my-skill", "Add a new skill"),
+                ("wai resource add skill issue/gather --template gather", "Add skill from template"),
+                ("wai resource list skills", "List all skills"),
+                ("wai resource install issue/gather --global", "Install skill globally"),
+                ("wai resource export issue/gather --output skills.tar.gz", "Export skills to archive"),
+                ("wai resource import skills --from ./other", "Import skills from directory"),
+                ("wai resource import archive skills.tar.gz", "Import skills from archive"),
+            ],
+            options: &[],
+            advanced_options: &[
+                "add skill --template <TPL>       Built-in templates: gather, create, tdd, rule-of-5",
+                "install   --global               Install to ~/.wai/resources/skills/",
+                "install   --from-repo <PATH>     Copy skill from another repository",
+                "export    --output <FILE>        Output tar.gz archive path",
+                "import archive --yes             Overwrite existing skills without prompting",
+            ],
+            env_vars: &[("NO_COLOR", "Disable colored output")],
+            internals: &[
+                "Skills stored in .wai/resources/agent-config/skills/<name>/SKILL.md",
+                "Hierarchical skill names use one '/' separator (e.g. issue/gather)",
+                "Global skills stored in ~/.wai/resources/skills/",
+            ],
+        }),
+        "way" => Some(HelpContent {
+            about: "Show repo hygiene and agent workflow conventions — skills, rules, best practices",
+            examples: &[
+                ("wai way", "Show hygiene status for the current repo"),
+                ("wai way --fix skills", "Scaffold missing recommended agent skills"),
+                ("wai way --json", "Machine-readable output for CI integration"),
+            ],
+            options: &[],
+            advanced_options: &[
+                "--fix <CHECK>    Scaffold missing items for a check (e.g. skills)",
+                "--json           Output machine-readable JSON",
+            ],
+            env_vars: &[("NO_COLOR", "Disable colored output")],
+            internals: &[
+                "Covers 11 areas: task runners, git hooks, editor config, docs, AI instructions,",
+                "  LLM context, agent skills, CI/CD, dev containers, and release pipelines",
+                "Works in any directory — a wai workspace is not required",
+                "Always exits successfully; shows recommendations without enforcing them",
+            ],
+        }),
         _ => None,
     }
 }
