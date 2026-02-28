@@ -93,7 +93,7 @@ fn cmd_create(name: &str, stages_str: &str) -> Result<()> {
         stages,
     };
 
-    let yaml = serde_yaml::to_string(&definition)
+    let yaml = serde_yml::to_string(&definition)
         .map_err(|e| miette::miette!("Failed to serialize pipeline: {}", e))?;
     fs::write(&def_path, yaml).into_diagnostic()?;
 
@@ -148,7 +148,7 @@ fn cmd_run(name: &str, topic: &str) -> Result<()> {
     fs::create_dir_all(&runs_dir).into_diagnostic()?;
 
     let run_path = runs_dir.join(format!("{}.yml", run_id));
-    let yaml = serde_yaml::to_string(&run)
+    let yaml = serde_yml::to_string(&run)
         .map_err(|e| miette::miette!("Failed to serialize run: {}", e))?;
     fs::write(&run_path, yaml).into_diagnostic()?;
 
@@ -189,7 +189,7 @@ fn cmd_advance(run_id: &str) -> Result<()> {
     run.current_stage += 1;
 
     // Persist
-    let yaml = serde_yaml::to_string(&run)
+    let yaml = serde_yml::to_string(&run)
         .map_err(|e| miette::miette!("Failed to serialize run: {}", e))?;
     fs::write(&run_path, yaml).into_diagnostic()?;
 
@@ -250,7 +250,7 @@ fn cmd_status(name: &str, run_filter: Option<&str>) -> Result<()> {
             continue;
         }
         if let Ok(content) = fs::read_to_string(&path)
-            && let Ok(run) = serde_yaml::from_str::<PipelineRun>(&content)
+            && let Ok(run) = serde_yml::from_str::<PipelineRun>(&content)
         {
             if let Some(filter) = run_filter
                 && run.run_id != filter
@@ -460,7 +460,7 @@ fn load_pipeline_definition(project_root: &Path, name: &str) -> Result<PipelineD
         );
     }
     let content = fs::read_to_string(&path).into_diagnostic()?;
-    serde_yaml::from_str(&content)
+    serde_yml::from_str(&content)
         .map_err(|e| miette::miette!("Failed to parse pipeline '{}': {}", name, e))
 }
 
@@ -486,7 +486,7 @@ fn find_run(project_root: &Path, run_id: &str) -> Result<(PipelineRun, PathBuf)>
         })
     {
         if let Ok(content) = fs::read_to_string(entry.path())
-            && let Ok(run) = serde_yaml::from_str::<PipelineRun>(&content)
+            && let Ok(run) = serde_yml::from_str::<PipelineRun>(&content)
             && run.run_id == run_id
         {
             return Ok((run, entry.path().to_path_buf()));

@@ -181,7 +181,7 @@ pub fn detect_plugins(project_root: &Path) -> Vec<ActivePlugin> {
 
             if is_yaml
                 && let Ok(content) = std::fs::read_to_string(&path)
-                && let Ok(def) = serde_yaml::from_str::<PluginDef>(&content)
+                && let Ok(def) = serde_yml::from_str::<PluginDef>(&content)
             {
                 let detected = if let Some(ref detector) = def.detector {
                     project_root.join(&detector.path).exists()

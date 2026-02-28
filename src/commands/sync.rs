@@ -30,7 +30,7 @@ pub fn run(status_only: bool, dry_run: bool) -> Result<()> {
 
     let content = std::fs::read_to_string(&projections_path).into_diagnostic()?;
     let config: ProjectionsConfig =
-        serde_yaml::from_str(&content).map_err(|e| crate::error::WaiError::ConfigError {
+        serde_yml::from_str(&content).map_err(|e| crate::error::WaiError::ConfigError {
             message: format!("Invalid .projections.yml: {}", e),
         })?;
 

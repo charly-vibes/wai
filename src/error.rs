@@ -119,7 +119,7 @@ pub enum WaiError {
 
     #[error("YAML error: {0}")]
     #[diagnostic(code(wai::yaml::error))]
-    Yaml(#[from] serde_yaml::Error),
+    Yaml(#[from] serde_yml::Error),
 
     #[error("Hmm, the LLM API key is missing or invalid")]
     #[diagnostic(

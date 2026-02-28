@@ -251,7 +251,7 @@ fn parse_skill_for_projection(path: &Path) -> Option<(String, String, String)> {
         name: String,
         description: String,
     }
-    let fm: Fm = serde_yaml::from_str(&fm_lines.join("\n")).ok()?;
+    let fm: Fm = serde_yml::from_str(&fm_lines.join("\n")).ok()?;
     if fm.name.trim().is_empty() || fm.description.trim().is_empty() {
         return None;
     }

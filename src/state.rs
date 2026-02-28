@@ -115,12 +115,12 @@ impl ProjectState {
             return Ok(Self::default());
         }
         let content = std::fs::read_to_string(state_path)?;
-        let state: Self = serde_yaml::from_str(&content)?;
+        let state: Self = serde_yml::from_str(&content)?;
         Ok(state)
     }
 
     pub fn save(&self, state_path: &Path) -> Result<(), WaiError> {
-        let content = serde_yaml::to_string(self)?;
+        let content = serde_yml::to_string(self)?;
         std::fs::write(state_path, content)?;
         Ok(())
     }

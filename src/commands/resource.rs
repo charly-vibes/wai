@@ -183,7 +183,7 @@ pub fn parse_skill_frontmatter(path: &Path) -> Option<SkillMetadata> {
 
     // Join lines and parse YAML
     let yaml_content = frontmatter_lines.join("\n");
-    let metadata: SkillMetadata = serde_yaml::from_str(&yaml_content).ok()?;
+    let metadata: SkillMetadata = serde_yml::from_str(&yaml_content).ok()?;
 
     // Validate that required fields are not empty
     if metadata.name.trim().is_empty() || metadata.description.trim().is_empty() {

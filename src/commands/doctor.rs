@@ -571,7 +571,7 @@ fn check_agent_config_sync(project_root: &Path) -> Vec<CheckResult> {
         }
     };
 
-    match serde_yaml::from_str::<ProjectionsConfig>(&content) {
+    match serde_yml::from_str::<ProjectionsConfig>(&content) {
         Ok(config) => {
             if config.projections.is_empty() {
                 results.push(CheckResult {
@@ -1109,7 +1109,7 @@ fn check_custom_plugins(project_root: &Path) -> Vec<CheckResult> {
             .to_string();
 
         match std::fs::read_to_string(&path) {
-            Ok(content) => match serde_yaml::from_str::<plugin::PluginDef>(&content) {
+            Ok(content) => match serde_yml::from_str::<plugin::PluginDef>(&content) {
                 Ok(_) => {
                     results.push(CheckResult {
                         name: format!("Custom plugin: {}", filename),
@@ -1467,7 +1467,7 @@ fn check_agent_tool_coverage(project_root: &Path) -> Vec<CheckResult> {
         .then(|| {
             std::fs::read_to_string(&projections_path)
                 .ok()
-                .and_then(|c| serde_yaml::from_str::<ProjectionsConfig>(&c).ok())
+                .and_then(|c| serde_yml::from_str::<ProjectionsConfig>(&c).ok())
                 .map(|cfg| cfg.projections)
         })
         .flatten()

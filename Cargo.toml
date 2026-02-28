@@ -28,7 +28,7 @@ owo-colors = "4"
 # Serialization for config
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
-serde_yaml = "0.9"
+serde_yml = "0.0.12"
 serde_json = "1"
 
 # Date/time
