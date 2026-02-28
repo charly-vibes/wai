@@ -6,6 +6,7 @@ use owo_colors::OwoColorize;
 use walkdir::WalkDir;
 
 use crate::config::{LlmConfig, ProjectConfig, STATE_FILE, wai_dir};
+use crate::context::current_context;
 use crate::error::WaiError;
 use crate::llm::{
     AGENT_SENTINEL, LlmError, claude_binary_exists, detect_backend, ollama_binary_exists,
@@ -992,6 +993,9 @@ fn print_verbose_stats(
 // ── Command entry point ───────────────────────────────────────────────────────
 
 pub fn run(query: String, no_llm: bool, json: bool, verbose: u8) -> Result<()> {
+    // Merge local --json with global --json so both `wai why --json` and
+    // `wai --json why` produce machine-readable output.
+    let json = json || current_context().json;
     let project_root = require_project()?;
 
     if no_llm {

@@ -14,7 +14,7 @@ use crate::cli::{
     ResourceListCommands,
 };
 use crate::config::{SKILLS_DIR, agent_config_dir, global_skills_dir};
-use crate::context::require_safe_mode;
+use crate::context::{current_context, require_safe_mode};
 use crate::error::WaiError;
 
 use super::require_project;
@@ -420,6 +420,9 @@ fn kebab_to_title_case(s: &str) -> String {
 }
 
 fn list_skills(json: bool) -> Result<()> {
+    // Merge local --json with global --json so both
+    // `wai resource list skills --json` and `wai --json resource list skills` work.
+    let json = json || current_context().json;
     let project_root = require_project()?;
     let local_skills_dir = agent_config_dir(&project_root).join(SKILLS_DIR);
     let global_dir = global_skills_dir();
@@ -964,6 +967,9 @@ fn validate_archive_entry_path(path_str: &str) -> Result<()> {
 
 /// Import skills from a tar.gz archive into the current project.
 fn import_skills_archive(archive_path: &str, yes: bool) -> Result<()> {
+    // Merge local --yes with global --yes so both
+    // `wai resource import archive f --yes` and `wai --yes resource import archive f` work.
+    let yes = yes || current_context().yes;
     let project_root = require_project()?;
     require_safe_mode("import skills from archive")?;
 
