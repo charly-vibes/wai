@@ -202,6 +202,8 @@ pub fn wai_block_content(detected_plugins: &[&str]) -> String {
          wai add plan \"plan\"           # Add plan artifact\n\
          wai add design \"design\"       # Add design artifact\n\
          wai search \"query\"            # Search across artifacts\n\
+         wai search --tag <tag>        # Filter by tag (repeatable)\n\
+         wai search --latest           # Most recent match only\n\
          wai why \"why use TOML?\"       # Ask why (LLM-powered oracle)\n\
          wai why src/config.rs         # Explain a file's history\n\
          wai reflect                   # Synthesize project patterns into CLAUDE.md\n\

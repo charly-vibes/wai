@@ -54,6 +54,7 @@ Available for all commands:
 | `wai doctor` | Diagnose **wai workspace** health (requires initialization) |
 | `wai doctor --fix` | Auto-repair detected workspace issues |
 | `wai way` | Check **repository best practices** for AI development |
+| `wai way --fix <CHECK>` | Scaffold missing items for a check (e.g. `skills`) |
 | `wai way --json` | Output best practices check as JSON |
 
 ### Choosing the Right Tool
@@ -71,6 +72,7 @@ Available for all commands:
 |---------|-------------|
 | `wai sync` | **Overwrite** agent configs to tool-specific locations |
 | `wai sync --status` | **Recommended:** Check sync status without modifying |
+| `wai sync --dry-run` | Preview operations without making any changes |
 | `wai config add <type> <file>` | Add agent config (skill/rule/context) |
 | `wai config list` | List all agent config files |
 | `wai config edit <path>` | **Safe:** Edit config file in $EDITOR |
@@ -89,6 +91,8 @@ Available for all commands:
 | `wai search --in <project>` | Search within specific project |
 | `wai search --regex` | Use regex patterns |
 | `wai search -n <limit>` | Limit number of results |
+| `wai search --tag <tag>` | Filter by tag (repeatable: `--tag foo --tag bar`) |
+| `wai search --latest` | Return only the most recently dated match |
 | `wai timeline <project>` | View chronological project timeline |
 | `wai timeline --from <date>` | Show entries from date onward (YYYY-MM-DD) |
 | `wai timeline --to <date>` | Show entries up to date (YYYY-MM-DD) |
@@ -112,6 +116,7 @@ Available phases: `research`, `design`, `plan`, `implement`, `review`, `archive`
 |---------|-------------|
 | `wai sync` | Sync agent configs to tool-specific locations |
 | `wai sync --status` | Show sync status without modifying |
+| `wai sync --dry-run` | Preview operations without making any changes |
 | `wai config add <type> <file>` | Add agent config (skill/rule/context) |
 | `wai config list` | List all agent config files |
 | `wai config edit <path>` | Edit config file in $EDITOR |

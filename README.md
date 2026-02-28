@@ -166,6 +166,7 @@ wai beads list         # Pass-through to beads plugin
 | `wai status` | Show project status with suggestions |
 | `wai ls [--root <dir>]` | List all wai projects across workspaces |
 | `wai way` | Check repository best practices (AI-friendly setup) |
+| `wai way --fix <CHECK>` | Scaffold missing items for a check (e.g. `skills`) |
 | `wai tutorial` | Run interactive quickstart tutorial |
 | `wai doctor [--fix]` | Diagnose workspace health (--fix to auto-repair) |
 
@@ -183,6 +184,8 @@ wai beads list         # Pass-through to beads plugin
 | `wai search --in <project>` | Search within specific project |
 | `wai search --regex` | Use regex patterns |
 | `wai search -n <limit>` | Limit number of results |
+| `wai search --tag <tag>` | Filter by tag (repeatable: `--tag foo --tag bar`) |
+| `wai search --latest` | Return only the most recently dated match |
 | `wai timeline <project>` | View chronological timeline |
 | `wai timeline --from <date>` | Show entries from date onward |
 | `wai timeline --to <date>` | Show entries up to date |
@@ -204,6 +207,7 @@ wai beads list         # Pass-through to beads plugin
 |---------|-------------|
 | `wai sync` | Sync agent configs to tool locations |
 | `wai sync --status` | Show sync status without modifying |
+| `wai sync --dry-run` | Preview operations without making any changes |
 | `wai config add <type> <file>` | Add agent config (skill/rule/context) |
 | `wai config list` | List all agent config files |
 | `wai config edit <path>` | Edit config file in $EDITOR |

@@ -121,6 +121,8 @@ wai add research "notes"      # Add research artifact
 wai add plan "plan"           # Add plan artifact
 wai add design "design"       # Add design artifact
 wai search "query"            # Search across artifacts
+wai search --tag <tag>        # Filter by tag (repeatable)
+wai search --latest           # Most recent match only
 wai why "why use TOML?"       # Ask why (LLM-powered oracle)
 wai why src/config.rs         # Explain a file's history
 wai reflect                   # Synthesize project patterns into CLAUDE.md
