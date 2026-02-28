@@ -8,7 +8,7 @@ use thiserror::Error;
 
 #[derive(Error, Diagnostic, Debug)]
 pub enum WaiError {
-    #[error("Hmm, no project initialized in this directory")]
+    #[error("No project initialized in this directory")]
     #[diagnostic(
         code(wai::project::not_initialized),
         help("Run `wai init` or `wai new project <name>` first")
@@ -29,21 +29,21 @@ pub enum WaiError {
     )]
     ProjectExists { path: String },
 
-    #[error("Hmm, project '{name}' not found")]
+    #[error("Project '{name}' not found")]
     #[diagnostic(
         code(wai::project::not_found),
         help("Run `wai show` to see available projects")
     )]
     ProjectNotFound { name: String },
 
-    #[error("Hmm, area '{name}' not found")]
+    #[error("Area '{name}' not found")]
     #[diagnostic(
         code(wai::area::not_found),
         help("Run `wai show` to see available areas")
     )]
     AreaNotFound { name: String },
 
-    #[error("Hmm, resource '{name}' not found")]
+    #[error("Resource '{name}' not found")]
     #[diagnostic(
         code(wai::resource::not_found),
         help("Run `wai show` to see available resources")
@@ -61,7 +61,7 @@ pub enum WaiError {
         valid_targets: String,
     },
 
-    #[error("Hmm, not sure which project to use")]
+    #[error("Ambiguous project: specify --project <name>")]
     #[diagnostic(
         code(wai::project::no_context),
         help("Run a command within a project directory or specify --project <name>")
@@ -121,7 +121,7 @@ pub enum WaiError {
     #[diagnostic(code(wai::yaml::error))]
     Yaml(#[from] serde_yml::Error),
 
-    #[error("Hmm, the LLM API key is missing or invalid")]
+    #[error("LLM API key is missing or invalid")]
     #[diagnostic(
         code(wai::llm::invalid_api_key),
         help(
@@ -146,14 +146,14 @@ pub enum WaiError {
     )]
     LlmNetworkError { message: String },
 
-    #[error("Hmm, LLM model '{model}' not found")]
+    #[error("LLM model '{model}' not found")]
     #[diagnostic(
         code(wai::llm::model_not_found),
         help("Run `ollama pull {model}` to download the model")
     )]
     LlmModelNotFound { model: String },
 
-    #[error("Hmm, no LLM backend found")]
+    #[error("No LLM backend found")]
     #[diagnostic(
         code(wai::llm::not_available),
         help("Set ANTHROPIC_API_KEY environment variable or install Ollama (https://ollama.com)")

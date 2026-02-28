@@ -3179,9 +3179,7 @@ fn error_not_initialized_is_conversational() {
         .args(["status"])
         .assert()
         .failure()
-        .stderr(
-            predicate::str::contains("Hmm,").or(predicate::str::contains("no project initialized")),
-        );
+        .stderr(predicate::str::contains("no project initialized"));
 }
 
 #[test]
@@ -3193,7 +3191,7 @@ fn error_project_not_found_is_conversational() {
         .args(["add", "research", "--project", "nonexistent", "notes"])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("Hmm,").and(predicate::str::contains("not found")));
+        .stderr(predicate::str::contains("not found"));
 }
 
 // ─── wai-933: Integration tests for resource management ──────────────────────
