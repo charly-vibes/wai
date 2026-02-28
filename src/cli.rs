@@ -332,6 +332,12 @@ pub enum Commands {
         /// Skip the confirmation prompt and write directly
         #[arg(short, long)]
         yes: bool,
+
+        /// Inject pre-generated content directly (skips LLM call).
+        /// Used in agent mode: the agent calls `wai reflect --inject-content "..."` after
+        /// receiving the context block from an initial `wai reflect` run.
+        #[arg(long, value_name = "CONTENT")]
+        inject_content: Option<String>,
     },
 
     /// Manage pipelines (ordered multi-skill workflows)

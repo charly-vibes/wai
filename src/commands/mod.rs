@@ -85,7 +85,8 @@ pub fn run(cli: Cli) -> Result<()> {
             output,
             dry_run,
             yes,
-        }) => reflect::run(project, conversation, output, dry_run, yes, cli.verbose),
+            inject_content,
+        }) => reflect::run(project, conversation, output, dry_run, yes, inject_content, cli.verbose),
         Some(Commands::External(args)) => run_external(args),
         None => show_welcome(),
     }

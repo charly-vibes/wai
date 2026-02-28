@@ -6,7 +6,7 @@ use owo_colors::OwoColorize;
 use walkdir::WalkDir;
 
 use crate::config::{ProjectConfig, wai_dir};
-use crate::llm::detect_backend;
+use crate::llm::{AGENT_SENTINEL, detect_backend};
 use crate::managed_block::{inject_reflect_block, read_reflect_block};
 
 // ── Reflect metadata ─────────────────────────────────────────────────────────
@@ -652,6 +652,7 @@ pub fn run(
     output: Option<String>,
     dry_run: bool,
     yes: bool,
+    inject_content: Option<String>,
     _verbose: u8,
 ) -> Result<()> {
     use crate::context::current_context;
@@ -667,13 +668,31 @@ pub fn run(
     println!("  {} Gathering context …", "◆".cyan());
     let ctx = gather_reflect_context(&project_root, conversation.as_deref(), &targets)?;
 
-    // 3.1–3.3: Call LLM.
-    println!("  {} Calling LLM …", "○".dimmed());
-
     let today = chrono::Local::now().format("%Y-%m-%d").to_string();
-    let prompt = build_reflect_prompt(&ctx, &today);
 
-    let raw_response = call_llm(&project_root, &prompt)?;
+    // 3.1–3.3: Call LLM (or use injected content / agent-mode sentinel path).
+    let raw_response = if let Some(content) = inject_content {
+        // Agent provided the content directly via --inject-content.
+        content
+    } else {
+        println!("  {} Calling LLM …", "○".dimmed());
+        let prompt = build_reflect_prompt(&ctx, &today);
+        let raw = call_llm(&project_root, &prompt)?;
+        if raw == AGENT_SENTINEL {
+            // AgentBackend already printed [AGENT CONTEXT]...[/AGENT CONTEXT] to stdout.
+            // The enclosing agent will read the context and generate the REFLECT block.
+            // Instruct it to feed the result back via --inject-content.
+            println!();
+            println!("  {} Agent mode — context sent to agent.", "◆".cyan());
+            println!(
+                "  {} Once the agent provides the REFLECT content, run:",
+                "○".dimmed()
+            );
+            println!("  {}   wai reflect --inject-content '<content>'", "○".dimmed());
+            return Ok(());
+        }
+        raw
+    };
 
     // 3.4: Extract REFLECT content.
     let new_content = extract_reflect_content(&raw_response);
