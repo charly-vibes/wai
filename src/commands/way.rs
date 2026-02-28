@@ -132,7 +132,11 @@ fn render_human(checks: &[CheckResult], summary: &Summary, verbose: u8) -> Resul
     use miette::IntoDiagnostic;
 
     println!();
-    println!("  {} The Wai Way — Repository Best Practices", "◆".cyan());
+    println!(
+        "  {} Repo Hygiene & Agent Workflow Conventions",
+        "◆".cyan()
+    );
+    println!("  {} For wai workspace health, run 'wai doctor'", "·".dimmed());
     println!();
 
     for check in checks {

@@ -170,23 +170,35 @@ pub enum Commands {
     #[command(subcommand)]
     Plugin(PluginCommands),
 
-    /// Diagnose workspace health
+    /// Check wai workspace health
+    #[command(
+        about = "Check wai workspace health — validates .wai/ structure, config.toml, projections, and plugins. Run this when your workspace seems broken.",
+        long_about = "Checks wai workspace health: .wai/ directory structure, config.toml validity,\n\
+            schema version, projections, plugin tool availability, agent config sync,\n\
+            project state, and agent instructions.\n\n\
+            Exits with code 1 if any check fails. Use --fix to automatically repair\n\
+            issues where possible.\n\n\
+            For repo hygiene and agent workflow conventions (skills, best practices),\n\
+            run 'wai way' instead — it works without a wai workspace."
+    )]
     Doctor {
         /// Automatically fix issues where possible
         #[arg(long)]
         fix: bool,
     },
 
-    /// Check repository best practices (the wai way)
+    /// Show repo hygiene and agent workflow conventions — skills, rules, best practices. Works without a wai workspace.
     #[command(
-        about = "Check repository best practices (the wai way)",
-        long_about = "Validates your repository against best practices for AI-friendly development.\n\n\
-            Checks 10 areas including task runners (justfile, Makefile), git hooks (prek, pre-commit),\n\
+        about = "Show repo hygiene and agent workflow conventions — skills, rules, best practices. Works without a wai workspace.",
+        long_about = "Shows repo hygiene status and agent workflow conventions for AI-friendly development.\n\n\
+            Covers 11 areas: task runners (justfile, Makefile), git hooks (prek, pre-commit),\n\
             editor config, documentation (README, LICENSE, CONTRIBUTING, .gitignore), AI instructions\n\
-            (CLAUDE.md, AGENTS.md), CI/CD configuration, and dev containers.\n\n\
+            (CLAUDE.md, AGENTS.md), LLM context (llm.txt), agent skills, CI/CD, dev containers,\n\
+            and release pipelines.\n\n\
             These are recommendations, not requirements — the command always exits successfully\n\
-            and suggests improvements without enforcing them. Works in any directory; wai\n\
-            initialization is not required.\n\n\
+            and suggests improvements without enforcing them. Works in any directory; a wai\n\
+            workspace is not required.\n\n\
+            For wai workspace health (broken .wai/, config errors, plugin issues), run 'wai doctor' instead.\n\n\
             Use --fix skills to scaffold missing recommended agent skills.\n\
             Use --json for machine-readable output suitable for CI integration and automation."
     )]
