@@ -2041,7 +2041,7 @@ fn way_always_exits_zero_all_passing() {
 
     // All checks passing
     fs::write(tmp.path().join("justfile"), "test:\n\techo test").unwrap();
-    fs::write(tmp.path().join(".prek.toml"), "[hooks]").unwrap();
+    fs::write(tmp.path().join("prek.toml"), "[hooks]").unwrap();
     fs::write(tmp.path().join(".editorconfig"), "root = true").unwrap();
     fs::write(tmp.path().join("README.md"), "# Test").unwrap();
     fs::write(tmp.path().join("LICENSE"), "MIT").unwrap();
@@ -2134,7 +2134,7 @@ fn way_complete_repository_all_pass() {
 
     // Set up all best practices
     fs::write(tmp.path().join("justfile"), "test:\n\techo test").unwrap();
-    fs::write(tmp.path().join(".prek.toml"), "[hooks]").unwrap();
+    fs::write(tmp.path().join("prek.toml"), "[hooks]").unwrap();
     fs::write(tmp.path().join(".editorconfig"), "root = true").unwrap();
     fs::write(tmp.path().join("README.md"), "# Test").unwrap();
     fs::write(tmp.path().join("LICENSE"), "MIT").unwrap();
@@ -2160,7 +2160,7 @@ fn way_complete_repository_minimal_suggestions() {
 
     // Set up all best practices
     fs::write(tmp.path().join("justfile"), "test:\n\techo test").unwrap();
-    fs::write(tmp.path().join(".prek.toml"), "[hooks]").unwrap();
+    fs::write(tmp.path().join("prek.toml"), "[hooks]").unwrap();
     fs::write(tmp.path().join(".editorconfig"), "root = true").unwrap();
     fs::write(tmp.path().join("README.md"), "# Test").unwrap();
     fs::write(tmp.path().join("LICENSE"), "MIT").unwrap();
@@ -2230,7 +2230,7 @@ fn way_check_task_runner_missing() {
 #[test]
 fn way_check_git_hooks_prek() {
     let tmp = TempDir::new().unwrap();
-    fs::write(tmp.path().join(".prek.toml"), "[hooks]").unwrap();
+    fs::write(tmp.path().join("prek.toml"), "[hooks]").unwrap();
 
     wai_cmd(tmp.path())
         .args(["way", "--json"])
