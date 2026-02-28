@@ -19,6 +19,7 @@ pub fn run(
     limit: Option<usize>,
     tag_filter: Vec<String>,
     latest: bool,
+    context_size: usize,
 ) -> Result<()> {
     let display_limit = limit.unwrap_or(DEFAULT_LIMIT);
     let project_root = require_project()?;
@@ -117,7 +118,7 @@ pub fn run(
                     .path()
                     .strip_prefix(&project_root)
                     .unwrap_or(entry.path());
-                let context_lines = extract_context_lines(&content, line_num, 1);
+                let context_lines = extract_context_lines(&content, line_num, context_size);
                 results.push((
                     rel_path.display().to_string(),
                     line_num + 1,
@@ -179,25 +180,72 @@ pub fn run(
     println!();
 
     // Compute the width needed to pad line numbers for alignment.
+    // When context is shown, also account for surrounding line numbers.
     let max_line_num = display_results
         .iter()
-        .map(|(_, line_num, ..)| *line_num)
+        .map(|(_, line_num, ..)| line_num + context_size)
         .max()
         .unwrap_or(1);
     let line_num_width = max_line_num.to_string().len();
 
     let mut current_file = String::new();
-    for (path, line_num, line, start, end, _context_lines) in display_results {
+    // last_shown_end tracks the last line number (1-based) printed for the current file,
+    // so we can insert "--" separators between non-adjacent context blocks.
+    let mut last_shown_end: Option<usize> = None;
+
+    for (path, line_num, line, start, end, context_lines) in display_results {
         if *path != current_file {
             current_file = path.clone();
+            last_shown_end = None;
             println!("  {}", path.cyan());
         }
-        let padded_num = format!("{:>width$}", line_num, width = line_num_width);
-        println!(
-            "    {}:  {}",
-            padded_num.dimmed(),
-            highlight_match(line, *start, *end),
-        );
+
+        if context_size > 0 {
+            // extract_context_lines uses `line_num` (0-based) as the center, so
+            // the number of pre-context lines actually collected is
+            // min(context_size, line_num_0based) = min(context_size, line_num - 1).
+            let pre_count = context_size.min(line_num.saturating_sub(1));
+            let first_line_num = line_num.saturating_sub(pre_count); // 1-based number of first context line
+
+            // Insert separator when this block is not adjacent to the previous one.
+            if let Some(prev_end) = last_shown_end {
+                if first_line_num > prev_end + 1 {
+                    println!("    {}", "--".dimmed());
+                }
+            }
+
+            // Print pre-context lines (dim).
+            for (i, ctx_line) in context_lines.iter().enumerate() {
+                let abs_line_num = first_line_num + i;
+                if abs_line_num == *line_num {
+                    // This is the match line — print highlighted.
+                    let padded_num = format!("{:>width$}", abs_line_num, width = line_num_width);
+                    println!(
+                        "    {}:  {}",
+                        padded_num.dimmed(),
+                        highlight_match(ctx_line, *start, *end),
+                    );
+                } else {
+                    // Context line — print dim.
+                    let padded_num = format!("{:>width$}", abs_line_num, width = line_num_width);
+                    println!(
+                        "    {}:  {}",
+                        padded_num.dimmed(),
+                        ctx_line.dimmed(),
+                    );
+                }
+            }
+
+            let last_line_num = first_line_num + context_lines.len().saturating_sub(1);
+            last_shown_end = Some(last_line_num);
+        } else {
+            let padded_num = format!("{:>width$}", line_num, width = line_num_width);
+            println!(
+                "    {}:  {}",
+                padded_num.dimmed(),
+                highlight_match(line, *start, *end),
+            );
+        }
     }
 
     println!();

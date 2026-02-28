@@ -142,6 +142,10 @@ pub enum Commands {
         /// Return only the most recently dated match
         #[arg(long)]
         latest: bool,
+
+        /// Number of surrounding context lines to show (like grep -C)
+        #[arg(short = 'C', long = "context", default_value_t = 0)]
+        context: usize,
     },
 
     /// View chronological timeline of artifacts
