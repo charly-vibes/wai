@@ -10,6 +10,7 @@ pub struct CliContext {
     pub safe: bool,
     #[allow(dead_code)]
     pub verbose: u8,
+    pub quiet: bool,
 }
 
 thread_local! {
@@ -30,6 +31,7 @@ pub fn current_context() -> CliContext {
             yes: false,
             safe: false,
             verbose: 0,
+            quiet: false,
         })
     })
 }

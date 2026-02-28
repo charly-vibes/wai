@@ -54,6 +54,7 @@ fn main() -> Result<()> {
         yes: cli.yes,
         safe: cli.safe,
         verbose: cli.verbose,
+        quiet: cli.quiet,
     });
     match commands::run(cli) {
         Ok(_) => Ok(()),

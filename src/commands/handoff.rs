@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use crate::cli::HandoffCommands;
 use crate::config::{HANDOFFS_DIR, STATE_FILE, projects_dir};
-use crate::context::require_safe_mode;
+use crate::context::{current_context, require_safe_mode};
 use crate::error::WaiError;
 use crate::plugin;
 use crate::state::ProjectState;
@@ -19,12 +19,14 @@ pub fn run(cmd: HandoffCommands) -> Result<()> {
         HandoffCommands::Create { project } => {
             require_safe_mode("create handoff")?;
             let path = create_handoff(&project_root, &project)?;
-            let filename = path.file_name().unwrap_or_default().to_string_lossy();
-            log::success(format!(
-                "Created handoff for '{}' at handoffs/{}",
-                project, filename
-            ))
-            .into_diagnostic()?;
+            if !current_context().quiet {
+                let filename = path.file_name().unwrap_or_default().to_string_lossy();
+                log::success(format!(
+                    "Created handoff for '{}' at handoffs/{}",
+                    project, filename
+                ))
+                .into_diagnostic()?;
+            }
             Ok(())
         }
     }

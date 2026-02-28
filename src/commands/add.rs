@@ -7,7 +7,7 @@ use crate::cli::AddCommands;
 use crate::config::{
     DESIGNS_DIR, PLANS_DIR, RESEARCH_DIR, archives_dir, areas_dir, projects_dir, resources_dir,
 };
-use crate::context::require_safe_mode;
+use crate::context::{current_context, require_safe_mode};
 use crate::error::WaiError;
 use crate::json::Suggestion;
 use crate::state::Phase;
@@ -32,7 +32,15 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             let body = get_content(content.as_deref(), file.as_deref())?;
             let slug = slug::slugify(body.chars().take(50).collect::<String>());
             let date = Utc::now().format("%Y-%m-%d");
-            let filename = format!("{}-{}.md", date, slug);
+            let base_filename = format!("{}-{}.md", date, slug);
+
+            // Deduplicate: if the file already exists, append a counter
+            let mut filename = base_filename.clone();
+            let mut counter = 2;
+            while dir.join(&filename).exists() {
+                filename = format!("{}-{}-{}.md", date, slug, counter);
+                counter += 1;
+            }
 
             let mut file_content = String::new();
 
@@ -48,47 +56,53 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             file_content.push('\n');
 
             std::fs::write(dir.join(&filename), &file_content).into_diagnostic()?;
-            log::success(format!("Added research to '{}'", target_project)).into_diagnostic()?;
+            let ctx = current_context();
+            if !ctx.quiet {
+                log::success(format!("Added research to '{}'", target_project))
+                    .into_diagnostic()?;
+            }
 
             // Post-command suggestions after adding research
-            if let Some(ctx) = workflows::scan_project(&project_root, &target_project) {
-                let suggestions = match ctx.phase {
-                    Phase::Research if ctx.research_count >= 2 => vec![
-                        Suggestion {
-                            label: "Add more research".to_string(),
-                            command: "wai add research \"...\"".to_string(),
-                        },
-                        Suggestion {
-                            label: "Move to design phase".to_string(),
-                            command: "wai phase set design".to_string(),
-                        },
-                        Suggestion {
-                            label: "Review research".to_string(),
-                            command: "wai search \"research\"".to_string(),
-                        },
-                    ],
-                    Phase::Research => vec![
-                        Suggestion {
-                            label: "Add more research".to_string(),
-                            command: "wai add research \"...\"".to_string(),
-                        },
-                        Suggestion {
-                            label: "Check phase".to_string(),
-                            command: "wai phase".to_string(),
-                        },
-                    ],
-                    _ => vec![
-                        Suggestion {
-                            label: "Continue research".to_string(),
-                            command: "wai add research \"...\"".to_string(),
-                        },
-                        Suggestion {
-                            label: "Review research".to_string(),
-                            command: "wai search \"research\"".to_string(),
-                        },
-                    ],
-                };
-                print_suggestions(&suggestions);
+            if !ctx.quiet {
+                if let Some(wf_ctx) = workflows::scan_project(&project_root, &target_project) {
+                    let suggestions = match wf_ctx.phase {
+                        Phase::Research if wf_ctx.research_count >= 2 => vec![
+                            Suggestion {
+                                label: "Add more research".to_string(),
+                                command: "wai add research \"...\"".to_string(),
+                            },
+                            Suggestion {
+                                label: "Move to design phase".to_string(),
+                                command: "wai phase set design".to_string(),
+                            },
+                            Suggestion {
+                                label: "Review research".to_string(),
+                                command: "wai search \"research\"".to_string(),
+                            },
+                        ],
+                        Phase::Research => vec![
+                            Suggestion {
+                                label: "Add more research".to_string(),
+                                command: "wai add research \"...\"".to_string(),
+                            },
+                            Suggestion {
+                                label: "Check phase".to_string(),
+                                command: "wai phase".to_string(),
+                            },
+                        ],
+                        _ => vec![
+                            Suggestion {
+                                label: "Continue research".to_string(),
+                                command: "wai add research \"...\"".to_string(),
+                            },
+                            Suggestion {
+                                label: "Review research".to_string(),
+                                command: "wai search \"research\"".to_string(),
+                            },
+                        ],
+                    };
+                    print_suggestions(&suggestions);
+                }
             }
 
             Ok(())
@@ -106,7 +120,15 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             let body = get_content(content.as_deref(), file.as_deref())?;
             let slug = slug::slugify(body.chars().take(50).collect::<String>());
             let date = Utc::now().format("%Y-%m-%d");
-            let filename = format!("{}-{}.md", date, slug);
+            let base_filename = format!("{}-{}.md", date, slug);
+
+            // Deduplicate: if the file already exists, append a counter
+            let mut filename = base_filename.clone();
+            let mut counter = 2;
+            while dir.join(&filename).exists() {
+                filename = format!("{}-{}-{}.md", date, slug, counter);
+                counter += 1;
+            }
 
             let mut file_content = String::new();
 
@@ -121,7 +143,9 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             file_content.push('\n');
 
             std::fs::write(dir.join(&filename), &file_content).into_diagnostic()?;
-            log::success(format!("Added plan to '{}'", target_project)).into_diagnostic()?;
+            if !current_context().quiet {
+                log::success(format!("Added plan to '{}'", target_project)).into_diagnostic()?;
+            }
             Ok(())
         }
         AddCommands::Design {
@@ -137,7 +161,15 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             let body = get_content(content.as_deref(), file.as_deref())?;
             let slug = slug::slugify(body.chars().take(50).collect::<String>());
             let date = Utc::now().format("%Y-%m-%d");
-            let filename = format!("{}-{}.md", date, slug);
+            let base_filename = format!("{}-{}.md", date, slug);
+
+            // Deduplicate: if the file already exists, append a counter
+            let mut filename = base_filename.clone();
+            let mut counter = 2;
+            while dir.join(&filename).exists() {
+                filename = format!("{}-{}-{}.md", date, slug, counter);
+                counter += 1;
+            }
 
             let mut file_content = String::new();
 
@@ -152,7 +184,9 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             file_content.push('\n');
 
             std::fs::write(dir.join(&filename), &file_content).into_diagnostic()?;
-            log::success(format!("Added design to '{}'", target_project)).into_diagnostic()?;
+            if !current_context().quiet {
+                log::success(format!("Added design to '{}'", target_project)).into_diagnostic()?;
+            }
             Ok(())
         }
     }

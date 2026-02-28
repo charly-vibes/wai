@@ -106,6 +106,10 @@ fn show_welcome() -> Result<()> {
 
     let context = current_context();
 
+    if context.quiet {
+        return Ok(());
+    }
+
     if context.json {
         let project_detected = find_project_root().is_some();
         let suggestions = if project_detected {
@@ -348,6 +352,10 @@ pub fn require_project() -> Result<std::path::PathBuf> {
 /// ```
 pub fn print_suggestions(suggestions: &[crate::json::Suggestion]) {
     if suggestions.is_empty() {
+        return;
+    }
+
+    if current_context().quiet {
         return;
     }
 

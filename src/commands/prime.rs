@@ -3,6 +3,7 @@ use miette::{IntoDiagnostic, Result};
 use owo_colors::OwoColorize;
 use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, SystemTime};
 
 use crate::config::{HANDOFFS_DIR, STATE_FILE, projects_dir};
 use crate::context::current_context;
@@ -12,6 +13,9 @@ use crate::plugin;
 use crate::state::ProjectState;
 
 use super::require_project;
+
+/// Maximum age of a `.pending-resume` file before it is considered stale.
+const RESUME_WINDOW: Duration = Duration::from_secs(12 * 60 * 60);
 
 pub fn run(project: Option<String>) -> Result<()> {
     let project_root = require_project()?;
@@ -45,20 +49,12 @@ pub fn run(project: Option<String>) -> Result<()> {
     // Project + phase
     println!("{} Project: {} [{}]", "•".dimmed(), project_name, phase);
 
-    // Resume detection: check for .pending-resume signal from wai close
-    let today_naive = Local::now().date_naive();
-    let resume_info = read_pending_resume(&proj_dir).and_then(|hp| {
-        // Parse date strictly: None if frontmatter absent or date malformed (→ treated as stale)
-        let date = parse_handoff_date_strict(&hp)?;
-        if date != today_naive {
-            return None; // stale signal
-        }
-        let (_, snippet) = read_handoff_summary(&hp);
-        if snippet.is_empty() {
-            return None;
-        }
-        Some((hp, date, snippet))
-    });
+    // Resume detection: check for .pending-resume signal from wai close.
+    // The signal is valid if the .pending-resume file was written within the
+    // last 12 hours.  A stale file (older than 12 hours) is deleted with a
+    // diagnostic note so the user knows it was found but skipped.
+    let pending_resume_path = proj_dir.join(".pending-resume");
+    let resume_info = check_pending_resume(&proj_dir, &pending_resume_path);
 
     if let Some((handoff_path, date, snippet)) = resume_info {
         println!("⚡ RESUMING: {} — '{}'", date.format("%Y-%m-%d"), snippet);
@@ -150,6 +146,44 @@ pub fn read_pending_resume(project_dir: &Path) -> Option<PathBuf> {
     } else {
         None
     }
+}
+
+/// Check the `.pending-resume` signal using a 12-hour freshness window.
+///
+/// Returns `Some((handoff_path, date, snippet))` when the signal is fresh and
+/// the handoff has a non-empty snippet.  When the `.pending-resume` file exists
+/// but is older than 12 hours, prints a diagnostic note, deletes the stale
+/// file, and returns `None`.
+fn check_pending_resume(
+    project_dir: &Path,
+    pending_path: &Path,
+) -> Option<(PathBuf, NaiveDate, String)> {
+    // If the signal file doesn't exist there's nothing to do.
+    let meta = std::fs::metadata(pending_path).ok()?;
+
+    // Determine the age of the .pending-resume file via its mtime.
+    let mtime = meta.modified().ok()?;
+    let age = SystemTime::now().duration_since(mtime).unwrap_or(RESUME_WINDOW);
+
+    if age > RESUME_WINDOW {
+        // Stale: emit a note, delete the file, and return None.
+        let created_local: chrono::DateTime<Local> = mtime.into();
+        println!(
+            "note: stale resume signal found (created {}), skipping.",
+            created_local.format("%Y-%m-%d %H:%M")
+        );
+        let _ = std::fs::remove_file(pending_path);
+        return None;
+    }
+
+    // Fresh: resolve the handoff path from the file contents.
+    let hp = read_pending_resume(project_dir)?;
+    let date = parse_handoff_date_strict(&hp)?;
+    let (_, snippet) = read_handoff_summary(&hp);
+    if snippet.is_empty() {
+        return None;
+    }
+    Some((hp, date, snippet))
 }
 
 /// Extract lines from the `## Next Steps` section of a handoff file.

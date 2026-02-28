@@ -9,6 +9,8 @@ use crate::output::print_json;
 
 use super::require_project;
 
+const DEFAULT_LIMIT: usize = 20;
+
 pub fn run(
     query: String,
     type_filter: Option<String>,
@@ -18,6 +20,7 @@ pub fn run(
     tag_filter: Vec<String>,
     latest: bool,
 ) -> Result<()> {
+    let display_limit = limit.unwrap_or(DEFAULT_LIMIT);
     let project_root = require_project()?;
     let context = current_context();
 
@@ -110,19 +113,7 @@ pub fn run(
                     end,
                     context_lines,
                 ));
-
-                if let Some(max) = limit
-                    && results.len() >= max
-                {
-                    break;
-                }
             }
-        }
-
-        if let Some(max) = limit
-            && results.len() >= max
-        {
-            break;
         }
     }
 
@@ -162,32 +153,49 @@ pub fn run(
     }
 
     let total = results.len();
-    let limited = limit.is_some_and(|max| total >= max);
+    let truncated = total > display_limit;
+    let display_results = &results[..total.min(display_limit)];
 
     println!();
     println!(
-        "  {} Search results for '{}' ({}{} matches)",
+        "  {} Search results for '{}' ({} matches)",
         "◆".cyan(),
         query.bold(),
         total,
-        if limited { "+" } else { "" }
     );
     println!();
 
+    // Compute the width needed to pad line numbers for alignment.
+    let max_line_num = display_results
+        .iter()
+        .map(|(_, line_num, ..)| *line_num)
+        .max()
+        .unwrap_or(1);
+    let line_num_width = max_line_num.to_string().len();
+
     let mut current_file = String::new();
-    for (path, line_num, line, start, end, _context_lines) in &results {
+    for (path, line_num, line, start, end, _context_lines) in display_results {
         if *path != current_file {
             current_file = path.clone();
             println!("  {}", path.cyan());
         }
+        let padded_num = format!("{:>width$}", line_num, width = line_num_width);
         println!(
             "    {}:  {}",
-            line_num.to_string().dimmed(),
-            highlight_match(line, *start, *end)
+            padded_num.dimmed(),
+            highlight_match(line, *start, *end),
         );
     }
 
     println!();
+
+    if truncated {
+        eprintln!(
+            "Showing first {} of {} results. Use -n to see more.",
+            display_limit, total
+        );
+    }
+
     Ok(())
 }
 

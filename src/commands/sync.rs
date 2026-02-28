@@ -4,7 +4,7 @@ use owo_colors::OwoColorize;
 use serde::Deserialize;
 
 use crate::config::agent_config_dir;
-use crate::context::require_safe_mode;
+use crate::context::{current_context, require_safe_mode};
 use crate::error::WaiError;
 use crate::sync_core::{self, Projection};
 
@@ -34,75 +34,83 @@ pub fn run(status_only: bool, dry_run: bool) -> Result<()> {
             message: format!("Invalid .projections.yml: {}", e),
         })?;
 
+    let quiet = current_context().quiet;
+
     if config.projections.is_empty() {
-        println!();
-        println!("  {} No projections configured.", "○".dimmed());
-        println!(
-            "  {} Edit .wai/resources/agent-config/.projections.yml to add projections",
-            "→".dimmed()
-        );
-        println!();
+        if !quiet {
+            println!();
+            println!("  {} No projections configured.", "○".dimmed());
+            println!(
+                "  {} Edit .wai/resources/agent-config/.projections.yml to add projections",
+                "→".dimmed()
+            );
+            println!();
+        }
         return Ok(());
     }
 
     if status_only {
-        println!();
-        println!("  {} Sync Status", "◆".cyan());
-        for proj in &config.projections {
-            if proj.target == "claude-code" {
-                let cc_dir = project_root.join(".claude").join("commands");
-                let exists = cc_dir.exists();
+        if !quiet {
+            println!();
+            println!("  {} Sync Status", "◆".cyan());
+            for proj in &config.projections {
+                if proj.target == "claude-code" {
+                    let cc_dir = project_root.join(".claude").join("commands");
+                    let exists = cc_dir.exists();
+                    let status = if exists {
+                        "synced".green().to_string()
+                    } else {
+                        "not synced".yellow().to_string()
+                    };
+                    println!(
+                        "    {} [claude-code] → .claude/commands/ [{}]",
+                        "•".dimmed(),
+                        status
+                    );
+                    continue;
+                }
+                let target_path = project_root.join(&proj.target);
+                let exists = target_path.exists();
                 let status = if exists {
                     "synced".green().to_string()
                 } else {
                     "not synced".yellow().to_string()
                 };
                 println!(
-                    "    {} [claude-code] → .claude/commands/ [{}]",
+                    "    {} {} → {} [{}]",
                     "•".dimmed(),
+                    proj.sources.join(", "),
+                    proj.target,
                     status
                 );
-                continue;
             }
-            let target_path = project_root.join(&proj.target);
-            let exists = target_path.exists();
-            let status = if exists {
-                "synced".green().to_string()
-            } else {
-                "not synced".yellow().to_string()
-            };
-            println!(
-                "    {} {} → {} [{}]",
-                "•".dimmed(),
-                proj.sources.join(", "),
-                proj.target,
-                status
-            );
+            println!();
         }
-        println!();
         return Ok(());
     }
 
     if dry_run {
-        println!();
-        println!("  {} Dry-run — no files will be modified", "◆".cyan());
-        for proj in &config.projections {
-            if proj.target == "claude-code" {
+        if !quiet {
+            println!();
+            println!("  {} Dry-run — no files will be modified", "◆".cyan());
+            for proj in &config.projections {
+                if proj.target == "claude-code" {
+                    println!(
+                        "    {} [claude-code] skills/ → .claude/commands/",
+                        "•".dimmed()
+                    );
+                    continue;
+                }
                 println!(
-                    "    {} [claude-code] skills/ → .claude/commands/",
-                    "•".dimmed()
+                    "    {} [{}] {} → {}",
+                    "•".dimmed(),
+                    proj.strategy,
+                    proj.sources.join(", "),
+                    proj.target
                 );
-                continue;
             }
-            println!(
-                "    {} [{}] {} → {}",
-                "•".dimmed(),
-                proj.strategy,
-                proj.sources.join(", "),
-                proj.target
-            );
+            println!();
         }
-        println!();
         return Ok(());
     }
 
@@ -121,15 +129,19 @@ pub fn run(status_only: bool, dry_run: bool) -> Result<()> {
             "reference" => sync_core::execute_reference(&project_root, &config_dir, proj)?,
             "copy" => sync_core::execute_copy(&project_root, &config_dir, proj)?,
             other => {
-                log::warning(format!(
-                    "Unknown strategy '{}' for target '{}'",
-                    other, proj.target
-                ))
-                .into_diagnostic()?;
+                if !quiet {
+                    log::warning(format!(
+                        "Unknown strategy '{}' for target '{}'",
+                        other, proj.target
+                    ))
+                    .into_diagnostic()?;
+                }
             }
         }
     }
 
-    log::success("Agent configs synced").into_diagnostic()?;
+    if !quiet {
+        log::success("Agent configs synced").into_diagnostic()?;
+    }
     Ok(())
 }
