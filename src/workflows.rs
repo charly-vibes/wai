@@ -111,7 +111,7 @@ pub fn detect_patterns(ctx: &ProjectContext) -> Vec<WorkflowDetection> {
     }
 
     // Research phase with enough research to advance
-    if ctx.phase == Phase::Research && ctx.research_count >= 3 {
+    if ctx.phase == Phase::Research && ctx.research_count >= 2 {
         detections.push(WorkflowDetection {
             pattern: WorkflowPattern::ResearchReadyToAdvance,
             message: "Enough research collected — consider advancing to design".to_string(),
@@ -322,7 +322,7 @@ mod tests {
         let ctx = ProjectContext {
             name: "test".to_string(),
             phase: Phase::Research,
-            research_count: 3,
+            research_count: 2,
             plan_count: 0,
             design_count: 0,
             handoff_count: 0,
@@ -342,7 +342,7 @@ mod tests {
     }
 
     #[test]
-    fn research_below_threshold_does_not_trigger_advance() {
+    fn research_at_two_suggests_advance() {
         let ctx = ProjectContext {
             name: "test".to_string(),
             phase: Phase::Research,
@@ -352,8 +352,12 @@ mod tests {
             handoff_count: 0,
         };
         let detections = detect_patterns(&ctx);
-        // 2 research artifacts — not minimal (>1) and not enough to advance (<3)
-        assert!(detections.is_empty());
+        // 2 research artifacts — threshold is now >= 2, so advance is suggested
+        assert_eq!(detections.len(), 1);
+        assert_eq!(
+            detections[0].pattern,
+            WorkflowPattern::ResearchReadyToAdvance
+        );
     }
 
     #[test]
