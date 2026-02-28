@@ -152,6 +152,31 @@ pub struct ShowItemEntry {
     pub item_count: Option<usize>,
 }
 
+#[derive(Debug, Serialize)]
+pub struct BeadsSummary {
+    pub open: u64,
+    pub ready: u64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct OpenspecEntry {
+    pub name: String,
+    pub done: usize,
+    pub total: usize,
+}
+
+#[derive(Debug, Serialize)]
+pub struct PrimePayload {
+    pub project: Option<String>,
+    pub phase: Option<String>,
+    pub resume: bool,
+    pub handoff_summary: Option<String>,
+    pub next_steps: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub beads: Option<BeadsSummary>,
+    pub openspec: Vec<OpenspecEntry>,
+}
+
 #[allow(dead_code)]
 pub fn sanitize_path(path: &std::path::Path, project_root: &std::path::Path) -> String {
     if let Ok(relative) = path.strip_prefix(project_root) {

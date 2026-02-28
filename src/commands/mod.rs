@@ -348,6 +348,14 @@ pub fn require_project() -> Result<PathBuf> {
 ///
 /// Returns `None` when the content does not contain the expected fields.
 pub(crate) fn beads_summary(content: &str) -> Option<String> {
+    let (o, r) = beads_counts(content)?;
+    Some(format!("{} open issues ({} ready)", o, r))
+}
+
+/// Parse `bd stats` output and return `(open, ready)` counts as raw numbers.
+///
+/// Returns `None` when the content does not contain both expected fields.
+pub(crate) fn beads_counts(content: &str) -> Option<(u64, u64)> {
     let mut open: Option<u64> = None;
     let mut ready: Option<u64> = None;
     for line in content.lines() {
@@ -359,7 +367,7 @@ pub(crate) fn beads_summary(content: &str) -> Option<String> {
         }
     }
     if let (Some(o), Some(r)) = (open, ready) {
-        Some(format!("{} open issues ({} ready)", o, r))
+        Some((o, r))
     } else {
         None
     }
