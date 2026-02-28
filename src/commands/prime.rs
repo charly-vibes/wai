@@ -163,7 +163,9 @@ fn check_pending_resume(
 
     // Determine the age of the .pending-resume file via its mtime.
     let mtime = meta.modified().ok()?;
-    let age = SystemTime::now().duration_since(mtime).unwrap_or(RESUME_WINDOW);
+    let age = SystemTime::now()
+        .duration_since(mtime)
+        .unwrap_or(RESUME_WINDOW);
 
     if age > RESUME_WINDOW {
         // Stale: emit a note, delete the file, and return None.

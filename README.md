@@ -520,7 +520,7 @@ wai way --json       # Machine-readable JSON output
 | Check | What It Validates | Recommendation |
 |-------|------------------|----------------|
 | **Task runner** | Presence of `justfile` or `Makefile` | Standardizes common tasks (build, test, deploy) |
-| **Git hooks** | Presence of `.prek.toml` or `.pre-commit-config.yaml` | Automates quality checks before commits |
+| **Git hooks** | Presence of `.prek.toml`, `lefthook.yml`, `.husky/`, or `.pre-commit-config.yaml` | Automates quality checks before commits |
 | **Editor config** | Presence of `.editorconfig` | Ensures consistent formatting across editors |
 | **Documentation** | Presence of `README.md`, `LICENSE`, `CONTRIBUTING.md`, `.gitignore` | Documents project and prevents accidental commits |
 | **AI instructions** | Presence of `CLAUDE.md` or `AGENTS.md` | Provides context to AI assistants |

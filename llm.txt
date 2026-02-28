@@ -1,0 +1,78 @@
+# wai
+
+> Workflow manager for AI-driven development — captures the *why* behind decisions.
+
+## What It Does
+
+wai is a CLI tool that helps teams document the reasoning, research, and design decisions that shaped their code. When you revisit a project later, wai tells you *why* it was built that way.
+
+- **Artifact tracking** — research, design, and plan documents organized by project and phase
+- **PARA method** — Projects / Areas / Resources / Archives structure
+- **Phase workflow** — research → design → plan → implement → review → archive
+- **Session handoffs** — `wai close` creates a handoff doc; `wai prime` resumes where you left off
+- **Plugin system** — integrates with beads (issues), git, and openspec
+- **AI features** — `wai why` (LLM oracle), `wai reflect` (synthesizes context into CLAUDE.md)
+- **Agent config sync** — single source of truth for AI assistant configs, synced to tool locations
+
+## Key Commands
+
+```
+wai init                    # Initialize in current directory
+wai status                  # Project status and suggestions
+wai add research "..."      # Add research artifact
+wai add design "..."        # Add design artifact
+wai add plan "..."          # Add plan artifact
+wai search "query"          # Search all artifacts
+wai phase next              # Advance project phase
+wai prime                   # Orient at session start
+wai close                   # Session handoff
+wai why "why X?"            # LLM-powered reasoning oracle
+wai reflect                 # Synthesize context into CLAUDE.md
+wai way                     # Check repository best practices
+wai doctor                  # Workspace health check
+wai sync                    # Sync agent configs
+```
+
+## Project Structure
+
+```
+.wai/
+├── config.toml
+├── projects/           # Active projects (phase-tracked)
+├── areas/              # Ongoing responsibilities
+├── resources/
+│   └── agent-config/   # Skills, rules, context for AI assistants
+└── archives/           # Completed work
+```
+
+## Source Layout
+
+```
+src/
+├── main.rs
+├── cli.rs              # Clap argument definitions
+├── commands/           # One file per subcommand
+│   ├── way.rs          # wai way — best practices checker
+│   ├── status.rs       # wai status
+│   ├── add.rs          # wai add
+│   ├── search.rs       # wai search
+│   └── ...
+├── plugin.rs           # Plugin detection and dispatch
+└── config.rs           # Config loading and paths
+```
+
+## Installation
+
+```bash
+# Homebrew
+brew tap charly-vibes/charly && brew install wai
+
+# Cargo
+cargo install --path .
+```
+
+## Links
+
+- Repository: https://github.com/charly-vibes/wai
+- Issues: https://github.com/charly-vibes/wai/issues
+- Changelog: CHANGELOG.md

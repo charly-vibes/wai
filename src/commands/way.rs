@@ -273,14 +273,35 @@ fn check_git_hooks(repo_root: &Path) -> CheckResult {
         "Automated checks (linters, tests) run automatically before code is committed.".to_string(),
     );
 
-    let prek_config = repo_root.join(".prek.toml");
+    let prek_config = repo_root.join("prek.toml");
     let precommit_config = repo_root.join(".pre-commit-config.yaml");
+    let lefthook_config = repo_root.join("lefthook.yml");
+    let lefthook_config_yaml = repo_root.join("lefthook.yaml");
+    let husky_dir = repo_root.join(".husky");
 
     if prek_config.exists() {
         CheckResult {
             name: name.to_string(),
             status: Status::Pass,
             message: "prek detected (recommended)".to_string(),
+            intent,
+            success_criteria,
+            suggestion: None,
+        }
+    } else if lefthook_config.exists() || lefthook_config_yaml.exists() {
+        CheckResult {
+            name: name.to_string(),
+            status: Status::Pass,
+            message: "lefthook detected".to_string(),
+            intent,
+            success_criteria,
+            suggestion: None,
+        }
+    } else if husky_dir.exists() && husky_dir.is_dir() {
+        CheckResult {
+            name: name.to_string(),
+            status: Status::Pass,
+            message: "husky detected".to_string(),
             intent,
             success_criteria,
             suggestion: None,

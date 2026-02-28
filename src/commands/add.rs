@@ -63,46 +63,46 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             }
 
             // Post-command suggestions after adding research
-            if !ctx.quiet {
-                if let Some(wf_ctx) = workflows::scan_project(&project_root, &target_project) {
-                    let suggestions = match wf_ctx.phase {
-                        Phase::Research if wf_ctx.research_count >= 2 => vec![
-                            Suggestion {
-                                label: "Add more research".to_string(),
-                                command: "wai add research \"...\"".to_string(),
-                            },
-                            Suggestion {
-                                label: "Move to design phase".to_string(),
-                                command: "wai phase set design".to_string(),
-                            },
-                            Suggestion {
-                                label: "Review research".to_string(),
-                                command: "wai search \"research\"".to_string(),
-                            },
-                        ],
-                        Phase::Research => vec![
-                            Suggestion {
-                                label: "Add more research".to_string(),
-                                command: "wai add research \"...\"".to_string(),
-                            },
-                            Suggestion {
-                                label: "Check phase".to_string(),
-                                command: "wai phase".to_string(),
-                            },
-                        ],
-                        _ => vec![
-                            Suggestion {
-                                label: "Continue research".to_string(),
-                                command: "wai add research \"...\"".to_string(),
-                            },
-                            Suggestion {
-                                label: "Review research".to_string(),
-                                command: "wai search \"research\"".to_string(),
-                            },
-                        ],
-                    };
-                    print_suggestions(&suggestions);
-                }
+            if !ctx.quiet
+                && let Some(wf_ctx) = workflows::scan_project(&project_root, &target_project)
+            {
+                let suggestions = match wf_ctx.phase {
+                    Phase::Research if wf_ctx.research_count >= 2 => vec![
+                        Suggestion {
+                            label: "Add more research".to_string(),
+                            command: "wai add research \"...\"".to_string(),
+                        },
+                        Suggestion {
+                            label: "Move to design phase".to_string(),
+                            command: "wai phase set design".to_string(),
+                        },
+                        Suggestion {
+                            label: "Review research".to_string(),
+                            command: "wai search \"research\"".to_string(),
+                        },
+                    ],
+                    Phase::Research => vec![
+                        Suggestion {
+                            label: "Add more research".to_string(),
+                            command: "wai add research \"...\"".to_string(),
+                        },
+                        Suggestion {
+                            label: "Check phase".to_string(),
+                            command: "wai phase".to_string(),
+                        },
+                    ],
+                    _ => vec![
+                        Suggestion {
+                            label: "Continue research".to_string(),
+                            command: "wai add research \"...\"".to_string(),
+                        },
+                        Suggestion {
+                            label: "Review research".to_string(),
+                            command: "wai search \"research\"".to_string(),
+                        },
+                    ],
+                };
+                print_suggestions(&suggestions);
             }
 
             Ok(())
