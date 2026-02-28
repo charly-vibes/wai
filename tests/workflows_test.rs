@@ -56,13 +56,14 @@ fn research_threshold_triggers_advance_at_three() {
 }
 
 #[test]
-fn two_research_artifacts_triggers_no_pattern() {
-    // 2 is above minimal (>1) but below threshold (<3) — no pattern expected
+fn two_research_artifacts_triggers_advance() {
+    // threshold is >= 2, so 2 artifacts should suggest advancing to design
     let detections = detect_patterns(&ctx(Phase::Research, 2, 0, 0));
-    assert!(
-        detections.is_empty(),
-        "2 research artifacts should trigger no pattern, got: {:?}",
-        detections.iter().map(|d| &d.pattern).collect::<Vec<_>>()
+    assert_eq!(detections.len(), 1);
+    assert_eq!(
+        detections[0].pattern,
+        WorkflowPattern::ResearchReadyToAdvance,
+        "2 research artifacts should trigger ResearchReadyToAdvance"
     );
 }
 
