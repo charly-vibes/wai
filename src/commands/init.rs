@@ -3,7 +3,7 @@ use miette::{IntoDiagnostic, Result};
 
 use crate::config::{CONFIG_DIR, ProjectConfig, ProjectSettings, WhyConfig};
 use crate::context::current_context;
-use crate::workspace::ensure_workspace_current;
+use crate::workspace::{ensure_workspace_current, sync_tool_commit};
 
 pub fn run(name: Option<String>) -> Result<()> {
     let current_dir = std::env::current_dir().into_diagnostic()?;
@@ -43,8 +43,14 @@ pub fn run(name: Option<String>) -> Result<()> {
     }
 
     if already_initialized {
-        // For re-init, repair/update workspace using shared function
-        let actions = ensure_workspace_current(&current_dir)?;
+        // For re-init, repair/update workspace using shared function.
+        // sync_tool_commit is called explicitly here (and only here) so that
+        // config.toml is only stamped during intentional init commands, not on
+        // every wai invocation.
+        let mut actions = ensure_workspace_current(&current_dir)?;
+        if let Some(action) = sync_tool_commit(&current_dir)? {
+            actions.push(action);
+        }
 
         if !quiet {
             // Report actions taken

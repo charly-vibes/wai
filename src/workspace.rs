@@ -22,13 +22,60 @@ impl WorkspaceAction {
     }
 }
 
+/// Updates `version` and `tool_commit` in `config.toml` to match the current binary.
+///
+/// This is intentionally separated from `ensure_workspace_current` so that the
+/// version stamp is only written during explicit user commands (`wai init`).
+/// Automatic per-command checks must NOT call this function, because writing
+/// `config.toml` on every run silently dirtifies the git working tree after a
+/// binary upgrade.
+///
+/// Returns an action description when the config was updated, or `None` when it
+/// was already up to date or when config could not be loaded.
+pub fn sync_tool_commit(project_root: &Path) -> Result<Option<WorkspaceAction>> {
+    let wai_dir = project_root.join(crate::config::CONFIG_DIR);
+    let config_path = wai_dir.join("config.toml");
+    if !config_path.exists() {
+        return Ok(None);
+    }
+    match ProjectConfig::load(project_root) {
+        Ok(mut config) => {
+            let current_version = env!("CARGO_PKG_VERSION");
+            let current_commit = env!("WAI_GIT_COMMIT");
+            let version_changed = config.project.version != current_version;
+            let commit_changed = !current_commit.starts_with("unknown")
+                && config.project.tool_commit != current_commit;
+            if version_changed || commit_changed {
+                config.project.version = current_version.to_string();
+                if !current_commit.starts_with("unknown") {
+                    config.project.tool_commit = current_commit.to_string();
+                }
+                config.save(project_root)?;
+                Ok(Some(WorkspaceAction::new(format!(
+                    "Updated workspace to wai {} ({})",
+                    current_version, current_commit
+                ))))
+            } else {
+                Ok(None)
+            }
+        }
+        Err(_) => {
+            // Config exists but is invalid — don't modify it.
+            Ok(None)
+        }
+    }
+}
+
 /// Ensures the workspace is current by creating/repairing all expected artifacts:
 /// - PARA directories (projects, areas, resources, archives, plugins)
 /// - agent-config subdirectories (skills, rules, context)
 /// - resource subdirectories (templates, patterns)
 /// - default files (.gitignore, .projections.yml, PLUGINS.md)
-/// - config.toml version update
 /// - managed block injection in agent instruction files
+///
+/// This function does NOT update `tool_commit` or `version` in `config.toml`.
+/// Call `sync_tool_commit` explicitly from commands that are meant to stamp the
+/// workspace (currently only `wai init`).
 ///
 /// Returns a list of actions taken for reporting.
 pub fn ensure_workspace_current(project_root: &Path) -> Result<Vec<WorkspaceAction>> {
@@ -100,34 +147,6 @@ pub fn ensure_workspace_current(project_root: &Path) -> Result<Vec<WorkspaceActi
         std::fs::write(&gitignore_path, "# Local-only files\n*.local\n*.cache\n")
             .into_diagnostic()?;
         actions.push(WorkspaceAction::new("Created .wai/.gitignore".to_string()));
-    }
-
-    // Update config.toml version and tool_commit if they differ from the current binary
-    let config_path = wai_dir.join("config.toml");
-    if config_path.exists() {
-        match ProjectConfig::load(project_root) {
-            Ok(mut config) => {
-                let current_version = env!("CARGO_PKG_VERSION");
-                let current_commit = env!("WAI_GIT_COMMIT");
-                let version_changed = config.project.version != current_version;
-                let commit_changed = !current_commit.starts_with("unknown")
-                    && config.project.tool_commit != current_commit;
-                if version_changed || commit_changed {
-                    config.project.version = current_version.to_string();
-                    if !current_commit.starts_with("unknown") {
-                        config.project.tool_commit = current_commit.to_string();
-                    }
-                    config.save(project_root)?;
-                    actions.push(WorkspaceAction::new(format!(
-                        "Updated workspace to wai {} ({})",
-                        current_version, current_commit
-                    )));
-                }
-            }
-            Err(_) => {
-                // Config exists but is invalid - don't modify it
-            }
-        }
     }
 
     // Detect plugins for managed block injection
