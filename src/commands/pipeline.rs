@@ -131,6 +131,7 @@ pub fn run(cmd: PipelineCommands) -> Result<()> {
         PipelineCommands::Init { name } => cmd_init(&name),
         PipelineCommands::Start { name, topic } => cmd_start(&name, topic.as_deref()),
         PipelineCommands::Next => cmd_next(),
+        PipelineCommands::Current => cmd_current(),
     }
 }
 
@@ -647,6 +648,44 @@ fn cmd_next() -> Result<()> {
         println!("      wai pipeline suggest   # start another pipeline");
     } else {
         print_step(&definition, next_step, &updated.topic);
+    }
+
+    Ok(())
+}
+
+// ─── current ──────────────────────────────────────────────────────────────────
+
+fn cmd_current() -> Result<()> {
+    let project_root = require_project()?;
+
+    // 1. Resolve run ID (env var → .last-run)
+    let run_id = resolve_active_run_id(&project_root)?;
+
+    // 2. Load run state
+    let runs_dir = crate::config::wai_dir(&project_root).join("pipeline-runs");
+    let run_path = runs_dir.join(format!("{}.yml", run_id));
+    if !run_path.exists() {
+        miette::bail!(
+            "No run state found for '{}'. The .last-run pointer may be stale.\nStart a new run with: wai pipeline start <name> --topic=<topic>",
+            run_id
+        );
+    }
+    let run: PipelineRun = serde_yml::from_str(&fs::read_to_string(&run_path).into_diagnostic()?)
+        .map_err(|e| miette::miette!("Failed to parse run state for '{}': {}", run_id, e))?;
+
+    // 3. Load pipeline definition
+    let def_path = crate::config::pipelines_dir(&project_root)
+        .join(format!("{}.toml", run.pipeline));
+    let definition = load_pipeline_toml(&def_path)?;
+
+    // 4. Print current step (or completion block if the run is done)
+    if run.current_step >= definition.steps.len() {
+        println!("──────────────────────────────────────────────");
+        println!("Pipeline '{}' is already complete!", definition.name);
+        println!();
+        println!("Next: wai close");
+    } else {
+        print_step(&definition, run.current_step, &run.topic);
     }
 
     Ok(())

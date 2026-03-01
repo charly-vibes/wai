@@ -5650,3 +5650,159 @@ fn pipeline_next_errors_when_run_already_complete() {
                 .or(predicate::str::contains("complete")),
         );
 }
+
+// ─── wai pipeline current ─────────────────────────────────────────────────────
+
+#[test]
+fn pipeline_current_reprints_step_prompt() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml(tmp.path(), "my-pipe");
+
+    // Start a pipeline run
+    wai_cmd(tmp.path())
+        .args(["pipeline", "start", "my-pipe", "--topic=my-topic"])
+        .assert()
+        .success();
+
+    // Call pipeline current — should reprint step 1 without advancing
+    let output = wai_cmd(tmp.path())
+        .args(["pipeline", "current"])
+        .env_remove("WAI_PIPELINE_RUN")
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let stdout = String::from_utf8(output).unwrap();
+    let stripped = strip_ansi(&stdout);
+
+    // Should contain step 1/2 header
+    assert!(
+        stripped.contains("step 1/2"),
+        "Output should contain 'step 1/2', got:\n{stripped}"
+    );
+
+    // Should contain the rendered prompt with topic substituted
+    assert!(
+        stripped.contains("my-topic"),
+        "Output should contain topic in rendered prompt, got:\n{stripped}"
+    );
+
+    // Should NOT contain the literal {topic} placeholder
+    assert!(
+        !stripped.contains("{topic}"),
+        "Output should not contain literal {{topic}} placeholder, got:\n{stripped}"
+    );
+
+    // Verify state was NOT advanced — current_step should still be 0
+    let last_run_path = tmp.path().join(".wai/resources/pipelines/.last-run");
+    let run_id = fs::read_to_string(&last_run_path).unwrap();
+    let run_id = run_id.trim().to_string();
+    let run_file = tmp.path().join(".wai/pipeline-runs").join(format!("{}.yml", run_id));
+    let content = fs::read_to_string(&run_file).unwrap();
+    assert!(
+        content.contains("current_step: 0"),
+        "Run state must NOT have advanced after 'current'; got:\n{content}"
+    );
+}
+
+#[test]
+fn pipeline_current_after_next_shows_step_2() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml(tmp.path(), "my-pipe");
+
+    // Start a run
+    wai_cmd(tmp.path())
+        .args(["pipeline", "start", "my-pipe", "--topic=my-topic"])
+        .assert()
+        .success();
+
+    // Advance once
+    wai_cmd(tmp.path())
+        .args(["pipeline", "next"])
+        .env_remove("WAI_PIPELINE_RUN")
+        .assert()
+        .success();
+
+    // Now pipeline current should show step 2
+    let output = wai_cmd(tmp.path())
+        .args(["pipeline", "current"])
+        .env_remove("WAI_PIPELINE_RUN")
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let stdout = String::from_utf8(output).unwrap();
+    let stripped = strip_ansi(&stdout);
+
+    assert!(
+        stripped.contains("step 2/2"),
+        "Output should contain 'step 2/2' after one advance, got:\n{stripped}"
+    );
+}
+
+#[test]
+fn pipeline_current_errors_when_no_active_run() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    // No pipeline started, no .last-run file, no WAI_PIPELINE_RUN env
+    wai_cmd(tmp.path())
+        .args(["pipeline", "current"])
+        .env_remove("WAI_PIPELINE_RUN")
+        .assert()
+        .failure()
+        .stderr(
+            predicate::str::contains("No active pipeline run")
+                .or(predicate::str::contains("pipeline start")),
+        );
+}
+
+#[test]
+fn pipeline_current_on_complete_run_prints_done() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml(tmp.path(), "my-pipe");
+
+    // Start a run
+    wai_cmd(tmp.path())
+        .args(["pipeline", "start", "my-pipe", "--topic=test-topic"])
+        .assert()
+        .success();
+
+    // Advance through all steps (2-step pipeline)
+    wai_cmd(tmp.path())
+        .args(["pipeline", "next"])
+        .env_remove("WAI_PIPELINE_RUN")
+        .assert()
+        .success();
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "next"])
+        .env_remove("WAI_PIPELINE_RUN")
+        .assert()
+        .success();
+
+    // pipeline current on a completed run should indicate done (not error)
+    let output = wai_cmd(tmp.path())
+        .args(["pipeline", "current"])
+        .env_remove("WAI_PIPELINE_RUN")
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let stdout = String::from_utf8(output).unwrap();
+    let stripped = strip_ansi(&stdout);
+
+    assert!(
+        stripped.contains("complete") || stripped.contains("done") || stripped.contains("wai close"),
+        "Output should indicate the pipeline is complete, got:\n{stripped}"
+    );
+}

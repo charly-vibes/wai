@@ -782,4 +782,22 @@ pub enum PipelineCommands {
     ///   WAI_PIPELINE_RUN  When set, identifies the active run. Falls back to
     ///                     `.wai/resources/pipelines/.last-run` when not set.
     Next,
+
+    /// Reprint the current step prompt (for session recovery after /clear)
+    ///
+    /// Resolves the active run from `WAI_PIPELINE_RUN` env var, falling back
+    /// to the `.last-run` pointer file. Loads run state and pipeline
+    /// definition, then reprints the current step prompt WITHOUT advancing
+    /// the step counter. Pure read-only operation.
+    ///
+    /// Use this after a `/clear` or terminal loss to recover the current
+    /// step context without losing your place.
+    ///
+    /// EXAMPLES
+    ///   wai pipeline current
+    ///
+    /// ENVIRONMENT
+    ///   WAI_PIPELINE_RUN  When set, identifies the active run. Falls back to
+    ///                     `.wai/resources/pipelines/.last-run` when not set.
+    Current,
 }

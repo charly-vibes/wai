@@ -31,9 +31,9 @@
 
 ## 5. Command: `pipeline current` (`src/cli.rs`, `src/commands/pipeline.rs`)
 
-- [ ] 5.1 Add `PipelineCommands::Current` variant to `src/cli.rs`
-- [ ] 5.2 Implement `cmd_current`: resolve run ID (env → `.last-run`), load run state and definition, print current step prompt block
-- [ ] 5.3 Error clearly when no active run found
+- [x] 5.1 Add `PipelineCommands::Current` variant to `src/cli.rs`
+- [x] 5.2 Implement `cmd_current`: resolve run ID (env → `.last-run`), load run state and definition, print current step prompt block
+- [x] 5.3 Error clearly when no active run found
 
 ## 6. Remove old commands (`src/cli.rs`, `src/commands/pipeline.rs`)
 
