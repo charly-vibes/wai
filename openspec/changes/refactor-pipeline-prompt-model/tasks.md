@@ -37,9 +37,9 @@
 
 ## 6. Remove old commands (`src/cli.rs`, `src/commands/pipeline.rs`)
 
-- [ ] 6.1 Remove `PipelineCommands::Create`, `Run`, `Advance` variants and their implementations
-- [ ] 6.2 Remove `parse_stages()`, `validate_skill_exists()`, and `load_pipeline_definition()` (YAML loader)
-- [ ] 6.3 Remove `serde_yaml` usage from `src/commands/pipeline.rs` for definitions (keep for run state)
+- [x] 6.1 Remove `PipelineCommands::Create`, `Run`, `Advance` variants and their implementations
+- [x] 6.2 Remove `parse_stages()`, `validate_skill_exists()`, and `load_pipeline_definition()` (YAML loader)
+- [x] 6.3 Remove `serde_yaml` usage from `src/commands/pipeline.rs` for definitions (keep for run state)
 
 ## 7. `wai status` pipeline integration (`src/commands/status.rs`)
 

@@ -357,18 +357,6 @@ pub fn write_pipeline_run_state(project_root: &Path, run_id: &str) -> Result<(),
     Ok(())
 }
 
-/// Remove the active pipeline run state file, if it exists.
-///
-/// Called when `wai pipeline advance` completes the last stage.
-/// Silently succeeds if the file is already absent.
-pub fn clear_pipeline_run_state(project_root: &Path) -> Result<(), WaiError> {
-    let path = pipeline_run_file(project_root);
-    if path.exists() {
-        std::fs::remove_file(&path)?;
-    }
-    Ok(())
-}
-
 /// Read the active pipeline run ID from the state file, if present.
 ///
 /// Returns `None` when the file does not exist or its contents are empty.

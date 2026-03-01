@@ -361,20 +361,20 @@ pub enum Commands {
         inject_content: Option<String>,
     },
 
-    /// Manage pipelines (ordered multi-skill workflows)
+    /// Manage pipelines (ordered multi-step workflows)
     #[command(
-        about = "Manage pipelines (ordered multi-skill workflows)",
-        long_about = "Pipelines chain skills into ordered stages, tracking run state and\n\
-            auto-tagging artifacts with the run ID.\n\n\
+        about = "Manage pipelines (ordered multi-step workflows)",
+        long_about = "Pipelines chain prompt-driven steps into ordered workflows, tracking run\n\
+            state and auto-tagging artifacts with the run ID.\n\n\
             EXAMPLES\n\
-              wai pipeline create review --stages=\"issue/gather:research,impl/run:plan\"\n\
-              wai pipeline run review --topic=my-feature\n\
-              wai pipeline advance <run-id>\n\
-              wai pipeline status review\n\n\
+              wai pipeline init my-workflow\n\
+              wai pipeline start my-workflow --topic=auth-refactor\n\
+              wai pipeline next\n\
+              wai pipeline current\n\
+              wai pipeline suggest \"auth login\"\n\n\
             STATE FILE\n\
-              `wai pipeline run` writes the active run ID to .wai/.pipeline-run so\n\
-              `wai add` picks it up automatically — no export needed. The file is\n\
-              removed when `wai pipeline advance` completes the last stage.\n\n\
+              `wai pipeline start` writes the active run ID to .wai/.pipeline-run so\n\
+              `wai add` picks it up automatically — no export needed.\n\n\
             ENVIRONMENT (optional override)\n\
               WAI_PIPELINE_RUN  When set, overrides the state file. Useful for running\n\
                                 `wai add` from a subshell or script:\n\
@@ -667,46 +667,7 @@ pub struct ResourceExportArgs {
 
 #[derive(Subcommand)]
 pub enum PipelineCommands {
-    /// Create a new pipeline with ordered stages
-    ///
-    /// Each stage is specified as "skill:artifact-type". The skill name must
-    /// exist in the project's skills directory. Artifact type is a label for
-    /// the expected output (e.g. research, plan, design).
-    ///
-    /// EXAMPLE
-    ///   wai pipeline create review \
-    ///     --stages="issue/gather:research,impl/run:plan,impl/review:design"
-    Create {
-        /// Pipeline name
-        name: String,
-
-        /// Ordered stages as "skill:artifact-type,..." pairs
-        ///
-        /// Each pair is "skill-name:artifact-type" separated by commas.
-        /// Example: "issue/gather:research,impl/run:plan"
-        #[arg(long)]
-        stages: String,
-    },
-
-    /// Start a new pipeline run
-    ///
-    /// Generates a run ID of the form "<pipeline>-<date>-<topic>" and persists
-    /// initial run state. Outputs the run ID and a hint to set WAI_PIPELINE_RUN.
-    ///
-    /// ENVIRONMENT
-    ///   After running, set WAI_PIPELINE_RUN to enable automatic artifact tagging:
-    ///     export WAI_PIPELINE_RUN=<run-id>
-    ///   Then use `wai add research/plan/design` — artifacts are tagged automatically.
-    Run {
-        /// Pipeline name
-        name: String,
-
-        /// Topic slug for this run (used in the run ID)
-        #[arg(long)]
-        topic: String,
-    },
-
-    /// Start a new TOML pipeline run (replaces 'run' for TOML-based pipelines)
+    /// Start a new TOML pipeline run
     ///
     /// Loads a TOML pipeline definition, generates a unique run ID, writes run
     /// state to `.wai/pipeline-runs/<run-id>.yml`, records the run ID in
@@ -727,16 +688,6 @@ pub enum PipelineCommands {
         /// Topic to use for {topic} substitution in step prompts
         #[arg(long)]
         topic: Option<String>,
-    },
-
-    /// Advance to the next stage of a pipeline run
-    ///
-    /// Marks the current stage complete (recording the artifact path if a
-    /// pipeline-run-tagged artifact is found), then outputs a hint for the
-    /// next stage. Errors if the run ID is unknown or all stages are already done.
-    Advance {
-        /// Run ID (e.g., review-2026-02-25-my-feature)
-        run_id: String,
     },
 
     /// Show status of a pipeline's runs
