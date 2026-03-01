@@ -41,7 +41,10 @@ pub fn wai_block_content(detected_plugins: &[&str], installed_skills: &[&str]) -
         block.push_str(
             "\n\
              > **CRITICAL**: Use TDD (write tests first) and Tidy First (separate refactoring \
-             commits from feature commits) when implementing changes.\n",
+             commits from feature commits) when implementing changes.\n\
+             \n\
+             > **When beginning research or creating a ticket**: run `wai search \"<topic>\"` \
+             to check for existing patterns before writing new content.\n",
         );
     }
     if has_ro5 {
@@ -673,6 +676,45 @@ mod wai_block_tests {
         assert!(
             !output.contains("/ro5"),
             "unexpected '/ro5' in output without ro5 skill"
+        );
+    }
+
+    // 6.4: search-before-research instruction present with companions, absent without
+    // The instruction uses "before writing new content" as its distinguishing phrase.
+
+    const SEARCH_INSTRUCTION: &str = "before writing new content";
+
+    #[test]
+    fn search_before_research_present_with_companions() {
+        for plugins in [&["beads"][..], &["openspec"][..], &["beads", "openspec"][..]] {
+            let output = wai_block_content(plugins, &[]);
+            assert!(
+                output.contains(SEARCH_INSTRUCTION),
+                "expected search-before-research instruction with plugins {:?}",
+                plugins
+            );
+        }
+    }
+
+    #[test]
+    fn search_before_research_absent_without_companions() {
+        let output = wai_block_content(&[], &[]);
+        assert!(
+            !output.contains(SEARCH_INSTRUCTION),
+            "unexpected search-before-research instruction without companion tools"
+        );
+    }
+
+    #[test]
+    fn search_before_research_after_tdd_disclaimer() {
+        let output = wai_block_content(&["beads"], &[]);
+        let tdd_pos = output.find("CRITICAL").expect("CRITICAL not found");
+        let search_pos = output
+            .find(SEARCH_INSTRUCTION)
+            .expect("search instruction not found");
+        assert!(
+            search_pos > tdd_pos,
+            "search-before-research should appear after TDD disclaimer"
         );
     }
 }
