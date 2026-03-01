@@ -3,7 +3,8 @@ use std::path::Path;
 
 use crate::config::{
     AGENT_CONFIG_DIR, ARCHIVES_DIR, AREAS_DIR, CONFIG_DIR, CONTEXT_DIR, PLUGINS_DIR, PROJECTS_DIR,
-    ProjectConfig, RESOURCES_DIR, RULES_DIR, SKILLS_DIR, agent_config_dir,
+    ProjectConfig, PATTERNS_DIR, REFLECTIONS_DIR, RESOURCES_DIR, RULES_DIR, SKILLS_DIR,
+    TEMPLATES_DIR, agent_config_dir,
 };
 use crate::managed_block::inject_managed_block;
 use crate::plugin;
@@ -133,7 +134,7 @@ pub fn ensure_workspace_current(project_root: &Path) -> Result<Vec<WorkspaceActi
 
     // Create resource subdirectories
     let resources = wai_dir.join(RESOURCES_DIR);
-    let resource_subdirs = ["templates", "patterns"];
+    let resource_subdirs = [TEMPLATES_DIR, PATTERNS_DIR, REFLECTIONS_DIR];
 
     for subdir in &resource_subdirs {
         let subdir_path = resources.join(subdir);

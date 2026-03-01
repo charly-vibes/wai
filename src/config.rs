@@ -26,6 +26,10 @@ pub const CONTEXT_DIR: &str = "context";
 /// Pipeline definitions and run state within resources/
 pub const PIPELINES_DIR: &str = "pipelines";
 
+/// Template and pattern resource files within resources/
+pub const TEMPLATES_DIR: &str = "templates";
+pub const PATTERNS_DIR: &str = "patterns";
+
 /// Reflection resource files within resources/
 pub const REFLECTIONS_DIR: &str = "reflections";
 
