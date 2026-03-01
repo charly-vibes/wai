@@ -59,24 +59,24 @@
 
 ## 9. Step prompt convention (init template content)
 
-- [ ] 9.1 Update `pipeline init` starter template to demonstrate thin prompt style: one-line task summary + optional skill hint + `wai add` + `wai pipeline next`
-- [ ] 9.2 Add a comment in the generated template explaining the convention: "Step prompts are navigation hints. Instructions for HOW to do the work belong in skills."
+- [x] 9.1 Update `pipeline init` starter template to demonstrate thin prompt style: one-line task summary + optional skill hint + `wai add` + `wai pipeline next`
+- [x] 9.2 Add a comment in the generated template explaining the convention: "Step prompts are navigation hints. Instructions for HOW to do the work belong in skills."
 
 ## 10. Tests
 
-- [ ] 10.1 Unit test: `render_prompt()` substitutes `{topic}` correctly; no panic on missing placeholder
-- [ ] 10.2 Unit test: `load_pipeline_toml()` rejects duplicate step IDs with named error
-- [ ] 10.3 Unit test: `load_pipeline_toml()` rejects empty prompts with named step ID in error
-- [ ] 10.4 Integration test: `pipeline start` → `pipeline next` (mid-run) → `pipeline next` (last step) → completion block
-- [ ] 10.5 Integration test: `.last-run` written on start; `pipeline next` resolves it when env var absent
-- [ ] 10.6 Integration test: `pipeline current` re-prints prompt after env var cleared
-- [ ] 10.7 Integration test: `pipeline next` on already-complete run errors clearly
-- [ ] 10.8 Unit test: `pipeline suggest` with no description lists all pipelines sorted alphabetically
-- [ ] 10.9 Unit test: `pipeline suggest "fix auth bug"` ranks pipeline with matching keywords above unrelated ones; deterministic order for equal-score pipelines (alphabetical)
-- [ ] 10.10 Unit test: `pipeline suggest "xyz123"` with no matches returns all pipelines in alphabetical order
-- [ ] 10.11 Integration test: `wai status` emits "Available pipelines" section when no run active and pipelines exist
-- [ ] 10.12 Integration test: `wai status` falls back to idle state when `.last-run` points to a missing run file (stale pointer)
+- [x] 10.1 Unit test: `render_prompt()` substitutes `{topic}` correctly; no panic on missing placeholder
+- [x] 10.2 Unit test: `load_pipeline_toml()` rejects duplicate step IDs with named error
+- [x] 10.3 Unit test: `load_pipeline_toml()` rejects empty prompts with named step ID in error
+- [x] 10.4 Integration test: `pipeline start` → `pipeline next` (mid-run) → `pipeline next` (last step) → completion block
+- [x] 10.5 Integration test: `.last-run` written on start; `pipeline next` resolves it when env var absent
+- [x] 10.6 Integration test: `pipeline current` re-prints prompt after env var cleared
+- [x] 10.7 Integration test: `pipeline next` on already-complete run errors clearly
+- [x] 10.8 Unit test: `pipeline suggest` with no description lists all pipelines sorted alphabetically
+- [x] 10.9 Unit test: `pipeline suggest "fix auth bug"` ranks pipeline with matching keywords above unrelated ones; deterministic order for equal-score pipelines (alphabetical)
+- [x] 10.10 Unit test: `pipeline suggest "xyz123"` with no matches returns all pipelines in alphabetical order
+- [x] 10.11 Integration test: `wai status` emits "Available pipelines" section when no run active and pipelines exist
+- [x] 10.12 Integration test: `wai status` falls back to idle state when `.last-run` points to a missing run file (stale pointer)
 
 ## 11. Spec update: `context-suggestions` (`openspec/specs/context-suggestions/`)
 
-- [ ] 11.1 Update context-suggestions spec to reflect that the wai status suggestions block gains `wai pipeline suggest` (when idle with pipelines present) and `wai pipeline current` (when a pipeline run is active)
+- [x] 11.1 Update context-suggestions spec to reflect that the wai status suggestions block gains `wai pipeline suggest` (when idle with pipelines present) and `wai pipeline current` (when a pipeline run is active)

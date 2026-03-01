@@ -95,6 +95,29 @@ When a project has no artifacts, suggestions SHALL guide initial setup.
 - **THEN** suggest starting with research: `wai add research "..."`
 - **AND** suggest checking phase: `wai phase`
 
+### Requirement: Pipeline Suggestions
+
+When pipelines are configured, suggestions SHALL surface pipeline discovery and recovery actions.
+
+#### Scenario: Active pipeline run
+
+- **WHEN** a pipeline run is active (resolved from `WAI_PIPELINE_RUN` env var or `.wai/resources/pipelines/.last-run`)
+- **THEN** status emits a "⚡ PIPELINE ACTIVE: `<name>` step N/M" line in a Pipeline section
+- **AND** suggests reprinting the current step: `wai pipeline current`
+
+#### Scenario: Pipelines available but no active run
+
+- **WHEN** no active pipeline run exists
+- **AND** `.wai/resources/pipelines/` contains at least one valid `.toml` pipeline definition
+- **THEN** status emits an "Available pipelines" section listing each pipeline with name, description, and step count
+- **AND** suggests discovering pipelines: `wai pipeline suggest`
+
+#### Scenario: Stale pipeline pointer
+
+- **WHEN** `.last-run` pointer exists but the referenced run file is missing
+- **THEN** the stale pointer is silently ignored
+- **AND** status falls back to the "available pipelines" or idle state
+
 ### Requirement: Suggestion Output Blocks
 
 Status output SHALL include a clearly labeled suggestion block for human and machine parsing.
