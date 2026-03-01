@@ -71,8 +71,15 @@ pub fn write_reflect_resource(
     let refl_dir = crate::config::reflections_dir(project_root);
     std::fs::create_dir_all(&refl_dir).into_diagnostic()?;
 
-    let date = chrono::Local::now().format("%Y-%m-%d").to_string();
-    let filename = format!("{}-{}.md", date, project_name);
+    let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    let name_slug = slug::slugify(project_name);
+    let mut filename = format!("{}-{}.md", date, name_slug);
+    // Deduplicate: if the file already exists, append a counter
+    let mut counter = 2;
+    while refl_dir.join(&filename).exists() {
+        filename = format!("{}-{}-{}.md", date, name_slug, counter);
+        counter += 1;
+    }
     let path = refl_dir.join(&filename);
 
     let mut front_matter = format!(
