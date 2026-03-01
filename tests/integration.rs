@@ -5714,3 +5714,180 @@ fn pipeline_suggest_empty_string_treated_as_no_description() {
         "'alpha' should appear before 'beta' (alphabetical, empty string = no scoring), got:\n{stripped}"
     );
 }
+
+// ─── wai status: pipeline integration ────────────────────────────────────────
+
+/// Helper: write a run state YAML file directly, simulating a started pipeline run.
+fn write_pipeline_run(
+    dir: &std::path::Path,
+    pipeline_name: &str,
+    run_id: &str,
+    current_step: usize,
+) {
+    let runs_dir = dir.join(".wai/pipeline-runs");
+    fs::create_dir_all(&runs_dir).unwrap();
+    let yaml = format!(
+        "run_id: {run_id}\npipeline: {pipeline_name}\ntopic: test-topic\ncreated_at: \"2026-01-01T00:00:00Z\"\ncurrent_step: {current_step}\n"
+    );
+    fs::write(runs_dir.join(format!("{run_id}.yml")), yaml).unwrap();
+
+    // Write .last-run pointer
+    let pipelines_dir = dir.join(".wai/resources/pipelines");
+    fs::create_dir_all(&pipelines_dir).unwrap();
+    fs::write(pipelines_dir.join(".last-run"), run_id).unwrap();
+}
+
+#[test]
+fn status_shows_pipeline_active_when_run_exists() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+
+    // Create the pipeline TOML definition
+    write_pipeline_toml(tmp.path(), "my-pipe");
+
+    // Simulate a started run at step 0 (step 1/2)
+    write_pipeline_run(tmp.path(), "my-pipe", "my-pipe-2026-01-01-test-topic", 0);
+
+    let output = wai_cmd(tmp.path())
+        .args(["status"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let stdout = String::from_utf8(output).unwrap();
+    let stripped = strip_ansi(&stdout);
+
+    assert!(
+        stripped.contains("PIPELINE ACTIVE"),
+        "Output should contain 'PIPELINE ACTIVE', got:\n{stripped}"
+    );
+    assert!(
+        stripped.contains("my-pipe"),
+        "Output should contain pipeline name 'my-pipe', got:\n{stripped}"
+    );
+    assert!(
+        stripped.contains("step 1/"),
+        "Output should contain 'step 1/', got:\n{stripped}"
+    );
+}
+
+#[test]
+fn status_shows_pipeline_current_suggestion_when_active() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+
+    write_pipeline_toml(tmp.path(), "my-pipe");
+    write_pipeline_run(tmp.path(), "my-pipe", "my-pipe-2026-01-01-test-topic", 0);
+
+    let output = wai_cmd(tmp.path())
+        .args(["status"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let stdout = String::from_utf8(output).unwrap();
+    let stripped = strip_ansi(&stdout);
+
+    assert!(
+        stripped.contains("wai pipeline current"),
+        "Output should suggest 'wai pipeline current', got:\n{stripped}"
+    );
+}
+
+#[test]
+fn status_shows_available_pipelines_when_no_active_run() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+
+    // Create a pipeline TOML but no active run
+    write_pipeline_toml(tmp.path(), "my-pipe");
+
+    let output = wai_cmd(tmp.path())
+        .args(["status"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let stdout = String::from_utf8(output).unwrap();
+    let stripped = strip_ansi(&stdout);
+
+    assert!(
+        stripped.contains("Available pipelines"),
+        "Output should contain 'Available pipelines', got:\n{stripped}"
+    );
+    assert!(
+        stripped.contains("my-pipe"),
+        "Output should contain pipeline name 'my-pipe', got:\n{stripped}"
+    );
+}
+
+#[test]
+fn status_shows_pipeline_suggest_when_pipelines_exist() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+
+    // Create a pipeline TOML but no active run
+    write_pipeline_toml(tmp.path(), "my-pipe");
+
+    let output = wai_cmd(tmp.path())
+        .args(["status"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let stdout = String::from_utf8(output).unwrap();
+    let stripped = strip_ansi(&stdout);
+
+    assert!(
+        stripped.contains("wai pipeline suggest"),
+        "Output should suggest 'wai pipeline suggest', got:\n{stripped}"
+    );
+}
+
+#[test]
+fn status_ignores_stale_last_run_pointer() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+
+    // Create a pipeline TOML
+    write_pipeline_toml(tmp.path(), "my-pipe");
+
+    // Write .last-run pointing to a nonexistent run file (stale pointer)
+    let pipelines_dir = tmp.path().join(".wai/resources/pipelines");
+    fs::create_dir_all(&pipelines_dir).unwrap();
+    fs::write(pipelines_dir.join(".last-run"), "nonexistent-run-id").unwrap();
+
+    // Should NOT crash and should show "Available pipelines" instead
+    let output = wai_cmd(tmp.path())
+        .args(["status"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let stdout = String::from_utf8(output).unwrap();
+    let stripped = strip_ansi(&stdout);
+
+    assert!(
+        !stripped.contains("PIPELINE ACTIVE"),
+        "Should not show PIPELINE ACTIVE for stale pointer, got:\n{stripped}"
+    );
+    assert!(
+        stripped.contains("Available pipelines"),
+        "Should show Available pipelines when pointer is stale, got:\n{stripped}"
+    );
+}

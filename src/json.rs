@@ -30,6 +30,28 @@ pub struct StatusProject {
 }
 
 #[derive(Debug, Serialize)]
+pub struct StatusPipelineActive {
+    pub name: String,
+    pub step: usize,
+    pub total: usize,
+}
+
+#[derive(Debug, Serialize)]
+pub struct StatusPipelineAvailable {
+    pub name: String,
+    pub description: Option<String>,
+    pub steps: usize,
+}
+
+#[derive(Debug, Serialize)]
+pub struct StatusPipeline {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub active: Option<StatusPipelineActive>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub available: Vec<StatusPipelineAvailable>,
+}
+
+#[derive(Debug, Serialize)]
 pub struct StatusPayload {
     pub project_root: String,
     pub projects: Vec<StatusProject>,
@@ -37,6 +59,8 @@ pub struct StatusPayload {
     pub hook_outputs: Vec<HookOutput>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub openspec: Option<StatusOpenSpec>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pipeline: Option<StatusPipeline>,
     pub suggestions: Vec<Suggestion>,
 }
 

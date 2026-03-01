@@ -43,11 +43,11 @@
 
 ## 7. `wai status` pipeline integration (`src/commands/status.rs`)
 
-- [ ] 7.1 Read `.last-run` pointer on status (fall back to `WAI_PIPELINE_RUN` env); if pointer exists but run file is missing, treat as no active run (stale pointer silently ignored)
-- [ ] 7.2 If active run found: load run state, emit pipeline section ("⚡ PIPELINE ACTIVE: <name> step N/M")
-- [ ] 7.3 Add `wai pipeline current` to suggestions block when active run is present
-- [ ] 7.4 If no active run and pipelines directory has at least one `.toml` definition: emit "Available pipelines" section listing name, description, and step count; skip malformed TOML files with inline warning ("⚠ pipeline <name>: invalid TOML, skipped") rather than erroring
-- [ ] 7.5 Add `wai pipeline suggest` to suggestions block when pipelines are present but no run is active
+- [x] 7.1 Read `.last-run` pointer on status (fall back to `WAI_PIPELINE_RUN` env); if pointer exists but run file is missing, treat as no active run (stale pointer silently ignored)
+- [x] 7.2 If active run found: load run state, emit pipeline section ("⚡ PIPELINE ACTIVE: <name> step N/M")
+- [x] 7.3 Add `wai pipeline current` to suggestions block when active run is present
+- [x] 7.4 If no active run and pipelines directory has at least one `.toml` definition: emit "Available pipelines" section listing name, description, and step count; skip malformed TOML files with inline warning ("⚠ pipeline <name>: invalid TOML, skipped") rather than erroring
+- [x] 7.5 Add `wai pipeline suggest` to suggestions block when pipelines are present but no run is active
 
 ## 8. Command: `pipeline suggest` (`src/cli.rs`, `src/commands/pipeline.rs`)
 

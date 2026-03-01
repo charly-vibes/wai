@@ -1,12 +1,15 @@
 use cliclack::{intro, outro};
 use miette::{IntoDiagnostic, Result};
 use owo_colors::OwoColorize;
+use std::fs;
+use std::path::Path;
 
-use crate::config::{ProjectConfig, STATE_FILE, find_project_root, projects_dir};
+use crate::config::{ProjectConfig, STATE_FILE, find_project_root, last_run_path, pipelines_dir, projects_dir};
 use crate::context::current_context;
 use crate::error::WaiError;
 use crate::json::{
-    HookOutput, StatusChange, StatusChangeSection, StatusOpenSpec, StatusPayload, StatusPlugin,
+    HookOutput, StatusChange, StatusChangeSection, StatusOpenSpec, StatusPayload,
+    StatusPipeline, StatusPipelineActive, StatusPipelineAvailable, StatusPlugin,
     StatusProject, Suggestion,
 };
 use crate::openspec;
@@ -16,6 +19,78 @@ use crate::state::{Phase, ProjectState};
 use crate::workflows;
 
 use super::beads_summary;
+use super::pipeline::{PipelineDefinition, PipelineRun, load_pipeline_toml};
+
+// ─── Pipeline state detection ─────────────────────────────────────────────────
+
+enum PipelineStatusInfo {
+    Active {
+        run: PipelineRun,
+        definition: PipelineDefinition,
+    },
+    Available(Vec<(String, PipelineDefinition)>),
+    None,
+}
+
+fn detect_pipeline_state(workspace_root: &Path) -> PipelineStatusInfo {
+    // 1. Try to resolve active run ID: env var → .last-run file
+    let last_run_file = last_run_path(workspace_root);
+    let run_id = std::env::var("WAI_PIPELINE_RUN")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .or_else(|| {
+            fs::read_to_string(&last_run_file)
+                .ok()
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+        });
+
+    if let Some(rid) = run_id {
+        let run_path = workspace_root
+            .join(".wai/pipeline-runs")
+            .join(format!("{}.yml", rid));
+        if run_path.exists() {
+            if let Ok(content) = fs::read_to_string(&run_path) {
+                if let Ok(run) = serde_yml::from_str::<PipelineRun>(&content) {
+                    let def_path = pipelines_dir(workspace_root)
+                        .join(format!("{}.toml", run.pipeline));
+                    if let Ok(def) = load_pipeline_toml(&def_path) {
+                        return PipelineStatusInfo::Active { run, definition: def };
+                    }
+                }
+            }
+        }
+        // Stale pointer — fall through to available pipelines
+    }
+
+    // 2. No active run — list available pipelines
+    let pipelines = pipelines_dir(workspace_root);
+    let mut available: Vec<(String, PipelineDefinition)> = Vec::new();
+    if pipelines.exists() {
+        if let Ok(entries) = fs::read_dir(&pipelines) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file()
+                    && path.extension().and_then(|e| e.to_str()) == Some("toml")
+                {
+                    if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
+                        match load_pipeline_toml(&path) {
+                            Ok(def) => available.push((name.to_string(), def)),
+                            Err(e) => eprintln!("warning: {}: {}", path.display(), e),
+                        }
+                    }
+                }
+            }
+        }
+        available.sort_by(|(a, _), (b, _)| a.cmp(b));
+    }
+
+    if available.is_empty() {
+        PipelineStatusInfo::None
+    } else {
+        PipelineStatusInfo::Available(available)
+    }
+}
 
 pub fn run(verbose: u8) -> Result<()> {
     let project_root = find_project_root().ok_or(WaiError::NotInitialized)?;
@@ -169,6 +244,40 @@ pub fn run(verbose: u8) -> Result<()> {
         }
     }
 
+    // Pipeline status section
+    let pipeline_state = detect_pipeline_state(&project_root);
+    match &pipeline_state {
+        PipelineStatusInfo::Active { run, definition } => {
+            let total = definition.steps.len();
+            let step_num = run.current_step + 1;
+            println!();
+            println!("  {} Pipeline", "◆".cyan());
+            println!(
+                "    {} PIPELINE ACTIVE: {} step {}/{}",
+                "⚡".yellow(),
+                run.pipeline,
+                step_num,
+                total
+            );
+        }
+        PipelineStatusInfo::Available(pipelines) => {
+            println!();
+            println!("  {} Available pipelines", "◆".cyan());
+            for (name, def) in pipelines {
+                let desc = def.description.as_deref().unwrap_or("(no description)");
+                let steps = def.steps.len();
+                println!(
+                    "    {} {}  {} ({} steps)",
+                    "•".dimmed(),
+                    name.bold(),
+                    desc.dimmed(),
+                    steps
+                );
+            }
+        }
+        PipelineStatusInfo::None => {}
+    }
+
     // Suggestions — phase-aware when projects exist
     println!();
     println!("  {} Suggestions", "◆".cyan());
@@ -226,6 +335,27 @@ pub fn run(verbose: u8) -> Result<()> {
         }
     }
 
+    // Pipeline suggestions — always appended after workflow suggestions
+    match &pipeline_state {
+        PipelineStatusInfo::Active { .. } => {
+            let s = Suggestion {
+                label: "Resume pipeline".to_string(),
+                command: "wai pipeline current".to_string(),
+            };
+            println!("    {} {}: {}", "→".dimmed(), s.label, s.command);
+            suggestions.push(s);
+        }
+        PipelineStatusInfo::Available(_) => {
+            let s = Suggestion {
+                label: "Choose a pipeline".to_string(),
+                command: "wai pipeline suggest".to_string(),
+            };
+            println!("    {} {}: {}", "→".dimmed(), s.label, s.command);
+            suggestions.push(s);
+        }
+        PipelineStatusInfo::None => {}
+    }
+
     outro("Run 'wai show' for full overview").into_diagnostic()?;
     Ok(())
 }
@@ -281,7 +411,7 @@ fn render_json(project_root: &std::path::Path, _project_name: &str) -> Result<()
         })
         .collect();
 
-    let suggestions = if projects.is_empty() {
+    let mut suggestions = if projects.is_empty() {
         vec![Suggestion {
             label: "Create your first project".to_string(),
             command: "wai new project \"my-app\"".to_string(),
@@ -321,12 +451,50 @@ fn render_json(project_root: &std::path::Path, _project_name: &str) -> Result<()
             .collect(),
     });
 
+    // Pipeline state for JSON
+    let pipeline_state = detect_pipeline_state(project_root);
+    let pipeline = match &pipeline_state {
+        PipelineStatusInfo::Active { run, definition } => {
+            suggestions.push(Suggestion {
+                label: "Resume pipeline".to_string(),
+                command: "wai pipeline current".to_string(),
+            });
+            Some(StatusPipeline {
+                active: Some(StatusPipelineActive {
+                    name: run.pipeline.clone(),
+                    step: run.current_step + 1,
+                    total: definition.steps.len(),
+                }),
+                available: Vec::new(),
+            })
+        }
+        PipelineStatusInfo::Available(pipelines) => {
+            suggestions.push(Suggestion {
+                label: "Choose a pipeline".to_string(),
+                command: "wai pipeline suggest".to_string(),
+            });
+            Some(StatusPipeline {
+                active: Option::None,
+                available: pipelines
+                    .iter()
+                    .map(|(name, def)| StatusPipelineAvailable {
+                        name: name.clone(),
+                        description: def.description.clone(),
+                        steps: def.steps.len(),
+                    })
+                    .collect(),
+            })
+        }
+        PipelineStatusInfo::None => Option::None,
+    };
+
     let payload = StatusPayload {
         project_root: project_root.display().to_string(),
         projects,
         plugins,
         hook_outputs,
         openspec,
+        pipeline,
         suggestions,
     };
 
