@@ -800,4 +800,20 @@ pub enum PipelineCommands {
     ///   WAI_PIPELINE_RUN  When set, identifies the active run. Falls back to
     ///                     `.wai/resources/pipelines/.last-run` when not set.
     Current,
+
+    /// List and rank available TOML pipelines, optionally by keyword match
+    ///
+    /// Scans `.wai/resources/pipelines/` for `.toml` files. If a description
+    /// is provided, ranks pipelines by keyword overlap (case-insensitive word
+    /// matching against pipeline name and description). Ties are broken
+    /// alphabetically. An empty string is treated as absent (no scoring).
+    ///
+    /// EXAMPLES
+    ///   wai pipeline suggest
+    ///   wai pipeline suggest "auth login flow"
+    ///   wai pipeline suggest "database migration"
+    Suggest {
+        /// Optional description to filter/rank pipelines by keyword overlap
+        description: Option<String>,
+    },
 }

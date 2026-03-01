@@ -132,6 +132,9 @@ pub fn run(cmd: PipelineCommands) -> Result<()> {
         PipelineCommands::Start { name, topic } => cmd_start(&name, topic.as_deref()),
         PipelineCommands::Next => cmd_next(),
         PipelineCommands::Current => cmd_current(),
+        PipelineCommands::Suggest { description } => {
+            cmd_suggest(description.as_deref())
+        }
     }
 }
 
@@ -689,6 +692,82 @@ fn cmd_current() -> Result<()> {
     }
 
     Ok(())
+}
+
+// ─── suggest ──────────────────────────────────────────────────────────────────
+
+fn cmd_suggest(description: Option<&str>) -> Result<()> {
+    let project_root = require_project()?;
+    let pipelines = pipelines_dir(&project_root);
+
+    // Collect all valid pipeline TOMLs
+    let mut found: Vec<(String, PipelineDefinition)> = vec![];
+    if pipelines.exists() {
+        for entry in fs::read_dir(&pipelines).into_diagnostic()? {
+            let entry = entry.into_diagnostic()?;
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) == Some("toml") {
+                if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
+                    match load_pipeline_toml(&path) {
+                        Ok(def) => found.push((name.to_string(), def)),
+                        Err(e) => eprintln!("warning: skipping {}: {}", path.display(), e),
+                    }
+                }
+            }
+        }
+    }
+
+    if found.is_empty() {
+        println!("No pipelines defined.");
+        println!();
+        println!("Create one with: wai pipeline init <name>");
+        return Ok(());
+    }
+
+    // Normalize description: treat empty string as None
+    let query = description
+        .filter(|s| !s.trim().is_empty())
+        .map(|s| s.to_lowercase());
+
+    // Score and sort
+    if let Some(ref q) = query {
+        let words: Vec<&str> = q.split_whitespace().collect();
+        found.sort_by(|(a_name, a_def), (b_name, b_def)| {
+            let score_a = score_pipeline(a_name, a_def, &words);
+            let score_b = score_pipeline(b_name, b_def, &words);
+            // Descending score, then ascending name for ties
+            score_b.cmp(&score_a).then(a_name.cmp(b_name))
+        });
+    } else {
+        found.sort_by(|(a, _), (b, _)| a.cmp(b));
+    }
+
+    // Print each pipeline
+    for (name, def) in &found {
+        let desc = def.description.as_deref().unwrap_or("(no description)");
+        let steps = def.steps.len();
+        println!("  {} — {} ({} steps)", name, desc, steps);
+    }
+
+    println!();
+    let top_name = &found[0].0;
+    println!(
+        "Start: wai pipeline start {} --topic=<your-topic>",
+        top_name
+    );
+
+    Ok(())
+}
+
+/// Score a pipeline by counting how many query words appear in its name + description.
+fn score_pipeline(name: &str, def: &PipelineDefinition, words: &[&str]) -> usize {
+    let haystack = format!(
+        "{} {}",
+        name,
+        def.description.as_deref().unwrap_or("")
+    )
+    .to_lowercase();
+    words.iter().filter(|w| haystack.contains(*w)).count()
 }
 
 /// Resolve the active run ID: check `WAI_PIPELINE_RUN` env var first, then

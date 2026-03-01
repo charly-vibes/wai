@@ -51,11 +51,11 @@
 
 ## 8. Command: `pipeline suggest` (`src/cli.rs`, `src/commands/pipeline.rs`)
 
-- [ ] 8.1 Add `PipelineCommands::Suggest { description: Option<String> }` variant to `src/cli.rs`
-- [ ] 8.2 Implement `cmd_suggest`: scan `.wai/resources/pipelines/` for TOML definitions, load each, print name + description + step count
-- [ ] 8.3 If `description` provided and non-empty: score each pipeline by keyword overlap (case-insensitive; split description into words, count matches against pipeline name + description fields); sort by score descending; break ties alphabetically by name; if all score 0, sort alphabetically; treat empty string as absent (no scoring)
-- [ ] 8.4 Print `wai pipeline start <name> --topic=<your-topic>` hint for the top-ranked result (or first alphabetical result if no description given), using a concrete placeholder rather than `<slug>`
-- [ ] 8.5 If no pipelines found: print "No pipelines defined" with hint to run `wai pipeline init`
+- [x] 8.1 Add `PipelineCommands::Suggest { description: Option<String> }` variant to `src/cli.rs`
+- [x] 8.2 Implement `cmd_suggest`: scan `.wai/resources/pipelines/` for TOML definitions, load each, print name + description + step count
+- [x] 8.3 If `description` provided and non-empty: score each pipeline by keyword overlap (case-insensitive; split description into words, count matches against pipeline name + description fields); sort by score descending; break ties alphabetically by name; if all score 0, sort alphabetically; treat empty string as absent (no scoring)
+- [x] 8.4 Print `wai pipeline start <name> --topic=<your-topic>` hint for the top-ranked result (or first alphabetical result if no description given), using a concrete placeholder rather than `<slug>`
+- [x] 8.5 If no pipelines found: print "No pipelines defined" with hint to run `wai pipeline init`
 
 ## 9. Step prompt convention (init template content)
 

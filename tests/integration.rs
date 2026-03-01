@@ -5805,3 +5805,175 @@ fn pipeline_current_on_complete_run_prints_done() {
         "Output should indicate the pipeline is complete, got:\n{stripped}"
     );
 }
+
+// ─── wai pipeline suggest ─────────────────────────────────────────────────────
+
+/// Helper: write a pipeline TOML with a specific name and description.
+fn write_pipeline_toml_with_desc(dir: &std::path::Path, name: &str, description: &str) {
+    let pipelines_dir = dir.join(".wai/resources/pipelines");
+    fs::create_dir_all(&pipelines_dir).unwrap();
+    let content = format!(
+        "[pipeline]\nname = \"{name}\"\ndescription = \"{description}\"\n\n[[steps]]\nid = \"step-one\"\nprompt = \"{{topic}}: do the thing.\"\n",
+        name = name,
+        description = description
+    );
+    fs::write(pipelines_dir.join(format!("{}.toml", name)), content).unwrap();
+}
+
+#[test]
+fn pipeline_suggest_lists_all_pipelines() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml_with_desc(tmp.path(), "auth", "Authentication workflow");
+    write_pipeline_toml_with_desc(tmp.path(), "database", "Database migration workflow");
+
+    let output = wai_cmd(tmp.path())
+        .args(["pipeline", "suggest"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let stdout = String::from_utf8(output).unwrap();
+    let stripped = strip_ansi(&stdout);
+
+    assert!(
+        stripped.contains("auth"),
+        "Output should contain 'auth' pipeline, got:\n{stripped}"
+    );
+    assert!(
+        stripped.contains("database"),
+        "Output should contain 'database' pipeline, got:\n{stripped}"
+    );
+
+    // Both pipelines listed, should show start hint
+    assert!(
+        stripped.contains("wai pipeline start"),
+        "Output should contain a start hint, got:\n{stripped}"
+    );
+}
+
+#[test]
+fn pipeline_suggest_with_description_ranks_keyword_match_first() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml_with_desc(tmp.path(), "auth", "Authentication and login workflow");
+    write_pipeline_toml_with_desc(tmp.path(), "database", "Database migration and schema changes");
+
+    let output = wai_cmd(tmp.path())
+        .args(["pipeline", "suggest", "auth login"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let stdout = String::from_utf8(output).unwrap();
+    let stripped = strip_ansi(&stdout);
+
+    // "auth" should appear before "database" in the output
+    let auth_pos = stripped.find("auth").expect("'auth' should be in output");
+    let db_pos = stripped.find("database").expect("'database' should be in output");
+    assert!(
+        auth_pos < db_pos,
+        "'auth' should appear before 'database' when query matches 'auth login', got:\n{stripped}"
+    );
+
+    // The start hint should point to the top result (auth)
+    assert!(
+        stripped.contains("wai pipeline start auth"),
+        "Start hint should point to 'auth', got:\n{stripped}"
+    );
+}
+
+#[test]
+fn pipeline_suggest_no_match_still_shows_all_alphabetically() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml_with_desc(tmp.path(), "zebra", "Zebra workflow");
+    write_pipeline_toml_with_desc(tmp.path(), "apple", "Apple workflow");
+
+    let output = wai_cmd(tmp.path())
+        .args(["pipeline", "suggest", "xyzzy-nomatch-token"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let stdout = String::from_utf8(output).unwrap();
+    let stripped = strip_ansi(&stdout);
+
+    // Both should appear
+    assert!(stripped.contains("apple"), "Output should contain 'apple', got:\n{stripped}");
+    assert!(stripped.contains("zebra"), "Output should contain 'zebra', got:\n{stripped}");
+
+    // Alphabetically "apple" comes before "zebra" when scores are tied at 0
+    let apple_pos = stripped.find("apple").unwrap();
+    let zebra_pos = stripped.find("zebra").unwrap();
+    assert!(
+        apple_pos < zebra_pos,
+        "'apple' should appear before 'zebra' (alphabetical tie-break), got:\n{stripped}"
+    );
+}
+
+#[test]
+fn pipeline_suggest_no_pipelines_prints_hint() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    // Ensure the pipelines dir exists but is empty (no TOML files)
+    fs::create_dir_all(tmp.path().join(".wai/resources/pipelines")).unwrap();
+
+    let output = wai_cmd(tmp.path())
+        .args(["pipeline", "suggest"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let stdout = String::from_utf8(output).unwrap();
+    let stripped = strip_ansi(&stdout);
+
+    assert!(
+        stripped.contains("No pipelines"),
+        "Output should say 'No pipelines', got:\n{stripped}"
+    );
+    assert!(
+        stripped.contains("wai pipeline init"),
+        "Output should hint 'wai pipeline init', got:\n{stripped}"
+    );
+}
+
+#[test]
+fn pipeline_suggest_empty_string_treated_as_no_description() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml_with_desc(tmp.path(), "beta", "Beta workflow");
+    write_pipeline_toml_with_desc(tmp.path(), "alpha", "Alpha workflow");
+
+    // With empty string — should behave same as no description: alphabetical order
+    let output = wai_cmd(tmp.path())
+        .args(["pipeline", "suggest", ""])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let stdout = String::from_utf8(output).unwrap();
+    let stripped = strip_ansi(&stdout);
+
+    // Should show both pipelines
+    assert!(stripped.contains("alpha"), "Output should contain 'alpha', got:\n{stripped}");
+    assert!(stripped.contains("beta"), "Output should contain 'beta', got:\n{stripped}");
+
+    // Alphabetically: "alpha" before "beta"
+    let alpha_pos = stripped.find("alpha").unwrap();
+    let beta_pos = stripped.find("beta").unwrap();
+    assert!(
+        alpha_pos < beta_pos,
+        "'alpha' should appear before 'beta' (alphabetical, empty string = no scoring), got:\n{stripped}"
+    );
+}
