@@ -1,4 +1,5 @@
 use assert_cmd::Command;
+use chrono::Utc;
 use std::fs;
 use tempfile::TempDir;
 use wai::state::Phase;
@@ -10,6 +11,7 @@ fn ctx(phase: Phase, research: usize, plan: usize, design: usize) -> ProjectCont
     ProjectContext {
         name: "test".to_string(),
         phase,
+        phase_started: Utc::now(),
         research_count: research,
         plan_count: plan,
         design_count: design,

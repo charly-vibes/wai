@@ -1,8 +1,13 @@
 use std::path::Path;
 
+use chrono::{DateTime, Utc};
+
 use crate::config::{self, STATE_FILE};
 use crate::json::Suggestion;
 use crate::state::{Phase, ProjectState};
+
+/// Number of days a project can stay in a phase before being considered stale.
+pub const STALE_PHASE_DAYS: i64 = 14;
 
 /// Known workflow patterns that wai can detect.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,6 +39,7 @@ pub struct WorkflowDetection {
 pub struct ProjectContext {
     pub name: String,
     pub phase: Phase,
+    pub phase_started: DateTime<Utc>,
     pub research_count: usize,
     pub plan_count: usize,
     pub design_count: usize,
@@ -50,7 +56,13 @@ pub fn scan_project(project_root: &Path, project_name: &str) -> Option<ProjectCo
     }
 
     let state_path = project_dir.join(STATE_FILE);
-    let phase = ProjectState::load(&state_path).ok()?.current;
+    let state = ProjectState::load(&state_path).ok()?;
+    let phase = state.current;
+    let phase_started = state
+        .history
+        .last()
+        .map(|e| e.started)
+        .unwrap_or_else(Utc::now);
 
     let research_count = count_artifacts(&project_dir.join(config::RESEARCH_DIR));
     let plan_count = count_artifacts(&project_dir.join(config::PLANS_DIR));
@@ -60,6 +72,7 @@ pub fn scan_project(project_root: &Path, project_name: &str) -> Option<ProjectCo
     Some(ProjectContext {
         name: project_name.to_string(),
         phase,
+        phase_started,
         research_count,
         plan_count,
         design_count,
@@ -215,6 +228,7 @@ mod tests {
         let ctx = ProjectContext {
             name: "test".to_string(),
             phase: Phase::Research,
+            phase_started: Utc::now(),
             research_count: 0,
             plan_count: 0,
             design_count: 0,
@@ -230,6 +244,7 @@ mod tests {
         let ctx = ProjectContext {
             name: "test".to_string(),
             phase: Phase::Research,
+            phase_started: Utc::now(),
             research_count: 1,
             plan_count: 0,
             design_count: 0,
@@ -245,6 +260,7 @@ mod tests {
         let ctx = ProjectContext {
             name: "test".to_string(),
             phase: Phase::Design,
+            phase_started: Utc::now(),
             research_count: 3,
             plan_count: 1,
             design_count: 2,
@@ -260,6 +276,7 @@ mod tests {
         let ctx = ProjectContext {
             name: "test".to_string(),
             phase: Phase::Plan,
+            phase_started: Utc::now(),
             research_count: 2,
             plan_count: 1,
             design_count: 1,
@@ -275,6 +292,7 @@ mod tests {
         let ctx = ProjectContext {
             name: "test".to_string(),
             phase: Phase::Implement,
+            phase_started: Utc::now(),
             research_count: 3,
             plan_count: 2,
             design_count: 1,
@@ -290,6 +308,7 @@ mod tests {
         let ctx = ProjectContext {
             name: "test".to_string(),
             phase: Phase::Review,
+            phase_started: Utc::now(),
             research_count: 5,
             plan_count: 2,
             design_count: 2,
@@ -304,6 +323,7 @@ mod tests {
         let ctx = ProjectContext {
             name: "test".to_string(),
             phase: Phase::Research,
+            phase_started: Utc::now(),
             research_count: 5,
             plan_count: 0,
             design_count: 0,
@@ -322,6 +342,7 @@ mod tests {
         let ctx = ProjectContext {
             name: "test".to_string(),
             phase: Phase::Research,
+            phase_started: Utc::now(),
             research_count: 2,
             plan_count: 0,
             design_count: 0,
@@ -346,6 +367,7 @@ mod tests {
         let ctx = ProjectContext {
             name: "test".to_string(),
             phase: Phase::Research,
+            phase_started: Utc::now(),
             research_count: 2,
             plan_count: 0,
             design_count: 0,
@@ -365,6 +387,7 @@ mod tests {
         let ctx = ProjectContext {
             name: "test".to_string(),
             phase: Phase::Design,
+            phase_started: Utc::now(),
             research_count: 0,
             plan_count: 0,
             design_count: 1,
@@ -389,6 +412,7 @@ mod tests {
         let ctx = ProjectContext {
             name: "test".to_string(),
             phase: Phase::Implement,
+            phase_started: Utc::now(),
             research_count: 0,
             plan_count: 1,
             design_count: 1,
@@ -413,6 +437,7 @@ mod tests {
         let ctx = ProjectContext {
             name: "test".to_string(),
             phase: Phase::Implement,
+            phase_started: Utc::now(),
             research_count: 1,
             plan_count: 2,
             design_count: 1,
