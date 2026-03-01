@@ -26,6 +26,9 @@ pub const CONTEXT_DIR: &str = "context";
 /// Pipeline definitions and run state within resources/
 pub const PIPELINES_DIR: &str = "pipelines";
 
+/// Reflection resource files within resources/
+pub const REFLECTIONS_DIR: &str = "reflections";
+
 /// Active pipeline run state file (`.wai/.pipeline-run`).
 ///
 /// Written by `wai pipeline run` and removed by `wai pipeline advance` when
@@ -219,6 +222,11 @@ pub fn agent_config_dir(project_root: &Path) -> PathBuf {
 /// Get the pipelines directory path (.wai/resources/pipelines/).
 pub fn pipelines_dir(project_root: &Path) -> PathBuf {
     resources_dir(project_root).join(PIPELINES_DIR)
+}
+
+/// Get the reflections directory path (.wai/resources/reflections/).
+pub fn reflections_dir(project_root: &Path) -> PathBuf {
+    resources_dir(project_root).join(REFLECTIONS_DIR)
 }
 
 /// Get a specific project's directory path.
