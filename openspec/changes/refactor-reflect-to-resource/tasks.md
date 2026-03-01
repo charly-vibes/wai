@@ -2,10 +2,10 @@
 
 ## Phase 1: Storage and Config
 
-- [ ] 1.1 Add `REFLECTIONS_DIR = "reflections"` constant to `src/config.rs`
-- [ ] 1.2 Add `reflections_dir(project_root: &Path) -> PathBuf` helper to `src/config.rs`
+- [x] 1.1 Add `REFLECTIONS_DIR = "reflections"` constant to `src/config.rs`
+- [x] 1.2 Add `reflections_dir(project_root: &Path) -> PathBuf` helper to `src/config.rs`
   (returns `.wai/resources/reflections/`)
-- [ ] 1.3 Add `REFLECTIONS_DIR` to the dirs created by `ensure_workspace_current()`
+- [x] 1.3 Add `REFLECTIONS_DIR` to the dirs created by `ensure_workspace_current()`
   (alongside agent-config, pipelines, templates, patterns)
 
 ## Phase 2: Write to Resource File
@@ -15,7 +15,7 @@
   resource file, not a managed block; project_name is the dir name string already
   available in run())
 - [ ] 2.2 Add suffix logic: if `<date>-<project>.md` already exists, try `-2`, `-3`, etc.
-- [ ] 2.3 Extend `ReflectContext` struct with `handoff_count: usize` (count of handoff
+- [x] 2.3 Extend `ReflectContext` struct with `handoff_count: usize` (count of handoff
   files loaded); populate in `gather_reflect_context()`
 - [ ] 2.3a Add YAML front-matter writer: `date`, `project`, `sessions_analyzed` (=
   handoff_count from 2.3), `type: reflection` — note: sessions_analyzed is for
@@ -39,12 +39,12 @@
 
 ## Phase 4: Managed Block Updates
 
-- [ ] 4.1 Add `WAI:REFLECT:REF:START/END` injection to `inject_managed_block()` in
+- [x] 4.1 Add `WAI:REFLECT:REF:START/END` injection to `inject_managed_block()` in
   `src/managed_block.rs` — injects slim reference block after the `WAI:END` marker
-- [ ] 4.2 Add `wai_reflect_ref_content()` function that returns the slim reference block text
-- [ ] 4.3 Add search-before-research instruction to `wai_block_content()` in
+- [x] 4.2 Add `wai_reflect_ref_content()` function that returns the slim reference block text
+- [x] 4.3 Add search-before-research instruction to `wai_block_content()` in
   `src/managed_block.rs` — gated on `has_companions`, placed after TDD disclaimer
-- [ ] 4.4 No change needed at wai init call site — `inject_managed_block()` is already
+- [x] 4.4 No change needed at wai init call site — `inject_managed_block()` is already
   called by `wai init`; extending it internally (4.1) is sufficient
 - [ ] 4.5 Update this repo's own `CLAUDE.md` by running `wai init` (or manually) after
   implementing 4.1–4.4
