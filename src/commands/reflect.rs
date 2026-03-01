@@ -139,10 +139,11 @@ pub fn detect_output_targets(
 
 // ── Context gathering ─────────────────────────────────────────────────────────
 
-/// Budget allocations for the three context tiers.
+/// Budget allocations for context tiers (conversation, handoffs, secondary, previous reflections).
 const CONVERSATION_BUDGET: usize = 30_000;
 const HANDOFF_BUDGET: usize = 40_000;
 const SECONDARY_BUDGET: usize = 30_000;
+const PREVIOUS_REFLECTIONS_BUDGET: usize = 20_000;
 
 /// All context gathered before calling the LLM.
 #[derive(Debug)]
@@ -157,6 +158,8 @@ pub struct ReflectContext {
     pub secondary: Vec<SecondaryEntry>,
     /// Existing REFLECT block content per target file (to avoid repeating).
     pub existing_blocks: Vec<(PathBuf, String)>,
+    /// Previous reflection resource files, newest-first, up to budget.
+    pub previous_reflections: Vec<ReflectionEntry>,
 }
 
 #[derive(Debug)]
@@ -169,6 +172,13 @@ pub struct HandoffEntry {
 pub struct SecondaryEntry {
     pub rel_path: String,
     pub kind: &'static str,
+    pub content: String,
+}
+
+/// A previous reflection file loaded from `.wai/resources/reflections/`.
+#[derive(Debug)]
+pub struct ReflectionEntry {
+    pub rel_path: String,
     pub content: String,
 }
 
@@ -247,7 +257,10 @@ pub fn read_handoffs(project_root: &Path, budget: usize) -> Vec<HandoffEntry> {
         if used >= budget {
             break;
         }
-        let take = content.len().min(budget - used);
+        let mut take = content.len().min(budget - used);
+        while take > 0 && !content.is_char_boundary(take) {
+            take -= 1;
+        }
         let trimmed = content[..take].to_string();
         used += trimmed.len();
         result.push(HandoffEntry {
@@ -323,7 +336,10 @@ pub fn read_secondary_artifacts(project_root: &Path, budget: usize) -> Vec<Secon
         if used >= budget {
             break;
         }
-        let take = content.len().min(budget - used);
+        let mut take = content.len().min(budget - used);
+        while take > 0 && !content.is_char_boundary(take) {
+            take -= 1;
+        }
         let trimmed = content[..take].to_string();
         used += trimmed.len();
         result.push(SecondaryEntry {
@@ -331,6 +347,72 @@ pub fn read_secondary_artifacts(project_root: &Path, budget: usize) -> Vec<Secon
             kind,
             content: trimmed,
         });
+    }
+    result
+}
+
+/// Read previous reflection files from `.wai/resources/reflections/`, sorted
+/// newest-first, up to `budget` chars.
+/// Older files beyond the budget are dropped entirely. Uses `max_depth(1)` — only
+/// direct children of the reflections directory are read.
+pub fn read_previous_reflections(project_root: &Path, budget: usize) -> Vec<ReflectionEntry> {
+    let refl_dir = crate::config::reflections_dir(project_root);
+    if !refl_dir.exists() {
+        return Vec::new();
+    }
+
+    let mut entries: Vec<(SystemTime, String, String)> = Vec::new();
+
+    for entry in WalkDir::new(&refl_dir)
+        .max_depth(1)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().is_file())
+    {
+        let path = entry.path();
+        if path.extension().and_then(|x| x.to_str()) != Some("md") {
+            continue;
+        }
+        if path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .map(|n| n.starts_with('.'))
+            .unwrap_or(false)
+        {
+            continue;
+        }
+        let content = match std::fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+        let mtime = entry
+            .metadata()
+            .ok()
+            .and_then(|m| m.modified().ok())
+            .unwrap_or(SystemTime::UNIX_EPOCH);
+        let rel_path = path
+            .strip_prefix(project_root)
+            .unwrap_or(path)
+            .to_string_lossy()
+            .to_string();
+        entries.push((mtime, rel_path, content));
+    }
+
+    entries.sort_by(|a, b| b.0.cmp(&a.0));
+
+    let mut result = Vec::new();
+    let mut used = 0usize;
+    for (_, rel_path, content) in entries {
+        if used >= budget {
+            break;
+        }
+        let mut take = content.len().min(budget - used);
+        while take > 0 && !content.is_char_boundary(take) {
+            take -= 1;
+        }
+        let trimmed = content[..take].to_string();
+        used += trimmed.len();
+        result.push(ReflectionEntry { rel_path, content: trimmed });
     }
     result
 }
@@ -349,6 +431,7 @@ pub fn gather_reflect_context(
     let handoffs = read_handoffs(project_root, HANDOFF_BUDGET);
     let handoff_count = handoffs.len();
     let secondary = read_secondary_artifacts(project_root, SECONDARY_BUDGET);
+    let previous_reflections = read_previous_reflections(project_root, PREVIOUS_REFLECTIONS_BUDGET);
 
     // Read existing REFLECT blocks from each target so LLM can avoid repeating them.
     let existing_blocks = output_targets
@@ -362,6 +445,7 @@ pub fn gather_reflect_context(
         handoff_count,
         secondary,
         existing_blocks,
+        previous_reflections,
     })
 }
 
@@ -523,6 +607,16 @@ pub fn build_reflect_prompt(ctx: &ReflectContext, today: &str) -> String {
                 s.kind,
                 escape_fences(&s.content)
             ));
+        }
+        parts.push(section);
+    }
+
+    if !ctx.previous_reflections.is_empty() {
+        let mut section = String::from(
+            "# Previous Reflections\n\nExtend and correct these — do not repeat them verbatim:\n",
+        );
+        for r in &ctx.previous_reflections {
+            section.push_str(&format!("\n## {}\n```\n{}\n```\n", r.rel_path, escape_fences(&r.content)));
         }
         parts.push(section);
     }
