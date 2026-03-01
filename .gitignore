@@ -28,3 +28,7 @@ docs/book/
 
 # Local dev (wai project data)
 .para/
+
+# Dolt database files (added by bd init)
+.dolt/
+*.db
