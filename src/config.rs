@@ -336,6 +336,17 @@ pub fn pipeline_run_file(project_root: &Path) -> PathBuf {
     wai_dir(project_root).join(PIPELINE_RUN_FILE)
 }
 
+/// Get the path to the `.last-run` pointer file used by TOML-based pipelines.
+///
+/// This file stores the most recently started run ID so that `wai pipeline next`
+/// and `wai pipeline current` can resolve the active run without requiring the
+/// user to set `WAI_PIPELINE_RUN` in their shell.
+///
+/// Stored at `.wai/resources/pipelines/.last-run`.
+pub fn last_run_path(workspace_root: &Path) -> PathBuf {
+    pipelines_dir(workspace_root).join(".last-run")
+}
+
 /// Write a run ID to the active pipeline run state file.
 ///
 /// Creates or overwrites `.wai/.pipeline-run` with just the run ID (no trailing newline).

@@ -2,6 +2,7 @@ use cliclack::log;
 use miette::{IntoDiagnostic, Result};
 use owo_colors::OwoColorize;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
@@ -17,14 +18,68 @@ use super::require_project;
 
 // ─── Data structures ─────────────────────────────────────────────────────────
 
-/// A pipeline definition stored at `.wai/resources/pipelines/<name>.yml`.
-#[derive(Debug, Serialize, Deserialize)]
+// ── New TOML-based pipeline model ────────────────────────────────────────────
+
+/// One step in a TOML pipeline definition.
+///
+/// Stored as `[[steps]]` entries in a `.wai/resources/pipelines/<name>.toml` file.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct PipelineStep {
+    pub id: String,
+    pub prompt: String,
+}
+
+/// A pipeline definition deserialized from a TOML file.
+///
+/// The TOML format uses a `[pipeline]` table and `[[steps]]` arrays:
+/// ```toml
+/// [pipeline]
+/// name = "feature"
+/// description = "Full feature workflow"
+///
+/// [[steps]]
+/// id = "research"
+/// prompt = "Research {topic}: gather background, constraints, prior art."
+/// ```
+#[derive(Debug, Clone, serde::Deserialize)]
 pub struct PipelineDefinition {
+    pub name: String,
+    pub description: Option<String>,
+    pub steps: Vec<PipelineStep>,
+}
+
+/// Top-level TOML file wrapper.
+///
+/// The TOML format uses a `[pipeline]` section for metadata and top-level
+/// `[[steps]]` arrays. This wrapper captures both and merges them into a
+/// [`PipelineDefinition`].
+#[derive(serde::Deserialize)]
+struct PipelineDefinitionFile {
+    pipeline: PipelineMetadata,
+    #[serde(default)]
+    steps: Vec<PipelineStep>,
+}
+
+/// Pipeline metadata from the `[pipeline]` TOML section.
+#[derive(serde::Deserialize)]
+struct PipelineMetadata {
+    name: String,
+    description: Option<String>,
+}
+
+// ── Legacy YAML-based pipeline model (used by old create/run/advance/status commands) ──
+
+/// A legacy pipeline definition stored at `.wai/resources/pipelines/<name>.yml`.
+///
+/// This struct is retained for backward compatibility with existing YAML pipeline
+/// files while the new TOML-based commands are built out.
+#[derive(Debug, Serialize, Deserialize)]
+struct LegacyPipelineDefinition {
     pub name: String,
     pub stages: Vec<PipelineStage>,
 }
 
-/// One stage in a pipeline definition: a skill name and expected artifact type.
+/// One stage in a legacy pipeline definition: a skill name and expected artifact type.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PipelineStage {
     pub skill: String,
@@ -38,12 +93,11 @@ pub struct PipelineRun {
     pub pipeline: String,
     pub topic: String,
     pub created_at: String,
-    /// Index of the current (not-yet-completed) stage; equals `stages.len()` when done.
-    pub current_stage: usize,
-    pub stages: Vec<RunStage>,
+    /// Index of the current (not-yet-completed) step; equals total step count when done.
+    pub current_step: usize,
 }
 
-/// Per-stage state within a run.
+/// Per-stage state within a legacy run (kept for reading old run YAML files).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RunStage {
     pub skill: String,
@@ -51,6 +105,18 @@ pub struct RunStage {
     pub completed: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub artifact_path: Option<String>,
+}
+
+/// Legacy run state that includes the `stages` field, used only for reading
+/// run files written before the Phase 1 refactor.
+#[derive(Debug, Serialize, Deserialize)]
+struct LegacyPipelineRun {
+    pub run_id: String,
+    pub pipeline: String,
+    pub topic: String,
+    pub created_at: String,
+    pub current_stage: usize,
+    pub stages: Vec<RunStage>,
 }
 
 // ─── Entry point ─────────────────────────────────────────────────────────────
@@ -91,7 +157,7 @@ fn cmd_create(name: &str, stages_str: &str) -> Result<()> {
         miette::bail!("Pipeline '{}' already exists", name);
     }
 
-    let definition = PipelineDefinition {
+    let definition = LegacyPipelineDefinition {
         name: name.to_string(),
         stages,
     };
@@ -127,8 +193,8 @@ fn cmd_run(name: &str, topic: &str) -> Result<()> {
     let topic_slug = slug::slugify(topic);
     let run_id = format!("{}-{}-{}", name, date, topic_slug);
 
-    // Build initial run state
-    let run = PipelineRun {
+    // Build initial run state (legacy format with stages embedded)
+    let legacy_run = LegacyPipelineRun {
         run_id: run_id.clone(),
         pipeline: name.to_string(),
         topic: topic.to_string(),
@@ -151,7 +217,7 @@ fn cmd_run(name: &str, topic: &str) -> Result<()> {
     fs::create_dir_all(&runs_dir).into_diagnostic()?;
 
     let run_path = runs_dir.join(format!("{}.yml", run_id));
-    let yaml = serde_yml::to_string(&run)
+    let yaml = serde_yml::to_string(&legacy_run)
         .map_err(|e| miette::miette!("Failed to serialize run: {}", e))?;
     fs::write(&run_path, yaml).into_diagnostic()?;
 
@@ -172,7 +238,7 @@ fn cmd_run(name: &str, topic: &str) -> Result<()> {
     println!("  (Optional) Also export for subshells:");
     println!("    export WAI_PIPELINE_RUN={}", run_id);
     println!();
-    print_stage_hint(&run, 0);
+    print_stage_hint(&legacy_run, 0);
     Ok(())
 }
 
@@ -258,14 +324,14 @@ fn cmd_status(name: &str, run_filter: Option<&str>) -> Result<()> {
         return Ok(());
     }
 
-    let mut runs: Vec<PipelineRun> = Vec::new();
+    let mut runs: Vec<LegacyPipelineRun> = Vec::new();
     for entry in fs::read_dir(&runs_dir).into_diagnostic()?.flatten() {
         let path = entry.path();
         if path.extension().and_then(|e| e.to_str()) != Some("yml") {
             continue;
         }
         if let Ok(content) = fs::read_to_string(&path)
-            && let Ok(run) = serde_yml::from_str::<PipelineRun>(&content)
+            && let Ok(run) = serde_yml::from_str::<LegacyPipelineRun>(&content)
         {
             if let Some(filter) = run_filter
                 && run.run_id != filter
@@ -465,8 +531,8 @@ fn validate_skill_exists(project_root: &Path, skill: &str) -> Result<()> {
     Ok(())
 }
 
-/// Load a pipeline definition YAML from `.wai/resources/pipelines/<name>.yml`.
-fn load_pipeline_definition(project_root: &Path, name: &str) -> Result<PipelineDefinition> {
+/// Load a legacy pipeline definition YAML from `.wai/resources/pipelines/<name>.yml`.
+fn load_pipeline_definition(project_root: &Path, name: &str) -> Result<LegacyPipelineDefinition> {
     let path = pipelines_dir(project_root).join(format!("{}.yml", name));
     if !path.exists() {
         miette::bail!(
@@ -479,9 +545,47 @@ fn load_pipeline_definition(project_root: &Path, name: &str) -> Result<PipelineD
         .map_err(|e| miette::miette!("Failed to parse pipeline '{}': {}", name, e))
 }
 
-/// Search all pipeline run directories for a run with the given ID.
+/// Load a TOML pipeline definition from `.wai/resources/pipelines/<name>.toml`.
+///
+/// Validates that all step IDs are unique and all prompts are non-empty.
+pub fn load_pipeline_toml(path: &Path) -> Result<PipelineDefinition> {
+    let content = fs::read_to_string(path).into_diagnostic()?;
+    let file: PipelineDefinitionFile = toml::from_str(&content)
+        .map_err(|e| miette::miette!("Failed to parse pipeline TOML: {}", e))?;
+    let def = PipelineDefinition {
+        name: file.pipeline.name,
+        description: file.pipeline.description,
+        steps: file.steps,
+    };
+
+    // Validate unique IDs
+    let mut seen_ids = HashSet::new();
+    for step in &def.steps {
+        if !seen_ids.insert(step.id.as_str()) {
+            miette::bail!("duplicate step id: {}", step.id);
+        }
+    }
+
+    // Validate non-empty prompts
+    for step in &def.steps {
+        if step.prompt.trim().is_empty() {
+            miette::bail!("empty prompt for step: {}", step.id);
+        }
+    }
+
+    Ok(def)
+}
+
+/// Substitute `{topic}` in a prompt string with the given topic value.
+///
+/// If the prompt contains no `{topic}` placeholder, the prompt is returned unchanged.
+pub fn render_prompt(prompt: &str, topic: &str) -> String {
+    prompt.replace("{topic}", topic)
+}
+
+/// Search all pipeline run directories for a legacy run with the given ID.
 /// Returns the loaded run and its file path.
-fn find_run(project_root: &Path, run_id: &str) -> Result<(PipelineRun, PathBuf)> {
+fn find_run(project_root: &Path, run_id: &str) -> Result<(LegacyPipelineRun, PathBuf)> {
     let pipelines = pipelines_dir(project_root);
     if !pipelines.exists() {
         miette::bail!("Run '{}' not found", run_id);
@@ -501,7 +605,7 @@ fn find_run(project_root: &Path, run_id: &str) -> Result<(PipelineRun, PathBuf)>
         })
     {
         if let Ok(content) = fs::read_to_string(entry.path())
-            && let Ok(run) = serde_yml::from_str::<PipelineRun>(&content)
+            && let Ok(run) = serde_yml::from_str::<LegacyPipelineRun>(&content)
             && run.run_id == run_id
         {
             return Ok((run, entry.path().to_path_buf()));
@@ -594,8 +698,8 @@ fn count_runs(project_root: &Path, name: &str) -> usize {
         .unwrap_or(0)
 }
 
-/// Print a hint for invoking the given stage index.
-fn print_stage_hint(run: &PipelineRun, stage_idx: usize) {
+/// Print a hint for invoking the given stage index (legacy YAML-based runs).
+fn print_stage_hint(run: &LegacyPipelineRun, stage_idx: usize) {
     if stage_idx >= run.stages.len() {
         return;
     }
@@ -613,4 +717,138 @@ fn print_stage_hint(run: &PipelineRun, stage_idx: usize) {
     );
     println!("    When done: wai pipeline advance {}", run.run_id);
     println!();
+}
+
+// ─── Unit tests ───────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::NamedTempFile;
+    use std::io::Write;
+
+    // ── render_prompt ──────────────────────────────────────────────────────
+
+    #[test]
+    fn render_prompt_substitutes_topic() {
+        assert_eq!(render_prompt("Hello {topic}!", "world"), "Hello world!");
+    }
+
+    #[test]
+    fn render_prompt_no_placeholder_no_panic() {
+        assert_eq!(render_prompt("Hello!", "world"), "Hello!");
+    }
+
+    #[test]
+    fn render_prompt_multiple_occurrences() {
+        assert_eq!(
+            render_prompt("Research {topic}. Focus on {topic} constraints.", "auth"),
+            "Research auth. Focus on auth constraints."
+        );
+    }
+
+    // ── load_pipeline_toml ─────────────────────────────────────────────────
+
+    fn write_toml(content: &str) -> NamedTempFile {
+        let mut f = NamedTempFile::new().expect("create tempfile");
+        f.write_all(content.as_bytes()).expect("write toml");
+        f
+    }
+
+    #[test]
+    fn load_pipeline_toml_valid() {
+        let toml = r#"
+[pipeline]
+name = "feature"
+description = "A feature workflow"
+
+[[steps]]
+id = "research"
+prompt = "Research {topic}: gather background."
+
+[[steps]]
+id = "implement"
+prompt = "Implement {topic}."
+"#;
+        let f = write_toml(toml);
+        let def = load_pipeline_toml(f.path()).expect("should parse valid TOML");
+        assert_eq!(def.name, "feature");
+        assert_eq!(def.description.as_deref(), Some("A feature workflow"));
+        assert_eq!(def.steps.len(), 2);
+        assert_eq!(def.steps[0].id, "research");
+        assert_eq!(def.steps[1].id, "implement");
+    }
+
+    #[test]
+    fn load_pipeline_toml_no_description() {
+        let toml = r#"
+[pipeline]
+name = "minimal"
+
+[[steps]]
+id = "go"
+prompt = "Do {topic}."
+"#;
+        let f = write_toml(toml);
+        let def = load_pipeline_toml(f.path()).expect("should parse minimal TOML");
+        assert_eq!(def.description, None);
+        assert_eq!(def.steps.len(), 1);
+    }
+
+    #[test]
+    fn load_pipeline_toml_rejects_duplicate_ids() {
+        let toml = r#"
+[pipeline]
+name = "broken"
+
+[[steps]]
+id = "research"
+prompt = "Research {topic}."
+
+[[steps]]
+id = "research"
+prompt = "More research on {topic}."
+"#;
+        let f = write_toml(toml);
+        let result = load_pipeline_toml(f.path());
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("duplicate step id: research"),
+            "expected 'duplicate step id: research' in error, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn load_pipeline_toml_rejects_empty_prompt() {
+        let toml = r#"
+[pipeline]
+name = "broken"
+
+[[steps]]
+id = "research"
+prompt = ""
+"#;
+        let f = write_toml(toml);
+        let result = load_pipeline_toml(f.path());
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("empty prompt for step: research"),
+            "expected 'empty prompt for step: research' in error, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn load_pipeline_toml_rejects_whitespace_only_prompt() {
+        let toml = "[pipeline]\nname = \"broken\"\n\n[[steps]]\nid = \"step1\"\nprompt = \"   \"\n";
+        let f = write_toml(toml);
+        let result = load_pipeline_toml(f.path());
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("empty prompt for step: step1"),
+            "expected 'empty prompt for step: step1' in error, got: {msg}"
+        );
+    }
 }

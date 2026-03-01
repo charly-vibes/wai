@@ -1,11 +1,11 @@
 ## 1. Data model (`src/commands/pipeline.rs`, `src/config.rs`)
 
-- [ ] 1.1 Add `PipelineStep { id: String, prompt: String }` struct
-- [ ] 1.2 Add `PipelineDefinition { name: String, description: Option<String>, steps: Vec<PipelineStep> }` (TOML format, replaces old struct)
-- [ ] 1.3 Update `PipelineRun`: rename `current_stage: usize` → `current_step: usize`; remove `stages: Vec<RunStage>`
-- [ ] 1.4 Add `last_run_path()` helper to `src/config.rs` returning `.wai/resources/pipelines/.last-run`
-- [ ] 1.5 Add `load_pipeline_toml()`: deserialize TOML, validate unique IDs and non-empty prompts
-- [ ] 1.6 Add `render_prompt()`: substitute `{topic}` in a prompt string with the given topic value
+- [x] 1.1 Add `PipelineStep { id: String, prompt: String }` struct
+- [x] 1.2 Add `PipelineDefinition { name: String, description: Option<String>, steps: Vec<PipelineStep> }` (TOML format, replaces old struct)
+- [x] 1.3 Update `PipelineRun`: rename `current_stage: usize` → `current_step: usize`; remove `stages: Vec<RunStage>`
+- [x] 1.4 Add `last_run_path()` helper to `src/config.rs` returning `.wai/resources/pipelines/.last-run`
+- [x] 1.5 Add `load_pipeline_toml()`: deserialize TOML, validate unique IDs and non-empty prompts
+- [x] 1.6 Add `render_prompt()`: substitute `{topic}` in a prompt string with the given topic value
 
 ## 2. Command: `pipeline init` (`src/cli.rs`, `src/commands/pipeline.rs`)
 
