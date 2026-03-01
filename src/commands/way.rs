@@ -77,6 +77,8 @@ pub fn run(fix: Option<String>) -> Result<()> {
         check_devcontainer(&repo_root),
         check_release_pipeline(&repo_root),
         check_test_coverage(&repo_root),
+        check_beads(&repo_root),
+        check_openspec(&repo_root),
     ];
 
     let summary = Summary {
@@ -1219,6 +1221,83 @@ fn check_test_coverage(repo_root: &Path) -> CheckResult {
         suggestion: Some(
             "Configure a coverage tool with an enforced threshold — Rust: https://github.com/xd009642/tarpaulin · Python: https://coverage.readthedocs.io · JS: https://github.com/istanbuljs/nyc".to_string(),
         ),
+    }
+}
+
+fn check_beads(repo_root: &Path) -> CheckResult {
+    let name = "Issue tracking";
+    let intent = Some(
+        "Structured task tracking keeps work visible and prevents context loss across sessions."
+            .to_string(),
+    );
+    let success_criteria = Some(
+        "A beads workspace (.beads/) exists for tracking issues and dependencies.".to_string(),
+    );
+
+    let beads_dir = repo_root.join(".beads");
+    if beads_dir.exists() && beads_dir.is_dir() {
+        let issues_jsonl = beads_dir.join("issues.jsonl");
+        let message = if let Ok(content) = std::fs::read_to_string(&issues_jsonl) {
+            let count = content.lines().filter(|l| !l.trim().is_empty()).count();
+            format!("beads detected ({} issues tracked)", count)
+        } else {
+            "beads detected".to_string()
+        };
+        CheckResult {
+            name: name.to_string(),
+            status: Status::Pass,
+            message,
+            intent,
+            success_criteria,
+            suggestion: None,
+        }
+    } else {
+        CheckResult {
+            name: name.to_string(),
+            status: Status::Info,
+            message: "No issue tracker detected".to_string(),
+            intent,
+            success_criteria,
+            suggestion: Some(
+                "Initialize beads issue tracking — https://github.com/steveyegge/beads"
+                    .to_string(),
+            ),
+        }
+    }
+}
+
+fn check_openspec(repo_root: &Path) -> CheckResult {
+    let name = "Change proposals";
+    let intent = Some(
+        "Formal change proposals prevent architectural drift and create a reviewable design record."
+            .to_string(),
+    );
+    let success_criteria = Some(
+        "An openspec workspace (openspec/) exists for managing change proposals.".to_string(),
+    );
+
+    let openspec_dir = repo_root.join("openspec");
+    if openspec_dir.exists() && openspec_dir.is_dir() {
+        CheckResult {
+            name: name.to_string(),
+            status: Status::Pass,
+            message: "openspec detected".to_string(),
+            intent,
+            success_criteria,
+            suggestion: None,
+        }
+    } else {
+        CheckResult {
+            name: name.to_string(),
+            status: Status::Info,
+            message: "No change proposal system detected".to_string(),
+            intent,
+            success_criteria,
+            suggestion: Some(
+                "Track architectural change proposals — https://github.com/Fission-AI/OpenSpec"
+                    .to_string(),
+            ),
+        }
     }
 }
 

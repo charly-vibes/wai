@@ -2837,6 +2837,70 @@ fn way_check_test_coverage_not_configured() {
         );
 }
 
+// ─── way: check_beads ─────────────────────────────────────────────────────────
+
+#[test]
+fn way_check_beads_present() {
+    let tmp = TempDir::new().unwrap();
+    fs::create_dir_all(tmp.path().join(".beads")).unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Issue tracking")
+                .and(predicate::str::contains("beads detected"))
+                .and(predicate::str::contains("\"pass\"")),
+        );
+}
+
+#[test]
+fn way_check_beads_absent() {
+    let tmp = TempDir::new().unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Issue tracking")
+                .and(predicate::str::contains("\"info\"")),
+        );
+}
+
+// ─── way: check_openspec ──────────────────────────────────────────────────────
+
+#[test]
+fn way_check_openspec_present() {
+    let tmp = TempDir::new().unwrap();
+    fs::create_dir_all(tmp.path().join("openspec")).unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Change proposals")
+                .and(predicate::str::contains("openspec detected"))
+                .and(predicate::str::contains("\"pass\"")),
+        );
+}
+
+#[test]
+fn way_check_openspec_absent() {
+    let tmp = TempDir::new().unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Change proposals")
+                .and(predicate::str::contains("\"info\"")),
+        );
+}
+
 // ─── Post-Command Suggestions ────────────────────────────────────────────────
 
 #[test]
