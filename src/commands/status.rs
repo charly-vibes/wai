@@ -411,11 +411,31 @@ fn render_json(project_root: &std::path::Path, _project_name: &str) -> Result<()
         })
         .collect();
 
+    // Gather workflow suggestions from pattern detection
+    let mut workflow_suggestions: Vec<Suggestion> = Vec::new();
+    if proj_dir.exists() {
+        if let Ok(entries) = std::fs::read_dir(&proj_dir) {
+            for entry in entries.filter_map(|e| e.ok()) {
+                if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                    if let Some(name) = entry.file_name().to_str() {
+                        if let Some(ctx) = workflows::scan_project(project_root, name) {
+                            for detection in workflows::detect_patterns(&ctx) {
+                                workflow_suggestions.extend(detection.suggestions);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     let mut suggestions = if projects.is_empty() {
         vec![Suggestion {
             label: "Create your first project".to_string(),
             command: "wai new project \"my-app\"".to_string(),
         }]
+    } else if !workflow_suggestions.is_empty() {
+        workflow_suggestions
     } else {
         vec![
             Suggestion {

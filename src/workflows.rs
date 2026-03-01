@@ -90,6 +90,31 @@ pub fn detect_patterns(ctx: &ProjectContext) -> Vec<WorkflowDetection> {
 
     let total_artifacts = ctx.research_count + ctx.plan_count + ctx.design_count;
 
+    // Stale phase: project has been in same phase for more than STALE_PHASE_DAYS
+    // (checked first, before early returns, so it fires even for new/minimal projects)
+    if ctx.phase != Phase::Archive {
+        let days = (Utc::now() - ctx.phase_started).num_days();
+        if days > STALE_PHASE_DAYS {
+            detections.push(WorkflowDetection {
+                pattern: WorkflowPattern::StalePhase { days },
+                message: format!(
+                    "Project has been in {} phase for {} days — consider advancing or archiving",
+                    ctx.phase, days
+                ),
+                suggestions: vec![
+                    Suggestion {
+                        label: "Advance phase".to_string(),
+                        command: "wai phase next".to_string(),
+                    },
+                    Suggestion {
+                        label: "Archive project".to_string(),
+                        command: format!("wai move {} archives", ctx.name),
+                    },
+                ],
+            });
+        }
+    }
+
     // New project: no artifacts at all, still in research phase
     if total_artifacts == 0 && ctx.phase == Phase::Research {
         detections.push(WorkflowDetection {
@@ -203,30 +228,6 @@ pub fn detect_patterns(ctx: &ProjectContext) -> Vec<WorkflowDetection> {
                 },
             ],
         });
-    }
-
-    // Stale phase: project has been in same phase for more than STALE_PHASE_DAYS
-    if ctx.phase != Phase::Archive {
-        let days = (Utc::now() - ctx.phase_started).num_days();
-        if days > STALE_PHASE_DAYS {
-            detections.push(WorkflowDetection {
-                pattern: WorkflowPattern::StalePhase { days },
-                message: format!(
-                    "Project has been in {} phase for {} days — consider advancing or archiving",
-                    ctx.phase, days
-                ),
-                suggestions: vec![
-                    Suggestion {
-                        label: "Advance phase".to_string(),
-                        command: "wai phase next".to_string(),
-                    },
-                    Suggestion {
-                        label: "Archive project".to_string(),
-                        command: format!("wai move {} archives", ctx.name),
-                    },
-                ],
-            });
-        }
     }
 
     // LooksComplete: in review phase with at least one handoff

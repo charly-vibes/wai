@@ -1,5 +1,5 @@
 use assert_cmd::Command;
-use chrono::Local;
+use chrono::{Duration, Local, SecondsFormat, Utc};
 use predicates::prelude::*;
 use std::fs;
 use tempfile::TempDir;
@@ -1547,6 +1547,117 @@ fn status_shows_minimal_research_suggestion_for_new_project() {
         .assert()
         .success()
         .stdout(predicate::str::contains("research"));
+}
+
+// ─── wai status: lifecycle completion checks ────────────────────────────────
+
+/// Write a state file with `phase_started` set `days_ago` days in the past.
+fn write_stale_state(project_dir: &std::path::Path, phase: &str, days_ago: u32) {
+    let started = Utc::now() - Duration::days(days_ago as i64);
+    let state_yaml = format!(
+        "current: {phase}\nhistory:\n- phase: {phase}\n  started: '{}'\n",
+        started.to_rfc3339_opts(SecondsFormat::Nanos, true)
+    );
+    fs::write(project_dir.join(".state"), state_yaml).unwrap();
+}
+
+#[test]
+fn status_flags_stale_project() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+
+    let project_dir = tmp.path().join(".wai/projects/my-app");
+    write_stale_state(&project_dir, "research", 20);
+
+    wai_cmd(tmp.path())
+        .args(["status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("phase next").or(predicate::str::contains("move")));
+}
+
+#[test]
+fn status_does_not_flag_recent_project() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+
+    // phase_started within threshold (7 days ago) — should not show stale suggestion
+    let project_dir = tmp.path().join(".wai/projects/my-app");
+    write_stale_state(&project_dir, "research", 7);
+
+    let stdout = wai_cmd(tmp.path())
+        .args(["status"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let output = String::from_utf8(stdout).unwrap();
+    assert!(
+        !output.contains("phase next") || !output.contains("20 days"),
+        "should not show stale-phase suggestion for recent project"
+    );
+}
+
+#[test]
+fn status_flags_complete_review_project() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+
+    // Set project to review phase and create a handoff file
+    let project_dir = tmp.path().join(".wai/projects/my-app");
+    write_stale_state(&project_dir, "review", 2);
+    fs::write(
+        project_dir.join("handoffs/2026-01-01-handoff.md"),
+        "Session handoff",
+    )
+    .unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("move").or(predicate::str::contains("archive")));
+}
+
+#[test]
+fn status_json_includes_stale_suggestion() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+
+    let project_dir = tmp.path().join(".wai/projects/my-app");
+    write_stale_state(&project_dir, "implement", 20);
+
+    wai_cmd(tmp.path())
+        .args(["status", "--json"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("phase next").or(predicate::str::contains("move")));
+}
+
+#[test]
+fn status_json_includes_complete_suggestion() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+
+    let project_dir = tmp.path().join(".wai/projects/my-app");
+    write_stale_state(&project_dir, "review", 1);
+    fs::write(
+        project_dir.join("handoffs/2026-01-01-handoff.md"),
+        "Session handoff",
+    )
+    .unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["status", "--json"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("move").or(predicate::str::contains("archive")));
 }
 
 // ─── wai (no args) ─────────────────────────────────────────────────────────
