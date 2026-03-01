@@ -5371,3 +5371,142 @@ fn pipeline_init_template_is_valid_toml() {
         parsed.err()
     );
 }
+
+// ─── wai pipeline start ───────────────────────────────────────────────────────
+
+/// Helper: write a minimal two-step TOML pipeline for start tests.
+fn write_pipeline_toml(dir: &std::path::Path, name: &str) {
+    let pipelines_dir = dir.join(".wai/resources/pipelines");
+    fs::create_dir_all(&pipelines_dir).unwrap();
+    let content = format!(
+        r#"[pipeline]
+name = "{name}"
+description = "Test pipeline"
+
+[[steps]]
+id = "step-one"
+prompt = "{{topic}}: do step one research."
+
+[[steps]]
+id = "step-two"
+prompt = "{{topic}}: do step two implementation."
+"#,
+        name = name
+    );
+    fs::write(pipelines_dir.join(format!("{}.toml", name)), content).unwrap();
+}
+
+#[test]
+fn pipeline_start_creates_run_state() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml(tmp.path(), "my-pipe");
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "start", "my-pipe", "--topic=auth-refactor"])
+        .assert()
+        .success();
+
+    // A run state file should exist under .wai/pipeline-runs/
+    let runs_dir = tmp.path().join(".wai/pipeline-runs");
+    assert!(runs_dir.exists(), ".wai/pipeline-runs/ should be created");
+
+    let entries: Vec<_> = fs::read_dir(&runs_dir)
+        .unwrap()
+        .flatten()
+        .filter(|e| {
+            e.path()
+                .extension()
+                .and_then(|x| x.to_str())
+                == Some("yml")
+        })
+        .collect();
+    assert_eq!(entries.len(), 1, "Exactly one run state file should be written");
+
+    // The run state file name should contain the pipeline name and topic slug
+    let run_file = &entries[0].path();
+    let stem = run_file.file_stem().unwrap().to_string_lossy().to_string();
+    assert!(stem.contains("my-pipe"), "Run ID should contain pipeline name, got: {stem}");
+    assert!(stem.contains("auth-refactor"), "Run ID should contain topic slug, got: {stem}");
+
+    // The run state YAML should parse and have correct fields
+    let content = fs::read_to_string(run_file).unwrap();
+    assert!(content.contains("pipeline: my-pipe"), "Run state should record pipeline name");
+    assert!(content.contains("auth-refactor"), "Run state should record topic");
+    assert!(content.contains("current_step: 0"), "New run should start at step 0");
+}
+
+#[test]
+fn pipeline_start_writes_last_run_file() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml(tmp.path(), "my-pipe");
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "start", "my-pipe", "--topic=feature-x"])
+        .assert()
+        .success();
+
+    let last_run_path = tmp.path().join(".wai/resources/pipelines/.last-run");
+    assert!(last_run_path.exists(), ".last-run pointer file should be written");
+
+    let run_id = fs::read_to_string(&last_run_path).unwrap();
+    let run_id = run_id.trim();
+    assert!(!run_id.is_empty(), ".last-run should contain a non-empty run ID");
+    assert!(run_id.starts_with("my-pipe"), "Run ID should start with pipeline name, got: {run_id}");
+    assert!(run_id.contains("feature-x"), "Run ID should contain topic slug, got: {run_id}");
+}
+
+#[test]
+fn pipeline_start_prints_first_step_prompt() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml(tmp.path(), "my-pipe");
+
+    let output = wai_cmd(tmp.path())
+        .args(["pipeline", "start", "my-pipe", "--topic=my-topic"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let stdout = String::from_utf8(output).unwrap();
+    let stripped = strip_ansi(&stdout);
+
+    // Should contain env export line
+    assert!(
+        stripped.contains("WAI_PIPELINE_RUN="),
+        "Output should contain WAI_PIPELINE_RUN export line, got:\n{stripped}"
+    );
+
+    // Should contain step 1/N header
+    assert!(
+        stripped.contains("step 1/2"),
+        "Output should contain 'step 1/2' header, got:\n{stripped}"
+    );
+
+    // Should contain the rendered prompt with topic substituted
+    assert!(
+        stripped.contains("my-topic"),
+        "Output should contain topic in rendered prompt, got:\n{stripped}"
+    );
+
+    // Should NOT contain the literal {topic} placeholder
+    assert!(
+        !stripped.contains("{topic}"),
+        "Output should not contain literal {{topic}} placeholder, got:\n{stripped}"
+    );
+}
+
+#[test]
+fn pipeline_start_fails_for_unknown_pipeline() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "start", "nonexistent", "--topic=foo"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("nonexistent").or(predicate::str::contains("not found")));
+}

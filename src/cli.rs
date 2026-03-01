@@ -706,6 +706,29 @@ pub enum PipelineCommands {
         topic: String,
     },
 
+    /// Start a new TOML pipeline run (replaces 'run' for TOML-based pipelines)
+    ///
+    /// Loads a TOML pipeline definition, generates a unique run ID, writes run
+    /// state to `.wai/pipeline-runs/<run-id>.yml`, records the run ID in
+    /// `.wai/resources/pipelines/.last-run`, then prints an env export line
+    /// and the first step prompt.
+    ///
+    /// EXAMPLES
+    ///   wai pipeline start feature --topic=auth-refactor
+    ///   wai pipeline start review --topic="my feature"
+    ///
+    /// ENVIRONMENT
+    ///   Sets WAI_PIPELINE_RUN in your shell when you run the printed export line.
+    ///   `wai add` picks up the run ID automatically from `.wai/.pipeline-run`.
+    Start {
+        /// Name of the pipeline to start (must be a .toml file in .wai/resources/pipelines/)
+        name: String,
+
+        /// Topic to use for {topic} substitution in step prompts
+        #[arg(long)]
+        topic: Option<String>,
+    },
+
     /// Advance to the next stage of a pipeline run
     ///
     /// Marks the current stage complete (recording the artifact path if a

@@ -15,10 +15,10 @@
 
 ## 3. Command: `pipeline start` (`src/cli.rs`, `src/commands/pipeline.rs`)
 
-- [ ] 3.1 Add `PipelineCommands::Start { name, topic }` variant to `src/cli.rs`
-- [ ] 3.2 Implement `cmd_start`: load and validate TOML definition, generate run ID, write run state YAML
-- [ ] 3.3 Write run ID to `.last-run` pointer file
-- [ ] 3.4 Print env export line + first step prompt block (step 1/N header, rendered prompt)
+- [x] 3.1 Add `PipelineCommands::Start { name, topic }` variant to `src/cli.rs`
+- [x] 3.2 Implement `cmd_start`: load and validate TOML definition, generate run ID, write run state YAML
+- [x] 3.3 Write run ID to `.last-run` pointer file
+- [x] 3.4 Print env export line + first step prompt block (step 1/N header, rendered prompt)
 
 ## 4. Command: `pipeline next` (`src/cli.rs`, `src/commands/pipeline.rs`)
 

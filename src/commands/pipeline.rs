@@ -129,6 +129,7 @@ pub fn run(cmd: PipelineCommands) -> Result<()> {
         PipelineCommands::Status { name, run } => cmd_status(&name, run.as_deref()),
         PipelineCommands::List => cmd_list(),
         PipelineCommands::Init { name } => cmd_init(&name),
+        PipelineCommands::Start { name, topic } => cmd_start(&name, topic.as_deref()),
     }
 }
 
@@ -524,6 +525,84 @@ fn cmd_init(name: &str) -> Result<()> {
         name
     );
     Ok(())
+}
+
+// ─── start ────────────────────────────────────────────────────────────────────
+
+fn cmd_start(name: &str, topic: Option<&str>) -> Result<()> {
+    let project_root = require_project()?;
+    require_safe_mode("pipeline start")?;
+
+    // 1. Find and load the pipeline TOML definition
+    let def_path = pipelines_dir(&project_root).join(format!("{}.toml", name));
+    if !def_path.exists() {
+        miette::bail!(
+            "Pipeline '{}' not found. Create it with: wai pipeline init {}",
+            name,
+            name
+        );
+    }
+    let definition = load_pipeline_toml(&def_path)?;
+
+    if definition.steps.is_empty() {
+        miette::bail!("Pipeline '{}' has no steps defined", name);
+    }
+
+    // 2. Generate a unique run ID: <name>-<YYYY-MM-DD>-<topic-slug>
+    let date = chrono::Utc::now().format("%Y-%m-%d");
+    let topic_str = topic.unwrap_or("");
+    let topic_slug = if topic_str.is_empty() {
+        "run".to_string()
+    } else {
+        slug::slugify(topic_str)
+    };
+    let run_id = format!("{}-{}-{}", name, date, topic_slug);
+
+    // 3. Create run state
+    let run = PipelineRun {
+        run_id: run_id.clone(),
+        pipeline: name.to_string(),
+        topic: topic_str.to_string(),
+        created_at: chrono::Utc::now().to_rfc3339(),
+        current_step: 0,
+    };
+
+    // 4. Write run state to .wai/pipeline-runs/<run-id>.yml
+    let runs_dir = crate::config::wai_dir(&project_root).join("pipeline-runs");
+    fs::create_dir_all(&runs_dir).into_diagnostic()?;
+    let run_path = runs_dir.join(format!("{}.yml", run_id));
+    let yaml = serde_yml::to_string(&run)
+        .map_err(|e| miette::miette!("Failed to serialize run state: {}", e))?;
+    fs::write(&run_path, yaml).into_diagnostic()?;
+
+    // 5. Write .last-run pointer file
+    let last_run = crate::config::last_run_path(&project_root);
+    fs::create_dir_all(last_run.parent().unwrap()).into_diagnostic()?;
+    fs::write(&last_run, &run_id).into_diagnostic()?;
+
+    // 6. Write .wai/.pipeline-run so `wai add` picks up the run ID automatically
+    crate::config::write_pipeline_run_state(&project_root, &run_id)
+        .map_err(|e| miette::miette!("Failed to write pipeline run state: {}", e))?;
+
+    // 7. Print env export line + first step prompt block
+    println!("export WAI_PIPELINE_RUN={}", run_id);
+    println!();
+    print_step(&definition, 0, topic_str);
+
+    Ok(())
+}
+
+/// Print a step prompt block with a "step N/M" header and rendered prompt.
+fn print_step(definition: &PipelineDefinition, idx: usize, topic: &str) {
+    let step = &definition.steps[idx];
+    let total = definition.steps.len();
+    println!(
+        "── step {}/{}: {} ──────────────────────────────",
+        idx + 1,
+        total,
+        step.id
+    );
+    println!("{}", render_prompt(&step.prompt, topic));
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
