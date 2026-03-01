@@ -1348,4 +1348,91 @@ mod tests {
         assert_eq!(ctx.handoff_count, 2);
         assert_eq!(ctx.handoff_count, ctx.handoffs.len());
     }
+
+    // ── write_reflect_resource ────────────────────────────────────────────────
+
+    // 6.1: writes correct path with YAML front-matter
+    #[test]
+    fn write_reflect_resource_creates_file_with_front_matter() {
+        let dir = tmp();
+        write_reflect_resource(dir.path(), "my-proj", "body text", 3).unwrap();
+
+        let refl_dir = crate::config::reflections_dir(dir.path());
+        let entries: Vec<_> = fs::read_dir(&refl_dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .collect();
+        assert_eq!(entries.len(), 1, "expected exactly one reflection file");
+
+        let content = fs::read_to_string(entries[0].path()).unwrap();
+        assert!(content.contains("sessions_analyzed: 3"), "missing sessions_analyzed");
+        assert!(content.contains("project: \"my-proj\""), "missing project field");
+        assert!(content.contains("type: reflection"), "missing type field");
+        assert!(content.contains("body text"), "missing content body");
+        let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+        assert!(content.contains(&format!("date: \"{}\"", today)), "missing date field");
+    }
+
+    #[test]
+    fn write_reflect_resource_filename_contains_slug_and_date() {
+        let dir = tmp();
+        write_reflect_resource(dir.path(), "My Project", "content", 1).unwrap();
+
+        let refl_dir = crate::config::reflections_dir(dir.path());
+        let entries: Vec<_> = fs::read_dir(&refl_dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .collect();
+        assert_eq!(entries.len(), 1);
+
+        let filename = entries[0].file_name();
+        let name = filename.to_string_lossy();
+        // slug::slugify("My Project") == "my-project"
+        assert!(name.contains("my-project"), "filename should contain slugified name, got: {name}");
+        let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+        assert!(name.contains(&today), "filename should contain date, got: {name}");
+        assert!(name.ends_with(".md"), "filename should end with .md");
+    }
+
+    #[test]
+    fn write_reflect_resource_creates_dir_if_missing() {
+        let dir = tmp();
+        // reflections dir does not exist yet — function must create it
+        let refl_dir = crate::config::reflections_dir(dir.path());
+        assert!(!refl_dir.exists(), "precondition: reflections dir should not exist yet");
+
+        write_reflect_resource(dir.path(), "proj", "content", 0).unwrap();
+        assert!(refl_dir.exists(), "reflections dir should have been created");
+        assert_eq!(
+            fs::read_dir(&refl_dir).unwrap().count(),
+            1,
+            "expected one file written in the reflections dir"
+        );
+    }
+
+    // 6.2: suffix logic (-2, -3) when file already exists
+    #[test]
+    fn write_reflect_resource_suffix_on_collision() {
+        let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
+        let dir = tmp();
+
+        write_reflect_resource(dir.path(), "proj", "first", 1).unwrap();
+        write_reflect_resource(dir.path(), "proj", "second", 2).unwrap();
+        write_reflect_resource(dir.path(), "proj", "third", 3).unwrap();
+
+        let refl_dir = crate::config::reflections_dir(dir.path());
+        let mut names: Vec<String> = fs::read_dir(&refl_dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.file_name().to_string_lossy().to_string())
+            .collect();
+        names.sort();
+
+        assert_eq!(names.len(), 3, "expected 3 reflection files, got: {names:?}");
+        // Lexicographic sort of full filenames: "{date}-proj-2.md" < "{date}-proj-3.md" < "{date}-proj.md"
+        // because '-' (0x2D) < '.' (0x2E) in ASCII, so suffixed variants sort before the base file.
+        assert!(names[0].starts_with(&format!("{}-proj-2.", date)), "-2 suffix missing: {names:?}");
+        assert!(names[1].starts_with(&format!("{}-proj-3.", date)), "-3 suffix missing: {names:?}");
+        assert!(names[2].starts_with(&format!("{}-proj.", date)), "base file missing: {names:?}");
+    }
 }
