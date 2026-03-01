@@ -2008,8 +2008,7 @@ fn way_works_without_wai_init() {
 
     // Don't init workspace - way should still work
     wai_cmd(tmp.path()).args(["way"]).assert().success().stdout(
-        predicate::str::contains("The Wai Way")
-            .and(predicate::str::contains("Repository Best Practices")),
+        predicate::str::contains("Repo Hygiene & Agent Workflow Conventions"),
     );
 }
 
