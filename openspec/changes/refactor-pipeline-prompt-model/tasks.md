@@ -22,12 +22,12 @@
 
 ## 4. Command: `pipeline next` (`src/cli.rs`, `src/commands/pipeline.rs`)
 
-- [ ] 4.1 Add `PipelineCommands::Next` variant to `src/cli.rs` (no arguments)
-- [ ] 4.2 Implement `cmd_next`: resolve run ID from `WAI_PIPELINE_RUN` env var, then `.last-run`; error if neither
-- [ ] 4.3 Error if resolved run is already complete
-- [ ] 4.4 Mark current step complete (reuse existing tag-discovery logic for artifact path)
-- [ ] 4.5 Increment `current_step`, persist run state
-- [ ] 4.6 If more steps remain: print next step prompt block; if last step completed: print completion block with `wai close` suggestion
+- [x] 4.1 Add `PipelineCommands::Next` variant to `src/cli.rs` (no arguments)
+- [x] 4.2 Implement `cmd_next`: resolve run ID from `WAI_PIPELINE_RUN` env var, then `.last-run`; error if neither
+- [x] 4.3 Error if resolved run is already complete
+- [x] 4.4 Mark current step complete (reuse existing tag-discovery logic for artifact path)
+- [x] 4.5 Increment `current_step`, persist run state
+- [x] 4.6 If more steps remain: print next step prompt block; if last step completed: print completion block with `wai close` suggestion
 
 ## 5. Command: `pipeline current` (`src/cli.rs`, `src/commands/pipeline.rs`)
 

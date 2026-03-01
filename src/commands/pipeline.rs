@@ -130,6 +130,7 @@ pub fn run(cmd: PipelineCommands) -> Result<()> {
         PipelineCommands::List => cmd_list(),
         PipelineCommands::Init { name } => cmd_init(&name),
         PipelineCommands::Start { name, topic } => cmd_start(&name, topic.as_deref()),
+        PipelineCommands::Next => cmd_next(),
     }
 }
 
@@ -590,6 +591,87 @@ fn cmd_start(name: &str, topic: Option<&str>) -> Result<()> {
     print_step(&definition, 0, topic_str);
 
     Ok(())
+}
+
+// ─── next ─────────────────────────────────────────────────────────────────────
+
+fn cmd_next() -> Result<()> {
+    let project_root = require_project()?;
+    require_safe_mode("pipeline next")?;
+
+    // 1. Resolve run ID (env var → .last-run)
+    let run_id = resolve_active_run_id(&project_root)?;
+
+    // 2. Load run state
+    let runs_dir = crate::config::wai_dir(&project_root).join("pipeline-runs");
+    let run_path = runs_dir.join(format!("{}.yml", run_id));
+    if !run_path.exists() {
+        miette::bail!(
+            "Run state file not found for run '{}'. The run may have been deleted or the ID is stale.",
+            run_id
+        );
+    }
+    let run: PipelineRun = serde_yml::from_str(&fs::read_to_string(&run_path).into_diagnostic()?)
+        .map_err(|e| miette::miette!("Failed to parse run state for '{}': {}", run_id, e))?;
+
+    // 3. Load pipeline definition
+    let def_path = crate::config::pipelines_dir(&project_root)
+        .join(format!("{}.toml", run.pipeline));
+    let definition = load_pipeline_toml(&def_path)?;
+
+    // 4. Check not already complete
+    if run.current_step >= definition.steps.len() {
+        miette::bail!(
+            "Pipeline run '{}' is already complete. Start a new run with: wai pipeline start {} --topic=<topic>",
+            run_id,
+            run.pipeline
+        );
+    }
+
+    // 5. Advance step
+    let next_step = run.current_step + 1;
+    let updated = PipelineRun {
+        current_step: next_step,
+        ..run
+    };
+    let yaml = serde_yml::to_string(&updated)
+        .map_err(|e| miette::miette!("Failed to serialize run state: {}", e))?;
+    fs::write(&run_path, yaml).into_diagnostic()?;
+
+    // 6. Print next step or completion block
+    if next_step >= definition.steps.len() {
+        println!("──────────────────────────────────────────────");
+        println!("Pipeline '{}' complete!", definition.name);
+        println!();
+        println!("Next: wai close");
+        println!("      wai pipeline suggest   # start another pipeline");
+    } else {
+        print_step(&definition, next_step, &updated.topic);
+    }
+
+    Ok(())
+}
+
+/// Resolve the active run ID: check `WAI_PIPELINE_RUN` env var first, then
+/// fall back to the `.last-run` pointer file at `.wai/resources/pipelines/.last-run`.
+fn resolve_active_run_id(project_root: &Path) -> Result<String> {
+    // Try env var first
+    if let Ok(run_id) = std::env::var("WAI_PIPELINE_RUN") {
+        if !run_id.is_empty() {
+            return Ok(run_id);
+        }
+    }
+    // Fall back to .last-run pointer file
+    let last_run = crate::config::last_run_path(project_root);
+    if last_run.exists() {
+        let run_id = fs::read_to_string(&last_run).into_diagnostic()?.trim().to_string();
+        if !run_id.is_empty() {
+            return Ok(run_id);
+        }
+    }
+    miette::bail!(
+        "No active pipeline run. Start one with: wai pipeline start <name> --topic=<topic>"
+    )
 }
 
 /// Print a step prompt block with a "step N/M" header and rendered prompt.

@@ -767,4 +767,19 @@ pub enum PipelineCommands {
         /// Name for the new pipeline (creates <name>.toml)
         name: String,
     },
+
+    /// Advance to the next step in the active pipeline run
+    ///
+    /// Resolves the active run from `WAI_PIPELINE_RUN` env var, falling back
+    /// to the `.last-run` pointer file. Marks the current step complete,
+    /// increments `current_step`, persists run state, then prints the next
+    /// step prompt or a completion block with a `wai close` suggestion.
+    ///
+    /// EXAMPLES
+    ///   wai pipeline next
+    ///
+    /// ENVIRONMENT
+    ///   WAI_PIPELINE_RUN  When set, identifies the active run. Falls back to
+    ///                     `.wai/resources/pipelines/.last-run` when not set.
+    Next,
 }
