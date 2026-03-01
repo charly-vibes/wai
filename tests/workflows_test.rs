@@ -1,5 +1,5 @@
 use assert_cmd::Command;
-use chrono::Utc;
+use chrono::{Duration, Utc};
 use std::fs;
 use tempfile::TempDir;
 use wai::state::Phase;
@@ -259,5 +259,159 @@ fn scan_then_detect_gives_correct_workflow_pattern() {
             .iter()
             .any(|d| d.pattern == WorkflowPattern::ResearchReadyToAdvance),
         "should detect ResearchReadyToAdvance after 3 research artifacts"
+    );
+}
+
+// ─── lifecycle completion pattern tests ───────────────────────────────────────
+
+fn stale_ctx(phase: Phase, days_old: i64) -> ProjectContext {
+    ProjectContext {
+        name: "test".to_string(),
+        phase,
+        phase_started: Utc::now() - Duration::days(days_old),
+        research_count: 2,
+        plan_count: 1,
+        design_count: 1,
+        handoff_count: 0,
+    }
+}
+
+#[test]
+fn stale_phase_detected_after_threshold() {
+    let ctx = stale_ctx(Phase::Implement, 15);
+    let detections = detect_patterns(&ctx);
+    assert!(
+        detections
+            .iter()
+            .any(|d| matches!(d.pattern, WorkflowPattern::StalePhase { .. })),
+        "should detect StalePhase when phase is >14 days old"
+    );
+}
+
+#[test]
+fn stale_phase_not_detected_within_threshold() {
+    let ctx = stale_ctx(Phase::Implement, 13);
+    let detections = detect_patterns(&ctx);
+    assert!(
+        !detections
+            .iter()
+            .any(|d| matches!(d.pattern, WorkflowPattern::StalePhase { .. })),
+        "should not detect StalePhase when phase is <14 days old"
+    );
+}
+
+#[test]
+fn stale_phase_not_detected_for_archive() {
+    let ctx = stale_ctx(Phase::Archive, 30);
+    let detections = detect_patterns(&ctx);
+    assert!(
+        !detections
+            .iter()
+            .any(|d| matches!(d.pattern, WorkflowPattern::StalePhase { .. })),
+        "should not detect StalePhase for archive phase"
+    );
+}
+
+#[test]
+fn looks_complete_detected_in_review_with_handoff() {
+    let ctx = ProjectContext {
+        name: "test".to_string(),
+        phase: Phase::Review,
+        phase_started: Utc::now(),
+        research_count: 3,
+        plan_count: 1,
+        design_count: 1,
+        handoff_count: 1,
+    };
+    let detections = detect_patterns(&ctx);
+    assert!(
+        detections
+            .iter()
+            .any(|d| d.pattern == WorkflowPattern::LooksComplete),
+        "should detect LooksComplete in review phase with handoff"
+    );
+}
+
+#[test]
+fn looks_complete_not_detected_without_handoff() {
+    let ctx = ProjectContext {
+        name: "test".to_string(),
+        phase: Phase::Review,
+        phase_started: Utc::now(),
+        research_count: 3,
+        plan_count: 1,
+        design_count: 1,
+        handoff_count: 0,
+    };
+    let detections = detect_patterns(&ctx);
+    assert!(
+        !detections
+            .iter()
+            .any(|d| d.pattern == WorkflowPattern::LooksComplete),
+        "should not detect LooksComplete in review phase without handoff"
+    );
+}
+
+#[test]
+fn looks_complete_not_detected_outside_review() {
+    let ctx = ProjectContext {
+        name: "test".to_string(),
+        phase: Phase::Implement,
+        phase_started: Utc::now(),
+        research_count: 3,
+        plan_count: 1,
+        design_count: 1,
+        handoff_count: 2,
+    };
+    let detections = detect_patterns(&ctx);
+    assert!(
+        !detections
+            .iter()
+            .any(|d| d.pattern == WorkflowPattern::LooksComplete),
+        "should not detect LooksComplete outside review phase"
+    );
+}
+
+#[test]
+fn stale_phase_suggestions_include_archive_and_advance() {
+    let ctx = stale_ctx(Phase::Research, 20);
+    let detections = detect_patterns(&ctx);
+    let d = detections
+        .iter()
+        .find(|d| matches!(d.pattern, WorkflowPattern::StalePhase { .. }))
+        .expect("StalePhase should be present");
+    assert!(
+        d.suggestions.iter().any(|s| s.command.contains("phase next")),
+        "StalePhase suggestions should include 'wai phase next'"
+    );
+    assert!(
+        d.suggestions.iter().any(|s| s.command.contains("move")),
+        "StalePhase suggestions should include 'wai move'"
+    );
+}
+
+#[test]
+fn looks_complete_suggestions_include_archive_and_advance() {
+    let ctx = ProjectContext {
+        name: "proj".to_string(),
+        phase: Phase::Review,
+        phase_started: Utc::now(),
+        research_count: 2,
+        plan_count: 1,
+        design_count: 1,
+        handoff_count: 1,
+    };
+    let detections = detect_patterns(&ctx);
+    let d = detections
+        .iter()
+        .find(|d| d.pattern == WorkflowPattern::LooksComplete)
+        .expect("LooksComplete should be present");
+    assert!(
+        d.suggestions.iter().any(|s| s.command.contains("move")),
+        "LooksComplete suggestions should include 'wai move'"
+    );
+    assert!(
+        d.suggestions.iter().any(|s| s.command.contains("phase next")),
+        "LooksComplete suggestions should include 'wai phase next'"
     );
 }

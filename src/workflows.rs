@@ -24,6 +24,10 @@ pub enum WorkflowPattern {
     ReadyToImplement,
     /// Actively in implement phase.
     ImplementPhaseActive,
+    /// Project has been in the same phase for longer than the stale threshold.
+    StalePhase { days: i64 },
+    /// Project is in review phase with at least one handoff — likely ready to archive.
+    LooksComplete,
 }
 
 /// A detected workflow pattern with a human message and suggested next steps.
@@ -201,6 +205,48 @@ pub fn detect_patterns(ctx: &ProjectContext) -> Vec<WorkflowDetection> {
         });
     }
 
+    // Stale phase: project has been in same phase for more than STALE_PHASE_DAYS
+    if ctx.phase != Phase::Archive {
+        let days = (Utc::now() - ctx.phase_started).num_days();
+        if days > STALE_PHASE_DAYS {
+            detections.push(WorkflowDetection {
+                pattern: WorkflowPattern::StalePhase { days },
+                message: format!(
+                    "Project has been in {} phase for {} days — consider advancing or archiving",
+                    ctx.phase, days
+                ),
+                suggestions: vec![
+                    Suggestion {
+                        label: "Advance phase".to_string(),
+                        command: "wai phase next".to_string(),
+                    },
+                    Suggestion {
+                        label: "Archive project".to_string(),
+                        command: format!("wai move {} archives", ctx.name),
+                    },
+                ],
+            });
+        }
+    }
+
+    // LooksComplete: in review phase with at least one handoff
+    if ctx.phase == Phase::Review && ctx.handoff_count >= 1 {
+        detections.push(WorkflowDetection {
+            pattern: WorkflowPattern::LooksComplete,
+            message: "Project looks complete — handoff created while in review phase".to_string(),
+            suggestions: vec![
+                Suggestion {
+                    label: "Archive project".to_string(),
+                    command: format!("wai move {} archives", ctx.name),
+                },
+                Suggestion {
+                    label: "Advance to archive phase".to_string(),
+                    command: "wai phase next".to_string(),
+                },
+            ],
+        });
+    }
+
     detections
 }
 
@@ -304,7 +350,7 @@ mod tests {
     }
 
     #[test]
-    fn no_patterns_for_review_phase() {
+    fn looks_complete_fires_for_review_phase_with_handoff() {
         let ctx = ProjectContext {
             name: "test".to_string(),
             phase: Phase::Review,
@@ -315,7 +361,8 @@ mod tests {
             handoff_count: 1,
         };
         let detections = detect_patterns(&ctx);
-        assert!(detections.is_empty());
+        assert_eq!(detections.len(), 1);
+        assert_eq!(detections[0].pattern, WorkflowPattern::LooksComplete);
     }
 
     #[test]
