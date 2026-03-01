@@ -1264,6 +1264,7 @@ mod tests {
             handoff_count: 0,
             secondary: vec![],
             existing_blocks: vec![],
+            previous_reflections: vec![],
         }
     }
 
@@ -1290,6 +1291,7 @@ mod tests {
             handoff_count: 0,
             secondary: vec![],
             existing_blocks: vec![],
+            previous_reflections: vec![],
         };
         let prompt = build_reflect_prompt(&ctx, "2026-02-24");
         assert!(prompt.contains("session transcript here"));
@@ -1307,6 +1309,7 @@ mod tests {
             handoff_count: 1,
             secondary: vec![],
             existing_blocks: vec![],
+            previous_reflections: vec![],
         };
         let prompt = build_reflect_prompt(&ctx, "2026-02-24");
         assert!(prompt.contains("handoff notes here"));
@@ -1321,6 +1324,7 @@ mod tests {
             handoff_count: 0,
             secondary: vec![],
             existing_blocks: vec![(PathBuf::from("CLAUDE.md"), "existing guidance".to_string())],
+            previous_reflections: vec![],
         };
         let prompt = build_reflect_prompt(&ctx, "2026-02-24");
         assert!(prompt.contains("existing guidance"));
@@ -1335,6 +1339,7 @@ mod tests {
             handoff_count: 0,
             secondary: vec![],
             existing_blocks: vec![],
+            previous_reflections: vec![],
         };
         let prompt = build_reflect_prompt(&ctx, "2026-02-24");
         // Should be escaped to ~~~

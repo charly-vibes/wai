@@ -76,6 +76,7 @@ pub fn run(fix: Option<String>) -> Result<()> {
         check_ci_cd(&repo_root),
         check_devcontainer(&repo_root),
         check_release_pipeline(&repo_root),
+        check_test_coverage(&repo_root),
     ];
 
     let summary = Summary {
@@ -950,6 +951,275 @@ fn has_release_workflow(repo_root: &Path) -> bool {
         }
     }
     false
+}
+
+fn check_test_coverage(repo_root: &Path) -> CheckResult {
+    let name = "Test coverage";
+    let intent = Some(
+        "Enforced coverage thresholds catch regressions automatically and keep quality high."
+            .to_string(),
+    );
+    let success_criteria =
+        Some("A coverage tool is configured with a minimum threshold.".to_string());
+
+    // Rust — tarpaulin
+    let tarpaulin_toml = repo_root.join("tarpaulin.toml");
+    if tarpaulin_toml.exists() {
+        let has_threshold = std::fs::read_to_string(&tarpaulin_toml)
+            .ok()
+            .is_some_and(|c| c.contains("fail-under"));
+        return if has_threshold {
+            CheckResult {
+                name: name.to_string(),
+                status: Status::Pass,
+                message: "tarpaulin configured (threshold enforced)".to_string(),
+                intent,
+                success_criteria,
+                suggestion: None,
+            }
+        } else {
+            CheckResult {
+                name: name.to_string(),
+                status: Status::Pass,
+                message: "tarpaulin configured".to_string(),
+                intent,
+                success_criteria,
+                suggestion: Some(
+                    "Add `fail-under` to tarpaulin config to enforce a minimum — https://github.com/xd009642/tarpaulin".to_string(),
+                ),
+            }
+        };
+    }
+
+    // Rust — tarpaulin via Cargo.toml metadata
+    if let Ok(cargo_content) = std::fs::read_to_string(repo_root.join("Cargo.toml")) {
+        if cargo_content.contains("[package.metadata.tarpaulin]")
+            || cargo_content.contains("[workspace.metadata.tarpaulin]")
+        {
+            let has_threshold = cargo_content.contains("fail-under");
+            return if has_threshold {
+                CheckResult {
+                    name: name.to_string(),
+                    status: Status::Pass,
+                    message: "tarpaulin configured (threshold enforced)".to_string(),
+                    intent,
+                    success_criteria,
+                    suggestion: None,
+                }
+            } else {
+                CheckResult {
+                    name: name.to_string(),
+                    status: Status::Pass,
+                    message: "tarpaulin configured".to_string(),
+                    intent,
+                    success_criteria,
+                    suggestion: Some(
+                        "Add `fail-under` to tarpaulin config to enforce a minimum — https://github.com/xd009642/tarpaulin".to_string(),
+                    ),
+                }
+            };
+        }
+        // Rust — cargo-llvm-cov via dev-dependencies
+        if cargo_content.contains("cargo-llvm-cov") {
+            return CheckResult {
+                name: name.to_string(),
+                status: Status::Pass,
+                message: "cargo-llvm-cov detected".to_string(),
+                intent,
+                success_criteria,
+                suggestion: Some(
+                    "Configure a threshold via CI flags or llvm-cov config — https://github.com/taiki-e/cargo-llvm-cov".to_string(),
+                ),
+            };
+        }
+    }
+
+    // Python — coverage.py / pytest-cov
+    let coveragerc = repo_root.join(".coveragerc");
+    if coveragerc.exists() {
+        let has_threshold = std::fs::read_to_string(&coveragerc)
+            .ok()
+            .is_some_and(|c| c.contains("fail_under"));
+        return if has_threshold {
+            CheckResult {
+                name: name.to_string(),
+                status: Status::Pass,
+                message: "coverage.py configured (threshold enforced)".to_string(),
+                intent,
+                success_criteria,
+                suggestion: None,
+            }
+        } else {
+            CheckResult {
+                name: name.to_string(),
+                status: Status::Pass,
+                message: "coverage.py configured".to_string(),
+                intent,
+                success_criteria,
+                suggestion: Some(
+                    "Add `fail_under` to [tool.coverage.report] in pyproject.toml — https://coverage.readthedocs.io".to_string(),
+                ),
+            }
+        };
+    }
+    if let Ok(pyproject) = std::fs::read_to_string(repo_root.join("pyproject.toml")) {
+        if pyproject.contains("[tool.coverage.report]") {
+            let has_threshold = pyproject.contains("fail_under");
+            return if has_threshold {
+                CheckResult {
+                    name: name.to_string(),
+                    status: Status::Pass,
+                    message: "coverage.py configured (threshold enforced)".to_string(),
+                    intent,
+                    success_criteria,
+                    suggestion: None,
+                }
+            } else {
+                CheckResult {
+                    name: name.to_string(),
+                    status: Status::Pass,
+                    message: "coverage.py configured".to_string(),
+                    intent,
+                    success_criteria,
+                    suggestion: Some(
+                        "Add `fail_under` to [tool.coverage.report] in pyproject.toml — https://coverage.readthedocs.io".to_string(),
+                    ),
+                }
+            };
+        }
+    }
+
+    // JavaScript / TypeScript — vitest
+    for config_name in &["vitest.config.ts", "vitest.config.js", "vitest.config.mts"] {
+        let config_path = repo_root.join(config_name);
+        if let Ok(content) = std::fs::read_to_string(&config_path) {
+            if content.contains("coverage") {
+                let has_threshold = content.contains("thresholds");
+                return if has_threshold {
+                    CheckResult {
+                        name: name.to_string(),
+                        status: Status::Pass,
+                        message: "vitest coverage configured (threshold enforced)".to_string(),
+                        intent,
+                        success_criteria,
+                        suggestion: None,
+                    }
+                } else {
+                    CheckResult {
+                        name: name.to_string(),
+                        status: Status::Pass,
+                        message: "vitest coverage configured".to_string(),
+                        intent,
+                        success_criteria,
+                        suggestion: Some(
+                            "Add `thresholds` to the coverage block in vitest.config — https://vitest.dev/config/#coverage".to_string(),
+                        ),
+                    }
+                };
+            }
+        }
+    }
+
+    // JavaScript / TypeScript — nyc or c8
+    let nycrc = repo_root.join(".nycrc");
+    let nycrc_json = repo_root.join(".nycrc.json");
+    let c8_config = repo_root.join("c8.config.js");
+    if nycrc.exists() || nycrc_json.exists() || c8_config.exists() {
+        let content = nycrc
+            .exists()
+            .then(|| std::fs::read_to_string(&nycrc).ok())
+            .flatten()
+            .or_else(|| {
+                nycrc_json
+                    .exists()
+                    .then(|| std::fs::read_to_string(&nycrc_json).ok())
+                    .flatten()
+            })
+            .or_else(|| {
+                c8_config
+                    .exists()
+                    .then(|| std::fs::read_to_string(&c8_config).ok())
+                    .flatten()
+            })
+            .unwrap_or_default();
+        let has_threshold = content.contains("branches") || content.contains("lines");
+        return if has_threshold {
+            CheckResult {
+                name: name.to_string(),
+                status: Status::Pass,
+                message: "nyc/c8 configured (threshold enforced)".to_string(),
+                intent,
+                success_criteria,
+                suggestion: None,
+            }
+        } else {
+            CheckResult {
+                name: name.to_string(),
+                status: Status::Pass,
+                message: "nyc/c8 configured".to_string(),
+                intent,
+                success_criteria,
+                suggestion: Some(
+                    "Add branch/line thresholds to nyc or c8 config — https://github.com/istanbuljs/nyc · https://github.com/bcoe/c8".to_string(),
+                ),
+            }
+        };
+    }
+    if let Ok(pkg) = std::fs::read_to_string(repo_root.join("package.json")) {
+        if pkg.contains("\"nyc\"") || pkg.contains("\"c8\"") {
+            let has_threshold = pkg.contains("branches") || pkg.contains("lines");
+            return if has_threshold {
+                CheckResult {
+                    name: name.to_string(),
+                    status: Status::Pass,
+                    message: "nyc/c8 configured (threshold enforced)".to_string(),
+                    intent,
+                    success_criteria,
+                    suggestion: None,
+                }
+            } else {
+                CheckResult {
+                    name: name.to_string(),
+                    status: Status::Pass,
+                    message: "nyc/c8 configured".to_string(),
+                    intent,
+                    success_criteria,
+                    suggestion: Some(
+                        "Add branch/line thresholds to nyc or c8 config — https://github.com/istanbuljs/nyc · https://github.com/bcoe/c8".to_string(),
+                    ),
+                }
+            };
+        }
+    }
+
+    // Any language — codecov / coveralls
+    let codecov_yml = repo_root.join(".codecov.yml");
+    let codecov_yaml = repo_root.join("codecov.yml");
+    let coveralls_yml = repo_root.join(".coveralls.yml");
+    if codecov_yml.exists() || codecov_yaml.exists() || coveralls_yml.exists() {
+        return CheckResult {
+            name: name.to_string(),
+            status: Status::Pass,
+            message: "Coverage reporting service detected (codecov/coveralls)".to_string(),
+            intent,
+            success_criteria,
+            suggestion: Some(
+                "Add a coverage threshold in the config to enforce minimums".to_string(),
+            ),
+        };
+    }
+
+    // Nothing detected
+    CheckResult {
+        name: name.to_string(),
+        status: Status::Info,
+        message: "No coverage tool configured".to_string(),
+        intent,
+        success_criteria,
+        suggestion: Some(
+            "Configure a coverage tool with an enforced threshold — Rust: https://github.com/xd009642/tarpaulin · Python: https://coverage.readthedocs.io · JS: https://github.com/istanbuljs/nyc".to_string(),
+        ),
+    }
 }
 
 fn check_gh_cli() -> CheckResult {

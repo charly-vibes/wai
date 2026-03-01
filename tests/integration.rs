@@ -2761,6 +2761,82 @@ fn way_check_justfile_recipes() {
         );
 }
 
+// ─── way: check_test_coverage ─────────────────────────────────────────────────
+
+#[test]
+fn way_check_test_coverage_tarpaulin_with_threshold() {
+    let tmp = TempDir::new().unwrap();
+    fs::write(
+        tmp.path().join("tarpaulin.toml"),
+        "[report]\nfail-under = 80\n",
+    )
+    .unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Test coverage")
+                .and(predicate::str::contains("tarpaulin configured (threshold enforced)"))
+                .and(predicate::str::contains("\"pass\"")),
+        );
+}
+
+#[test]
+fn way_check_test_coverage_tarpaulin_no_threshold() {
+    let tmp = TempDir::new().unwrap();
+    fs::write(tmp.path().join("tarpaulin.toml"), "[report]\n").unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Test coverage")
+                .and(predicate::str::contains("tarpaulin configured"))
+                .and(predicate::str::contains("\"pass\""))
+                .and(predicate::str::contains("fail-under")),
+        );
+}
+
+#[test]
+fn way_check_test_coverage_vitest_with_thresholds() {
+    let tmp = TempDir::new().unwrap();
+    fs::write(
+        tmp.path().join("vitest.config.ts"),
+        "export default { test: { coverage: { thresholds: { lines: 80 } } } }\n",
+    )
+    .unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Test coverage")
+                .and(predicate::str::contains(
+                    "vitest coverage configured (threshold enforced)",
+                ))
+                .and(predicate::str::contains("\"pass\"")),
+        );
+}
+
+#[test]
+fn way_check_test_coverage_not_configured() {
+    let tmp = TempDir::new().unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Test coverage")
+                .and(predicate::str::contains("No coverage tool configured"))
+                .and(predicate::str::contains("\"info\"")),
+        );
+}
+
 // ─── Post-Command Suggestions ────────────────────────────────────────────────
 
 #[test]
