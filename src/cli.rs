@@ -731,4 +731,17 @@ pub enum PipelineCommands {
 
     /// List all pipelines
     List,
+
+    /// Scaffold a new TOML pipeline definition
+    ///
+    /// Creates `.wai/resources/pipelines/<name>.toml` with a minimal two-step
+    /// template. Edit the prompts, then start a run with:
+    ///   wai pipeline start <name> --topic=<your-topic>
+    ///
+    /// EXAMPLE
+    ///   wai pipeline init my-workflow
+    Init {
+        /// Name for the new pipeline (creates <name>.toml)
+        name: String,
+    },
 }

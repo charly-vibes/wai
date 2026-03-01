@@ -5250,3 +5250,124 @@ fn pipeline_status_unknown_pipeline_fails() {
         .failure()
         .stderr(predicate::str::contains("not found"));
 }
+
+// ─── wai pipeline init ────────────────────────────────────────────────────────
+
+#[test]
+fn pipeline_init_creates_toml_file() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "init", "my-workflow"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("my-workflow"));
+
+    let toml_path = tmp
+        .path()
+        .join(".wai/resources/pipelines/my-workflow.toml");
+    assert!(toml_path.exists(), "Expected TOML file at {:?}", toml_path);
+
+    let content = fs::read_to_string(&toml_path).unwrap();
+    // Check the pipeline name is set correctly
+    assert!(
+        content.contains("name = \"my-workflow\""),
+        "Expected pipeline name in TOML: {}",
+        content
+    );
+    // Check both steps are present
+    assert!(
+        content.contains("id = \"step-one\""),
+        "Expected step-one in TOML: {}",
+        content
+    );
+    assert!(
+        content.contains("id = \"step-two\""),
+        "Expected step-two in TOML: {}",
+        content
+    );
+    // Check the {topic} placeholder is present (not substituted)
+    assert!(
+        content.contains("{topic}"),
+        "Expected {{topic}} placeholder in TOML: {}",
+        content
+    );
+    // Check the convention comment is present
+    assert!(
+        content.contains("navigation hints"),
+        "Expected convention comment in TOML: {}",
+        content
+    );
+}
+
+#[test]
+fn pipeline_init_creates_pipelines_dir_if_absent() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    let pipelines_dir = tmp.path().join(".wai/resources/pipelines");
+    assert!(!pipelines_dir.exists(), "Pipelines dir should not exist yet");
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "init", "new-pipe"])
+        .assert()
+        .success();
+
+    assert!(pipelines_dir.exists(), "Pipelines dir should have been created");
+}
+
+#[test]
+fn pipeline_init_fails_if_file_already_exists() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    // Create the pipeline the first time — should succeed
+    wai_cmd(tmp.path())
+        .args(["pipeline", "init", "duplicate"])
+        .assert()
+        .success();
+
+    // Try again — should fail with a clear error
+    wai_cmd(tmp.path())
+        .args(["pipeline", "init", "duplicate"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("already exists"));
+}
+
+#[test]
+fn pipeline_init_rejects_invalid_name() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "init", "Bad Name!"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Invalid character"));
+}
+
+#[test]
+fn pipeline_init_template_is_valid_toml() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "init", "valid-check"])
+        .assert()
+        .success();
+
+    let toml_path = tmp
+        .path()
+        .join(".wai/resources/pipelines/valid-check.toml");
+    let content = fs::read_to_string(&toml_path).unwrap();
+
+    // Verify the generated file parses as valid TOML
+    let parsed: Result<toml::Value, _> = toml::from_str(&content);
+    assert!(
+        parsed.is_ok(),
+        "Generated TOML should be valid, but got error: {:?}",
+        parsed.err()
+    );
+}

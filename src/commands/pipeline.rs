@@ -128,6 +128,7 @@ pub fn run(cmd: PipelineCommands) -> Result<()> {
         PipelineCommands::Advance { run_id } => cmd_advance(&run_id),
         PipelineCommands::Status { name, run } => cmd_status(&name, run.as_deref()),
         PipelineCommands::List => cmd_list(),
+        PipelineCommands::Init { name } => cmd_init(&name),
     }
 }
 
@@ -462,6 +463,66 @@ fn cmd_list() -> Result<()> {
     }
     println!();
 
+    Ok(())
+}
+
+// ─── init ─────────────────────────────────────────────────────────────────────
+
+fn cmd_init(name: &str) -> Result<()> {
+    let project_root = require_project()?;
+    require_safe_mode("pipeline init")?;
+
+    validate_pipeline_name(name)?;
+
+    let pipelines = pipelines_dir(&project_root);
+    fs::create_dir_all(&pipelines).into_diagnostic()?;
+
+    let file_path = pipelines.join(format!("{}.toml", name));
+    if file_path.exists() {
+        miette::bail!(
+            "Pipeline '{}' already exists: {}",
+            name,
+            file_path.display()
+        );
+    }
+
+    // The template uses {topic} as the variable substitution placeholder.
+    // We build this as a plain string (no format!) to avoid escaping collisions.
+    let template = concat!(
+        "# Step prompts are navigation hints. Instructions for HOW to do the\n",
+        "# work belong in skills.\n",
+        "[pipeline]\n",
+        "name = \"PIPELINE_NAME\"\n",
+        "description = \"Describe what this pipeline does\"\n",
+        "\n",
+        "[[steps]]\n",
+        "id = \"step-one\"\n",
+        "prompt = \"\"\"\n",
+        "{topic}: TODO describe step one task.\n",
+        "Use skill `<skill-name>` if available.\n",
+        "Record findings: `wai add research \"...\"`\n",
+        "Advance: `wai pipeline next`\n",
+        "\"\"\"\n",
+        "\n",
+        "[[steps]]\n",
+        "id = \"step-two\"\n",
+        "prompt = \"\"\"\n",
+        "{topic}: TODO describe step two task.\n",
+        "Use skill `<skill-name>` if available.\n",
+        "Record decisions: `wai add design \"...\"`\n",
+        "Advance: `wai pipeline next`\n",
+        "\"\"\"\n",
+    );
+    let template = template.replace("PIPELINE_NAME", name);
+
+    fs::write(&file_path, template).into_diagnostic()?;
+
+    log::success(format!("Created pipeline: {}", file_path.display())).into_diagnostic()?;
+    println!(
+        "  {} Edit the prompts, then start with: wai pipeline start {} --topic=<your-topic>",
+        "→".cyan(),
+        name
+    );
     Ok(())
 }
 

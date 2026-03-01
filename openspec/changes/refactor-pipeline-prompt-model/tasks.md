@@ -9,9 +9,9 @@
 
 ## 2. Command: `pipeline init` (`src/cli.rs`, `src/commands/pipeline.rs`)
 
-- [ ] 2.1 Add `PipelineCommands::Init { name }` variant to `src/cli.rs`
-- [ ] 2.2 Implement `cmd_init`: create `.wai/resources/pipelines/` if absent, write a minimal two-step TOML template (thin prompt style per section 9 — see 9.1 for template content)
-- [ ] 2.3 Fail with clear error if `<name>.toml` already exists
+- [x] 2.1 Add `PipelineCommands::Init { name }` variant to `src/cli.rs`
+- [x] 2.2 Implement `cmd_init`: create `.wai/resources/pipelines/` if absent, write a minimal two-step TOML template (thin prompt style per section 9 — see 9.1 for template content)
+- [x] 2.3 Fail with clear error if `<name>.toml` already exists
 
 ## 3. Command: `pipeline start` (`src/cli.rs`, `src/commands/pipeline.rs`)
 
