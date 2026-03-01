@@ -115,6 +115,8 @@ pub struct ReflectContext {
     pub conversation: Option<String>,
     /// Handoff artifacts, newest-first, concatenated up to budget.
     pub handoffs: Vec<HandoffEntry>,
+    /// Number of handoff files actually loaded (for YAML front-matter).
+    pub handoff_count: usize,
     /// Research/design/plan artifacts up to budget.
     pub secondary: Vec<SecondaryEntry>,
     /// Existing REFLECT block content per target file (to avoid repeating).
@@ -309,6 +311,7 @@ pub fn gather_reflect_context(
     };
 
     let handoffs = read_handoffs(project_root, HANDOFF_BUDGET);
+    let handoff_count = handoffs.len();
     let secondary = read_secondary_artifacts(project_root, SECONDARY_BUDGET);
 
     // Read existing REFLECT blocks from each target so LLM can avoid repeating them.
@@ -320,6 +323,7 @@ pub fn gather_reflect_context(
     Ok(ReflectContext {
         conversation,
         handoffs,
+        handoff_count,
         secondary,
         existing_blocks,
     })
@@ -1127,6 +1131,7 @@ mod tests {
         ReflectContext {
             conversation: None,
             handoffs: vec![],
+            handoff_count: 0,
             secondary: vec![],
             existing_blocks: vec![],
         }
@@ -1152,6 +1157,7 @@ mod tests {
         let ctx = ReflectContext {
             conversation: Some("session transcript here".to_string()),
             handoffs: vec![],
+            handoff_count: 0,
             secondary: vec![],
             existing_blocks: vec![],
         };
@@ -1168,6 +1174,7 @@ mod tests {
                 rel_path: ".wai/projects/foo/handoffs/h.md".to_string(),
                 content: "handoff notes here".to_string(),
             }],
+            handoff_count: 1,
             secondary: vec![],
             existing_blocks: vec![],
         };
@@ -1181,6 +1188,7 @@ mod tests {
         let ctx = ReflectContext {
             conversation: None,
             handoffs: vec![],
+            handoff_count: 0,
             secondary: vec![],
             existing_blocks: vec![(PathBuf::from("CLAUDE.md"), "existing guidance".to_string())],
         };
@@ -1194,6 +1202,7 @@ mod tests {
         let ctx = ReflectContext {
             conversation: Some("some ```code``` here".to_string()),
             handoffs: vec![],
+            handoff_count: 0,
             secondary: vec![],
             existing_blocks: vec![],
         };
@@ -1279,5 +1288,28 @@ mod tests {
         let artifacts = read_secondary_artifacts(dir.path(), 25_000);
         let total: usize = artifacts.iter().map(|a| a.content.len()).sum();
         assert!(total <= 25_000);
+    }
+
+    // ── gather_reflect_context handoff_count tests ────────────────────────
+
+    #[test]
+    fn gather_reflect_context_handoff_count_zero_when_no_handoffs() {
+        let dir = tmp();
+        fs::write(dir.path().join("CLAUDE.md"), "# Claude\n").unwrap();
+        let targets = vec![dir.path().join("CLAUDE.md")];
+        let ctx = gather_reflect_context(dir.path(), None, &targets).unwrap();
+        assert_eq!(ctx.handoff_count, 0);
+    }
+
+    #[test]
+    fn gather_reflect_context_handoff_count_matches_loaded_entries() {
+        let dir = tmp();
+        fs::write(dir.path().join("CLAUDE.md"), "# Claude\n").unwrap();
+        make_wai_handoff(dir.path(), "proj", "h1.md", "handoff 1");
+        make_wai_handoff(dir.path(), "proj", "h2.md", "handoff 2");
+        let targets = vec![dir.path().join("CLAUDE.md")];
+        let ctx = gather_reflect_context(dir.path(), None, &targets).unwrap();
+        assert_eq!(ctx.handoff_count, 2);
+        assert_eq!(ctx.handoff_count, ctx.handoffs.len());
     }
 }
