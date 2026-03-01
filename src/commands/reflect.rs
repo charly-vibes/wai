@@ -55,6 +55,35 @@ pub fn write_reflect_meta(project_dir: &Path, meta: &ReflectMeta) -> Result<()> 
     Ok(())
 }
 
+/// Write a reflection resource file to `.wai/resources/reflections/<date>-<project>.md`.
+///
+/// Prepends YAML front-matter with `date`, `project`, `sessions_analyzed`, and
+/// `type: reflection`. Creates the reflections directory if it doesn't exist.
+///
+/// * `handoff_count` — number of handoff artifacts analyzed; written as
+///   `sessions_analyzed` in the YAML front-matter.
+pub fn write_reflect_resource(
+    project_root: &Path,
+    project_name: &str,
+    content: &str,
+    handoff_count: usize,
+) -> Result<()> {
+    let refl_dir = crate::config::reflections_dir(project_root);
+    std::fs::create_dir_all(&refl_dir).into_diagnostic()?;
+
+    let date = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let filename = format!("{}-{}.md", date, project_name);
+    let path = refl_dir.join(&filename);
+
+    let mut front_matter = format!(
+        "---\ndate: \"{}\"\nproject: \"{}\"\nsessions_analyzed: {}\ntype: reflection\n---\n\n",
+        date, project_name, handoff_count
+    );
+    front_matter.push_str(content);
+    std::fs::write(&path, front_matter).into_diagnostic()?;
+    Ok(())
+}
+
 // ── Output target detection ──────────────────────────────────────────────────
 
 /// Detect the output target(s) based on `--output` override and what files
