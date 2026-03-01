@@ -280,28 +280,61 @@ pub fn inject_managed_block(
     detected_plugins: &[&str],
     installed_skills: &[&str],
 ) -> Result<InjectResult, std::io::Error> {
-    let block = wai_block_content(detected_plugins, installed_skills);
+    let wai_block = wai_block_content(detected_plugins, installed_skills);
+    let ref_block = format!(
+        "{}\n{}{}\n",
+        REFLECT_REF_START,
+        wai_reflect_ref_content(),
+        REFLECT_REF_END
+    );
 
     if path.exists() {
         let content = std::fs::read_to_string(path)?;
 
         if let (Some(start_idx), Some(end_idx)) = (content.find(WAI_START), content.find(WAI_END)) {
-            let end_idx = end_idx + WAI_END.len();
-            let mut new_content = String::with_capacity(content.len());
+            let wai_end_pos = end_idx + WAI_END.len();
+            let mut new_content = String::with_capacity(content.len() + 512);
             new_content.push_str(&content[..start_idx]);
-            new_content.push_str(&block);
-            new_content.push_str(&content[end_idx..]);
+            new_content.push_str(&wai_block);
+
+            // Handle content after WAI:END — update existing REF block or append one.
+            let tail = &content[wai_end_pos..];
+            if let (Some(ref_start), Some(ref_end)) =
+                (tail.find(REFLECT_REF_START), tail.find(REFLECT_REF_END))
+            {
+                if ref_start < ref_end {
+                    let ref_end_abs = ref_end + REFLECT_REF_END.len();
+                    new_content.push_str(&tail[..ref_start]);
+                    new_content.push_str(&ref_block);
+                    new_content.push_str(&tail[ref_end_abs..]);
+                } else {
+                    // Inverted markers — treat as no REF block.
+                    new_content.push_str("\n\n");
+                    new_content.push_str(&ref_block);
+                    new_content.push_str(tail);
+                }
+            } else {
+                new_content.push_str("\n\n");
+                new_content.push_str(&ref_block);
+                new_content.push_str(tail);
+            }
+
             std::fs::write(path, new_content)?;
             Ok(InjectResult::Updated)
         } else {
-            let mut new_content = block;
+            let mut new_content = wai_block;
+            new_content.push_str("\n\n");
+            new_content.push_str(&ref_block);
             new_content.push_str("\n\n");
             new_content.push_str(&content);
             std::fs::write(path, new_content)?;
             Ok(InjectResult::Prepended)
         }
     } else {
-        std::fs::write(path, &block)?;
+        let mut new_content = wai_block;
+        new_content.push_str("\n\n");
+        new_content.push_str(&ref_block);
+        std::fs::write(path, &new_content)?;
         Ok(InjectResult::Created)
     }
 }
@@ -332,6 +365,24 @@ impl InjectResult {
             InjectResult::Updated => format!("Updated wai instructions in {}", filename),
         }
     }
+}
+
+// ── REFLECT:REF block ────────────────────────────────────────────────────────
+
+const REFLECT_REF_START: &str = "<!-- WAI:REFLECT:REF:START -->";
+const REFLECT_REF_END: &str = "<!-- WAI:REFLECT:REF:END -->";
+
+/// Returns the slim reference block content that tells agents where project
+/// patterns live and instructs them to search before starting research.
+pub fn wai_reflect_ref_content() -> &'static str {
+    "## Accumulated Project Patterns\n\
+     \n\
+     Project-specific conventions, gotchas, and architecture notes live in\n\
+     `.wai/resources/reflections/`. Run `wai search \"<topic>\"` to retrieve relevant\n\
+     context before starting research or creating tickets.\n\
+     \n\
+     > **Before research or ticket creation**: always run `wai search \"<topic>\"` to\n\
+     > check for known patterns. Do not rediscover what is already documented.\n"
 }
 
 // ── REFLECT block ────────────────────────────────────────────────────────────
@@ -622,6 +673,90 @@ mod wai_block_tests {
         assert!(
             !output.contains("/ro5"),
             "unexpected '/ro5' in output without ro5 skill"
+        );
+    }
+}
+
+#[cfg(test)]
+mod reflect_ref_tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn tmp() -> TempDir {
+        tempfile::tempdir().expect("tempdir")
+    }
+
+    // 6.3: wai_reflect_ref_content() contains "wai search" and the resource path
+    #[test]
+    fn reflect_ref_content_contains_wai_search() {
+        let content = wai_reflect_ref_content();
+        assert!(
+            content.contains("wai search"),
+            "expected 'wai search' in reflect_ref_content"
+        );
+    }
+
+    #[test]
+    fn reflect_ref_content_contains_resource_path() {
+        let content = wai_reflect_ref_content();
+        assert!(
+            content.contains(".wai/resources/reflections/"),
+            "expected resource path in reflect_ref_content"
+        );
+    }
+
+    // 6.5: WAI:REFLECT:REF:START/END block injected by inject_managed_block()
+    #[test]
+    fn inject_managed_block_adds_reflect_ref_block() {
+        let dir = tmp();
+        let path = dir.path().join("CLAUDE.md");
+        std::fs::write(&path, "# Header\n").unwrap();
+        inject_managed_block(&path, &[], &[]).unwrap();
+        let content = std::fs::read_to_string(&path).unwrap();
+        assert!(
+            content.contains(REFLECT_REF_START),
+            "expected WAI:REFLECT:REF:START in output"
+        );
+        assert!(
+            content.contains(REFLECT_REF_END),
+            "expected WAI:REFLECT:REF:END in output"
+        );
+    }
+
+    #[test]
+    fn inject_managed_block_reflect_ref_after_wai_end() {
+        let dir = tmp();
+        let path = dir.path().join("CLAUDE.md");
+        std::fs::write(&path, "# Header\n").unwrap();
+        inject_managed_block(&path, &[], &[]).unwrap();
+        let content = std::fs::read_to_string(&path).unwrap();
+        let wai_end_pos = content.find(WAI_END).expect("WAI:END not found");
+        let ref_start_pos = content
+            .find(REFLECT_REF_START)
+            .expect("REFLECT:REF:START not found");
+        assert!(
+            ref_start_pos > wai_end_pos,
+            "REFLECT:REF block should appear after WAI:END"
+        );
+    }
+
+    #[test]
+    fn inject_managed_block_updates_reflect_ref_in_place() {
+        let dir = tmp();
+        let path = dir.path().join("CLAUDE.md");
+        std::fs::write(
+            &path,
+            "<!-- WAI:START -->\nwai\n<!-- WAI:END -->\n\n\
+             <!-- WAI:REFLECT:REF:START -->\nold content\n<!-- WAI:REFLECT:REF:END -->\n",
+        )
+        .unwrap();
+        inject_managed_block(&path, &[], &[]).unwrap();
+        let content = std::fs::read_to_string(&path).unwrap();
+        let count = content.matches(REFLECT_REF_START).count();
+        assert_eq!(count, 1, "should not duplicate REFLECT:REF block");
+        assert!(
+            !content.contains("old content"),
+            "should have replaced old REF content"
         );
     }
 }
