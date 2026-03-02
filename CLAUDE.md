@@ -29,14 +29,17 @@ Detected workflow tools:
 
 > **CRITICAL**: Use TDD (write tests first) and Tidy First (separate refactoring commits from feature commits) when implementing changes.
 
+> **When beginning research or creating a ticket**: run `wai search "<topic>"` to check for existing patterns before writing new content.
+> **Ro5**: The Rule of 5 skill is installed. Run `/ro5` after key phase transitions — implement, research, design — for iterative quality review.
+
 ## When to Use What
 
 | Need | Tool | Example |
 |------|------|---------|
 | Record reasoning/research | wai | `wai add research "findings"` |
 | Capture design decisions | wai | `wai add design "architecture choice"` |
-| Session context transfer | wai | `wai close` |
-| Track work items/bugs | beads | `bd create "title"` |
+| Session context transfer | wai | `wai handoff create <project>` |
+| Track work items/bugs | beads | `bd create --title="..." --type=task` |
 | Find available work | beads | `bd ready` |
 | Manage dependencies | beads | `bd dep add <blocked> <blocker>` |
 | Propose system changes | openspec | Read `openspec/AGENTS.md` |
@@ -92,7 +95,7 @@ When beads and openspec are both active, keep them in sync:
 Before saying "done", run this checklist:
 
 ```
-[ ] wai close                      # create handoff + set pending-resume signal
+[ ] wai handoff create <project>   # capture context for next session
 [ ] bd close <id>                  # close completed issues; also close parent epic if last sub-task
 [ ] bd sync --from-main            # pull beads updates
 [ ] openspec tasks.md — mark completed tasks [x]
@@ -100,19 +103,20 @@ Before saying "done", run this checklist:
 [ ] git add <files> && git commit  # commit code + handoff
 ```
 
-`wai close` (not `wai handoff create`) is the canonical end-of-session command — it both
-creates the handoff file and writes the `.pending-resume` signal that makes `wai prime`
-show ⚡ RESUMING next session.
+### Autonomous Loop
 
-### Context Cycling (Autonomous Loop)
+One task per session. The resume loop:
 
-When context reaches ~40%, cycle with `/clear` rather than starting a new session:
+1. `wai prime` — orient (shows ⚡ RESUMING if mid-task)
+2. Work on the single task
+3. `wai close` — capture state (run this before every `/clear`)
+4. `git add <files> && git commit`
+5. `/clear` — fresh context
 
-1. `wai close` — capture state before clearing
-2. `git add <files> && git commit`
-3. `/clear` — fresh context
+→ Next session: `wai prime` shows RESUMING with exact next steps.
 
-→ Next run: `wai prime` detects the pending-resume and shows RESUMING with exact next steps.
+When context reaches ~40%: run `wai close`, then `/clear`.
+Do NOT skip `wai close` — it enables resume detection.
 
 ## Quick Reference
 
@@ -140,7 +144,7 @@ wai pipeline advance <run-id> # Mark stage done, get next hint
 ```bash
 bd ready                     # Available work
 bd show <id>                 # Issue details
-bd create "title"            # New issue
+bd create --title="..."      # New issue
 bd update <id> --status=in_progress
 bd close <id>                # Complete work
 ```
@@ -166,44 +170,16 @@ Keep this managed block so `wai init` can refresh the instructions.
 
 <!-- WAI:END -->
 
-<!-- WAI:REFLECT:START -->
-## Project-Specific AI Context
-_Last reflected: 2026-02-28 · 3 sessions analyzed_
+<!-- WAI:REFLECT:REF:START -->
+## Accumulated Project Patterns
 
-### Conventions
+Project-specific conventions, gotchas, and architecture notes live in
+`.wai/resources/reflections/`. Run `wai search "<topic>"` to retrieve relevant
+context before starting research or creating tickets.
 
-- **Error handling pattern**: All IO errors use `.into_diagnostic()?` (miette crate). Never use `.unwrap()` or `.expect()` in production paths.
-- **Config access**: LLM config is now `config.llm_config()` (returns `Cow<LlmConfig>`), not `config.why`. The `[why]` TOML section still deserializes for backwards compat but emits a deprecation warning.
-- **Global flags**: Commands must OR-merge local flags with `current_context()` globals: `let json = json || current_context().json`. Never read *only* the subcommand-local flag — `wai --json <cmd>` must work.
-- **Shared helpers**: `beads_summary`, `resolve_project_named`, `list_projects` live in `src/commands/mod.rs` as `pub(crate)` functions. Do not duplicate them in individual command files.
-- **Managed block template**: `src/managed_block.rs::wai_block_content()` is the source of truth for the WAI managed block. Editing `CLAUDE.md` directly only changes the current repo — the template must also be updated for the change to propagate to other repos via `wai init`.
-- **Phase badge colors**: research=yellow, design=magenta, plan=blue, implement=green, review=cyan, archive=dim. Defined in `status.rs::format_phase` — follow the same mapping in any new command that displays phases.
-
-### Common Gotchas
-
-- **`create_dir_all` before writes**: Always call `std::fs::create_dir_all(&dir).into_diagnostic()?` before `std::fs::write(dir.join(&filename), ...)`. The subdirectory may not exist (especially for fresh projects or manually-pruned repos).
-- **`fs::rename` is not cross-device**: Use `move_item()` helper in `move_cmd.rs` which falls back to recursive copy+delete on EXDEV. Never call `std::fs::rename` directly for PARA item moves.
-- **State captured BEFORE write**: When distinguishing Created vs Updated, always capture `let already_existed = path.exists()` *before* calling `fs::write`. The check after write always returns true.
-- **Stdout vs stderr for diagnostics**: Any diagnostic/warning that fires inside a JSON output path must go to `eprintln!` (stderr), never `println!`. Stale-resume notices, deprecation warnings, and progress indicators all belong on stderr.
-- **`ensure_workspace_current` does NOT update tool_commit**: As of the wai-cuq8 fix, `ensure_workspace_current` no longer touches `config.toml`. Call `sync_tool_commit()` explicitly from `wai init` only.
-- **Doctor suppresses projection warnings on empty projections**: If `.projections.yml` parses with `projections: []`, `check_agent_tool_coverage` returns early with no warnings. This is intentional — explicit empty means "no projections wanted".
-- **Pipeline state file**: Active run ID is stored in `.wai/.pipeline-run` (not committed). `wai add` reads env var first then falls back to the state file. `wai pipeline advance` clears it on last stage.
-
-### Steps That Tend to Require Multiple Tries
-
-- **Refactoring shared helpers**: When extracting a shared function, check ALL callers — grep for both the function name and any inline equivalent. `add.rs` has a `resolve_project` with a *different* signature from the shared one in `mod.rs`; don't conflate them.
-- **Managed block changes**: After editing `managed_block.rs`, the actual `CLAUDE.md` must also be updated (run `wai init` or manually invoke `inject_managed_block`). Template and committed file must stay in sync.
-- **Integration test helpers**: `tests/integration.rs` has helpers like `force_why_llm` and `set_privacy_notice_shown` that write TOML directly. After a config schema rename, update these helpers — they'll silently write the wrong section name otherwise.
-
-### Architecture Notes
-
-- **wai way vs wai doctor**: `wai doctor` = wai workspace health (broken .wai/, config.toml, projections, plugins). `wai way` = repo hygiene and agent workflow conventions (skills, rules — works without a wai workspace). They cross-reference each other in help text. Do not conflate.
-- **Help system**: `src/help.rs` provides custom `HelpContent` structs for all top-level commands. Commands without entries fall back to clap. When adding a new command, add a corresponding entry in `command_help()`.
-- **Pipeline runs**: Run IDs stored in `.wai/projects/<name>/pipelines/<id>.yaml`. Active run pointer is `.wai/.pipeline-run` (single-line, gitignored). `wai pipeline run` writes it; `wai pipeline advance` clears it on completion.
-- **Suggestion thresholds**: `src/workflows.rs` uses `research_count <= 1` for "add more research" and `>= 2` for "ready to advance". Thresholds are adjacent with no dead zones. Maintain adjacency when adding new threshold-based suggestions.
-- **JSON output pattern**: Use `print_json(&payload)` from `src/json.rs`. Structs derive `Serialize`. Use `#[serde(skip_serializing_if = "Option::is_none")]` and `#[serde(skip_serializing_if = "Vec::is_empty")]` to keep output clean.
-<!-- WAI:REFLECT:END -->
-
+> **Before research or ticket creation**: always run `wai search "<topic>"` to
+> check for known patterns. Do not rediscover what is already documented.
+<!-- WAI:REFLECT:REF:END -->
 
 <!-- OPENSPEC:START -->
 # OpenSpec Instructions

@@ -27,6 +27,11 @@ Detected workflow tools:
 - **beads (bd)** — issue tracking (tasks, bugs, dependencies)
 - **openspec** — specifications and change proposals (see `openspec/AGENTS.md`)
 
+> **CRITICAL**: Use TDD (write tests first) and Tidy First (separate refactoring commits from feature commits) when implementing changes.
+
+> **When beginning research or creating a ticket**: run `wai search "<topic>"` to check for existing patterns before writing new content.
+> **Ro5**: The Rule of 5 skill is installed. Run `/ro5` after key phase transitions — implement, research, design — for iterative quality review.
+
 ## When to Use What
 
 | Need | Tool | Example |
@@ -122,12 +127,17 @@ wai add research "notes"      # Add research artifact
 wai add plan "plan"           # Add plan artifact
 wai add design "design"       # Add design artifact
 wai search "query"            # Search across artifacts
+wai search --tag <tag>        # Filter by tag (repeatable)
+wai search --latest           # Most recent match only
 wai why "why use TOML?"       # Ask why (LLM-powered oracle)
 wai why src/config.rs         # Explain a file's history
 wai reflect                   # Synthesize project patterns into CLAUDE.md
-wai handoff create <project>  # Session handoff
+wai close                     # Session handoff + pending-resume signal
 wai phase show                # Current phase
 wai doctor                    # Workspace health
+wai pipeline list             # List pipelines
+wai pipeline run <n> --topic=<t>  # Start a run; set WAI_PIPELINE_RUN=<id>
+wai pipeline advance <run-id> # Mark stage done, get next hint
 ```
 
 ### beads
@@ -159,6 +169,18 @@ Do not edit `.wai/config.toml` directly. Use `wai` commands instead.
 Keep this managed block so `wai init` can refresh the instructions.
 
 <!-- WAI:END -->
+
+<!-- WAI:REFLECT:REF:START -->
+## Accumulated Project Patterns
+
+Project-specific conventions, gotchas, and architecture notes live in
+`.wai/resources/reflections/`. Run `wai search "<topic>"` to retrieve relevant
+context before starting research or creating tickets.
+
+> **Before research or ticket creation**: always run `wai search "<topic>"` to
+> check for known patterns. Do not rediscover what is already documented.
+<!-- WAI:REFLECT:REF:END -->
+
 
 <!-- WAI:REFLECT:START -->
 ## Project-Specific AI Context

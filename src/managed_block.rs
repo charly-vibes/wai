@@ -416,51 +416,6 @@ pub fn read_reflect_block(path: &Path) -> Option<String> {
     Some(content[start..end].to_string())
 }
 
-/// Inject or update a WAI:REFLECT block in the file at `path`.
-///
-/// - If the file already has a REFLECT block, it is replaced in-place.
-/// - If the file has a WAI:END marker, the REFLECT block is appended after it.
-/// - Otherwise the REFLECT block is appended at the end of the file.
-///
-/// `content` is the raw inner content (the text between the markers).
-pub fn inject_reflect_block(path: &Path, content: &str) -> Result<InjectResult, std::io::Error> {
-    let block = format!("{}\n{}\n{}\n", REFLECT_START, content.trim(), REFLECT_END);
-
-    if path.exists() {
-        let existing = std::fs::read_to_string(path)?;
-
-        if let (Some(start_idx), Some(end_idx)) =
-            (existing.find(REFLECT_START), existing.find(REFLECT_END))
-        {
-            // Update in-place.
-            let end_idx = end_idx + REFLECT_END.len();
-            let mut new_content = String::with_capacity(existing.len());
-            new_content.push_str(&existing[..start_idx]);
-            new_content.push_str(&block);
-            new_content.push_str(&existing[end_idx..]);
-            std::fs::write(path, new_content)?;
-            return Ok(InjectResult::Updated);
-        }
-
-        // No existing REFLECT block — append after WAI:END if present.
-        let mut new_content = existing.clone();
-        if let Some(wai_end_idx) = existing.find(WAI_END) {
-            let insert_at = wai_end_idx + WAI_END.len();
-            new_content.insert_str(insert_at, &format!("\n\n{block}"));
-        } else {
-            if !new_content.ends_with('\n') {
-                new_content.push('\n');
-            }
-            new_content.push('\n');
-            new_content.push_str(&block);
-        }
-        std::fs::write(path, new_content)?;
-        Ok(InjectResult::Prepended)
-    } else {
-        std::fs::write(path, &block)?;
-        Ok(InjectResult::Created)
-    }
-}
 
 #[cfg(test)]
 mod wai_block_tests {
@@ -859,59 +814,4 @@ mod reflect_tests {
         assert!(got.contains("inner content"));
     }
 
-    #[test]
-    fn inject_reflect_block_creates_file_when_missing() {
-        let dir = tmp();
-        let path = dir.path().join("AGENTS.md");
-        inject_reflect_block(&path, "some guidance").unwrap();
-        assert!(path.exists());
-        let content = std::fs::read_to_string(&path).unwrap();
-        assert!(content.contains(REFLECT_START));
-        assert!(content.contains("some guidance"));
-        assert!(content.contains(REFLECT_END));
-    }
-
-    #[test]
-    fn inject_reflect_block_appends_after_wai_end() {
-        let dir = tmp();
-        let path = dir.path().join("CLAUDE.md");
-        std::fs::write(&path, "<!-- WAI:START -->\nwai stuff\n<!-- WAI:END -->\n").unwrap();
-        inject_reflect_block(&path, "project guidance").unwrap();
-        let content = std::fs::read_to_string(&path).unwrap();
-        let wai_end_pos = content.find(WAI_END).unwrap();
-        let reflect_start_pos = content.find(REFLECT_START).unwrap();
-        assert!(
-            reflect_start_pos > wai_end_pos,
-            "REFLECT block should come after WAI:END"
-        );
-    }
-
-    #[test]
-    fn inject_reflect_block_updates_in_place() {
-        let dir = tmp();
-        let path = dir.path().join("CLAUDE.md");
-        std::fs::write(
-            &path,
-            "before\n<!-- WAI:REFLECT:START -->\nold\n<!-- WAI:REFLECT:END -->\nafter\n",
-        )
-        .unwrap();
-        inject_reflect_block(&path, "new content").unwrap();
-        let content = std::fs::read_to_string(&path).unwrap();
-        assert!(!content.contains("old\n"));
-        assert!(content.contains("new content"));
-        assert!(content.contains("before"));
-        assert!(content.contains("after"));
-    }
-
-    #[test]
-    fn inject_reflect_block_appends_at_end_when_no_wai_block() {
-        let dir = tmp();
-        let path = dir.path().join("AGENTS.md");
-        std::fs::write(&path, "# Agents\nSome content\n").unwrap();
-        inject_reflect_block(&path, "agent guidance").unwrap();
-        let content = std::fs::read_to_string(&path).unwrap();
-        assert!(content.contains("# Agents"));
-        assert!(content.contains(REFLECT_START));
-        assert!(content.contains("agent guidance"));
-    }
 }
