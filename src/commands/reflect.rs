@@ -1022,6 +1022,7 @@ pub fn run(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
     use std::fs;
     use tempfile::TempDir;
 
@@ -1601,5 +1602,101 @@ mod tests {
         assert!(names[0].starts_with(&format!("{}-proj-2.", date)), "-2 suffix missing: {names:?}");
         assert!(names[1].starts_with(&format!("{}-proj-3.", date)), "-3 suffix missing: {names:?}");
         assert!(names[2].starts_with(&format!("{}-proj.", date)), "base file missing: {names:?}");
+    }
+
+    // ── Integration test: migration path (6.6) ───────────────────────────────
+
+    /// Set up a minimal workspace in `dir`:
+    /// - `.wai/` (satisfies require_project)
+    /// - `.wai/projects/<project>/` (enables auto-detection)
+    /// - `CLAUDE.md` with an old WAI:REFLECT block
+    fn setup_migration_workspace(dir: &TempDir, project: &str) {
+        let root = dir.path();
+        // Create .wai dir so require_project() can find the root.
+        fs::create_dir_all(root.join(".wai")).unwrap();
+        // Create the project dir so auto-detection picks it up.
+        fs::create_dir_all(root.join(".wai/projects").join(project)).unwrap();
+        // Write CLAUDE.md with an old REFLECT block.
+        let claude_md = root.join("CLAUDE.md");
+        fs::write(
+            &claude_md,
+            "# Preamble\n\
+             <!-- WAI:REFLECT:START -->\n\
+             ## Old Patterns\n\
+             - old convention\n\
+             <!-- WAI:REFLECT:END -->\n\
+             # Postamble\n",
+        )
+        .unwrap();
+    }
+
+    #[test]
+    #[serial]
+    fn integration_test_migration_path() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        setup_migration_workspace(&dir, "my-project");
+
+        // Save and switch current directory so require_project() finds our workspace.
+        let original_dir = std::env::current_dir().unwrap();
+        std::env::set_current_dir(dir.path()).unwrap();
+
+        let result = run(
+            None,
+            None,
+            None,
+            false,
+            true,
+            Some("# Patterns\ntest content from inject".to_string()),
+            0,
+        );
+
+        // Restore working directory before asserting, so failures don't break
+        // other serial tests.
+        std::env::set_current_dir(&original_dir).unwrap();
+
+        result.expect("run() should succeed");
+
+        // 1. A resource file was created in .wai/resources/reflections/ with
+        //    a filename matching *-migrated.md.
+        let refl_dir = crate::config::reflections_dir(dir.path());
+        assert!(refl_dir.exists(), "reflections dir should have been created");
+        let migrated_files: Vec<_> = fs::read_dir(&refl_dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_name().to_string_lossy().contains("-migrated"))
+            .collect();
+        assert_eq!(
+            migrated_files.len(),
+            1,
+            "expected exactly one *-migrated.md file, found: {:?}",
+            migrated_files
+                .iter()
+                .map(|e| e.file_name())
+                .collect::<Vec<_>>()
+        );
+
+        // 2. The resource file contains `type: reflection-migrated` in its
+        //    YAML front-matter.
+        let migrated_content =
+            fs::read_to_string(migrated_files[0].path()).unwrap();
+        assert!(
+            migrated_content.contains("type: reflection-migrated"),
+            "migrated file should have type: reflection-migrated in front-matter, got:\n{}",
+            migrated_content
+        );
+
+        // 3. CLAUDE.md no longer contains WAI:REFLECT:START (old block replaced).
+        let claude_content =
+            fs::read_to_string(dir.path().join("CLAUDE.md")).unwrap();
+        assert!(
+            !claude_content.contains("WAI:REFLECT:START"),
+            "CLAUDE.md should no longer have WAI:REFLECT:START after migration"
+        );
+
+        // 4. CLAUDE.md contains WAI:REFLECT:REF:START (slim replacement block).
+        assert!(
+            claude_content.contains("WAI:REFLECT:REF:START"),
+            "CLAUDE.md should contain WAI:REFLECT:REF:START after migration"
+        );
     }
 }
