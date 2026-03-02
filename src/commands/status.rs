@@ -168,8 +168,10 @@ pub fn run(verbose: u8) -> Result<()> {
     // OpenSpec status — computed here for both Plugin Info summary and the detail section
     let spec_status = openspec::read_status(&project_root);
 
-    let has_plugin_info =
-        !hook_outputs.is_empty() || spec_status.as_ref().is_some_and(|s| !s.changes.is_empty());
+    let has_plugin_info = !hook_outputs.is_empty()
+        || spec_status
+            .as_ref()
+            .is_some_and(|s| s.changes.iter().any(|c| c.total == 0 || c.done < c.total));
 
     if has_plugin_info {
         println!();
@@ -188,6 +190,9 @@ pub fn run(verbose: u8) -> Result<()> {
         }
         if let Some(ref spec) = spec_status {
             for change in &spec.changes {
+                if change.total > 0 && change.done == change.total {
+                    continue; // hide completed changes; use --verbose to show all
+                }
                 let pct = if change.total > 0 {
                     change.done * 100 / change.total
                 } else {
@@ -210,8 +215,13 @@ pub fn run(verbose: u8) -> Result<()> {
         println!();
         println!("  {} OpenSpec", "◆".cyan());
 
-        if !spec_status.changes.is_empty() {
-            for change in &spec_status.changes {
+        let visible_changes: Vec<_> = spec_status
+            .changes
+            .iter()
+            .filter(|c| verbose > 0 || c.total == 0 || c.done < c.total)
+            .collect();
+        if !visible_changes.is_empty() {
+            for change in &visible_changes {
                 let ratio = if change.total > 0 {
                     format!("{}/{}", change.done, change.total)
                 } else {
@@ -230,8 +240,10 @@ pub fn run(verbose: u8) -> Result<()> {
                     }
                 }
             }
-        } else {
+        } else if spec_status.changes.is_empty() {
             println!("    {}", "(no active changes)".dimmed());
+        } else {
+            println!("    {}", "(all changes complete — use -v to show)".dimmed());
         }
 
         if verbose > 0 && !spec_status.specs.is_empty() {

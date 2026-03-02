@@ -1440,6 +1440,92 @@ fn status_verbose_shows_section_breakdown() {
 }
 
 #[test]
+fn status_hides_completed_openspec_changes_by_default() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+
+    let changes_dir = tmp.path().join("openspec/changes/done-feature");
+    fs::create_dir_all(&changes_dir).unwrap();
+    fs::write(
+        changes_dir.join("tasks.md"),
+        "## 1. Setup\n\n- [x] a\n- [x] b\n",
+    )
+    .unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("done-feature").not());
+}
+
+#[test]
+fn status_verbose_shows_completed_openspec_changes() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+
+    let changes_dir = tmp.path().join("openspec/changes/done-feature");
+    fs::create_dir_all(&changes_dir).unwrap();
+    fs::write(
+        changes_dir.join("tasks.md"),
+        "## 1. Setup\n\n- [x] a\n- [x] b\n",
+    )
+    .unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["status", "-v"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("done-feature").and(predicate::str::contains("2/2")));
+}
+
+#[test]
+fn status_all_complete_shows_hint_message() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+
+    let changes_dir = tmp.path().join("openspec/changes/done-feature");
+    fs::create_dir_all(&changes_dir).unwrap();
+    fs::write(
+        changes_dir.join("tasks.md"),
+        "## 1. Setup\n\n- [x] a\n- [x] b\n",
+    )
+    .unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("all changes complete"));
+}
+
+#[test]
+fn status_plugin_info_hidden_when_only_completed_openspec_changes() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+
+    let changes_dir = tmp.path().join("openspec/changes/done-feature");
+    fs::create_dir_all(&changes_dir).unwrap();
+    fs::write(
+        changes_dir.join("tasks.md"),
+        "## 1. Setup\n\n- [x] a\n- [x] b\n",
+    )
+    .unwrap();
+
+    // Plugin Info section should not appear when there are no active (incomplete) changes
+    // and no other hook outputs (no beads, etc.)
+    wai_cmd(tmp.path())
+        .args(["status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Plugin Info").not());
+}
+
+#[test]
 fn status_json_with_openspec_includes_field() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
