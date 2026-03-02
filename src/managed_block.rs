@@ -372,8 +372,8 @@ impl InjectResult {
 
 // ── REFLECT:REF block ────────────────────────────────────────────────────────
 
-const REFLECT_REF_START: &str = "<!-- WAI:REFLECT:REF:START -->";
-const REFLECT_REF_END: &str = "<!-- WAI:REFLECT:REF:END -->";
+pub const REFLECT_REF_START: &str = "<!-- WAI:REFLECT:REF:START -->";
+pub const REFLECT_REF_END: &str = "<!-- WAI:REFLECT:REF:END -->";
 
 /// Returns the slim reference block content that tells agents where project
 /// patterns live and instructs them to search before starting research.

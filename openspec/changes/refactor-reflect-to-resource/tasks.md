@@ -20,16 +20,16 @@
 - [ ] 2.3a Add YAML front-matter writer: `date`, `project`, `sessions_analyzed` (=
   handoff_count from 2.3), `type: reflection` — note: sessions_analyzed is for
   human inspection only; no wai command reads it back
-- [ ] 2.4 Update `run()` in `src/commands/reflect.rs` to call `write_reflect_resource()`
+- [x] 2.4 Update `run()` in `src/commands/reflect.rs` to call `write_reflect_resource()`
   instead of `inject_reflect_block()` — remove all writes to CLAUDE.md/AGENTS.md
-- [ ] 2.5 Update `--dry-run` path to show the resource file path that would be written
-- [ ] 2.6 Update success output: print the resource file path, not the target file
+- [x] 2.5 Update `--dry-run` path to show the resource file path that would be written
+- [x] 2.6 Update success output: print the resource file path, not the target file
 
 ## Phase 3: Migration
 
-- [ ] 3.1 In `run()`, scan all target files (CLAUDE.md, AGENTS.md if present) for
+- [x] 3.1 In `run()`, scan all target files (CLAUDE.md, AGENTS.md if present) for
   existing `WAI:REFLECT:START/END` blocks
-- [ ] 3.2 Apply unified migration rule when any old block is detected:
+- [x] 3.2 Apply unified migration rule when any old block is detected:
   - If no `*-migrated.md` exists in `.wai/resources/reflections/`: extract
     content from the first file that has the block, write to
     `<today>-<project>-migrated.md` with front-matter `type: reflection-migrated`

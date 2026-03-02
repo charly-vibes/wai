@@ -7,7 +7,10 @@ use walkdir::WalkDir;
 
 use crate::config::{ProjectConfig, wai_dir};
 use crate::llm::{AGENT_SENTINEL, detect_backend};
-use crate::managed_block::{inject_reflect_block, read_reflect_block};
+use crate::managed_block::{
+    REFLECT_REF_END, REFLECT_REF_START, has_reflect_block, read_reflect_block,
+    wai_reflect_ref_content,
+};
 
 // ── Reflect metadata ─────────────────────────────────────────────────────────
 
@@ -62,12 +65,14 @@ pub fn write_reflect_meta(project_dir: &Path, meta: &ReflectMeta) -> Result<()> 
 ///
 /// * `handoff_count` — number of handoff artifacts analyzed; written as
 ///   `sessions_analyzed` in the YAML front-matter.
+///
+/// Returns the path of the file written.
 pub fn write_reflect_resource(
     project_root: &Path,
     project_name: &str,
     content: &str,
     handoff_count: usize,
-) -> Result<()> {
+) -> Result<PathBuf> {
     let refl_dir = crate::config::reflections_dir(project_root);
     std::fs::create_dir_all(&refl_dir).into_diagnostic()?;
 
@@ -88,7 +93,23 @@ pub fn write_reflect_resource(
     );
     front_matter.push_str(content);
     std::fs::write(&path, front_matter).into_diagnostic()?;
-    Ok(())
+    Ok(path)
+}
+
+/// Compute the path that `write_reflect_resource` would write to, without writing.
+///
+/// Used for `--dry-run` to show the user what path would be created.
+pub fn predict_reflect_resource_path(project_root: &Path, project_name: &str) -> PathBuf {
+    let refl_dir = crate::config::reflections_dir(project_root);
+    let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    let name_slug = slug::slugify(project_name);
+    let mut filename = format!("{}-{}.md", date, name_slug);
+    let mut counter = 2;
+    while refl_dir.join(&filename).exists() {
+        filename = format!("{}-{}-{}.md", date, name_slug, counter);
+        counter += 1;
+    }
+    refl_dir.join(&filename)
 }
 
 // ── Output target detection ──────────────────────────────────────────────────
@@ -714,6 +735,7 @@ pub fn call_llm(project_root: &Path, prompt: &str) -> Result<String> {
 
 /// A line in a diff output.
 #[derive(Debug, PartialEq, Clone)]
+#[allow(dead_code)]
 pub enum DiffLine {
     Added(String),
     Removed(String),
@@ -723,6 +745,7 @@ pub enum DiffLine {
 /// Compute a simple line-level diff between `old` and `new`.
 ///
 /// Returns `None` if the content is identical (no change needed).
+#[allow(dead_code)]
 pub fn compute_diff(old: Option<&str>, new: &str) -> Option<Vec<DiffLine>> {
     let old_str = old.unwrap_or("");
     if old_str.trim() == new.trim() {
@@ -767,6 +790,7 @@ pub fn compute_diff(old: Option<&str>, new: &str) -> Option<Vec<DiffLine>> {
 }
 
 /// Print diff lines to stdout with color.
+#[allow(dead_code)]
 pub fn print_diff(diff: &[DiffLine]) {
     for line in diff {
         match line {
@@ -784,26 +808,146 @@ pub fn run(
     conversation: Option<PathBuf>,
     output: Option<String>,
     dry_run: bool,
-    yes: bool,
+    _yes: bool,
     inject_content: Option<String>,
     _verbose: u8,
 ) -> Result<()> {
-    use crate::context::current_context;
-
     let project_root = super::require_project()?;
-    let context = current_context();
 
-    // 2.4: Detect output targets.
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+
+    // Resolve project_name early as Option<String>.
+    let project_name: Option<String> = if let Some(ref name) = project {
+        let project_dir = crate::config::projects_dir(&project_root).join(name);
+        if project_dir.exists() {
+            Some(name.clone())
+        } else {
+            None
+        }
+    } else {
+        // Auto-detect the single project if only one exists.
+        let projects_dir = crate::config::projects_dir(&project_root);
+        if let Ok(entries) = std::fs::read_dir(&projects_dir) {
+            let projects: Vec<_> = entries
+                .filter_map(|e| e.ok())
+                .filter(|e| e.path().is_dir())
+                .collect();
+            if projects.len() == 1 {
+                projects[0]
+                    .file_name()
+                    .to_str()
+                    .map(|s| s.to_string())
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    };
+
+    // Detect output targets (CLAUDE.md / AGENTS.md).
     let targets = detect_output_targets(&project_root, output.as_deref())?;
 
-    // 2.1–2.5: Gather context.
+    // ── Migration step (3.1–3.2) ──────────────────────────────────────────────
+    // Scan target files for old WAI:REFLECT:START/END blocks.
+    // If any exist, migrate once and replace with slim REF blocks.
+    {
+        let refl_dir = crate::config::reflections_dir(&project_root);
+        // Check whether a *-migrated.md already exists.
+        let migrated_exists = if refl_dir.exists() {
+            std::fs::read_dir(&refl_dir)
+                .ok()
+                .map(|entries| {
+                    entries
+                        .filter_map(|e| e.ok())
+                        .any(|e| e.file_name().to_string_lossy().contains("-migrated"))
+                })
+                .unwrap_or(false)
+        } else {
+            false
+        };
+
+        let ref_block = format!(
+            "{}\n{}{}\n",
+            REFLECT_REF_START,
+            wai_reflect_ref_content(),
+            REFLECT_REF_END
+        );
+
+        let mut migration_notice_printed = false;
+        let mut first_content: Option<String> = None;
+
+        for target in &targets {
+            if !has_reflect_block(target) {
+                continue;
+            }
+
+            // Extract content from the first file that has the block for migration.
+            if first_content.is_none() {
+                first_content = read_reflect_block(target);
+            }
+
+            // Replace old WAI:REFLECT block with WAI:REFLECT:REF block.
+            let existing = std::fs::read_to_string(target).into_diagnostic()?;
+            // Find and replace the REFLECT:START/END block with the REF block.
+            let reflect_start_marker = "<!-- WAI:REFLECT:START -->";
+            let reflect_end_marker = "<!-- WAI:REFLECT:END -->";
+            if let (Some(s), Some(e)) = (existing.find(reflect_start_marker), existing.find(reflect_end_marker)) {
+                if s < e {
+                    let end_pos = e + reflect_end_marker.len();
+                    // Check if a REF block already exists after the old block.
+                    let tail = &existing[end_pos..];
+                    let already_has_ref = tail.contains(REFLECT_REF_START);
+                    let mut new_content = String::with_capacity(existing.len());
+                    new_content.push_str(&existing[..s]);
+                    if !already_has_ref {
+                        new_content.push_str(&ref_block);
+                    }
+                    new_content.push_str(&existing[end_pos..]);
+                    std::fs::write(target, new_content).into_diagnostic()?;
+                }
+            }
+
+            if !migration_notice_printed {
+                migration_notice_printed = true;
+            }
+        }
+
+        // Write migrated resource file if we found content and no migrated file exists.
+        if let Some(content) = first_content {
+            if !migrated_exists {
+                std::fs::create_dir_all(&refl_dir).into_diagnostic()?;
+                let project_slug = project_name
+                    .as_deref()
+                    .map(|n| slug::slugify(n))
+                    .unwrap_or_else(|| "project".to_string());
+                let migrated_filename = format!("{}-{}-migrated.md", today, project_slug);
+                let migrated_path = refl_dir.join(&migrated_filename);
+                let front_matter = format!(
+                    "---\ndate: \"{}\"\nproject: \"{}\"\ntype: reflection-migrated\n---\n\n{}",
+                    today,
+                    project_name.as_deref().unwrap_or("unknown"),
+                    content.trim()
+                );
+                std::fs::write(&migrated_path, front_matter).into_diagnostic()?;
+            }
+        }
+
+        if migration_notice_printed {
+            println!();
+            println!(
+                "  {} Migrated WAI:REFLECT block(s) to resource file.",
+                "◆".cyan()
+            );
+        }
+    }
+
+    // Gather context.
     println!();
     println!("  {} Gathering context …", "◆".cyan());
     let ctx = gather_reflect_context(&project_root, conversation.as_deref(), &targets)?;
 
-    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
-
-    // 3.1–3.3: Call LLM (or use injected content / agent-mode sentinel path).
+    // Call LLM (or use injected content / agent-mode sentinel path).
     let raw_response = if let Some(content) = inject_content {
         // Agent provided the content directly via --inject-content.
         content
@@ -827,83 +971,27 @@ pub fn run(
         raw
     };
 
-    // 3.4: Extract REFLECT content.
+    // Extract REFLECT content from LLM response.
     let new_content = extract_reflect_content(&raw_response);
 
-    // 4.1: Compute diffs per target.
-    let mut target_diffs: Vec<(PathBuf, Option<Vec<DiffLine>>)> = Vec::new();
-    for target in &targets {
-        let existing = read_reflect_block(target);
-        let diff = compute_diff(existing.as_deref(), &new_content);
-        target_diffs.push((target.clone(), diff));
-    }
-
-    // 4.3: Handle empty diff case (all targets unchanged).
-    let all_unchanged = target_diffs.iter().all(|(_, d)| d.is_none());
-    if all_unchanged {
-        println!();
-        println!("  {} REFLECT block is already up to date.", "○".dimmed());
-        return Ok(());
-    }
-
-    // Show diff.
-    println!();
-    println!("  {} Proposed changes:", "◆".cyan().bold());
-    for (target, diff_opt) in &target_diffs {
-        let filename = target
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("unknown");
-        if let Some(diff) = diff_opt {
-            println!();
-            println!("  {}", filename.bold());
-            print_diff(diff);
-        } else {
-            println!();
-            println!("  {} {} — no changes", "○".dimmed(), filename);
-        }
-    }
-
-    // 4.2: --dry-run exits here.
+    // --dry-run: show the resource file path that would be written, then exit.
     if dry_run {
+        let project_str = project_name.as_deref().unwrap_or("project");
+        let would_write = predict_reflect_resource_path(&project_root, project_str);
         println!();
-        println!("  {} Dry run — no files written.", "○".dimmed());
+        println!("  {} Dry run — would write:", "○".dimmed());
+        println!("  {}", would_write.display());
+        println!();
         return Ok(());
     }
 
-    // 4.4–4.5: Confirm or auto-confirm with --yes.
-    let file_list: Vec<&str> = targets
-        .iter()
-        .filter_map(|t| t.file_name().and_then(|n| n.to_str()))
-        .collect();
-    let confirm_msg = format!("Write to {}?", file_list.join(" and "));
+    // Write resource file.
+    let project_str = project_name.as_deref().unwrap_or("project");
+    let resource_path = write_reflect_resource(&project_root, project_str, &new_content, ctx.handoff_count)?;
 
-    let confirmed = if yes || context.yes || context.no_input {
-        true
-    } else {
-        cliclack::confirm(confirm_msg)
-            .interact()
-            .into_diagnostic()?
-    };
-
-    if !confirmed {
-        println!();
-        println!("  {} Cancelled.", "○".dimmed());
-        return Ok(());
-    }
-
-    // 4.6: Inject REFLECT block into each target.
-    let mut written = Vec::new();
-    for (target, diff_opt) in &target_diffs {
-        if diff_opt.is_some() {
-            inject_reflect_block(target, &new_content).into_diagnostic()?;
-            written.push(target.clone());
-        }
-    }
-
-    // 4.7: Write .reflect-meta.
-    if let Some(project_name) = project.as_deref() {
-        let project_dir = crate::config::projects_dir(&project_root).join(project_name);
+    // Update .reflect-meta for the resolved project.
+    if let Some(ref name) = project_name {
+        let project_dir = crate::config::projects_dir(&project_root).join(name);
         if project_dir.exists() {
             let existing_meta = read_reflect_meta(&project_dir)?.unwrap_or(ReflectMeta {
                 last_reflected: today.clone(),
@@ -915,35 +1003,15 @@ pub fn run(
             };
             write_reflect_meta(&project_dir, &new_meta)?;
         }
-    } else {
-        // Auto-detect the single project if only one exists.
-        let projects_dir = crate::config::projects_dir(&project_root);
-        if let Ok(entries) = std::fs::read_dir(&projects_dir) {
-            let projects: Vec<_> = entries.filter_map(|e| e.ok()).collect();
-            if projects.len() == 1 {
-                let project_dir = projects[0].path();
-                let existing_meta = read_reflect_meta(&project_dir)?.unwrap_or(ReflectMeta {
-                    last_reflected: today.clone(),
-                    session_count: 0,
-                });
-                let new_meta = ReflectMeta {
-                    last_reflected: today.clone(),
-                    session_count: existing_meta.session_count + 1,
-                };
-                write_reflect_meta(&project_dir, &new_meta)?;
-            }
-        }
     }
 
-    // 4.8: Print success message.
+    // Print success with the resource file path.
     println!();
-    for path in &written {
-        let filename = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("unknown");
-        println!("  {} Updated {}", "✓".green(), filename.bold());
-    }
+    println!(
+        "  {} Wrote {}",
+        "✓".green(),
+        resource_path.display().to_string().bold()
+    );
     println!();
 
     Ok(())
