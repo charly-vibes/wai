@@ -45,14 +45,17 @@ The existing 11 checks will be mapped to agnostic capabilities. The **Message** 
 
 ### 3. Custom Plugin Support
 
-The plugin system will be updated to allow YAML-defined plugins to provide their own agnostic context:
+The plugin system will be updated to allow plugins to provide their own agnostic context. The `PluginDef` struct gains `intent: Option<String>` and `success_criteria: Option<String>` with `#[serde(default)]` so they are optional in any plugin file.
 
-```yaml
-name: my-plugin
-description: Custom check
-intent: "Verify domain-specific rule X"
-success_criteria: "Rule X is satisfied according to tool Y"
-# ...
+Plugin definitions use **TOML** (`.wai/plugins/*.toml`), consistent with every other config file in the project (`config.toml`, `Cargo.toml`, `prek.toml`). The `toml` crate is already a dependency. The original proposal used YAML — that was corrected here before any users existed so there is no migration burden.
+
+Example plugin file (`.wai/plugins/my-check.toml`):
+
+```toml
+name = "my-check"
+description = "Custom check"
+intent = "Verify domain-specific rule X"
+success_criteria = "Rule X is satisfied according to tool Y"
 ```
 
 If these fields are missing from a plugin definition, `wai way` will provide sensible default "Generic check" intent/criteria.
@@ -80,4 +83,28 @@ The `--json` output will always include the `intent` and `success_criteria` fiel
 
 ## Decision
 
-We will proceed with the unified data model and renaming of checks to better serve both human users and AI agents.
+We will proceed with the unified data model and renaming of checks to better serve both human users and AI agents. Plugin files use TOML for consistency with the rest of the project.
+
+## Implementation Status
+
+As of 2026-03-02, review of the codebase shows most structural work is already in place:
+
+- `CheckResult` struct already has `intent`/`success_criteria` fields (`src/commands/way.rs`)
+- `render_human` already renders them under `--verbose`
+- All 11 original check functions already use agnostic names with intent/success criteria
+- `PluginDef` already has `intent`/`success_criteria` with `#[serde(default)]`
+- `openspec validate --strict` passes
+
+**Remaining work:**
+
+1. **Migrate plugin loader from YAML to TOML** (`src/plugin.rs`): change file extension filter from `yml`/`yaml` to `toml`, swap `serde_yml::from_str` for `toml::from_str`.
+
+2. **Add tests for new fields:**
+   - `way_verbose_shows_intent` — `wai way -v` output contains `"Intent:"`
+   - `way_verbose_shows_success_criteria` — `wai way -v` output contains `"Success:"`
+   - `way_json_includes_intent` — `wai way --json` payload contains `"intent"` key
+   - `way_plugin_toml_parsed` — a `.toml` plugin file with `intent`/`success_criteria` is loaded correctly
+
+3. **Update spec**: add TOML plugin format scenario to `Plugin Agnostic Context Support` requirement.
+
+4. **Validate and archive**: run `openspec validate refactor-way-agnostic --strict`, then archive the change.
