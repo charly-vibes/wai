@@ -65,7 +65,7 @@
 - [ ] 6.3 Unit test: `wai_reflect_ref_content()` contains "wai search" and the resource path
 - [ ] 6.4 Unit test: search-before-research instruction present with companions, absent without
 - [ ] 6.5 Unit test: `WAI:REFLECT:REF:START/END` block injected by `inject_managed_block()`
-- [ ] 6.6 Integration test: migration path — old block detected → resource file created →
+- [x] 6.6 Integration test: migration path — old block detected → resource file created →
   old block replaced with REF block
 - [ ] 6.7 `cargo check` passes with no warnings
 - [ ] 6.8 `cargo test` passes
