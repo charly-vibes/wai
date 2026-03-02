@@ -3,8 +3,8 @@
 ## Purpose
 
 Define the `wai reflect` command, which synthesizes accumulated session context
-into project-specific AI-assistant guidance and injects it into CLAUDE.md and/or
-AGENTS.md as a persistent, project-aware REFLECT block.
+into project-specific AI-assistant guidance and writes the result to a versioned
+resource file in `.wai/resources/reflections/`.
 
 ## Problem Statement
 
@@ -33,11 +33,12 @@ Context sources are prioritized from richest to most distilled:
 Unlike `wai why`, `wai reflect` does not fall back to search. Reflection requires
 LLM synthesis to surface non-obvious patterns; keyword search cannot substitute.
 
-### Managed Block Injection
+### Resource File Storage
 
-The REFLECT block uses a separate `WAI:REFLECT:START` / `WAI:REFLECT:END` marker
-pair, distinct from the existing `WAI:START` / `WAI:END` tool-instructions block,
-so the two can evolve independently.
+`wai reflect` writes each run to a new dated file in `.wai/resources/reflections/`.
+Files accumulate across sessions, are committed and versioned, and are searchable
+via `wai search`. A slim `WAI:REFLECT:REF` block in `CLAUDE.md`/`AGENTS.md` points
+agents to the resource directory and instructs them to search before starting work.
 
 ## Scope and Requirements
 
@@ -63,10 +64,10 @@ AGENTS.md.
 - **WHEN** user runs `wai reflect`
 - **THEN** the system reads all handoff files from all projects as the primary source
 - **AND** reads research, design, and plan artifacts as secondary sources
-- **AND** reads the current content of any existing REFLECT block from the target file(s)
-- **AND** sends a structured prompt to the configured LLM (reusing `[why]` config)
-- **AND** displays a unified diff of old vs proposed REFLECT block content
-- **AND** prompts the user to confirm before writing, naming the target file(s)
+- **AND** reads previous reflections from `.wai/resources/reflections/` as additional context
+- **AND** sends a structured prompt to the configured LLM (reusing `[llm]` config)
+- **AND** writes the result to `.wai/resources/reflections/<date>-<project>.md`
+- **AND** prints the path of the written resource file
 
 #### Scenario: Conversation transcript as input
 
@@ -101,21 +102,9 @@ AGENTS.md.
 #### Scenario: Dry run mode
 
 - **WHEN** user runs `wai reflect --dry-run`
-- **THEN** the system displays the unified diff of old vs proposed content
+- **THEN** the system shows the resource file path that would be written
 - **AND** exits without writing to any file
-- **AND** indicates that no files were modified
-
-#### Scenario: No changes needed
-
-- **WHEN** the proposed REFLECT block content is identical to the existing content
-- **THEN** the system prints "Reflect block is already up to date" and exits 0
-- **AND** does NOT prompt the user or modify any file
-
-#### Scenario: Auto-confirm
-
-- **WHEN** user runs `wai reflect --yes`
-- **THEN** the system skips the confirmation prompt
-- **AND** writes the proposed REFLECT block to the target file(s) directly
+- **AND** still performs migration of any old WAI:REFLECT block if present
 
 #### Scenario: Scoped to a project
 
@@ -138,45 +127,86 @@ AGENTS.md.
 - **AND** suggests running `wai handoff create <project>` to capture session context
 - **AND** exits without calling the LLM
 
-### Requirement: Reflect Managed Block
+### Requirement: Reflect Output Storage
 
-The system SHALL maintain a dedicated `WAI:REFLECT` managed block in CLAUDE.md
-and/or AGENTS.md, separate from the existing `WAI` tool-instructions block.
+The system SHALL write `wai reflect` output to a versioned resource file in
+`.wai/resources/reflections/` instead of injecting a full block into `CLAUDE.md`
+or `AGENTS.md`.
 
-#### Scenario: First reflect run — block created
+#### Scenario: Reflect writes to resource file
 
-- **WHEN** user confirms a reflect run and the target file does not contain a REFLECT block
-- **THEN** the system appends the following structure:
-  - In CLAUDE.md: after the `WAI:END` marker (if present), otherwise at end of file
-  - In AGENTS.md: at end of file
-  ```markdown
-  <!-- WAI:REFLECT:START -->
-  ## Project-Specific AI Context
-  _Last reflected: YYYY-MM-DD · N sessions analyzed_
-
-  [LLM-generated sections]
-  <!-- WAI:REFLECT:END -->
+- **WHEN** user runs `wai reflect`
+- **THEN** the system writes the synthesized content to
+  `.wai/resources/reflections/YYYY-MM-DD-<project>.md`
+- **AND** the file is created (never overwritten; a second run on the same day
+  appends a `-2`, `-3` suffix)
+- **AND** the file begins with YAML front-matter:
+  ```yaml
+  ---
+  date: YYYY-MM-DD
+  project: <project-name>
+  sessions_analyzed: N
+  type: reflection
+  ---
   ```
-- **AND** all existing file content outside the markers is preserved
+- **AND** the LLM-generated content follows the front-matter
 
-#### Scenario: Subsequent reflect run — block updated with diff confirmation
+#### Scenario: Resource file is searchable
 
-- **WHEN** user runs `wai reflect` and the target file already contains a REFLECT block
-- **THEN** the system shows a unified diff of the old block vs. proposed new block
-- **AND** prompts for confirmation before writing
-- **AND** on confirm, replaces only the content between `WAI:REFLECT:START` and
-  `WAI:REFLECT:END`
-- **AND** the `_Last reflected:_` metadata line is updated with the current date
-  and session count
-- **AND** all file content outside the markers is preserved
+- **WHEN** user runs `wai search "<topic>"`
+- **THEN** reflection files in `.wai/resources/reflections/` are included in search results
 
-#### Scenario: Reflect block read-back for deduplication
+#### Scenario: Previous reflections included as context
 
-- **WHEN** building the LLM prompt for a reflect run
-- **AND** the target file contains an existing REFLECT block
-- **THEN** the system includes the existing block content in the prompt
-- **AND** instructs the LLM to add new patterns, correct stale ones, and omit
-  duplicates already covered
+- **WHEN** gathering context for a new `wai reflect` run
+- **THEN** existing files in `.wai/resources/reflections/` are included as an additional
+  context tier (lower priority than handoffs)
+- **AND** the LLM prompt instructs the LLM to extend and correct existing patterns
+  rather than repeat them
+
+### Requirement: Slim Reference Block in CLAUDE.md / AGENTS.md
+
+The system SHALL maintain a `WAI:REFLECT:REF` block in `CLAUDE.md` and/or `AGENTS.md`
+that contains only a brief pointer to the resource files and a mandatory search instruction.
+
+#### Scenario: wai init injects WAI:REFLECT:REF block
+
+- **WHEN** user runs `wai init` (fresh or refresh)
+- **THEN** the system injects or refreshes a `WAI:REFLECT:REF:START/END` block after the
+  `WAI:END` marker
+- **AND** the block instructs agents to run `wai search "<topic>"` before starting research
+
+#### Scenario: wai reflect does NOT touch CLAUDE.md
+
+- **WHEN** user runs `wai reflect`
+- **THEN** the system writes only to `.wai/resources/reflections/<date>-<project>.md`
+- **AND** does NOT modify `CLAUDE.md` or `AGENTS.md`
+
+#### Scenario: Migration from old WAI:REFLECT block
+
+- **WHEN** user runs `wai reflect`
+- **AND** `CLAUDE.md` or `AGENTS.md` contains an existing `WAI:REFLECT:START/END` block
+- **THEN** the system migrates the block content to
+  `.wai/resources/reflections/<today>-<project>-migrated.md` (if not already migrated)
+- **AND** replaces the `WAI:REFLECT:START/END` block in all target files with the slim
+  `WAI:REFLECT:REF:START/END` block
+
+### Requirement: Search-Before-Research Instruction in Managed Block
+
+The `wai init` managed block template SHALL include an explicit instruction for agents
+to search for known patterns before beginning research or creating tickets.
+
+#### Scenario: Managed block includes search instruction when companions detected
+
+- **WHEN** `wai init` generates the managed block
+- **AND** beads or openspec companion tools are detected
+- **THEN** the managed block includes a search-before-research instruction
+
+#### Scenario: No instruction without companions
+
+- **WHEN** `wai init` generates the managed block
+- **AND** no companion tools are detected
+- **THEN** the managed block does NOT include the search instruction
 
 ### Requirement: Context Sources and Budget
 

@@ -119,7 +119,7 @@ agents to search for known patterns before beginning research or creating ticket
 
 ## REMOVED Requirements
 
-### Requirement: Reflect Managed Block (superseded)
+### Requirement: Reflect Managed Block
 
 The previous requirement that `wai reflect` injects a `WAI:REFLECT:START/END`
 block into `CLAUDE.md` and/or `AGENTS.md` is superseded by the resource-based
