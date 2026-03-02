@@ -182,17 +182,18 @@ The legacy `[why]` section name is still accepted for backwards compatibility.
 - **Claude** — set `ANTHROPIC_API_KEY` or add `api_key` to `[llm]` config
 - **Ollama** — install from https://ollama.com and run a local model
 
-### Reflect — CLAUDE.md Synthesis
+### Reflect — Project Pattern Synthesis
 
 | Command | Description |
 |---------|-------------|
-| `wai reflect` | Synthesize session context into AI guidance block |
+| `wai reflect` | Synthesize session context into a resource file |
 | `wai reflect --conversation <file>` | Include conversation transcript as richest input |
 | `wai reflect --output <target>` | Target: `claude.md`, `agents.md`, or `both` |
-| `wai reflect --dry-run` | Preview changes without writing |
-| `wai reflect --yes` | Skip confirmation prompt |
+| `wai reflect --dry-run` | Preview the resource file path without writing |
 
-`wai reflect` reads accumulated handoffs, research, and optional conversation transcript, then asks an LLM to extract project-specific conventions and gotchas. Injects the result into `CLAUDE.md`/`AGENTS.md` as a persistent `WAI:REFLECT` block.
+`wai reflect` reads accumulated handoffs, research, and optional conversation transcript, then asks an LLM to extract project-specific conventions and gotchas. Writes the result to `.wai/resources/reflections/<date>-<project>.md` with YAML front-matter. A slim `WAI:REFLECT:REF` pointer block in `CLAUDE.md`/`AGENTS.md` tells agents where to find the patterns.
+
+On first run, any existing `WAI:REFLECT` block is automatically migrated to a `*-migrated.md` resource file and replaced with the slim reference block.
 
 **Context sources (ranked by richness):**
 1. Conversation transcript (`--conversation <file>`) — raw session detail

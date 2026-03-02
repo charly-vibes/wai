@@ -75,8 +75,8 @@
 - [x] 7.1 Remove `inject_reflect_block()` from `src/managed_block.rs` (replaced in 2.1)
 - [x] 7.2 Remove `read_reflect_block()` — no longer needed for injection (keep if used
   by gather_reflect_context; adapt as needed)
-- [ ] 7.3 Update `docs/src/commands.md` — reflect section now describes resource output
-- [ ] 7.4 Update `README.md` if it mentions the REFLECT block injection behavior
+- [x] 7.3 Update `docs/src/commands.md` — reflect section now describes resource output
+- [x] 7.4 Update `README.md` if it mentions the REFLECT block injection behavior
 - [x] 7.5 Run `wai init` on this repo to inject `WAI:REFLECT:REF` block into
   CLAUDE.md/AGENTS.md, then run `wai reflect` to migrate the existing
   `WAI:REFLECT` block (committed earlier this session) to

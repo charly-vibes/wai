@@ -430,7 +430,7 @@ wai reflect --output agents.md       # Write only to AGENTS.md
 wai reflect --dry-run                # Preview changes without writing
 ```
 
-`wai reflect` reads your handoffs, research, and optional conversation transcript, then asks an LLM to extract project-specific conventions, gotchas, and patterns. The result is injected into `CLAUDE.md` and/or `AGENTS.md` as a persistent `WAI:REFLECT` block that persists across sessions.
+`wai reflect` reads your handoffs, research, and optional conversation transcript, then asks an LLM to extract project-specific conventions, gotchas, and patterns. The result is written to `.wai/resources/reflections/<date>-<project>.md`. A slim `WAI:REFLECT:REF` pointer block in `CLAUDE.md`/`AGENTS.md` tells agents where to find the patterns. On first run, any existing `WAI:REFLECT` block is automatically migrated to a resource file.
 
 #### Session Resume Loop
 
