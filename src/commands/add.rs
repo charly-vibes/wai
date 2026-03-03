@@ -4,6 +4,7 @@ use miette::{IntoDiagnostic, Result};
 use std::io::IsTerminal;
 
 use crate::cli::AddCommands;
+use super::resource;
 use crate::config::{
     DESIGNS_DIR, PLANS_DIR, RESEARCH_DIR, archives_dir, areas_dir, projects_dir,
     read_pipeline_run_state, resources_dir,
@@ -193,6 +194,7 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             }
             Ok(())
         }
+        AddCommands::Skill { name, template } => resource::add_skill(&name, template.as_deref()),
     }
 }
 

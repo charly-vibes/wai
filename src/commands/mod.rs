@@ -247,6 +247,7 @@ fn run_external(args: Vec<String>) -> Result<()> {
         ("plugin", "list"),
         ("plugin", "enable"),
         ("plugin", "disable"),
+        ("add", "skill"),
         ("resource", "add"),
         ("resource", "list"),
         ("resource", "import"),

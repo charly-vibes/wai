@@ -224,6 +224,7 @@ pub fn wai_block_content(detected_plugins: &[&str], installed_skills: &[&str]) -
          wai add research \"notes\"      # Add research artifact\n\
          wai add plan \"plan\"           # Add plan artifact\n\
          wai add design \"design\"       # Add design artifact\n\
+         wai add skill <name>          # Scaffold a new agent skill\n\
          wai search \"query\"            # Search across artifacts\n\
          wai search --tag <tag>        # Filter by tag (repeatable)\n\
          wai search --latest           # Most recent match only\n\

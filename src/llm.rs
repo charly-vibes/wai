@@ -204,15 +204,20 @@ impl ClaudeCliClient {
     }
 }
 
-/// Return `true` when running inside a Claude Code agent session.
+/// Return `true` when running inside an agent session.
 ///
-/// Claude Code sets `CLAUDECODE` to a non-empty value when an agent is active.
-/// An empty string — used by [`ClaudeCliClient`] to bypass the nested-session
-/// guard — is treated as false.
+/// Checks env vars in priority order — first non-empty value wins:
+/// 1. `WAI_AGENT`    — universal override for any agent (Windsurf, Goose, …)
+/// 2. `CLAUDECODE`   — set by Claude Code when an agent is active
+/// 3. `CURSOR_AGENT` — set by Cursor IDE
+///
+/// An empty string is treated as unset (false). This allows
+/// [`ClaudeCliClient`] to bypass the nested-session guard by clearing
+/// `CLAUDECODE` without triggering detection via the other vars.
 pub fn in_agent_session() -> bool {
-    std::env::var("CLAUDECODE")
-        .map(|v| !v.is_empty())
-        .unwrap_or(false)
+    ["WAI_AGENT", "CLAUDECODE", "CURSOR_AGENT"]
+        .iter()
+        .any(|var| std::env::var(var).map(|v| !v.is_empty()).unwrap_or(false))
 }
 
 /// Return `true` if the `claude` binary is on PATH.
@@ -431,12 +436,13 @@ impl LlmClient for AgentBackend {
 /// Priority (explicit config):
 ///   - `"claude"`     → Claude API (requires `ANTHROPIC_API_KEY`)
 ///   - `"claude-cli"` → Claude CLI binary; warns if inside a Claude Code session
-///   - `"agent"`      → AgentBackend; warns if `CLAUDECODE` is unset/empty
+///   - `"agent"`      → AgentBackend; warns if no agent session detected
+///                      (detection: WAI_AGENT, CLAUDECODE, or CURSOR_AGENT non-empty)
 ///   - `"ollama"`     → Ollama local model
 ///
 /// Auto-detect priority:
-///   - Inside a Claude Code session (CLAUDECODE non-empty): API → Agent → Ollama
-///   - Otherwise:                                           API → Claude CLI → Ollama
+///   - Inside an agent session (WAI_AGENT / CLAUDECODE / CURSOR_AGENT non-empty): API → Agent → Ollama
+///   - Otherwise:                                                                  API → Claude CLI → Ollama
 ///
 /// Returns `None` → caller should fall back to `wai search`.
 pub fn detect_backend(cfg: &LlmConfig) -> Option<Box<dyn LlmClient>> {
@@ -649,8 +655,67 @@ mod tests {
     #[test]
     #[serial]
     fn claudecode_unset_returns_false() {
-        unsafe { std::env::remove_var("CLAUDECODE") };
+        unsafe {
+            std::env::remove_var("WAI_AGENT");
+            std::env::remove_var("CLAUDECODE");
+            std::env::remove_var("CURSOR_AGENT");
+        }
         assert!(!in_agent_session());
+    }
+
+    #[test]
+    #[serial]
+    fn wai_agent_set_returns_true() {
+        unsafe { std::env::set_var("WAI_AGENT", "1") };
+        assert!(in_agent_session());
+        unsafe { std::env::remove_var("WAI_AGENT") };
+    }
+
+    #[test]
+    #[serial]
+    fn wai_agent_empty_returns_false() {
+        unsafe {
+            std::env::set_var("WAI_AGENT", "");
+            std::env::remove_var("CLAUDECODE");
+            std::env::remove_var("CURSOR_AGENT");
+        }
+        assert!(!in_agent_session());
+        unsafe { std::env::remove_var("WAI_AGENT") };
+    }
+
+    #[test]
+    #[serial]
+    fn cursor_agent_set_returns_true() {
+        unsafe { std::env::set_var("CURSOR_AGENT", "1") };
+        assert!(in_agent_session());
+        unsafe { std::env::remove_var("CURSOR_AGENT") };
+    }
+
+    #[test]
+    #[serial]
+    fn all_agent_vars_unset_returns_false() {
+        unsafe {
+            std::env::remove_var("WAI_AGENT");
+            std::env::remove_var("CLAUDECODE");
+            std::env::remove_var("CURSOR_AGENT");
+        }
+        assert!(!in_agent_session());
+    }
+
+    #[test]
+    #[serial]
+    fn all_agent_vars_empty_returns_false() {
+        unsafe {
+            std::env::set_var("WAI_AGENT", "");
+            std::env::set_var("CLAUDECODE", "");
+            std::env::set_var("CURSOR_AGENT", "");
+        }
+        assert!(!in_agent_session());
+        unsafe {
+            std::env::remove_var("WAI_AGENT");
+            std::env::remove_var("CLAUDECODE");
+            std::env::remove_var("CURSOR_AGENT");
+        }
     }
 
     // ── resolve_model_alias ──

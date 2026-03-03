@@ -195,7 +195,10 @@ pub fn parse_skill_frontmatter(path: &Path) -> Option<SkillMetadata> {
 
 pub fn run_add(cmd: ResourceAddCommands) -> Result<()> {
     match cmd {
-        ResourceAddCommands::Skill { name, template } => add_skill(&name, template.as_deref()),
+        ResourceAddCommands::Skill { name, template } => {
+            eprintln!("⚠ 'wai resource add skill' is deprecated. Use: wai add skill {}", name);
+            add_skill(&name, template.as_deref())
+        }
     }
 }
 
@@ -228,7 +231,7 @@ pub fn run_export(args: ResourceExportArgs) -> Result<()> {
     export_skills(&args.skills, &args.output)
 }
 
-fn add_skill(name: &str, template_name: Option<&str>) -> Result<()> {
+pub fn add_skill(name: &str, template_name: Option<&str>) -> Result<()> {
     let project_root = require_project()?;
     require_safe_mode("add skill")?;
 

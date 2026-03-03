@@ -3950,6 +3950,78 @@ fn resource_add_skill_no_template_still_creates_bare_stub() {
     );
 }
 
+// ── wai add skill ────────────────────────────────────────────────────────────
+
+#[test]
+fn add_skill_creates_directory_and_skill_md() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["add", "skill", "my-skill"])
+        .assert()
+        .success();
+
+    let skill_dir = tmp
+        .path()
+        .join(".wai/resources/agent-config/skills/my-skill");
+    assert!(skill_dir.is_dir(), "skill directory should be created");
+
+    let skill_md = skill_dir.join("SKILL.md");
+    assert!(skill_md.is_file(), "SKILL.md should be created");
+
+    let content = fs::read_to_string(&skill_md).unwrap();
+    assert!(
+        content.contains("name: my-skill"),
+        "SKILL.md should include skill name"
+    );
+}
+
+#[test]
+fn add_skill_with_template_creates_templated_file() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["add", "skill", "issue/gather", "--template", "gather"])
+        .assert()
+        .success();
+
+    let skill_md = tmp
+        .path()
+        .join(".wai/resources/agent-config/skills/issue/gather/SKILL.md");
+    let content = fs::read_to_string(&skill_md).unwrap();
+    assert!(
+        content.contains("wai search"),
+        "gather template should contain wai search"
+    );
+}
+
+#[test]
+fn resource_add_skill_deprecated_still_works_and_warns() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["resource", "add", "skill", "my-skill"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("deprecated").and(predicate::str::contains("wai add skill")));
+}
+
+#[test]
+fn resource_add_skill_deprecation_warning_text_format() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["resource", "add", "skill", "my-skill"])
+        .assert()
+        .stderr(predicate::str::contains(
+            "'wai resource add skill' is deprecated. Use: wai add skill my-skill",
+        ));
+}
+
 // ── wai resource list skills ─────────────────────────────────────────────────
 
 #[test]

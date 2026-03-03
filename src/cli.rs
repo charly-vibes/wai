@@ -282,11 +282,11 @@ pub enum Commands {
             LLM BACKENDS\n\
               Claude     — set ANTHROPIC_API_KEY or add api_key to [llm] in .wai/config.toml\n\
               Claude CLI — install Claude Code; use llm = \"claude-cli\"\n\
-              Agent      — inside Claude Code sessions; use llm = \"agent\" or let auto-detect pick it\n\
+              Agent      — inside agent sessions; use llm = \"agent\" or let auto-detect pick it\n\
               Ollama     — install from https://ollama.com and run a local model\n\n\
             DETECTION PRIORITY\n\
-              Inside a Claude Code session (CLAUDECODE set):   API → Agent → Ollama\n\
-              Outside a Claude Code session:                   API → Claude CLI → Ollama\n\n\
+              Inside an agent session (WAI_AGENT / CLAUDECODE / CURSOR_AGENT set):  API → Agent → Ollama\n\
+              Outside an agent session:                                              API → Claude CLI → Ollama\n\n\
             ERROR CODES\n\
               wai::llm::invalid_api_key  — API key missing or rejected\n\
               wai::llm::rate_limit       — Rate limit hit; wait 60s or use Ollama\n\
@@ -467,6 +467,28 @@ pub enum AddCommands {
         /// Comma-separated tags written as YAML frontmatter
         #[arg(short, long)]
         tags: Option<String>,
+    },
+
+    /// Scaffold a new agent skill file
+    ///
+    /// Skill names may be flat ("my-skill") or hierarchical ("category/action").
+    /// Only one '/' separator is allowed; each segment must be lowercase
+    /// letters, digits, and hyphens (no leading/trailing hyphens).
+    ///
+    /// Built-in templates: gather, create, tdd, rule-of-5
+    Skill {
+        /// Skill name (e.g. "my-skill" or "issue/gather")
+        name: String,
+
+        /// Start from a built-in template.
+        ///
+        /// Valid templates:
+        ///   gather    — research stub: wai search, codebase exploration, wai add research
+        ///   create    — creation stub: retrieve plan, bd create items, wire dependencies
+        ///   tdd       — TDD stub: RED/GREEN/REFACTOR loop with cargo test and commits
+        ///   rule-of-5 — review stub: 5 passes with convergence check and APPROVED/NEEDS_CHANGES/NEEDS_HUMAN verdict
+        #[arg(long, value_name = "TEMPLATE")]
+        template: Option<String>,
     },
 }
 
