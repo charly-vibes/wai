@@ -2986,6 +2986,66 @@ fn way_check_agent_skills_missing() {
 }
 
 #[test]
+fn way_check_agent_skills_missing_suggests_fix_command() {
+    let tmp = TempDir::new().unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("wai way --fix skills"));
+}
+
+#[test]
+fn way_fix_skills_prints_description_before_acting() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    let output = wai_cmd(tmp.path())
+        .args(["way", "--fix", "skills"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let stdout = String::from_utf8(output).unwrap();
+    // Should explain what it's doing before listing created skills
+    assert!(
+        stdout.contains("rule-of-5-universal") && stdout.contains("commit"),
+        "Should mention both skills, got:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("scaffold") || stdout.contains("Scaffold") || stdout.contains("skill"),
+        "Should describe the action before acting, got:\n{stdout}"
+    );
+}
+
+#[test]
+fn way_fix_skills_scaffolds_both_skills() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["way", "--fix", "skills"])
+        .assert()
+        .success();
+
+    assert!(
+        tmp.path()
+            .join(".wai/resources/agent-config/skills/rule-of-5-universal/SKILL.md")
+            .exists(),
+        "rule-of-5-universal/SKILL.md should be created"
+    );
+    assert!(
+        tmp.path()
+            .join(".wai/resources/agent-config/skills/commit/SKILL.md")
+            .exists(),
+        "commit/SKILL.md should be created"
+    );
+}
+
+#[test]
 fn way_check_justfile_recipes() {
     let tmp = TempDir::new().unwrap();
     fs::write(

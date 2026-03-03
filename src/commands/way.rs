@@ -103,6 +103,15 @@ fn fix_skills(repo_root: &Path) -> Result<()> {
     let skills_dir = agent_config_dir(repo_root).join(SKILLS_DIR);
     std::fs::create_dir_all(&skills_dir).into_diagnostic()?;
 
+    println!();
+    println!(
+        "  Scaffolding recommended skills into {}:",
+        skills_dir.strip_prefix(repo_root).unwrap_or(&skills_dir).display()
+    );
+    println!("    • rule-of-5-universal — iterative quality review workflow");
+    println!("    • commit — structured, deliberate commit workflow");
+    println!();
+
     let mut created = 0usize;
 
     for (skill_name, content) in [SKILL_RULE_OF_5, SKILL_COMMIT] {
@@ -742,7 +751,7 @@ fn check_agent_skills(repo_root: &Path) -> CheckResult {
             intent,
             success_criteria,
             suggestion: Some(
-                "Add rule-of-5-universal (ro5) and commit to .wai/resources/agent-config/skills/"
+                "Run 'wai way --fix skills' to scaffold rule-of-5-universal (ro5) and commit"
                     .to_string(),
             ),
         };
@@ -777,7 +786,7 @@ fn check_agent_skills(repo_root: &Path) -> CheckResult {
             intent,
             success_criteria,
             suggestion: Some(
-                "Add rule-of-5-universal (ro5) and commit to .wai/resources/agent-config/skills/"
+                "Run 'wai way --fix skills' to scaffold rule-of-5-universal (ro5) and commit"
                     .to_string(),
             ),
         };
@@ -818,7 +827,7 @@ fn check_agent_skills(repo_root: &Path) -> CheckResult {
             intent,
             success_criteria,
             suggestion: Some(format!(
-                "Add to .wai/resources/agent-config/skills/: {}",
+                "Run 'wai way --fix skills' to scaffold missing: {}",
                 missing.join(", ")
             )),
         }
