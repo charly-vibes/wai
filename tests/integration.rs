@@ -2701,6 +2701,53 @@ fn way_check_ai_instructions_claude_md() {
 }
 
 #[test]
+fn way_check_ai_instructions_suggests_reflect_when_no_reflections() {
+    let tmp = TempDir::new().unwrap();
+    fs::write(tmp.path().join("CLAUDE.md"), "# Instructions").unwrap();
+    // No .wai/resources/reflections/ directory — reflect has never been run.
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("AI-agent context")
+                .and(predicate::str::contains("CLAUDE.md detected"))
+                .and(predicate::str::contains("wai reflect"))
+                .and(predicate::str::contains("resources/reflections")),
+        );
+}
+
+#[test]
+fn way_check_ai_instructions_no_reflect_suggestion_when_reflections_exist() {
+    let tmp = TempDir::new().unwrap();
+    fs::write(tmp.path().join("CLAUDE.md"), "# Instructions").unwrap();
+    // Create a reflection file to simulate reflect having been run.
+    let refl_dir = tmp.path().join(".wai/resources/reflections");
+    fs::create_dir_all(&refl_dir).unwrap();
+    fs::write(refl_dir.join("2026-01-01-my-proj.md"), "## patterns").unwrap();
+
+    let output = wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("AI-agent context"),
+        "expected AI-agent context check"
+    );
+    assert!(
+        stdout.contains("CLAUDE.md detected"),
+        "expected CLAUDE.md detected message"
+    );
+    // No suggestion should be present when reflections exist.
+    assert!(
+        !stdout.contains("wai reflect"),
+        "unexpected wai reflect suggestion when reflection file exists"
+    );
+}
+
+#[test]
 fn way_check_ai_instructions_agents_md() {
     let tmp = TempDir::new().unwrap();
     fs::write(tmp.path().join("AGENTS.md"), "# Instructions").unwrap();
@@ -4389,7 +4436,7 @@ fn close_zero_projects_shows_diagnostic() {
 }
 
 #[test]
-fn close_repeated_same_day_increments_suffix() {
+fn close_repeated_same_day_updates_existing() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
@@ -4407,23 +4454,21 @@ fn close_repeated_same_day_increments_suffix() {
         .success();
 
     let handoffs_dir = tmp.path().join(".wai/projects/myproject/handoffs");
-    let mut files: Vec<_> = fs::read_dir(&handoffs_dir)
+    let files: Vec<_> = fs::read_dir(&handoffs_dir)
         .unwrap()
         .filter_map(|e| e.ok())
         .map(|e| e.file_name().to_string_lossy().to_string())
         .collect();
-    files.sort();
 
-    assert_eq!(files.len(), 2, "expected 2 handoff files, got: {:?}", files);
-    // One file should have no numeric suffix and one should have the -1 suffix
-    assert!(
-        files.iter().any(|f| f.ends_with("session-end.md")),
-        "expected a session-end.md file, got: {:?}",
+    assert_eq!(
+        files.len(),
+        1,
+        "expected only 1 handoff file after two same-day runs, got: {:?}",
         files
     );
     assert!(
-        files.iter().any(|f| f.ends_with("session-end-1.md")),
-        "expected a session-end-1.md file, got: {:?}",
+        files[0].ends_with("session-end.md"),
+        "expected a session-end.md file, got: {:?}",
         files
     );
 }
@@ -4474,22 +4519,23 @@ fn close_overwrites_pending_resume_on_second_call() {
     let proj_dir = tmp.path().join(".wai/projects/myproject");
     let first = fs::read_to_string(proj_dir.join(".pending-resume")).unwrap();
 
-    // Second close on the same day produces a suffixed file
+    // Second close on the same day updates the same file in place.
     wai_cmd(tmp.path())
         .args(["close", "--project", "myproject"])
         .assert()
         .success();
 
     let second = fs::read_to_string(proj_dir.join(".pending-resume")).unwrap();
-    assert_ne!(
+    // Both runs point to the same (only) handoff file for this day.
+    assert_eq!(
         first.trim(),
         second.trim(),
-        ".pending-resume should be overwritten with the newest handoff path"
+        ".pending-resume should point to the same (updated) handoff file"
     );
-    // The new path should exist
+    // The path should exist.
     assert!(
         proj_dir.join(second.trim()).exists(),
-        "second .pending-resume path should exist"
+        ".pending-resume path should exist"
     );
 }
 
@@ -4828,13 +4874,19 @@ fn prime_close_prime_close_prime_end_to_end_resume_loop() {
         .success();
 
     let signal2 = fs::read_to_string(proj_dir.join(".pending-resume")).unwrap();
-    assert_ne!(
+    // Second close updates the same file in place, so .pending-resume still
+    // points to the same (only) handoff for this day.
+    assert_eq!(
         signal1.trim(),
         signal2.trim(),
-        "second close should overwrite .pending-resume"
+        "second close should keep .pending-resume pointing to the same handoff"
+    );
+    assert!(
+        !signal2.trim().is_empty(),
+        ".pending-resume should still be non-empty after second close"
     );
 
-    // second prime should show RESUMING pointing to the new handoff
+    // second prime should show RESUMING pointing to the updated handoff
     let out2 = wai_cmd(tmp.path())
         .args(["prime", "--project", "myproject", "--no-input"])
         .assert()
@@ -5081,12 +5133,18 @@ fn reflect_with_mock_llm_writes_claude_md_and_reflect_meta() {
         .env("NO_COLOR", "1")
         .assert()
         .success()
-        .stdout(predicate::str::contains("CLAUDE.md"));
+        .stdout(predicate::str::contains("Wrote"));
 
-    // CLAUDE.md should contain a WAI:REFLECT block.
-    let claude_md = fs::read_to_string(tmp.path().join("CLAUDE.md")).unwrap();
-    assert!(claude_md.contains("<!-- WAI:REFLECT:START -->"));
-    assert!(claude_md.contains("Use TDD always"));
+    // A reflection resource file should be created in .wai/resources/reflections/.
+    let refl_dir = tmp.path().join(".wai/resources/reflections");
+    assert!(refl_dir.exists(), "reflections dir should exist");
+    let entries: Vec<_> = fs::read_dir(&refl_dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .collect();
+    assert_eq!(entries.len(), 1, "expected exactly one reflection resource file");
+    let resource_content = fs::read_to_string(entries[0].path()).unwrap();
+    assert!(resource_content.contains("Use TDD always"), "resource file should contain reflect content");
 
     // .reflect-meta should be created.
     let meta_path = tmp.path().join(".wai/projects/test-proj/.reflect-meta");
@@ -5113,37 +5171,40 @@ fn reflect_dry_run_does_not_modify_claude_md() {
 }
 
 #[test]
-fn reflect_empty_diff_skips_write() {
+fn reflect_repeated_call_updates_existing_resource_file() {
     let tmp = TempDir::new().unwrap();
     reflect_workspace(tmp.path());
 
-    // Pre-populate CLAUDE.md with exactly what the mock LLM will produce.
-    let existing = format!(
-        "# Claude\n\
-        <!-- WAI:REFLECT:START -->\n{}\n<!-- WAI:REFLECT:END -->\n",
-        MOCK_REFLECT_CONTENT
+    // Run reflect twice with the same mock content.
+    for _ in 0..2 {
+        wai_cmd(tmp.path())
+            .args([
+                "reflect",
+                "--project",
+                "test-proj",
+                "--output",
+                "claude.md",
+                "--yes",
+            ])
+            .env("WAI_REFLECT_MOCK_RESPONSE", MOCK_REFLECT_CONTENT)
+            .env("NO_COLOR", "1")
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("Wrote"));
+    }
+
+    // Only one resource file should exist (idempotent — second call updates in place).
+    let refl_dir = tmp.path().join(".wai/resources/reflections");
+    let entries: Vec<_> = fs::read_dir(&refl_dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .collect();
+    assert_eq!(
+        entries.len(),
+        1,
+        "expected exactly one reflection file after two reflect calls, got: {:?}",
+        entries.iter().map(|e| e.file_name()).collect::<Vec<_>>()
     );
-    fs::write(tmp.path().join("CLAUDE.md"), &existing).unwrap();
-
-    // Target only claude.md so AGENTS.md (also created by init) doesn't interfere.
-    wai_cmd(tmp.path())
-        .args([
-            "reflect",
-            "--project",
-            "test-proj",
-            "--output",
-            "claude.md",
-            "--yes",
-        ])
-        .env("WAI_REFLECT_MOCK_RESPONSE", MOCK_REFLECT_CONTENT)
-        .env("NO_COLOR", "1")
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("up to date"));
-
-    // CLAUDE.md should be unchanged.
-    let after = fs::read_to_string(tmp.path().join("CLAUDE.md")).unwrap();
-    assert_eq!(existing, after);
 }
 
 #[test]

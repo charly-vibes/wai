@@ -514,7 +514,7 @@ fn check_documentation(repo_root: &Path) -> CheckResult {
 }
 
 fn check_ai_instructions(repo_root: &Path) -> CheckResult {
-    use crate::managed_block::has_reflect_block;
+    use crate::config::reflections_dir;
 
     let name = "AI-agent context";
     let intent = Some(
@@ -530,10 +530,20 @@ fn check_ai_instructions(repo_root: &Path) -> CheckResult {
     let agents_md = repo_root.join("AGENTS.md");
 
     if claude_md.exists() {
-        let has_reflect = has_reflect_block(&claude_md);
-        let suggestion = if !has_reflect {
+        // Check whether wai reflect has been run: a reflection resource file
+        // must exist in .wai/resources/reflections/. The old WAI:REFLECT inline
+        // block is no longer written — reflect now writes to a resource file and
+        // injects a slim WAI:REFLECT:REF reference block instead.
+        let refl_dir = reflections_dir(repo_root);
+        let has_reflections = refl_dir
+            .exists()
+            .then(|| std::fs::read_dir(&refl_dir).ok())
+            .flatten()
+            .map(|mut entries| entries.next().is_some())
+            .unwrap_or(false);
+        let suggestion = if !has_reflections {
             Some(
-                "No WAI:REFLECT block found — run `wai reflect` to synthesize project-specific AI guidance into CLAUDE.md".to_string(),
+                "No reflection resource found — run `wai reflect` to synthesize project-specific AI guidance into .wai/resources/reflections/".to_string(),
             )
         } else {
             None

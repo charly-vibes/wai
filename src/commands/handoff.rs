@@ -55,15 +55,9 @@ pub fn create_handoff(project_root: &Path, project: &str) -> Result<PathBuf> {
 
     let now = Local::now();
     let date = now.format("%Y-%m-%d");
-    let filename = format!("{}-session-end.md", date);
-
-    // Check for duplicate filenames
-    let mut final_filename = filename.clone();
-    let mut counter = 1;
-    while handoffs_dir.join(&final_filename).exists() {
-        final_filename = format!("{}-session-end-{}.md", date, counter);
-        counter += 1;
-    }
+    // If a same-day handoff already exists, overwrite it in place rather than
+    // creating a numbered duplicate (e.g. session-end-1.md).
+    let final_filename = format!("{}-session-end.md", date);
 
     // Gather plugin context via hook system
     let mut plugin_context = String::new();

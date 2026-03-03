@@ -63,6 +63,10 @@ pub fn write_reflect_meta(project_dir: &Path, meta: &ReflectMeta) -> Result<()> 
 /// Prepends YAML front-matter with `date`, `project`, `sessions_analyzed`, and
 /// `type: reflection`. Creates the reflections directory if it doesn't exist.
 ///
+/// If a reflection file for the same project already exists (any date), it is
+/// updated in place rather than creating a new numbered file.  There should be
+/// at most one reflection file per project at any time.
+///
 /// * `handoff_count` — number of handoff artifacts analyzed; written as
 ///   `sessions_analyzed` in the YAML front-matter.
 ///
@@ -78,14 +82,14 @@ pub fn write_reflect_resource(
 
     let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
     let name_slug = slug::slugify(project_name);
-    let mut filename = format!("{}-{}.md", date, name_slug);
-    // Deduplicate: if the file already exists, append a counter
-    let mut counter = 2;
-    while refl_dir.join(&filename).exists() {
-        filename = format!("{}-{}-{}.md", date, name_slug, counter);
-        counter += 1;
-    }
-    let path = refl_dir.join(&filename);
+
+    // Look for an existing reflection file for this project (any date).
+    // Convention: files are named `<date>-<slug>.md`; migrated files end in
+    // `-migrated.md` and are left untouched.
+    let existing_path = find_existing_reflection(&refl_dir, &name_slug);
+
+    let path = existing_path
+        .unwrap_or_else(|| refl_dir.join(format!("{}-{}.md", date, name_slug)));
 
     let mut front_matter = format!(
         "---\ndate: \"{}\"\nproject: \"{}\"\nsessions_analyzed: {}\ntype: reflection\n---\n\n",
@@ -96,6 +100,34 @@ pub fn write_reflect_resource(
     Ok(path)
 }
 
+/// Find an existing reflection file for `slug` inside `refl_dir`.
+///
+/// Matches files whose stem ends with `-<slug>` — i.e. the pattern
+/// `<date>-<slug>.md` — and excludes `-migrated` files.
+/// Returns the path of the first match, or `None` if none exists.
+fn find_existing_reflection(refl_dir: &Path, slug: &str) -> Option<PathBuf> {
+    let suffix = format!("-{}", slug);
+    let entries = std::fs::read_dir(refl_dir).ok()?;
+    for entry in entries.filter_map(|e| e.ok()) {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("md") {
+            continue;
+        }
+        let stem = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("");
+        // Skip migrated files.
+        if stem.ends_with("-migrated") {
+            continue;
+        }
+        if stem.ends_with(&suffix) {
+            return Some(path);
+        }
+    }
+    None
+}
+
 /// Compute the path that `write_reflect_resource` would write to, without writing.
 ///
 /// Used for `--dry-run` to show the user what path would be created.
@@ -103,13 +135,11 @@ pub fn predict_reflect_resource_path(project_root: &Path, project_name: &str) ->
     let refl_dir = crate::config::reflections_dir(project_root);
     let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
     let name_slug = slug::slugify(project_name);
-    let mut filename = format!("{}-{}.md", date, name_slug);
-    let mut counter = 2;
-    while refl_dir.join(&filename).exists() {
-        filename = format!("{}-{}-{}.md", date, name_slug, counter);
-        counter += 1;
+    // Mirror the idempotent logic: reuse an existing reflection if one exists.
+    if let Some(existing) = find_existing_reflection(&refl_dir, &name_slug) {
+        return existing;
     }
-    refl_dir.join(&filename)
+    refl_dir.join(format!("{}-{}.md", date, name_slug))
 }
 
 // ── Output target detection ──────────────────────────────────────────────────
@@ -1578,30 +1608,32 @@ mod tests {
         );
     }
 
-    // 6.2: suffix logic (-2, -3) when file already exists
+    // 6.2: repeated calls update existing file in place (idempotent)
     #[test]
-    fn write_reflect_resource_suffix_on_collision() {
-        let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    fn write_reflect_resource_updates_existing_in_place() {
         let dir = tmp();
 
-        write_reflect_resource(dir.path(), "proj", "first", 1).unwrap();
-        write_reflect_resource(dir.path(), "proj", "second", 2).unwrap();
-        write_reflect_resource(dir.path(), "proj", "third", 3).unwrap();
+        let path1 = write_reflect_resource(dir.path(), "proj", "first", 1).unwrap();
+        let path2 = write_reflect_resource(dir.path(), "proj", "second", 2).unwrap();
+        let path3 = write_reflect_resource(dir.path(), "proj", "third", 3).unwrap();
+
+        // All three calls must return the same path.
+        assert_eq!(path1, path2, "second call should reuse the same file");
+        assert_eq!(path2, path3, "third call should reuse the same file");
 
         let refl_dir = crate::config::reflections_dir(dir.path());
-        let mut names: Vec<String> = fs::read_dir(&refl_dir)
+        let names: Vec<String> = fs::read_dir(&refl_dir)
             .unwrap()
             .filter_map(|e| e.ok())
             .map(|e| e.file_name().to_string_lossy().to_string())
             .collect();
-        names.sort();
 
-        assert_eq!(names.len(), 3, "expected 3 reflection files, got: {names:?}");
-        // Lexicographic sort of full filenames: "{date}-proj-2.md" < "{date}-proj-3.md" < "{date}-proj.md"
-        // because '-' (0x2D) < '.' (0x2E) in ASCII, so suffixed variants sort before the base file.
-        assert!(names[0].starts_with(&format!("{}-proj-2.", date)), "-2 suffix missing: {names:?}");
-        assert!(names[1].starts_with(&format!("{}-proj-3.", date)), "-3 suffix missing: {names:?}");
-        assert!(names[2].starts_with(&format!("{}-proj.", date)), "base file missing: {names:?}");
+        assert_eq!(names.len(), 1, "expected exactly one reflection file, got: {names:?}");
+
+        // The file should contain the content from the latest call.
+        let content = fs::read_to_string(&path3).unwrap();
+        assert!(content.contains("third"), "file should contain latest content");
+        assert!(!content.contains("first"), "file should not contain stale content");
     }
 
     // ── Integration test: migration path (6.6) ───────────────────────────────
