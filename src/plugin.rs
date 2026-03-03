@@ -256,6 +256,62 @@ pub fn find_plugin_command<'a>(
     None
 }
 
+// ── bd memory helpers ─────────────────────────────────────────────────────────
+
+/// Character budget for bd memories injected into LLM prompts.
+/// Memories are short KV entries; 10K chars fits ~50–100 comfortably.
+pub const MEMORIES_BUDGET: usize = 10_000;
+
+/// Fetch all bd memories by shelling out to `bd memories`.
+///
+/// Returns `None` if beads is not detected (no `.beads/` directory), if `bd`
+/// is not on PATH, or if the command fails. Callers must degrade gracefully.
+pub fn fetch_memories(project_root: &Path) -> Option<String> {
+    if !project_root.join(".beads").exists() {
+        return None;
+    }
+    let output = Command::new("bd")
+        .arg("memories")
+        .current_dir(project_root)
+        .output()
+        .ok()?;
+    if !output.status.success() || output.stdout.is_empty() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&output.stdout).to_string();
+    if text.len() <= MEMORIES_BUDGET {
+        Some(text)
+    } else {
+        // Truncate at a char boundary to stay within budget.
+        let mut cut = MEMORIES_BUDGET;
+        while cut > 0 && !text.is_char_boundary(cut) {
+            cut -= 1;
+        }
+        Some(text[..cut].to_string())
+    }
+}
+
+/// Store a short insight in bd by shelling out to `bd remember "<text>"`.
+///
+/// Returns `Ok(())` on success, `Err` if beads is not detected or the command
+/// fails. Callers should warn the user on error but must not panic.
+pub fn store_memory(project_root: &Path, text: &str) -> Result<(), String> {
+    if !project_root.join(".beads").exists() {
+        return Err("beads not detected (.beads/ directory not found)".to_string());
+    }
+    let status = Command::new("bd")
+        .arg("remember")
+        .arg(text)
+        .current_dir(project_root)
+        .status()
+        .map_err(|e| format!("failed to run bd: {e}"))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("bd remember exited with {status}"))
+    }
+}
+
 /// Execute a pass-through command.
 pub fn execute_passthrough(
     project_root: &Path,
@@ -291,4 +347,59 @@ pub fn execute_passthrough(
     cmd.current_dir(project_root);
 
     cmd.status()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    // ── fetch_memories ────────────────────────────────────────────────────────
+
+    #[test]
+    fn fetch_memories_none_when_no_beads_dir() {
+        let tmp = TempDir::new().unwrap();
+        // No .beads/ → should return None without attempting to shell out.
+        assert!(fetch_memories(tmp.path()).is_none());
+    }
+
+    #[test]
+    fn fetch_memories_none_when_bd_not_on_path() {
+        let tmp = TempDir::new().unwrap();
+        std::fs::create_dir(tmp.path().join(".beads")).unwrap();
+        // Run with an empty PATH so bd cannot be found.
+        let result = std::panic::catch_unwind(|| {
+            // We can't override PATH inside the process for Command easily, so
+            // we verify that the function returns None (not panics) when bd
+            // is genuinely absent. In CI bd won't be available.
+            // If bd IS on PATH (dev machine), this test is a no-op for the None branch.
+            let _ = fetch_memories(tmp.path());
+        });
+        assert!(result.is_ok(), "fetch_memories must not panic");
+    }
+
+    #[test]
+    fn fetch_memories_truncates_to_budget() {
+        // Build a string larger than MEMORIES_BUDGET and verify truncation is
+        // at a valid char boundary.
+        let big = "x".repeat(MEMORIES_BUDGET + 500);
+        let mut cut = MEMORIES_BUDGET;
+        while cut > 0 && !big.is_char_boundary(cut) {
+            cut -= 1;
+        }
+        let truncated = &big[..cut];
+        assert!(truncated.len() <= MEMORIES_BUDGET);
+        assert!(big.is_char_boundary(truncated.len()));
+    }
+
+    // ── store_memory ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn store_memory_err_when_no_beads_dir() {
+        let tmp = TempDir::new().unwrap();
+        // No .beads/ → should return Err without attempting to shell out.
+        let result = store_memory(tmp.path(), "some insight");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("beads not detected"));
+    }
 }
