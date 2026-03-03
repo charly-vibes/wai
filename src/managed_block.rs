@@ -187,7 +187,10 @@ pub fn wai_block_content(detected_plugins: &[&str], installed_skills: &[&str]) -
         );
     }
     if has_openspec {
-        block.push_str("[ ] openspec tasks.md — mark completed tasks [x]\n");
+        block.push_str(
+            "[ ] openspec tasks.md — mark completed tasks [x]\n\
+             [ ] openspec list — archive any ✓ Complete changes (`openspec archive <id> --yes`)\n",
+        );
     }
     block.push_str(
         "[ ] wai reflect                    # update CLAUDE.md with project patterns (every ~5 sessions)\n\
@@ -461,6 +464,39 @@ mod wai_block_tests {
         assert!(
             openspec_pos < wai_reflect_pos,
             "openspec tasks.md should appear before wai reflect"
+        );
+    }
+
+    #[test]
+    fn openspec_archive_step_present_when_openspec_detected() {
+        let output = wai_block_content(&["openspec"], &[]);
+        assert!(
+            output.contains("openspec archive"),
+            "expected 'openspec archive' in output"
+        );
+    }
+
+    #[test]
+    fn openspec_archive_step_absent_without_openspec() {
+        let output = wai_block_content(&[], &[]);
+        assert!(
+            !output.contains("openspec archive"),
+            "unexpected 'openspec archive' in output without openspec"
+        );
+    }
+
+    #[test]
+    fn openspec_archive_step_after_tasks_step() {
+        let output = wai_block_content(&["openspec"], &[]);
+        let tasks_pos = output
+            .find("openspec tasks.md")
+            .expect("openspec tasks.md not found");
+        let archive_pos = output
+            .find("openspec archive")
+            .expect("openspec archive not found");
+        assert!(
+            tasks_pos < archive_pos,
+            "openspec archive should appear after openspec tasks.md"
         );
     }
 

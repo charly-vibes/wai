@@ -27,7 +27,10 @@ Detected workflow tools:
 - **beads (bd)** — issue tracking (tasks, bugs, dependencies)
 - **openspec** — specifications and change proposals (see `openspec/AGENTS.md`)
 
-> **CRITICAL**: Use TDD (write tests first) and Tidy First (separate refactoring commits from feature commits) when implementing changes.
+> **CRITICAL**: Apply TDD and Tidy First throughout — not just when writing code:
+> - **Planning/task creation**: each ticket should map to a red→green→refactor cycle; refactoring tasks must be separate tickets from feature tasks.
+> - **Design**: define the test shape (inputs/outputs) before designing the implementation.
+> - **Implementation**: write the failing test first, then make it pass, then tidy in a separate commit.
 
 > **When beginning research or creating a ticket**: run `wai search "<topic>"` to check for existing patterns before writing new content.
 > **Ro5**: The Rule of 5 skill is installed. Run `/ro5` after key phase transitions — implement, research, design — for iterative quality review.
@@ -99,6 +102,7 @@ Before saying "done", run this checklist:
 [ ] bd close <id>                  # close completed issues; also close parent epic if last sub-task
 [ ] bd sync --from-main            # pull beads updates
 [ ] openspec tasks.md — mark completed tasks [x]
+[ ] openspec list — archive any ✓ Complete changes (`openspec archive <id> --yes`)
 [ ] wai reflect                    # update CLAUDE.md with project patterns (every ~5 sessions)
 [ ] git add <files> && git commit  # commit code + handoff
 ```
@@ -180,6 +184,8 @@ context before starting research or creating tickets.
 > **Before research or ticket creation**: always run `wai search "<topic>"` to
 > check for known patterns. Do not rediscover what is already documented.
 <!-- WAI:REFLECT:REF:END -->
+
+
 
 <!-- OPENSPEC:START -->
 # OpenSpec Instructions
