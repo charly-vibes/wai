@@ -330,14 +330,27 @@ The system SHALL include `intent` and `success_criteria` in JSON output. These f
 
 ### Requirement: Plugin Agnostic Context Support
 
-The plugin system SHALL allow YAML-defined plugins to define their own `intent` and `success_criteria`.
+The plugin system SHALL allow TOML-defined plugins to define their own `intent` and `success_criteria`.
 
 #### Scenario: Plugin with custom context
 
-- **GIVEN** a plugin YAML with `intent` and `success_criteria` defined
+- **GIVEN** a plugin TOML with `intent` and `success_criteria` defined
 - **WHEN** the plugin definition is parsed
 - **THEN** these fields are available on the `PluginDef` struct
-- **AND** default to `None` if not present in the YAML
+- **AND** default to `None` if not present in the TOML
+
+#### Scenario: TOML plugin file parsed correctly
+
+- **GIVEN** a `.toml` plugin file in `.wai/plugins/` with content:
+  ```toml
+  name = "my-check"
+  intent = "Ensure the repo has a CODEOWNERS file."
+  success_criteria = "CODEOWNERS file exists in the repo root or .github/ directory."
+  ```
+- **WHEN** the plugin loader scans `.wai/plugins/` for `*.toml` files
+- **THEN** the file is parsed with `toml::from_str`
+- **AND** `intent` and `success_criteria` are available on the resulting `PluginDef`
+- **AND** YAML files (`*.yml`, `*.yaml`) are not loaded
 
 ### Requirement: Output Format
 

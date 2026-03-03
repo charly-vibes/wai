@@ -31,7 +31,7 @@ pub struct HookDef {
     pub inject_as: String,
 }
 
-/// Plugin configuration loaded from YAML.
+/// Plugin configuration loaded from TOML.
 #[derive(Debug, Clone, Deserialize)]
 pub struct PluginDef {
     pub name: String,
@@ -174,14 +174,14 @@ pub fn detect_plugins(project_root: &Path) -> Vec<ActivePlugin> {
     {
         for entry in entries.filter_map(|e| e.ok()) {
             let path = entry.path();
-            let is_yaml = path
+            let is_toml = path
                 .extension()
                 .and_then(|e| e.to_str())
-                .is_some_and(|e| e == "yml" || e == "yaml");
+                .is_some_and(|e| e == "toml");
 
-            if is_yaml
+            if is_toml
                 && let Ok(content) = std::fs::read_to_string(&path)
-                && let Ok(def) = serde_yml::from_str::<PluginDef>(&content)
+                && let Ok(def) = toml::from_str::<PluginDef>(&content)
             {
                 let detected = if let Some(ref detector) = def.detector {
                     project_root.join(&detector.path).exists()
