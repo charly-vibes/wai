@@ -182,3 +182,4 @@
 {"actor":"charly vibes","comment":null,"created_at":"2026-03-03T17:29:55Z","event_type":"closed","id":182,"issue_id":"wai-q2mf","new_value":"Research recorded as wai artifact on friction-analysis. Key finding: in_agent_session() already exists using CLAUDECODE. Recommend extending to WAI_AGENT + CURSOR_AGENT. Process tree inspection ruled out.","old_value":""}
 {"actor":"charly vibes","comment":null,"created_at":"2026-03-03T17:45:27Z","event_type":"created","id":183,"issue_id":"wai-yjmn","new_value":"","old_value":""}
 {"actor":"charly vibes","comment":null,"created_at":"2026-03-03T17:45:35Z","event_type":"closed","id":184,"issue_id":"wai-yjmn","new_value":"Implemented: updated managed_block.rs template to cover planning, design, and implementation phases","old_value":""}
+{"actor":"charly vibes","comment":null,"created_at":"2026-03-03T18:26:07Z","event_type":"created","id":185,"issue_id":"wai-8ooh","new_value":"","old_value":""}
