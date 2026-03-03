@@ -113,3 +113,30 @@
 {"actor":"charly vibes","comment":null,"created_at":"2026-03-03T11:46:32Z","event_type":"closed","id":113,"issue_id":"wai-shfz","new_value":"Closed","old_value":""}
 {"actor":"charly vibes","comment":null,"created_at":"2026-03-03T11:46:32Z","event_type":"closed","id":114,"issue_id":"wai-yiq7","new_value":"Closed","old_value":""}
 {"actor":"charly vibes","comment":null,"created_at":"2026-03-03T11:46:32Z","event_type":"closed","id":115,"issue_id":"wai-41hv","new_value":"Closed","old_value":""}
+{"actor":"charly vibes","comment":null,"created_at":"2026-03-03T11:49:20Z","event_type":"status_changed","id":116,"issue_id":"wai-vnan","new_value":"{\"status\":\"in_progress\"}","old_value":"{\"id\":\"wai-vnan\",\"title\":\"Validate refactor-way-agnostic change\",\"description\":\"Run 'openspec validate refactor-way-agnostic --strict' and confirm it passes cleanly after all other tasks are complete. Corresponds to refactor-way-agnostic:agnostic-capabilities-22.\",\"status\":\"open\",\"priority\":2,\"issue_type\":\"task\",\"owner\":\"charly.vibes@proton.me\",\"created_at\":\"2026-03-02T19:40:26Z\",\"created_by\":\"charly vibes\",\"updated_at\":\"2026-03-02T19:40:26Z\"}"}
+{"actor":"charly vibes","comment":null,"created_at":"2026-03-03T11:49:34Z","event_type":"closed","id":117,"issue_id":"wai-vnan","new_value":"Closed","old_value":""}
+{"actor":"charly vibes","comment":null,"created_at":"2026-03-03T11:52:02Z","event_type":"closed","id":118,"issue_id":"wai-vnan","new_value":"Closed","old_value":""}
+{"actor":"charly vibes","comment":null,"created_at":"2026-03-03T11:53:22Z","event_type":"status_changed","id":119,"issue_id":"wai-p9je","new_value":"{\"status\":\"in_progress\"}","old_value":"{\"id\":\"wai-p9je\",\"title\":\"feat(way): improve discoverability and clarity of --fix skills\",\"description\":\"The `wai way --fix skills` flag is hard to find and its purpose is unclear. Users don't know it exists or what it will do before running it. Improve discoverability (surface it in relevant output/suggestions) and add a clear description of what it does before it acts.\",\"status\":\"open\",\"priority\":3,\"issue_type\":\"feature\",\"owner\":\"charly.vibes@proton.me\",\"created_at\":\"2026-03-02T19:25:51Z\",\"created_by\":\"charly vibes\",\"updated_at\":\"2026-03-02T19:25:51Z\"}"}
+{"actor":"charly vibes","comment":null,"created_at":"2026-03-03T11:56:56Z","event_type":"closed","id":120,"issue_id":"wai-p9je","new_value":"Closed","old_value":""}
+{"actor":"charly vibes","comment":null,"created_at":"2026-03-03T11:59:12Z","event_type":"created","id":121,"issue_id":"wai-ct6m","new_value":"","old_value":""}
+{"actor":"charly vibes","comment":null,"created_at":"2026-03-03T11:59:25Z","event_type":"created","id":122,"issue_id":"wai-2jz9","new_value":"","old_value":""}
+{"actor":"charly vibes","comment":null,"created_at":"2026-03-03T11:59:28Z","event_type":"created","id":123,"issue_id":"wai-5w6c","new_value":"","old_value":""}
+{"actor":"charly vibes","comment":null,"created_at":"2026-03-03T11:59:29Z","event_type":"created","id":124,"issue_id":"wai-vwh5","new_value":"","old_value":""}
+{"actor":"charly vibes","comment":null,"created_at":"2026-03-03T11:59:29Z","event_type":"created","id":125,"issue_id":"wai-aq4b","new_value":"","old_value":""}
+{"actor":"charly vibes","comment":null,"created_at":"2026-03-03T11:59:32Z","event_type":"created","id":126,"issue_id":"wai-chxf","new_value":"","old_value":""}
+{"actor":"charly vibes","comment":null,"created_at":"2026-03-03T11:59:33Z","event_type":"created","id":127,"issue_id":"wai-9swz","new_value":"","old_value":""}
+{"actor":"charly vibes","comment":null,"created_at":"2026-03-03T11:59:34Z","event_type":"created","id":128,"issue_id":"wai-8z5m","new_value":"","old_value":""}
+{"actor":"charly vibes","comment":null,"created_at":"2026-03-03T11:59:35Z","event_type":"created","id":129,"issue_id":"wai-kg9f","new_value":"","old_value":""}
+{"actor":"charly vibes","comment":null,"created_at":"2026-03-03T11:59:37Z","event_type":"created","id":130,"issue_id":"wai-7sm3","new_value":"","old_value":""}
+{"actor":"charly vibes","comment":null,"created_at":"2026-03-03T11:59:37Z","event_type":"created","id":131,"issue_id":"wai-91qr","new_value":"","old_value":""}
+{"actor":"charly vibes","comment":null,"created_at":"2026-03-03T11:59:38Z","event_type":"created","id":132,"issue_id":"wai-s6o2","new_value":"","old_value":""}
+{"actor":"charly vibes","comment":null,"created_at":"2026-03-03T11:59:39Z","event_type":"created","id":133,"issue_id":"wai-v8nz","new_value":"","old_value":""}
+{"actor":"charly vibes","comment":null,"created_at":"2026-03-03T11:59:40Z","event_type":"created","id":134,"issue_id":"wai-fw3r","new_value":"","old_value":""}
+{"actor":"charly vibes","comment":null,"created_at":"2026-03-03T11:59:42Z","event_type":"created","id":135,"issue_id":"wai-glaj","new_value":"","old_value":""}
+{"actor":"charly vibes","comment":null,"created_at":"2026-03-03T11:59:42Z","event_type":"created","id":136,"issue_id":"wai-bfan","new_value":"","old_value":""}
+{"actor":"charly vibes","comment":null,"created_at":"2026-03-03T11:59:44Z","event_type":"created","id":137,"issue_id":"wai-vvn4","new_value":"","old_value":""}
+{"actor":"charly vibes","comment":null,"created_at":"2026-03-03T11:59:44Z","event_type":"created","id":138,"issue_id":"wai-ipfh","new_value":"","old_value":""}
+{"actor":"charly vibes","comment":null,"created_at":"2026-03-03T11:59:47Z","event_type":"created","id":139,"issue_id":"wai-yvbr","new_value":"","old_value":""}
+{"actor":"charly vibes","comment":null,"created_at":"2026-03-03T11:59:47Z","event_type":"created","id":140,"issue_id":"wai-n2zj","new_value":"","old_value":""}
+{"actor":"charly vibes","comment":null,"created_at":"2026-03-03T11:59:53Z","event_type":"created","id":141,"issue_id":"wai-0esi","new_value":"","old_value":""}
+{"actor":"charly vibes","comment":null,"created_at":"2026-03-03T11:59:55Z","event_type":"created","id":142,"issue_id":"wai-kiyu","new_value":"","old_value":""}
