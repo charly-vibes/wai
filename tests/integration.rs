@@ -6289,3 +6289,64 @@ fn status_ignores_stale_last_run_pointer() {
         "Should show Available pipelines when pointer is stale, got:\n{stripped}"
     );
 }
+
+// ─── wai way verbose / json agnostic fields ──────────────────────────────────
+
+#[test]
+fn way_verbose_shows_intent() {
+    let tmp = TempDir::new().unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "-v"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Intent:"));
+}
+
+#[test]
+fn way_verbose_shows_success_criteria() {
+    let tmp = TempDir::new().unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "-v"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Success:"));
+}
+
+#[test]
+fn way_json_includes_intent() {
+    let tmp = TempDir::new().unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"intent\""));
+}
+
+#[test]
+fn way_plugin_toml_parsed() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    // Place a TOML plugin file with intent and success_criteria
+    let plugins_dir = tmp.path().join(".wai/plugins");
+    fs::create_dir_all(&plugins_dir).unwrap();
+    fs::write(
+        plugins_dir.join("my-check.toml"),
+        r#"name = "my-check"
+description = "A custom check"
+intent = "Ensure the repo has a CODEOWNERS file."
+success_criteria = "CODEOWNERS file exists in the repo root or .github/ directory."
+"#,
+    )
+    .unwrap();
+
+    // Plugin list is the command that exercises detect_plugins
+    wai_cmd(tmp.path())
+        .args(["plugin", "list", "--json"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"my-check\""));
+}
