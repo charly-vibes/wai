@@ -40,8 +40,11 @@ pub fn wai_block_content(detected_plugins: &[&str], installed_skills: &[&str]) -
         }
         block.push_str(
             "\n\
-             > **CRITICAL**: Use TDD (write tests first) and Tidy First (separate refactoring \
-             commits from feature commits) when implementing changes.\n\
+             > **CRITICAL**: Apply TDD and Tidy First throughout — not just when writing code:\n\
+             > - **Planning/task creation**: each ticket should map to a red→green→refactor cycle; \
+             refactoring tasks must be separate tickets from feature tasks.\n\
+             > - **Design**: define the test shape (inputs/outputs) before designing the implementation.\n\
+             > - **Implementation**: write the failing test first, then make it pass, then tidy in a separate commit.\n\
              \n\
              > **When beginning research or creating a ticket**: run `wai search \"<topic>\"` \
              to check for existing patterns before writing new content.\n",
