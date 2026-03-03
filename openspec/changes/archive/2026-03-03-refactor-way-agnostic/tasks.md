@@ -27,4 +27,4 @@
 - [x] **[agnostic-capabilities-19]** Add integration test `way_json_includes_intent`: run `wai way --json` and assert payload contains `"intent"` key.
 - [x] **[agnostic-capabilities-20]** Add integration test `way_plugin_toml_parsed`: place a `.toml` plugin file with `intent`/`success_criteria` in `.wai/plugins/` and assert it is loaded correctly.
 - [x] **[agnostic-capabilities-21]** Update `Plugin Agnostic Context Support` requirement in `openspec/specs/repository-best-practices/spec.md` to use TOML examples and add a scenario for TOML plugin parsing.
-- [ ] **[agnostic-capabilities-22]** Run `openspec validate refactor-way-agnostic --strict` and confirm clean.
+- [x] **[agnostic-capabilities-22]** Run `openspec validate refactor-way-agnostic --strict` and confirm clean.

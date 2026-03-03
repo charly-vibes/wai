@@ -1,11 +1,8 @@
-# OpenSpec Delta: Agnostic Way Capabilities
+# agnostic-capabilities Specification
 
-**Change ID:** `refactor-way-agnostic`
-**Capability:** `agnostic-capabilities`
-**Status:** `draft`
-
-## MODIFIED Requirements
-
+## Purpose
+TBD - created by archiving change refactor-way-agnostic. Update Purpose after archive.
+## Requirements
 ### Requirement: Agnostic Repository Best Practice Checks
 
 The `wai way` command SHALL report on agnostic repository capabilities rather than specific tool implementations. Each check SHALL include its intent and success criteria to provide context for both human users and AI agents.
@@ -45,10 +42,12 @@ The system SHALL map tool-specific checks to agnostic capabilities, each with de
 
 ### Requirement: Plugin Agnostic Context Support
 
-The plugin system SHALL allow YAML-defined plugins to define their own `intent` and `success_criteria`.
+The plugin system SHALL allow TOML-defined plugins to define their own `intent` and `success_criteria`.
 
 #### Scenario: Plugin with custom context
 
-- **GIVEN** a plugin YAML with `intent` and `success_criteria` defined
-- **WHEN** `wai way` runs that plugin's check
-- **THEN** it SHALL use the defined intent and criteria in the output
+- **GIVEN** a plugin TOML with `intent` and `success_criteria` defined
+- **WHEN** the plugin definition is parsed
+- **THEN** these fields are available on the `PluginDef` struct
+- **AND** default to `None` if not present in the TOML
+
