@@ -1,4 +1,4 @@
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, CommandFactory, Parser, Subcommand};
 use std::path::PathBuf;
 
 const VERSION: &str = concat!(
@@ -789,4 +789,45 @@ pub enum PipelineCommands {
         /// Optional description to filter/rank pipelines by keyword overlap
         description: Option<String>,
     },
+}
+
+/// Returns the names of all top-level wai subcommands, derived from the [`Cli`] struct.
+///
+/// Used by typo detection in `run_external` so the list automatically stays in sync with
+/// the `Commands` enum — no manual update needed when adding a new subcommand.
+pub fn wai_subcommand_names() -> Vec<String> {
+    Cli::command()
+        .get_subcommands()
+        .map(|c| c.get_name().to_string())
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn derived_list_contains_all_known_commands() {
+        let names = wai_subcommand_names();
+        let expected = &[
+            "new", "add", "show", "move", "init", "status", "phase", "sync", "config", "handoff",
+            "search", "timeline", "plugin", "doctor", "way", "why", "import", "resource",
+            "tutorial", "close", "prime", "ls", "reflect", "pipeline",
+        ];
+        for cmd in expected {
+            assert!(
+                names.iter().any(|n| n == cmd),
+                "command '{cmd}' missing from derived list; was it removed from Commands?"
+            );
+        }
+    }
+
+    #[test]
+    fn derived_list_excludes_external_catchall() {
+        let names = wai_subcommand_names();
+        assert!(
+            !names.iter().any(|n| n == "external"),
+            "external catch-all should not appear as a named command"
+        );
+    }
 }

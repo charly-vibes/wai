@@ -226,11 +226,8 @@ fn run_external(args: Vec<String>) -> Result<()> {
     let plugin_name = &args[0];
     let command_name = args.get(1).map(|s| s.as_str());
 
-    let valid_commands = &[
-        "new", "add", "show", "move", "init", "status", "phase", "sync", "config", "handoff",
-        "search", "timeline", "plugin", "doctor", "way", "why", "import", "resource", "tutorial",
-        "close", "prime", "ls", "reflect", "pipeline",
-    ];
+    let cmd_names = crate::cli::wai_subcommand_names();
+    let valid_commands: Vec<&str> = cmd_names.iter().map(|s| s.as_str()).collect();
     // Valid (verb, noun) subcommand patterns for wrong-order detection
     let valid_patterns = &[
         ("new", "project"),
@@ -283,7 +280,7 @@ fn run_external(args: Vec<String>) -> Result<()> {
             .any(|p| p.def.name == *plugin_name && p.detected)
     });
 
-    if !is_known_plugin && let Some(suggestion) = engine.suggest_typo(plugin_name, valid_commands) {
+    if !is_known_plugin && let Some(suggestion) = engine.suggest_typo(plugin_name, &valid_commands) {
         miette::bail!(
             "{}. {}",
             suggestion.message(),
