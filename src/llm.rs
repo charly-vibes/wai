@@ -490,20 +490,20 @@ pub fn detect_backend(cfg: &LlmConfig) -> Option<Box<dyn LlmClient>> {
         }
         // Auto-detect
         _ => {
-            // 1. Claude API (direct, fastest)
-            if let Some(client) = ClaudeClient::from_config(cfg) {
-                return Some(Box::new(client));
-            }
-            // 2a. Inside Claude Code → prefer Agent (zero-cost, no subprocess)
+            // 1. Inside agent session → Agent (zero-cost, no subprocess)
             if in_agent_session() {
                 return Some(Box::new(AgentBackend));
             }
-            // 2b. Outside agent session → Claude CLI
+            // 2. Claude API (direct, fastest)
+            if let Some(client) = ClaudeClient::from_config(cfg) {
+                return Some(Box::new(client));
+            }
+            // 3. Claude CLI
             let cli = ClaudeCliClient::from_config(cfg);
             if cli.is_available() {
                 return Some(Box::new(cli));
             }
-            // 3. Ollama (local fallback)
+            // 4. Ollama (local fallback)
             let ollama = OllamaClient::from_config(cfg);
             if ollama.is_available() {
                 return Some(Box::new(ollama));
@@ -609,13 +609,13 @@ mod tests {
 
     #[test]
     #[serial]
-    fn claudecode_set_with_api_key_selects_claude_api() {
+    fn claudecode_set_with_api_key_prefers_agent_over_claude_api() {
         unsafe { std::env::set_var("CLAUDECODE", "1") };
         unsafe { std::env::set_var("ANTHROPIC_API_KEY", "sk-test") };
         let cfg = LlmConfig::default();
         let backend = detect_backend(&cfg);
         assert!(backend.is_some());
-        assert_eq!(backend.unwrap().name(), "Claude");
+        assert_eq!(backend.unwrap().name(), "Agent");
         unsafe { std::env::remove_var("CLAUDECODE") };
         unsafe { std::env::remove_var("ANTHROPIC_API_KEY") };
     }
