@@ -2,60 +2,105 @@
 
 This epic documents the identified friction points, "roughness," and desired paths for the `wai` tool. As an "annoying" LLM reviewer, I have scrutinized the codebase for inconsistencies, unintuitive behaviors, and workflow dead-ends.
 
+_Written: 2026-02-25. Status tags updated: 2026-03-04._
+
+---
+
+## Status Legend
+
+- **RESOLVED** — Fixed; verified against current source or completed spec.
+- **PARTIALLY RESOLVED** — Mitigated but not fully addressed.
+- **OPEN** — Still valid; no known fix.
+
+---
+
 ## 1. Command Architecture & Naming
 
-### 1.1 Overlapping Intent: `way` vs `doctor`
+### 1.1 Overlapping Intent: `wai way` vs `wai doctor`
+- **Status: RESOLVED**
 - **Friction:** `wai way` (best practices) and `wai doctor` (workspace health) have significant semantic overlap. Both commands support a `--fix` flag (though `way`'s is more specific).
-- **Desired Path:** Unify diagnostic commands. Perhaps `wai doctor` should include the "best practices" checks from `way` as a category, or `way` should be the primary entry point for all repository-level validation.
+- **What changed:** The distinction is now documented and cross-referenced in help text. `wai doctor` = workspace health (.wai/ structure, config, projections, plugins). `wai way` = repo hygiene and agent workflow conventions (skills, rules — works without a wai workspace).
+- **Decision (2026-03-04):** A unified `wai check` entry point was designed and proposed, then deliberately rejected. The domains are genuinely distinct and a third entry point would worsen discovery. The help text cross-references (73286cd) are sufficient. No further action.
 
 ### 1.2 Subcommand Verbosity & Nesting
-- **Friction:** Commands like `wai resource add skill` are four levels deep. 
+- **Status: OPEN**
+- **Friction:** Commands like `wai resource add skill` are four levels deep.
 - **Inconsistency:** `wai new resource` exists but is for PARA items, while `wai resource add skill` is for agent-ready skills. This distinction is confusing.
 - **Desired Path:** Flatten the hierarchy. `wai add skill` or `wai skill new` would be more direct.
 
 ### 1.3 Command Flag Inconsistencies
-- **Friction:** 
+- **Status: OPEN**
+- **Friction:**
     - `wai add research` has a short flag `-p` for `--project`.
     - `wai add plan` and `wai add design` only have a long `--project` flag.
 - **Desired Path:** Standardize flags across all `add` subcommands.
 
 ### 1.4 LLM Configuration Fragmentation
-- **Friction:** Both `wai why` and `wai reflect` use LLMs, but they are configured under a `[why]` block in `config.toml`. Users configuring `reflect` may not think to look in `[why]`.
-- **Desired Path:** Rename the configuration block to `[llm]` or `[ai]` to reflect its shared usage.
+- **Status: RESOLVED**
+- **Friction:** Both `wai why` and `wai reflect` used LLMs but were configured under `[why]` in `config.toml`.
+- **What changed:** Config is now accessed via `config.llm_config()`. The `[why]` TOML section still deserializes for backwards compatibility but emits a deprecation warning.
+
+---
 
 ## 2. Workflow & Suggestion Engine
 
 ### 2.1 Arbitrary Thresholds & "Dead Zones"
-- **Friction:** `src/workflows.rs` uses hardcoded counts for suggestions:
-    - 0-1 research items: Suggests adding more.
-    - 3+ research items: Suggests advancing phase.
-    - **Dead Zone:** If a user has exactly 2 research items, *no* patterns are detected, and suggestions disappear or revert to generic ones.
-- **Desired Path:** Replace hardcoded thresholds with more fluid logic or at least eliminate "dead zones" where the tool has nothing to say.
+- **Status: RESOLVED**
+- **Friction:** `src/workflows.rs` used hardcoded counts with a dead zone: 0–1 items → suggest more; 3+ items → suggest advancing; exactly 2 items → silence.
+- **What changed:** Thresholds are now adjacent (`<= 1` and `>= 2`) with no dead zone. Reflection note: "Maintain adjacency when adding new threshold-based suggestions."
 
 ### 2.2 Forced Whimsy in Error Messages
-- **Friction:** Many error messages in `src/error.rs` start with "Hmm,". While intended to be friendly, this can be annoying in non-interactive environments or during repetitive debugging.
-- **Desired Path:** Move the "whimsy" to the output formatter so it can be toggled or removed in `--quiet` or CI modes.
+- **Status: RESOLVED**
+- **Friction:** Error messages in `src/error.rs` started with "Hmm," — annoying in CI or repetitive debugging.
+- **What changed:** "Hmm," no longer appears in the current source tree.
 
 ### 2.3 Manual Pipeline State
-- **Friction:** `wai pipeline` requires the user to manually `export WAI_PIPELINE_RUN=<id>` for `wai add` to automatically tag artifacts. This breaks the "flow" and requires the user to manage shell state.
-- **Desired Path:** Use a local state file (e.g., in `.wai/`) to track the "active" pipeline run, similar to how git tracks the current branch.
+- **Status: RESOLVED**
+- **Friction:** `wai pipeline` required manually exporting `WAI_PIPELINE_RUN=<id>`.
+- **What changed:** Active run ID is now stored in `.wai/.pipeline-run` (not committed). `wai add` reads env var first, then falls back to the state file. `wai pipeline advance` clears it on last stage.
+
+---
 
 ## 3. Implementation Technical Debt
 
 ### 3.1 Hardcoded Validation in `mod.rs`
-- **Friction:** `src/commands/mod.rs` contains a hardcoded list of `valid_commands` and `valid_patterns` for typo/order detection. This must be updated manually every time a command is added.
-- **Desired Path:** Derive these lists dynamically from the `Cli` struct or a registry of commands.
+- **Status: OPEN**
+- **Friction:** `src/commands/mod.rs:229` contains a hardcoded `valid_commands` list and `valid_patterns` list for typo/order detection. Must be updated manually when commands are added.
+- **Desired Path:** Derive dynamically from the `Cli` struct or a command registry.
 
 ### 3.2 Side-Effects in "Show" Functions
-- **Friction:** `show_welcome` in `src/commands/mod.rs` automatically saves the user configuration if it's missing. "Show" functions should be read-only.
-- **Desired Path:** Move configuration initialization to a dedicated "pre-run" hook or the `UserConfig::load` method itself.
+- **Status: RESOLVED**
+- **Friction:** `show_welcome` automatically saved user config if missing.
+- **What changed:** First-run initialization is now handled inside `UserConfig::load`, keeping `show_welcome` read-only. (Comment at `src/commands/mod.rs:101`.)
 
 ### 3.3 Output Formatting Duplication
-- **Friction:** `show_welcome` and `run_external` both handle their own logic for formatting suggestions and JSON output.
-- **Desired Path:** Consolidate all suggestion rendering into `src/output.rs` or a dedicated `Display` trait for suggestions.
+- **Status: PARTIALLY RESOLVED**
+- **Friction:** `show_welcome` and `run_external` had separate suggestion-rendering logic.
+- **What changed:** `print_suggestions()` is now a shared `pub(crate)` function in `mod.rs:460`. Both callers use it.
+- **Remaining:** JSON output path inside `show_welcome` still builds its suggestion list inline rather than using a shared builder.
 
-## 4. Desired Path: "Agent-Aware" Mode
-- **Discovery:** Existing WIP in `openspec/changes/archive/` suggests a move toward "agent-aware" mode.
-- **Friction:** When running inside an LLM (like Claude Code), `wai` should not spawn another LLM subprocess.
-- **Desired Path:** Detect the parent agent and output raw context for the agent to synthesize, rather than performing its own LLM call. This is already partially planned but not fully implemented.
+---
 
+## 4. Agent-Aware Mode
+
+- **Status: OPEN**
+- **Discovery:** WIP in `openspec/changes/` points toward agent-aware mode.
+- **Friction:** When running inside Claude Code, `wai why`/`wai reflect` should not spawn a second LLM subprocess.
+- **Note:** `add-claude-code-projection` (11/11, complete) addresses skill file projection to Claude Code format — a related but distinct concern. The runtime detection problem (suppress LLM calls when parent is an agent) is not yet addressed.
+- **Desired Path:** Detect parent agent (e.g., via `CLAUDE_CODE` env var or similar) and output raw context for the agent to synthesize rather than calling the LLM directly.
+
+---
+
+## Top 5 Friction Points by Impact
+
+Priority order for design/plan phase work:
+
+1. **§1.2 Subcommand verbosity** — `wai resource add skill` is the most common agent task and four levels deep. High daily friction. Low implementation risk (CLI refactor).
+
+2. **§4 Agent-aware mode** — When wai spawns an LLM inside Claude Code, it burns tokens and latency for every `wai why` call. Compounds with usage frequency.
+
+3. **§1.1 `wai way` vs `wai doctor`** — Partial fix exists but the UX split still confuses new users. Medium effort to unify under a single entry point.
+
+4. **§3.1 Hardcoded `valid_commands`** — Silent maintenance trap. Every new command risks outdated typo suggestions until someone notices. Low effort to fix with a derive macro or registry.
+
+5. **§1.3 Flag inconsistencies** — Minor daily friction but easy to fix; `-p` standardization across all `add` subcommands is a few-line change.
