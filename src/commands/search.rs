@@ -6,6 +6,7 @@ use crate::config::{projects_dir, wai_dir};
 use crate::context::current_context;
 use crate::json::{SearchPayload, SearchResult};
 use crate::output::print_json;
+use crate::plugin::fetch_memories_for_query;
 
 use super::require_project;
 
@@ -20,6 +21,7 @@ pub fn run(
     tag_filter: Vec<String>,
     latest: bool,
     context_size: usize,
+    include_memories: bool,
 ) -> Result<()> {
     let display_limit = limit.unwrap_or(DEFAULT_LIMIT);
     let project_root = require_project()?;
@@ -255,6 +257,25 @@ pub fn run(
             "Showing first {} of {} results. Use -n to see more.",
             display_limit, total
         );
+    }
+
+    // bd memories section — shown when --include-memories is passed
+    if include_memories && !context.json {
+        if let Some(mem_raw) = fetch_memories_for_query(&project_root, &query) {
+            let mem_lines: Vec<&str> = mem_raw
+                .lines()
+                .filter(|l| !l.trim().is_empty())
+                .collect();
+            if !mem_lines.is_empty() {
+                println!();
+                println!("  {} Memories", "◆".cyan());
+                println!();
+                for line in &mem_lines {
+                    println!("  {}  {}", "[mem]".dimmed(), line);
+                }
+                println!();
+            }
+        }
     }
 
     Ok(())

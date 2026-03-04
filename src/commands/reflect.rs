@@ -11,6 +11,7 @@ use crate::managed_block::{
     REFLECT_REF_END, REFLECT_REF_START, has_reflect_block, read_reflect_block,
     wai_reflect_ref_content,
 };
+use crate::plugin::{fetch_memories, store_memory};
 
 // ── Reflect metadata ─────────────────────────────────────────────────────────
 
@@ -211,6 +212,8 @@ pub struct ReflectContext {
     pub existing_blocks: Vec<(PathBuf, String)>,
     /// Previous reflection resource files, newest-first, up to budget.
     pub previous_reflections: Vec<ReflectionEntry>,
+    /// Global memories from bd, to avoid re-deriving already-captured insights.
+    pub memories: Option<String>,
 }
 
 #[derive(Debug)]
@@ -483,6 +486,7 @@ pub fn gather_reflect_context(
     let handoff_count = handoffs.len();
     let secondary = read_secondary_artifacts(project_root, SECONDARY_BUDGET);
     let previous_reflections = read_previous_reflections(project_root, PREVIOUS_REFLECTIONS_BUDGET);
+    let memories = fetch_memories(project_root);
 
     // Read existing REFLECT blocks from each target so LLM can avoid repeating them.
     let existing_blocks = output_targets
@@ -497,6 +501,7 @@ pub fn gather_reflect_context(
         secondary,
         existing_blocks,
         previous_reflections,
+        memories,
     })
 }
 
@@ -628,6 +633,15 @@ pub fn build_reflect_prompt(ctx: &ReflectContext, today: &str) -> String {
             ));
         }
         parts.push(already);
+    }
+
+    if let Some(ref memories) = ctx.memories {
+        parts.push(format!(
+            "# Already in Global Memories\n\
+             The following insights are already captured as persistent memories in bd. \
+             Do NOT re-derive or repeat them:\n\n{}\n",
+            memories
+        ));
     }
 
     if let Some(ref transcript) = ctx.conversation {
@@ -833,6 +847,33 @@ pub fn print_diff(diff: &[DiffLine]) {
 
 // ── Command handler ───────────────────────────────────────────────────────────
 
+/// Extract top-level bullet point text from a markdown string.
+///
+/// A top-level bullet is a line starting with `- ` or `* ` (not indented).
+/// The bullet marker is stripped. Each bullet text is truncated to 60 chars
+/// for use as a bd memory key.
+pub fn extract_top_level_bullets(content: &str) -> Vec<String> {
+    content
+        .lines()
+        .filter_map(|line| {
+            let stripped = if let Some(rest) = line.strip_prefix("- ") {
+                rest
+            } else if let Some(rest) = line.strip_prefix("* ") {
+                rest
+            } else {
+                return None;
+            };
+            let text = stripped.trim().to_string();
+            if text.is_empty() {
+                return None;
+            }
+            // Truncate to 60 chars (by char count, not bytes)
+            let truncated: String = text.chars().take(60).collect();
+            Some(truncated)
+        })
+        .collect()
+}
+
 pub fn run(
     project: Option<String>,
     conversation: Option<PathBuf>,
@@ -841,6 +882,7 @@ pub fn run(
     _yes: bool,
     inject_content: Option<String>,
     _verbose: u8,
+    save_memories: bool,
 ) -> Result<()> {
     let project_root = super::require_project()?;
 
@@ -1043,6 +1085,23 @@ pub fn run(
         resource_path.display().to_string().bold()
     );
     println!();
+
+    if save_memories {
+        let bullets = extract_top_level_bullets(&new_content);
+        if bullets.is_empty() {
+            println!("  {} --save-memories: no top-level bullets found in reflection", "○".dimmed());
+        } else {
+            println!("  {} Saving {} bullet(s) to bd memories …", "◆".cyan(), bullets.len());
+            let mut saved = 0u32;
+            for bullet in &bullets {
+                match store_memory(&project_root, bullet) {
+                    Ok(()) => saved += 1,
+                    Err(e) => eprintln!("! Could not save memory: {}", e),
+                }
+            }
+            println!("  {} Saved {} memories", "✓".green(), saved);
+        }
+    }
 
     Ok(())
 }
@@ -1364,6 +1423,7 @@ mod tests {
             secondary: vec![],
             existing_blocks: vec![],
             previous_reflections: vec![],
+            memories: None,
         }
     }
 
@@ -1391,6 +1451,7 @@ mod tests {
             secondary: vec![],
             existing_blocks: vec![],
             previous_reflections: vec![],
+            memories: None,
         };
         let prompt = build_reflect_prompt(&ctx, "2026-02-24");
         assert!(prompt.contains("session transcript here"));
@@ -1409,6 +1470,7 @@ mod tests {
             secondary: vec![],
             existing_blocks: vec![],
             previous_reflections: vec![],
+            memories: None,
         };
         let prompt = build_reflect_prompt(&ctx, "2026-02-24");
         assert!(prompt.contains("handoff notes here"));
@@ -1424,10 +1486,22 @@ mod tests {
             secondary: vec![],
             existing_blocks: vec![(PathBuf::from("CLAUDE.md"), "existing guidance".to_string())],
             previous_reflections: vec![],
+            memories: None,
         };
         let prompt = build_reflect_prompt(&ctx, "2026-02-24");
         assert!(prompt.contains("existing guidance"));
         assert!(prompt.contains("Already Documented"));
+    }
+
+    #[test]
+    fn build_reflect_prompt_includes_memories_when_provided() {
+        let ctx = ReflectContext {
+            memories: Some("- Use fetch_memories for bd integration".to_string()),
+            ..empty_context()
+        };
+        let prompt = build_reflect_prompt(&ctx, "2026-03-04");
+        assert!(prompt.contains("Already in Global Memories"));
+        assert!(prompt.contains("fetch_memories"));
     }
 
     #[test]
@@ -1439,6 +1513,7 @@ mod tests {
             secondary: vec![],
             existing_blocks: vec![],
             previous_reflections: vec![],
+            memories: None,
         };
         let prompt = build_reflect_prompt(&ctx, "2026-02-24");
         // Should be escaped to ~~~
@@ -1730,5 +1805,23 @@ mod tests {
             claude_content.contains("WAI:REFLECT:REF:START"),
             "CLAUDE.md should contain WAI:REFLECT:REF:START after migration"
         );
+    }
+
+    #[test]
+    fn extract_top_level_bullets_returns_top_level_only() {
+        let content = "### Conventions\n- Use fetch_memories for bd integration\n  - nested bullet (ignored)\n* Another top-level bullet\n\nSome plain text\n- Third bullet";
+        let bullets = extract_top_level_bullets(content);
+        assert_eq!(bullets.len(), 3);
+        assert!(bullets[0].contains("fetch_memories"));
+        assert!(bullets[1].contains("Another top-level"));
+        assert!(bullets[2].contains("Third bullet"));
+    }
+
+    #[test]
+    fn extract_top_level_bullets_truncates_at_60_chars() {
+        let long_bullet = format!("- {}", "x".repeat(100));
+        let bullets = extract_top_level_bullets(&long_bullet);
+        assert_eq!(bullets.len(), 1);
+        assert!(bullets[0].chars().count() <= 60);
     }
 }

@@ -92,8 +92,13 @@ fn claude_code_needs_sync(config_dir: &std::path::Path, cc_dir: &std::path::Path
     false
 }
 
-pub fn run(status_only: bool, dry_run: bool) -> Result<()> {
+pub fn run(status_only: bool, dry_run: bool, from_main: bool) -> Result<()> {
     let project_root = require_project()?;
+
+    if from_main {
+        return run_from_main(&project_root, dry_run);
+    }
+
     let config_dir = agent_config_dir(&project_root);
     let projections_path = config_dir.join(".projections.yml");
 
@@ -220,5 +225,117 @@ pub fn run(status_only: bool, dry_run: bool) -> Result<()> {
     if !quiet {
         log::success("Agent configs synced").into_diagnostic()?;
     }
+    Ok(())
+}
+
+/// Sync .wai/areas/ and .wai/resources/ from the main git worktree.
+fn run_from_main(project_root: &std::path::Path, dry_run: bool) -> miette::Result<()> {
+    use crate::plugin::detect_main_worktree_root;
+
+    let main_root = match detect_main_worktree_root(project_root) {
+        Some(r) => r,
+        None => {
+            println!("Not in a git worktree — nothing to sync.");
+            return Ok(());
+        }
+    };
+
+    let dirs_to_sync = ["areas", "resources"];
+    let wai_subdir = ".wai";
+
+    let mut synced = 0u32;
+    let mut skipped = 0u32;
+    let mut conflicts = 0u32;
+
+    for dir_name in &dirs_to_sync {
+        let src_dir = main_root.join(wai_subdir).join(dir_name);
+        let dst_dir = project_root.join(wai_subdir).join(dir_name);
+
+        if !src_dir.exists() {
+            continue;
+        }
+
+        for entry in walkdir::WalkDir::new(&src_dir)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_type().is_file())
+        {
+            let rel = match entry.path().strip_prefix(&src_dir) {
+                Ok(r) => r,
+                Err(_) => continue,
+            };
+
+            let dst_file = dst_dir.join(rel);
+            let src_content = match std::fs::read(entry.path()) {
+                Ok(c) => c,
+                Err(_) => {
+                    skipped += 1;
+                    continue;
+                }
+            };
+
+            if dst_file.exists() {
+                let dst_content = std::fs::read(&dst_file).unwrap_or_default();
+                if src_content == dst_content {
+                    skipped += 1;
+                    continue;
+                }
+                // Content differs — conflict: skip-and-warn
+                println!(
+                    "! Conflict: {} differs from main — skipped (resolve manually)",
+                    dst_file
+                        .strip_prefix(project_root)
+                        .unwrap_or(&dst_file)
+                        .display()
+                );
+                conflicts += 1;
+                continue;
+            }
+
+            if dry_run {
+                println!(
+                    "  [dry-run] would copy: {}",
+                    dst_file
+                        .strip_prefix(project_root)
+                        .unwrap_or(&dst_file)
+                        .display()
+                );
+                synced += 1;
+                continue;
+            }
+
+            if let Some(parent) = dst_file.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            match std::fs::write(&dst_file, &src_content) {
+                Ok(()) => {
+                    println!(
+                        "  ✓ {}",
+                        dst_file
+                            .strip_prefix(project_root)
+                            .unwrap_or(&dst_file)
+                            .display()
+                    );
+                    synced += 1;
+                }
+                Err(e) => {
+                    println!(
+                        "! Failed to copy {}: {}",
+                        dst_file
+                            .strip_prefix(project_root)
+                            .unwrap_or(&dst_file)
+                            .display(),
+                        e
+                    );
+                    skipped += 1;
+                }
+            }
+        }
+    }
+
+    println!(
+        "Sync from main: {} copied, {} skipped, {} conflicts",
+        synced, skipped, conflicts
+    );
     Ok(())
 }

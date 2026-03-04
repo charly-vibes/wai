@@ -104,6 +104,10 @@ pub enum Commands {
         /// Preview operations without making any changes
         #[arg(long)]
         dry_run: bool,
+
+        /// Sync .wai/areas/ and .wai/resources/ from the main git worktree
+        #[arg(long)]
+        from_main: bool,
     },
 
     /// Manage agent configuration files
@@ -146,6 +150,10 @@ pub enum Commands {
         /// Number of surrounding context lines to show (like grep -C)
         #[arg(short = 'C', long = "context", default_value_t = 0)]
         context: usize,
+
+        /// Include bd memories in search results
+        #[arg(long)]
+        include_memories: bool,
     },
 
     /// View chronological timeline of artifacts
@@ -226,6 +234,10 @@ pub enum Commands {
         /// Project name (auto-detected when only one project exists)
         #[arg(short, long)]
         project: Option<String>,
+
+        /// Prompt for a short insight to save to bd memories
+        #[arg(long)]
+        remember: bool,
     },
 
     /// Orient yourself at session start: project, phase, last handoff, and suggested next step
@@ -359,6 +371,10 @@ pub enum Commands {
         /// receiving the context block from an initial `wai reflect` run.
         #[arg(long, value_name = "CONTENT")]
         inject_content: Option<String>,
+
+        /// Store top-level bullet points from the generated reflection as bd memories
+        #[arg(long)]
+        save_memories: bool,
     },
 
     /// Manage pipelines (ordered multi-step workflows)

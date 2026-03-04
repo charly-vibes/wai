@@ -10,6 +10,7 @@ use crate::json::{BeadsSummary, OpenspecEntry, PrimePayload};
 use crate::openspec;
 use crate::output::print_json;
 use crate::plugin;
+use crate::plugin::{detect_main_worktree_root, fetch_memories};
 use crate::state::ProjectState;
 
 use super::{beads_counts, beads_summary, list_projects, require_project, resolve_project_named};
@@ -129,6 +130,38 @@ pub fn run(project: Option<String>) -> Result<()> {
                 pct
             );
         }
+    }
+
+    // bd memories — show up to 5, omit section if unavailable
+    if let Some(memories_raw) = fetch_memories(&project_root) {
+        let lines: Vec<&str> = memories_raw
+            .lines()
+            .filter(|l| !l.trim().is_empty())
+            .collect();
+        if !lines.is_empty() {
+            println!("{} Memories:", "◆".cyan());
+            let shown = lines.iter().take(5);
+            for line in shown {
+                let truncated = if line.chars().count() > 80 {
+                    format!("{}…", line.chars().take(80).collect::<String>())
+                } else {
+                    line.to_string()
+                };
+                println!("  {} {}", "•".dimmed(), truncated);
+            }
+            if lines.len() > 5 {
+                println!(
+                    "  {} … and {} more, run `bd memories` to see all",
+                    "•".dimmed(),
+                    lines.len() - 5
+                );
+            }
+        }
+    }
+
+    // Worktree sync suggestion
+    if detect_main_worktree_root(&project_root).is_some() {
+        println!("{} In a git worktree — run `wai sync --from-main` to sync areas/resources", "→".cyan());
     }
 
     // Suggested next via bd ready --json

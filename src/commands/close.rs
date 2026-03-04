@@ -4,12 +4,13 @@ use std::path::Path;
 use crate::config::projects_dir;
 use crate::context::{current_context, require_safe_mode};
 use crate::plugin;
+use crate::plugin::{detect_main_worktree_root, store_memory};
 
 use super::handoff::create_handoff;
 use super::reflect::{count_handoffs_since, read_reflect_meta};
 use super::{require_project, resolve_project_named};
 
-pub fn run(project: Option<String>) -> Result<()> {
+pub fn run(project: Option<String>, remember: bool) -> Result<()> {
     let project_root = require_project()?;
     require_safe_mode("create handoff")?;
 
@@ -66,8 +67,14 @@ pub fn run(project: Option<String>) -> Result<()> {
             format!("git add {} && git commit", quoted.join(" "))
         };
 
-        let next_steps = if beads_detected {
+        let in_worktree = detect_main_worktree_root(&project_root).is_some();
+
+        let next_steps = if beads_detected && in_worktree {
+            format!("wai sync --from-main && bd sync --from-main && {}", git_add_part)
+        } else if beads_detected {
             format!("bd sync --from-main && {}", git_add_part)
+        } else if in_worktree {
+            format!("wai sync --from-main && {}", git_add_part)
         } else {
             git_add_part
         };
@@ -97,6 +104,27 @@ pub fn run(project: Option<String>) -> Result<()> {
                     "→ {} sessions since last reflect — run `wai reflect` to update {}",
                     session_count, target_hint
                 );
+            }
+        }
+    }
+
+    if remember {
+        if context.safe {
+            eprintln!("! --remember skipped in safe mode");
+        } else if context.no_input {
+            eprintln!("! --remember skipped in no-input mode");
+        } else {
+            print!("→ Insight to save (bd remember): ");
+            let _ = std::io::Write::flush(&mut std::io::stdout());
+            let mut line = String::new();
+            if std::io::BufRead::read_line(&mut std::io::stdin().lock(), &mut line).is_ok() {
+                let text = line.trim().to_string();
+                if !text.is_empty() {
+                    match store_memory(&project_root, &text) {
+                        Ok(()) => println!("✓ Memory saved"),
+                        Err(e) => eprintln!("! Could not save memory: {}", e),
+                    }
+                }
             }
         }
     }

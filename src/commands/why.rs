@@ -12,6 +12,8 @@ use crate::llm::{
     AGENT_SENTINEL, LlmError, claude_binary_exists, detect_backend, ollama_binary_exists,
 };
 
+use crate::plugin::fetch_memories;
+
 use super::require_project;
 
 // ── Response parsing ───────────────────────────────────────────────────────────
@@ -404,6 +406,8 @@ pub struct GatheredContext {
     pub meta: ProjectMeta,
     /// True when artifacts were truncated to fit the context budget.
     pub truncated: bool,
+    /// Global memories from bd, injected as supplementary context.
+    pub memories: Option<String>,
 }
 
 impl GatheredContext {
@@ -460,6 +464,7 @@ pub fn gather_context(project_root: &Path, query: &str) -> GatheredContext {
     };
 
     let meta = gather_meta(project_root);
+    let memories = fetch_memories(project_root);
 
     GatheredContext {
         query: query.to_string(),
@@ -468,6 +473,7 @@ pub fn gather_context(project_root: &Path, query: &str) -> GatheredContext {
         git_context,
         meta,
         truncated,
+        memories,
     }
 }
 
@@ -722,6 +728,15 @@ pub fn build_prompt(ctx: &GatheredContext) -> String {
             ));
         }
         parts.push(artifact_text);
+    }
+
+    if let Some(ref memories) = ctx.memories {
+        parts.push(format!(
+            "# Stored Memories (bd)\n\
+             These are persistent project memories. Use them as supplementary context \
+             when answering the question:\n\n{}\n",
+            memories
+        ));
     }
 
     // Git context for file queries
@@ -1311,6 +1326,7 @@ mod tests {
             git_context: None,
             meta: ProjectMeta::default(),
             truncated: false,
+            memories: None,
         }
     }
 
@@ -1373,6 +1389,22 @@ mod tests {
         assert!(prompt.contains("## Suggestions"));
     }
 
+    #[test]
+    fn build_prompt_includes_memories_when_provided() {
+        let ctx = GatheredContext {
+            query: "why?".to_string(),
+            is_file_query: false,
+            artifacts: vec![],
+            git_context: None,
+            meta: ProjectMeta { current_phase: None, recent_commits: vec![] },
+            truncated: false,
+            memories: Some("- Use bd CLI for integration".to_string()),
+        };
+        let prompt = build_prompt(&ctx);
+        assert!(prompt.contains("Stored Memories (bd)"));
+        assert!(prompt.contains("bd CLI"));
+    }
+
     // ── gathered_context is_empty ──
 
     #[test]
@@ -1384,6 +1416,7 @@ mod tests {
             git_context: None,
             meta: ProjectMeta::default(),
             truncated: false,
+            memories: None,
         };
         assert!(ctx.is_empty());
     }
@@ -1397,6 +1430,7 @@ mod tests {
             git_context: None,
             meta: ProjectMeta::default(),
             truncated: false,
+            memories: None,
         };
         assert!(!ctx.is_empty());
     }
