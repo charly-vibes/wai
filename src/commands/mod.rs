@@ -95,6 +95,40 @@ pub fn run(cli: Cli) -> Result<()> {
     }
 }
 
+fn welcome_suggestions(project_detected: bool) -> Vec<crate::json::Suggestion> {
+    if project_detected {
+        vec![
+            crate::json::Suggestion {
+                label: "Check project status".to_string(),
+                command: "wai status".to_string(),
+            },
+            crate::json::Suggestion {
+                label: "Show current project phase".to_string(),
+                command: "wai phase".to_string(),
+            },
+            crate::json::Suggestion {
+                label: "Create a new project".to_string(),
+                command: "wai new project".to_string(),
+            },
+        ]
+    } else {
+        vec![
+            crate::json::Suggestion {
+                label: "Initialize in current directory".to_string(),
+                command: "wai init".to_string(),
+            },
+            crate::json::Suggestion {
+                label: "Create a new project".to_string(),
+                command: "wai new project".to_string(),
+            },
+            crate::json::Suggestion {
+                label: "Show all commands".to_string(),
+                command: "wai --help".to_string(),
+            },
+        ]
+    }
+}
+
 fn show_welcome() -> Result<()> {
     use cliclack::{intro, outro};
 
@@ -112,37 +146,7 @@ fn show_welcome() -> Result<()> {
 
     if context.json {
         let project_detected = find_project_root().is_some();
-        let suggestions = if project_detected {
-            vec![
-                crate::json::Suggestion {
-                    label: "Check project status".to_string(),
-                    command: "wai status".to_string(),
-                },
-                crate::json::Suggestion {
-                    label: "Show current project phase".to_string(),
-                    command: "wai phase".to_string(),
-                },
-                crate::json::Suggestion {
-                    label: "Create a new project".to_string(),
-                    command: "wai new project".to_string(),
-                },
-            ]
-        } else {
-            vec![
-                crate::json::Suggestion {
-                    label: "Initialize in current directory".to_string(),
-                    command: "wai init".to_string(),
-                },
-                crate::json::Suggestion {
-                    label: "Create a new project".to_string(),
-                    command: "wai new project".to_string(),
-                },
-                crate::json::Suggestion {
-                    label: "Show all commands".to_string(),
-                    command: "wai --help".to_string(),
-                },
-            ]
-        };
+        let suggestions = welcome_suggestions(project_detected);
         let payload = crate::json::WelcomePayload {
             welcome: "wai - Workflow manager for AI-driven development".to_string(),
             project_detected,
