@@ -123,6 +123,58 @@ fn init_warns_if_already_initialized() {
         .stdout(predicate::str::contains("already initialized"));
 }
 
+#[test]
+fn init_json_fresh_includes_wai_way_suggestion() {
+    let tmp = TempDir::new().unwrap();
+    let out = wai_cmd(tmp.path())
+        .args(["--json", "init", "--name", "test-ws", "--yes"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let stdout = String::from_utf8_lossy(&out);
+    let payload: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(payload["already_initialized"], false);
+    assert_eq!(payload["project_name"], "test-ws");
+    let suggestions = payload["suggestions"].as_array().unwrap();
+    let commands: Vec<&str> = suggestions
+        .iter()
+        .map(|s| s["command"].as_str().unwrap())
+        .collect();
+    assert!(
+        commands.contains(&"wai way"),
+        "wai way not in suggestions: {:?}",
+        commands
+    );
+}
+
+#[test]
+fn init_json_reinit_includes_wai_way_suggestion() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    let out = wai_cmd(tmp.path())
+        .args(["--json", "init", "--name", "test-ws", "--yes"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let stdout = String::from_utf8_lossy(&out);
+    let payload: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(payload["already_initialized"], true);
+    let suggestions = payload["suggestions"].as_array().unwrap();
+    let commands: Vec<&str> = suggestions
+        .iter()
+        .map(|s| s["command"].as_str().unwrap())
+        .collect();
+    assert!(
+        commands.contains(&"wai way"),
+        "wai way not in suggestions: {:?}",
+        commands
+    );
+}
+
 // ─── Robust Reinit (wai-exc) ─────────────────────────────────────────────────
 
 #[test]

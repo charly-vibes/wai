@@ -21,7 +21,7 @@ pub fn run(name: Option<String>) -> Result<()> {
 
     // Check if already initialized
     let already_initialized = config_dir.exists();
-    if !quiet {
+    if !quiet && !context.json {
         if already_initialized {
             println!("┌  Initialize wai project");
             println!("▲  Project already initialized in this directory");
@@ -53,22 +53,40 @@ pub fn run(name: Option<String>) -> Result<()> {
         }
 
         if !quiet {
-            // Report actions taken
-            for action in &actions {
-                println!("✓ {}", action.description);
-            }
+            if context.json {
+                let existing_name = ProjectConfig::load(&current_dir)
+                    .map(|c| c.project.name.clone())
+                    .unwrap_or_else(|_| name.clone().unwrap_or_default());
+                let payload = crate::json::InitPayload {
+                    project_name: existing_name,
+                    already_initialized: true,
+                    detected_plugins: detected.iter().map(|s| s.to_string()).collect(),
+                    suggestions: vec![
+                        crate::json::Suggestion {
+                            label: "Check project status".to_string(),
+                            command: "wai status".to_string(),
+                        },
+                        crate::json::Suggestion {
+                            label: "See workflow conventions and available skills".to_string(),
+                            command: "wai way".to_string(),
+                        },
+                    ],
+                };
+                crate::output::print_json_line(&payload)?;
+            } else {
+                // Report actions taken
+                for action in &actions {
+                    println!("✓ {}", action.description);
+                }
 
-            if actions.is_empty() {
-                println!("✓ Workspace is up to date");
-            }
+                if actions.is_empty() {
+                    println!("✓ Workspace is up to date");
+                }
 
-            println!("└  Use 'wai status' to see project info");
+                println!("└  Use 'wai status' to see project info");
+            }
         }
         return Ok(());
-    }
-
-    if !quiet {
-        println!("┌  Initialize wai project");
     }
 
     // Get project name
@@ -141,29 +159,59 @@ pub fn run(name: Option<String>) -> Result<()> {
         .collect();
 
     if !quiet {
-        println!("◆  Created .wai/ directory with PARA structure");
-
-        // Report actions taken
-        for action in &actions {
-            if action.description.contains("Created") {
-                // Only print creation actions, not updates
-                println!("✓ {}", action.description);
+        if context.json {
+            let mut suggestions = vec![
+                crate::json::Suggestion {
+                    label: "Create your first project".to_string(),
+                    command: "wai new project \"my-app\"".to_string(),
+                },
+                crate::json::Suggestion {
+                    label: "Check project status".to_string(),
+                    command: "wai status".to_string(),
+                },
+                crate::json::Suggestion {
+                    label: "See workflow conventions and available skills".to_string(),
+                    command: "wai way".to_string(),
+                },
+            ];
+            if !detected.is_empty() {
+                suggestions.push(crate::json::Suggestion {
+                    label: "View detected plugins".to_string(),
+                    command: "wai plugin list".to_string(),
+                });
             }
-        }
+            let payload = crate::json::InitPayload {
+                project_name: project_name.clone(),
+                already_initialized: false,
+                detected_plugins: detected.iter().map(|s| s.to_string()).collect(),
+                suggestions,
+            };
+            crate::output::print_json_line(&payload)?;
+        } else {
+            println!("◆  Created .wai/ directory with PARA structure");
 
-        if !detected.is_empty() {
-            println!("✓ Detected plugins: {}", detected.join(", "));
-        }
+            // Report actions taken
+            for action in &actions {
+                if action.description.contains("Created") {
+                    // Only print creation actions, not updates
+                    println!("✓ {}", action.description);
+                }
+            }
 
-        println!("●  Next steps:");
-        println!("  → wai new project \"my-app\"    Create your first project");
-        println!("  → wai status                   Check project status");
-        println!("  → wai way                      See workflow conventions and available skills");
-        if !detected.is_empty() {
-            println!("  → wai plugin list              View detected plugins");
-        }
+            if !detected.is_empty() {
+                println!("✓ Detected plugins: {}", detected.join(", "));
+            }
 
-        println!("└  Workspace '{}' initialized!", project_name);
+            println!("●  Next steps:");
+            println!("  → wai new project \"my-app\"    Create your first project");
+            println!("  → wai status                   Check project status");
+            println!("  → wai way                      See workflow conventions and available skills");
+            if !detected.is_empty() {
+                println!("  → wai plugin list              View detected plugins");
+            }
+
+            println!("└  Workspace '{}' initialized!", project_name);
+        }
     }
     Ok(())
 }

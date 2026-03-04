@@ -17,6 +17,14 @@ pub struct WelcomePayload {
 }
 
 #[derive(Debug, Serialize)]
+pub struct InitPayload {
+    pub project_name: String,
+    pub already_initialized: bool,
+    pub detected_plugins: Vec<String>,
+    pub suggestions: Vec<Suggestion>,
+}
+
+#[derive(Debug, Serialize)]
 pub struct StatusPlugin {
     pub name: String,
     pub status: String,
