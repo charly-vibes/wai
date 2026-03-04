@@ -76,6 +76,7 @@
 {"created_at":"2026-02-19T16:26:07Z","created_by":"charly vibes","depends_on_id":"wai-daa","issue_id":"wai-7gk","type":"blocks"}
 {"created_at":"2026-02-19T23:36:14Z","created_by":"charly vibes","depends_on_id":"wai-1yz","issue_id":"wai-7j7","type":"blocks"}
 {"created_at":"2026-02-19T23:36:11Z","created_by":"charly vibes","depends_on_id":"wai-t4r","issue_id":"wai-7jm","type":"blocks"}
+{"created_at":"2026-03-04T15:02:42Z","created_by":"charly vibes","depends_on_id":"wai-c2ey","issue_id":"wai-7o54","type":"blocks"}
 {"created_at":"2026-02-24T16:55:15Z","created_by":"charly vibes","depends_on_id":"wai-8426","issue_id":"wai-7skm","type":"blocks"}
 {"created_at":"2026-02-24T16:55:15Z","created_by":"charly vibes","depends_on_id":"wai-endi","issue_id":"wai-7skm","type":"blocks"}
 {"created_at":"2026-03-03T12:18:13Z","created_by":"charly vibes","depends_on_id":"wai-kiyu","issue_id":"wai-7sm3","type":"blocks"}
@@ -141,6 +142,7 @@
 {"created_at":"2026-02-28T23:50:38Z","created_by":"charly vibes","depends_on_id":"wai-s2lx","issue_id":"wai-bvc9","type":"relates-to"}
 {"created_at":"2026-02-28T23:32:18Z","created_by":"charly vibes","depends_on_id":"wai-zd97","issue_id":"wai-bvc9","type":"blocks"}
 {"created_at":"2026-03-02T16:11:20Z","created_by":"charly vibes","depends_on_id":"wai-49ni","issue_id":"wai-bx24","type":"blocks"}
+{"created_at":"2026-03-04T13:27:15Z","created_by":"charly vibes","depends_on_id":"wai-aian","issue_id":"wai-c2ey","type":"blocks"}
 {"created_at":"2026-02-19T23:36:15Z","created_by":"charly vibes","depends_on_id":"wai-pls","issue_id":"wai-c55","type":"blocks"}
 {"created_at":"2026-02-19T16:26:04Z","created_by":"charly vibes","depends_on_id":"wai-7jc","issue_id":"wai-c6d","type":"blocks"}
 {"created_at":"2026-02-25T16:03:36Z","created_by":"charly vibes","depends_on_id":"wai-3h06","issue_id":"wai-c76v","type":"blocks"}
@@ -189,6 +191,7 @@
 {"created_at":"2026-02-19T16:26:06Z","created_by":"charly vibes","depends_on_id":"wai-daa","issue_id":"wai-gkx","type":"blocks"}
 {"created_at":"2026-03-03T12:18:11Z","created_by":"charly vibes","depends_on_id":"wai-chxf","issue_id":"wai-glaj","type":"blocks"}
 {"created_at":"2026-02-24T16:52:05Z","created_by":"charly vibes","depends_on_id":"wai-46r","issue_id":"wai-go77","type":"blocks"}
+{"created_at":"2026-03-04T13:27:15Z","created_by":"charly vibes","depends_on_id":"wai-aian","issue_id":"wai-gqdr","type":"blocks"}
 {"created_at":"2026-02-19T14:10:38Z","created_by":"charly vibes","depends_on_id":"wai-rvz","issue_id":"wai-gvw","type":"blocks"}
 {"created_at":"2026-03-02T16:11:28Z","created_by":"charly vibes","depends_on_id":"wai-6xfk","issue_id":"wai-h1vf","type":"blocks"}
 {"created_at":"2026-03-02T16:11:27Z","created_by":"charly vibes","depends_on_id":"wai-xi2h","issue_id":"wai-h1vf","type":"blocks"}
