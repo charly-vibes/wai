@@ -130,6 +130,7 @@ wai status                    # Project status and next steps
 wai add research "notes"      # Add research artifact
 wai add plan "plan"           # Add plan artifact
 wai add design "design"       # Add design artifact
+wai add skill <name>          # Scaffold a new agent skill
 wai search "query"            # Search across artifacts
 wai search --tag <tag>        # Filter by tag (repeatable)
 wai search --latest           # Most recent match only
@@ -184,6 +185,11 @@ context before starting research or creating tickets.
 > **Before research or ticket creation**: always run `wai search "<topic>"` to
 > check for known patterns. Do not rediscover what is already documented.
 <!-- WAI:REFLECT:REF:END -->
+
+
+
+
+
 
 
 
