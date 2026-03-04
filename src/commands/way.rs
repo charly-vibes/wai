@@ -248,7 +248,7 @@ fn check_task_runner(repo_root: &Path) -> CheckResult {
 fn parse_justfile_recipes(justfile_path: &Path) -> Vec<String> {
     let known_recipes = [
         "install", "serve", "dev", "test", "lint", "fmt", "format", "release", "build", "run",
-        "clean", "check", "watch",
+        "clean", "check", "watch", "docs",
     ];
 
     let content = match std::fs::read_to_string(justfile_path) {
@@ -514,14 +514,33 @@ fn check_editorconfig(repo_root: &Path) -> CheckResult {
     }
 }
 
+fn detect_doc_tool(repo_root: &Path) -> Option<String> {
+    if repo_root.join("Cargo.toml").exists() {
+        return Some("cargo doc".to_string());
+    }
+    if repo_root.join("mkdocs.yml").exists() || repo_root.join("mkdocs.yaml").exists() {
+        return Some("mkdocs".to_string());
+    }
+    if repo_root.join("docs").join("conf.py").exists() {
+        return Some("sphinx".to_string());
+    }
+    if repo_root.join("typedoc.json").exists() || repo_root.join(".typedoc.json").exists() {
+        return Some("typedoc".to_string());
+    }
+    if repo_root.join("go.mod").exists() {
+        return Some("godoc".to_string());
+    }
+    None
+}
+
 fn check_documentation(repo_root: &Path) -> CheckResult {
     let name = "Project documentation";
     let intent = Some(
-        "Provide essential project identity, onboarding, and legal/contribution guidance."
+        "Provide essential project identity, onboarding, and a discoverable docs/ folder with generated API docs."
             .to_string(),
     );
     let success_criteria = Some(
-        "Essential files (README, .gitignore, LICENSE) provide project context and rules."
+        "README, .gitignore, a docs/ folder with content, a language doc tool, and a 'just docs' recipe are all present."
             .to_string(),
     );
 
@@ -530,59 +549,92 @@ fn check_documentation(repo_root: &Path) -> CheckResult {
     let contributing = repo_root.join("CONTRIBUTING.md").exists();
     let gitignore = repo_root.join(".gitignore").exists();
 
-    let count = [readme, license, contributing, gitignore]
-        .iter()
-        .filter(|&&x| x)
-        .count();
+    // docs/ folder with at least one file
+    let docs_dir = repo_root.join("docs");
+    let has_docs_folder = docs_dir.is_dir()
+        && std::fs::read_dir(&docs_dir)
+            .map(|mut d| d.next().is_some())
+            .unwrap_or(false);
 
-    match count {
-        4 => CheckResult {
+    // Language-specific doc tool
+    let doc_tool = detect_doc_tool(repo_root);
+
+    // just docs recipe
+    let justfile = repo_root.join("justfile");
+    let has_just_docs = if justfile.exists() {
+        parse_justfile_recipes(&justfile).contains(&"docs".to_string())
+    } else {
+        false
+    };
+
+    // Collect missing critical files
+    let mut missing_critical: Vec<&str> = Vec::new();
+    if !readme {
+        missing_critical.push("README.md");
+    }
+    if !gitignore {
+        missing_critical.push(".gitignore");
+    }
+
+    // Collect improvement suggestions
+    let mut suggestions: Vec<String> = Vec::new();
+    if !license {
+        suggestions.push("LICENSE".to_string());
+    }
+    if !contributing {
+        suggestions.push("CONTRIBUTING.md".to_string());
+    }
+    if !has_docs_folder {
+        suggestions.push("docs/ folder with content".to_string());
+    }
+    if doc_tool.is_none() {
+        suggestions.push(
+            "language doc tool (e.g. cargo doc, mkdocs, sphinx, typedoc, godoc)".to_string(),
+        );
+    }
+    if justfile.exists() && !has_just_docs {
+        suggestions.push("just docs recipe".to_string());
+    }
+
+    if !missing_critical.is_empty() {
+        return CheckResult {
+            name: name.to_string(),
+            status: Status::Info,
+            message: format!("Missing critical files: {}", missing_critical.join(", ")),
+            intent,
+            success_criteria,
+            suggestion: Some(format!(
+                "Add: {}{}",
+                missing_critical.join(", "),
+                if suggestions.is_empty() {
+                    String::new()
+                } else {
+                    format!("; also consider: {}", suggestions.join(", "))
+                }
+            )),
+        };
+    }
+
+    if suggestions.is_empty() {
+        CheckResult {
             name: name.to_string(),
             status: Status::Pass,
-            message: "Complete".to_string(),
+            message: format!(
+                "Complete (doc tool: {})",
+                doc_tool.as_deref().unwrap_or("detected")
+            ),
             intent,
             success_criteria,
             suggestion: None,
-        },
-        0 => CheckResult {
+        }
+    } else {
+        CheckResult {
             name: name.to_string(),
-            status: Status::Info,
-            message: "Not configured".to_string(),
+            status: Status::Pass,
+            message: "Essential files present".to_string(),
             intent,
             success_criteria,
-            suggestion: Some(
-                "Add README.md and .gitignore at minimum, plus LICENSE and CONTRIBUTING.md"
-                    .to_string(),
-            ),
-        },
-        _ => {
-            // Check if critical files are missing
-            if !readme || !gitignore {
-                let mut missing = Vec::new();
-                if !readme {
-                    missing.push("README.md");
-                }
-                if !gitignore {
-                    missing.push(".gitignore");
-                }
-                CheckResult {
-                    name: name.to_string(),
-                    status: Status::Info,
-                    message: format!("⚠️  Missing critical files: {}", missing.join(", ")),
-                    intent,
-                    success_criteria,
-                    suggestion: Some("Add missing critical documentation files".to_string()),
-                }
-            } else {
-                CheckResult {
-                    name: name.to_string(),
-                    status: Status::Pass,
-                    message: format!("Partial documentation ({}/4 files)", count),
-                    intent,
-                    success_criteria,
-                    suggestion: Some("Consider adding LICENSE and CONTRIBUTING.md".to_string()),
-                }
-            }
+            suggestion: Some(format!("Consider adding: {}", suggestions.join(", "))),
         }
     }
 }

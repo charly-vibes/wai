@@ -67,6 +67,10 @@ pub fn run(name: Option<String>) -> Result<()> {
                             command: "wai status".to_string(),
                         },
                         crate::json::Suggestion {
+                            label: "Check workspace health".to_string(),
+                            command: "wai doctor".to_string(),
+                        },
+                        crate::json::Suggestion {
                             label: "See workflow conventions and available skills".to_string(),
                             command: "wai way".to_string(),
                         },
@@ -170,6 +174,10 @@ pub fn run(name: Option<String>) -> Result<()> {
                     command: "wai status".to_string(),
                 },
                 crate::json::Suggestion {
+                    label: "Check workspace health".to_string(),
+                    command: "wai doctor".to_string(),
+                },
+                crate::json::Suggestion {
                     label: "See workflow conventions and available skills".to_string(),
                     command: "wai way".to_string(),
                 },
@@ -205,6 +213,7 @@ pub fn run(name: Option<String>) -> Result<()> {
             println!("●  Next steps:");
             println!("  → wai new project \"my-app\"    Create your first project");
             println!("  → wai status                   Check project status");
+            println!("  → wai doctor                   Check workspace health");
             println!("  → wai way                      See workflow conventions and available skills");
             if !detected.is_empty() {
                 println!("  → wai plugin list              View detected plugins");

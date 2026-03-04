@@ -250,6 +250,7 @@ fn render_human(checks: &[CheckResult], summary: &Summary) -> Result<()> {
 
     println!();
     println!("  {} Workspace Health", "◆".cyan());
+    println!("  {} For repo hygiene and agent workflow conventions, run 'wai way'", "·".dimmed());
     println!();
 
     for check in checks {
