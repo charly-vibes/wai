@@ -1755,6 +1755,7 @@ mod tests {
             true,
             Some("# Patterns\ntest content from inject".to_string()),
             0,
+            false,
         );
 
         // Restore working directory before asserting, so failures don't break

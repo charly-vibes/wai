@@ -1014,7 +1014,7 @@ pub fn run(query: String, no_llm: bool, json: bool, verbose: u8) -> Result<()> {
     let project_root = require_project()?;
 
     if no_llm {
-        return super::search::run(query, None, None, false, None, Vec::new(), false, 0);
+        return super::search::run(query, None, None, false, None, Vec::new(), false, 0, false);
     }
 
     let ctx = gather_context(&project_root, &query);
@@ -1090,7 +1090,7 @@ pub fn run(query: String, no_llm: bool, json: bool, verbose: u8) -> Result<()> {
             if let Some(hint) = explicit_backend_agent_hint(&why_cfg) {
                 eprintln!("  {} {}", "→".cyan(), hint);
             }
-            return super::search::run(query, None, None, false, None, Vec::new(), false, 0);
+            return super::search::run(query, None, None, false, None, Vec::new(), false, 0, false);
         }
     };
 
@@ -1136,7 +1136,7 @@ pub fn run(query: String, no_llm: bool, json: bool, verbose: u8) -> Result<()> {
             if let Some(h) = explicit_backend_agent_hint(&why_cfg) {
                 eprintln!("  {} {}", "→".cyan(), h);
             }
-            return super::search::run(query, None, None, false, None, Vec::new(), false, 0);
+            return super::search::run(query, None, None, false, None, Vec::new(), false, 0, false);
         }
     };
     let elapsed_ms = start.elapsed().as_millis();
@@ -1171,6 +1171,7 @@ pub fn run(query: String, no_llm: bool, json: bool, verbose: u8) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
     use std::fs;
     use tempfile::TempDir;
 
@@ -1721,6 +1722,7 @@ mod tests {
     // ── explicit_backend_agent_hint (7.1) ──
 
     #[test]
+    #[serial]
     fn explicit_backend_failure_in_claude_code_suggests_agent_mode() {
         unsafe { std::env::set_var("CLAUDECODE", "1") };
         let cfg = LlmConfig {
@@ -1734,6 +1736,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn explicit_ollama_failure_in_claude_code_suggests_agent_mode() {
         unsafe { std::env::set_var("CLAUDECODE", "1") };
         let cfg = LlmConfig {
@@ -1747,6 +1750,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn auto_detect_backend_in_claude_code_no_hint() {
         unsafe { std::env::set_var("CLAUDECODE", "1") };
         let cfg = LlmConfig::default(); // llm = None → auto-detect

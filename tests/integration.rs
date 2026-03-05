@@ -2654,6 +2654,9 @@ fn way_check_documentation_complete() {
     fs::write(tmp.path().join("LICENSE"), "MIT").unwrap();
     fs::write(tmp.path().join("CONTRIBUTING.md"), "# Contributing").unwrap();
     fs::write(tmp.path().join(".gitignore"), "*.tmp").unwrap();
+    fs::write(tmp.path().join("Cargo.toml"), "[package]\nname = \"test\"").unwrap();
+    fs::create_dir(tmp.path().join("docs")).unwrap();
+    fs::write(tmp.path().join("docs").join("index.md"), "# Docs").unwrap();
 
     wai_cmd(tmp.path())
         .args(["way", "--json"])
@@ -2676,7 +2679,7 @@ fn way_check_documentation_not_configured() {
         .success()
         .stdout(
             predicate::str::contains("Project documentation")
-                .and(predicate::str::contains("Not configured"))
+                .and(predicate::str::contains("Missing critical files"))
                 .and(predicate::str::contains("\"info\"")),
         );
 }
@@ -2702,7 +2705,7 @@ fn way_check_documentation_missing_critical() {
 #[test]
 fn way_check_documentation_partial() {
     let tmp = TempDir::new().unwrap();
-    // Has critical files but missing LICENSE and CONTRIBUTING
+    // Has critical files but missing LICENSE, CONTRIBUTING, docs/, and doc tool
     fs::write(tmp.path().join("README.md"), "# Test").unwrap();
     fs::write(tmp.path().join(".gitignore"), "*.tmp").unwrap();
 
@@ -2712,7 +2715,7 @@ fn way_check_documentation_partial() {
         .success()
         .stdout(
             predicate::str::contains("Project documentation")
-                .and(predicate::str::contains("Partial documentation"))
+                .and(predicate::str::contains("Essential files present"))
                 .and(predicate::str::contains("\"pass\"")),
         );
 }
@@ -2724,6 +2727,9 @@ fn way_check_documentation_license_md_variant() {
     fs::write(tmp.path().join("LICENSE.md"), "MIT").unwrap();
     fs::write(tmp.path().join("CONTRIBUTING.md"), "# Contributing").unwrap();
     fs::write(tmp.path().join(".gitignore"), "*.tmp").unwrap();
+    fs::write(tmp.path().join("Cargo.toml"), "[package]\nname = \"test\"").unwrap();
+    fs::create_dir(tmp.path().join("docs")).unwrap();
+    fs::write(tmp.path().join("docs").join("index.md"), "# Docs").unwrap();
 
     wai_cmd(tmp.path())
         .args(["way", "--json"])
