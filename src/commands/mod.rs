@@ -234,43 +234,18 @@ fn run_external(args: Vec<String>) -> Result<()> {
 
     let cmd_names = crate::cli::wai_subcommand_names();
     let valid_commands: Vec<&str> = cmd_names.iter().map(|s| s.as_str()).collect();
-    // Valid (verb, noun) subcommand patterns for wrong-order detection
-    let valid_patterns = &[
-        ("new", "project"),
-        ("new", "area"),
-        ("new", "resource"),
-        ("add", "research"),
-        ("add", "plan"),
-        ("add", "design"),
-        ("phase", "next"),
-        ("phase", "set"),
-        ("phase", "back"),
-        ("phase", "show"),
-        ("handoff", "create"),
-        ("plugin", "list"),
-        ("plugin", "enable"),
-        ("plugin", "disable"),
-        ("add", "skill"),
-        ("resource", "add"),
-        ("resource", "list"),
-        ("resource", "import"),
-        ("config", "add"),
-        ("config", "list"),
-        ("config", "edit"),
-        ("pipeline", "create"),
-        ("pipeline", "run"),
-        ("pipeline", "advance"),
-        ("pipeline", "status"),
-        ("pipeline", "list"),
-        ("pipeline", "init"),
-    ];
+    let patterns_owned = crate::cli::wai_subcommand_patterns();
+    let valid_patterns: Vec<(&str, &str)> = patterns_owned
+        .iter()
+        .map(|(v, n)| (v.as_str(), n.as_str()))
+        .collect();
     let engine = SuggestionEngine::new();
 
     // Check for typos and wrong-order BEFORE requiring the workspace.
     // This ensures "Did you mean?" hints are shown even outside a workspace,
     // giving better context rather than just "NotInitialized".
     if let Some(second) = args.get(1)
-        && let Some(suggestion) = engine.suggest_order(plugin_name, second, valid_patterns)
+        && let Some(suggestion) = engine.suggest_order(plugin_name, second, &valid_patterns)
     {
         miette::bail!(
             "{}. {}",

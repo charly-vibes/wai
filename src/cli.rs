@@ -818,6 +818,23 @@ pub fn wai_subcommand_names() -> Vec<String> {
         .collect()
 }
 
+/// Derive all valid (verb, noun) subcommand patterns from the CLI struct.
+///
+/// Used by wrong-order detection in `run_external` — e.g. detects `wai research add`
+/// and suggests `wai add research`. Derived automatically so no manual update is
+/// needed when subcommands are added or renamed.
+pub fn wai_subcommand_patterns() -> Vec<(String, String)> {
+    Cli::command()
+        .get_subcommands()
+        .flat_map(|cmd| {
+            let verb = cmd.get_name().to_string();
+            cmd.get_subcommands()
+                .map(move |sub| (verb.clone(), sub.get_name().to_string()))
+                .collect::<Vec<_>>()
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -845,5 +862,31 @@ mod tests {
             !names.iter().any(|n| n == "external"),
             "external catch-all should not appear as a named command"
         );
+    }
+
+    #[test]
+    fn derived_patterns_contains_known_pairs() {
+        let patterns = wai_subcommand_patterns();
+        let expected: &[(&str, &str)] = &[
+            ("new", "project"),
+            ("new", "area"),
+            ("new", "resource"),
+            ("add", "research"),
+            ("add", "plan"),
+            ("add", "design"),
+            ("add", "skill"),
+            ("phase", "next"),
+            ("phase", "set"),
+            ("phase", "back"),
+            ("pipeline", "list"),
+            ("resource", "add"),
+            ("config", "list"),
+        ];
+        for (verb, noun) in expected {
+            assert!(
+                patterns.iter().any(|(v, n)| v == verb && n == noun),
+                "pattern ({verb:?}, {noun:?}) missing from derived patterns"
+            );
+        }
     }
 }
