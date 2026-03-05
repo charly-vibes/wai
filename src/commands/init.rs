@@ -154,6 +154,28 @@ pub fn run(name: Option<String>) -> Result<()> {
     // Create/repair all workspace artifacts using shared function
     let actions = ensure_workspace_current(&current_dir)?;
 
+    // Auto-commit .wai/ to git if inside a repo
+    let git_committed = if current_dir.join(".git").exists() {
+        let add_ok = std::process::Command::new("git")
+            .args(["add", ".wai/"])
+            .current_dir(&current_dir)
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false);
+        if add_ok {
+            std::process::Command::new("git")
+                .args(["commit", "-m", "chore: init wai workspace"])
+                .current_dir(&current_dir)
+                .output()
+                .map(|o| o.status.success())
+                .unwrap_or(false)
+        } else {
+            false
+        }
+    } else {
+        false
+    };
+
     // Auto-detect plugins for final message
     let plugins = crate::plugin::detect_plugins(&current_dir);
     let detected: Vec<&str> = plugins
@@ -204,6 +226,10 @@ pub fn run(name: Option<String>) -> Result<()> {
                     // Only print creation actions, not updates
                     println!("✓ {}", action.description);
                 }
+            }
+
+            if git_committed {
+                println!("✓ Committed .wai/ to git");
             }
 
             if !detected.is_empty() {

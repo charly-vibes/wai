@@ -5,6 +5,50 @@ All notable changes to wai will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Calendar Versioning](https://calver.org/) (YYYY.M.MICRO).
 
+## [2026.3.1] - 2026-03-05
+
+### Added
+
+#### Issue Linkage
+- **`--bead` flag** — `wai add research/plan/design --bead <id>` links an artifact to a beads issue ID via YAML frontmatter
+
+#### Init
+- **Git auto-commit** — `wai init` automatically stages and commits `.wai/` when inside a git repo (best-effort; silent on failure)
+
+#### Pipeline Refactor
+- **`wai pipeline init <name>`** — scaffold a new TOML pipeline definition
+- **`wai pipeline start <name> --topic=<slug>`** — start a run; writes run ID to `.wai/.pipeline-run` so `wai add` picks it up without `WAI_PIPELINE_RUN`
+- **`wai pipeline next`** — advance to the next step in the active run
+- **`wai pipeline current`** — show the current step of the active run
+- **`wai pipeline suggest "<query>"`** — get a skill suggestion for a topic
+- Removed deprecated `pipeline create/run/advance` commands
+
+#### Beads Memories Integration
+- `wai reflect --save-memories` — extract top-level bullets and persist each as a bd memory
+- `bd memories` context surfaced in `wai status`, `wai prime`, and `wai handoff`
+
+#### Workspace
+- Plugin definitions migrated from YAML to TOML (`.wai/plugins/*.toml`)
+- `valid_patterns` derived from the CLI struct — no manual maintenance required
+
+### Fixed
+- `wai close` and `wai reflect` are now idempotent
+- `wai move` falls back to copy+delete on cross-device rename
+- `wai add` uses `create_dir_all` before writing artifacts
+- `wai way` prek hook detection handles `core.hooksPath` and tool conflicts
+- Non-TTY multi-project resolve now errors cleanly
+- `wai doctor` suppresses projection warnings when projections are deliberately empty
+- `tool_commit` in config only updated during `wai init`, not every invocation
+- Error messages no longer have whimsical prefixes
+- `wai ls` adds timeout, progress indicator, and parallel call cap
+- `wai reflect` handles AgentBackend sentinel correctly
+
+### Documentation
+- Pipeline section updated to reflect new `init/start/next/current/suggest` API
+- `--bead` flag documented on all `wai add` subcommands
+
+---
+
 ## [2026.2.1] - 2026-02-25
 
 ### Added
