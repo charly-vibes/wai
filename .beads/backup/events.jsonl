@@ -420,3 +420,5 @@
 {"actor":"charly vibes","comment":null,"created_at":"2026-03-05T12:00:46Z","event_type":"created","id":420,"issue_id":"wai-yrr","new_value":"","old_value":""}
 {"actor":"charly vibes","comment":null,"created_at":"2026-03-05T12:00:46Z","event_type":"created","id":421,"issue_id":"wai-5s8","new_value":"","old_value":""}
 {"actor":"charly vibes","comment":null,"created_at":"2026-03-05T12:00:46Z","event_type":"created","id":422,"issue_id":"wai-g9ti","new_value":"","old_value":""}
+{"actor":"charly vibes","comment":null,"created_at":"2026-03-05T15:02:39Z","event_type":"closed","id":423,"issue_id":"wai-3t1x","new_value":"Already implemented in src/commands/reflect.rs and src/commands/why.rs respectively","old_value":""}
+{"actor":"charly vibes","comment":null,"created_at":"2026-03-05T15:02:39Z","event_type":"closed","id":424,"issue_id":"wai-8ooh","new_value":"Already implemented in src/commands/reflect.rs and src/commands/why.rs respectively","old_value":""}
