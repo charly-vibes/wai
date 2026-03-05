@@ -2,7 +2,7 @@
 
 This epic documents the identified friction points, "roughness," and desired paths for the `wai` tool. As an "annoying" LLM reviewer, I have scrutinized the codebase for inconsistencies, unintuitive behaviors, and workflow dead-ends.
 
-_Written: 2026-02-25. Status tags updated: 2026-03-04._
+_Written: 2026-02-25. Status tags updated: 2026-03-05._
 
 ---
 
@@ -23,17 +23,14 @@ _Written: 2026-02-25. Status tags updated: 2026-03-04._
 - **Decision (2026-03-04):** A unified `wai check` entry point was designed and proposed, then deliberately rejected. The domains are genuinely distinct and a third entry point would worsen discovery. The help text cross-references (73286cd) are sufficient. No further action.
 
 ### 1.2 Subcommand Verbosity & Nesting
-- **Status: OPEN**
+- **Status: RESOLVED**
 - **Friction:** Commands like `wai resource add skill` are four levels deep.
-- **Inconsistency:** `wai new resource` exists but is for PARA items, while `wai resource add skill` is for agent-ready skills. This distinction is confusing.
-- **Desired Path:** Flatten the hierarchy. `wai add skill` or `wai skill new` would be more direct.
+- **What changed:** `wai add skill` is now the primary entry point under `AddCommands::Skill`. `wai resource add skill` still routes to the same implementation but emits a deprecation warning directing users to `wai add skill`.
 
 ### 1.3 Command Flag Inconsistencies
-- **Status: OPEN**
-- **Friction:**
-    - `wai add research` has a short flag `-p` for `--project`.
-    - `wai add plan` and `wai add design` only have a long `--project` flag.
-- **Desired Path:** Standardize flags across all `add` subcommands.
+- **Status: RESOLVED**
+- **Friction:** `wai add research` had `-p` for `--project`; plan and design lacked the short flag.
+- **What changed:** All three `AddCommands` variants (Research, Plan, Design) now use `#[arg(short, long)]` for `project`, giving `-p` consistently across all subcommands.
 
 ### 1.4 LLM Configuration Fragmentation
 - **Status: RESOLVED**
@@ -64,9 +61,10 @@ _Written: 2026-02-25. Status tags updated: 2026-03-04._
 ## 3. Implementation Technical Debt
 
 ### 3.1 Hardcoded Validation in `mod.rs`
-- **Status: OPEN**
-- **Friction:** `src/commands/mod.rs:229` contains a hardcoded `valid_commands` list and `valid_patterns` list for typo/order detection. Must be updated manually when commands are added.
-- **Desired Path:** Derive dynamically from the `Cli` struct or a command registry.
+- **Status: PARTIALLY RESOLVED**
+- **Friction:** `src/commands/mod.rs` contained a hardcoded `valid_commands` list and `valid_patterns` list for typo/order detection.
+- **What changed:** `valid_commands` is now dynamically derived via `wai_subcommand_names()` (uses `Cli::command().get_subcommands()`). A test in `cli.rs` verifies the derived list contains all expected commands.
+- **Remaining:** `valid_patterns` (the (verb, noun) pair list for wrong-order detection) is still hardcoded in `run_external`. Must be updated manually when multi-word subcommands are added. Tracked in beads: wai-st9q.
 
 ### 3.2 Side-Effects in "Show" Functions
 - **Status: RESOLVED**
@@ -83,24 +81,22 @@ _Written: 2026-02-25. Status tags updated: 2026-03-04._
 
 ## 4. Agent-Aware Mode
 
-- **Status: OPEN**
-- **Discovery:** WIP in `openspec/changes/` points toward agent-aware mode.
-- **Friction:** When running inside Claude Code, `wai why`/`wai reflect` should not spawn a second LLM subprocess.
-- **Note:** `add-claude-code-projection` (11/11, complete) addresses skill file projection to Claude Code format — a related but distinct concern. The runtime detection problem (suppress LLM calls when parent is an agent) is not yet addressed.
-- **Desired Path:** Detect parent agent (e.g., via `CLAUDE_CODE` env var or similar) and output raw context for the agent to synthesize rather than calling the LLM directly.
+- **Status: RESOLVED**
+- **Friction:** When running inside Claude Code, `wai why`/`wai reflect` would spawn a second LLM subprocess — burning tokens and latency.
+- **What changed:** `src/llm.rs` implements `in_agent_session()` which detects `CLAUDECODE`, `WAI_AGENT`, and `CURSOR_AGENT` env vars. The auto-detect path in `detect_backend()` returns `AgentBackend` when in an agent session. `AgentBackend` outputs context via `AGENT_SENTINEL` for the parent agent to synthesize — no subprocess spawned. Both `wai why` and `wai reflect` are wired through this path.
 
 ---
 
 ## Top 5 Friction Points by Impact
 
-Priority order for design/plan phase work:
+_Updated 2026-03-05: §1.2, §1.3, §4, and the worktree design are all RESOLVED. Only §3.1 (valid_patterns hardcoded) remains open._
 
-1. **§1.2 Subcommand verbosity** — `wai resource add skill` is the most common agent task and four levels deep. High daily friction. Low implementation risk (CLI refactor).
+1. ~~**§1.2 Subcommand verbosity**~~ — **RESOLVED**: `wai add skill` is now the primary path; `wai resource add skill` deprecated.
 
-2. **§4 Agent-aware mode** — When wai spawns an LLM inside Claude Code, it burns tokens and latency for every `wai why` call. Compounds with usage frequency.
+2. ~~**§4 Agent-aware mode**~~ — **RESOLVED**: `in_agent_session()` detects Claude Code / Cursor / WAI_AGENT; AgentBackend used automatically.
 
-3. **§1.1 `wai way` vs `wai doctor`** — Partial fix exists but the UX split still confuses new users. Medium effort to unify under a single entry point.
+3. **§1.1 `wai way` vs `wai doctor`** — RESOLVED (cross-references added; `wai check` unification deliberately rejected).
 
-4. **§3.1 Hardcoded `valid_commands`** — Silent maintenance trap. Every new command risks outdated typo suggestions until someone notices. Low effort to fix with a derive macro or registry.
+4. **§3.1 Hardcoded `valid_patterns`** — PARTIALLY RESOLVED. `valid_commands` is now dynamic; `valid_patterns` (verb/noun pairs) still hardcoded. Tracked: wai-st9q (P4 backlog).
 
-5. **§1.3 Flag inconsistencies** — Minor daily friction but easy to fix; `-p` standardization across all `add` subcommands is a few-line change.
+5. ~~**§1.3 Flag inconsistencies**~~ — **RESOLVED**: `-p` now consistent across research/plan/design.

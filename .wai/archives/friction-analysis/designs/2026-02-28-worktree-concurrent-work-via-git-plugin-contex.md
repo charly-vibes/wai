@@ -1,5 +1,7 @@
 Worktree concurrent work via git plugin
 
+**Status: RESOLVED (2026-03-05)** — `wai sync --from-main` implemented in `src/commands/sync.rs`. `detect_main_worktree_root()` in `src/plugin/`. Integrated into `wai prime` (suggests sync when in worktree) and `wai close` (adds sync step to checklist). PARA-guided sharing model implemented: areas/ and resources/ sync, projects/ isolated per-branch.
+
 ## Context
 Research on how to handle git worktrees for concurrent work, framed as a git plugin capability (parallel to how beads uses --from-main).
 
