@@ -10,14 +10,22 @@ It organizes artifacts using the PARA method (Projects, Areas, Resources, Archiv
 
 `wai` bridges the gap between your thoughts and your codebase:
 
-1. **Capture:** Record research, designs, and decisions as you work.
-2. **Context:** Advance projects through defined phases (Research → Design → Plan → Implement).
-3. **Sync:** Keep AI instructions (`CLAUDE.md`, `.cursorrules`) automatically in sync with your latest project state.
-4. **Handoff:** Generate high-context session summaries for yourself or other agents.
+- **🧠 Capture** — Record research, designs, and decisions as you work.
+- **🗺️ Context** — Advance projects through phases (Research → Design → Plan → Implement).
+- **🔄 Sync** — Keep AI instructions (`CLAUDE.md`, `.cursorrules`) automatically in sync.
+- **📦 Handoff** — Generate high-context session summaries for yourself or other agents.
+
+## Key Capabilities
+
+- **PARA Method Storage**: Logical organization into Projects, Areas, Resources, and Archives.
+- **Phase Tracking**: Structured workflow from initial research to final archive.
+- **Sync Engine**: Single source of truth for agent configurations across multiple tools.
+- **Plugin System**: Seamless integration with `git`, `beads`, `openspec`, and more.
+- **Reasoning Oracle**: Ask natural language "why" questions about your codebase.
 
 ## Design Principles
 
-- **Desire Path Alignment** — Pave the cowpaths, make common workflows shortest
-- **Self-Healing Errors** — Errors suggest fixes, not just report problems
-- **Progressive Disclosure** — Simple by default, powerful when needed
-- **Context-Aware** — Offer next steps based on current state
+- **🛣️ Desire Path Alignment** — Pave the cowpaths; make common workflows shortest.
+- **🩹 Self-Healing Errors** — Errors suggest fixes, not just report problems.
+- **🌊 Progressive Disclosure** — Simple by default, powerful when needed.
+- **💡 Context-Aware** — Offer smart next steps based on your current project state.

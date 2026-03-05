@@ -58,39 +58,46 @@ Plugins can inject context into wai workflows through hooks:
 
 ## Custom Plugins
 
-Create custom plugins by adding YAML files to `.wai/plugins/`:
+Wai scans the `.wai/plugins/` directory at your workspace root for any files with a `.toml` extension.
 
 ### Example Plugin Definition
 
-```yaml
-name: my-tool
-description: Custom tool integration
-detector:
-  type: directory
-  path: .mytool
-commands:
-  - name: list
-    description: List items
-    command: mytool list
-    read_only: true
-  - name: sync
-    description: Sync data
-    command: mytool sync
-    read_only: false
-hooks:
-  - type: on_status
-    command: mytool stats
-    inject_as: mytool_stats
-  - type: on_handoff_generate
-    command: mytool status --format=summary
-    inject_as: mytool_context
+```toml
+name = "my-tool"
+description = "Custom tool integration"
+
+[detector]
+type = "directory"
+path = ".mytool"   # Relative to workspace root
+
+[[commands]]
+name = "list"
+description = "List items"
+passthrough = "mytool list"
+read_only = true
+
+[[commands]]
+name = "sync"
+description = "Sync data"
+passthrough = "mytool sync"
+read_only = false
+
+[hooks.on_status]
+command = "mytool stats"
+inject_as = "mytool_stats"
+
+[hooks.on_handoff_generate]
+command = "mytool status --format=summary"
+inject_as = "mytool_context"
 ```
 
 ### Detector Types
 
-- **directory** — Detect by directory presence
-- **file** — Detect by file presence
-- **command** — Detect by command availability
+- **directory** — Detect by directory presence. The `path` attribute is relative to the workspace root.
+- **file** — Detect by file presence. The `path` attribute is relative to the workspace root.
+- **command** — Detect by command availability. The `path` (or `command`) attribute is the shell command to execute (must return exit code 0).
+
+> **Note:** For the `command` detector in TOML, use the `path` field to specify the command to run (e.g. `path = "mytool --version"`).
 
 ### Command Attributes
 
@@ -179,13 +186,12 @@ wai my-tool sync --safe       # Blocked if not read_only
    cargo install beads
    ```
 
-3. **Custom plugin YAML syntax error**
+3. **Custom plugin TOML syntax error**
    ```bash
-   # Validate YAML
-   cat .wai/plugins/my-plugin.yml
+   # Validate TOML
+   cat .wai/plugins/my-plugin.toml
 
    # Check for common issues:
-   # - Incorrect indentation
    # - Missing required fields (name, description, detector)
    # - Wrong detector type (must be: directory, file, or command)
    ```
@@ -205,7 +211,7 @@ mytool command args
 # 3. Check command definition
 wai plugin list --json | jq '.plugins[] | select(.name=="myplugin") | .commands'
 
-# 4. Verify command is in PATH
+# 4. Verify passthrough is in PATH
 which mytool
 
 # 5. Check for command output issues
@@ -217,32 +223,36 @@ mytool command 2>&1 | head
 **Symptom:** Custom plugin in `.wai/plugins/` doesn't appear
 
 **Checklist:**
-- ✅ File has `.yml` or `.yaml` extension
+- ✅ File has `.toml` extension
 - ✅ File is in `.wai/plugins/` directory
-- ✅ YAML syntax is valid
+- ✅ TOML syntax is valid
 - ✅ Required fields present: `name`, `description`, `detector`
 - ✅ Detector path exists (for directory/file detectors)
 
 **Example Valid Plugin:**
-```yaml
-name: example-tool
-description: Example tool integration
-detector:
-  type: directory
-  path: .example
-commands:
-  - name: status
-    description: Show status
-    command: example status
-    read_only: true
-  - name: sync
-    description: Sync data
-    command: example sync
-    read_only: false
-hooks:
-  - type: on_status
-    command: example stats
-    inject_as: example_stats
+```toml
+name = "example-tool"
+description = "Example tool integration"
+
+[detector]
+type = "directory"
+path = ".example"
+
+[[commands]]
+name = "status"
+description = "Show status"
+passthrough = "example status"
+read_only = true
+
+[[commands]]
+name = "sync"
+description = "Sync data"
+passthrough = "example sync"
+read_only = false
+
+[hooks.on_status]
+command = "example stats"
+inject_as = "example_stats"
 ```
 
 ### Hook Output Not Showing
@@ -290,26 +300,26 @@ wai plugin list --json | jq '.plugins[] | select(.name=="myplugin") | .commands[
 **Detector Types and Requirements:**
 
 **Directory Detector:**
-```yaml
-detector:
-  type: directory
-  path: .mytool  # Directory must exist at workspace root
+```toml
+[detector]
+type = "directory"
+path = ".mytool"  # Directory must exist at workspace root
 ```
 Check: `ls -la .mytool/`
 
 **File Detector:**
-```yaml
-detector:
-  type: file
-  path: mytool.config  # File must exist at workspace root
+```toml
+[detector]
+type = "file"
+path = "mytool.config"  # File must exist at workspace root
 ```
 Check: `ls -la mytool.config`
 
 **Command Detector:**
-```yaml
-detector:
-  type: command
-  command: mytool --version  # Command must exit 0 and be in PATH
+```toml
+[detector]
+type = "command"
+path = "mytool --version"  # Command must exit 0 and be in PATH
 ```
 Check: `which mytool && mytool --version`
 

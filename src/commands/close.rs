@@ -14,8 +14,7 @@ pub fn run(project: Option<String>, remember: bool) -> Result<()> {
     let project_root = require_project()?;
     require_safe_mode("create handoff")?;
 
-    let project_name =
-        resolve_project_named(&project_root, project, "wai close --project <name>")?;
+    let project_name = resolve_project_named(&project_root, project, "wai close --project <name>")?;
 
     let handoff_path = create_handoff(&project_root, &project_name)?;
 
@@ -70,7 +69,10 @@ pub fn run(project: Option<String>, remember: bool) -> Result<()> {
         let in_worktree = detect_main_worktree_root(&project_root).is_some();
 
         let next_steps = if beads_detected && in_worktree {
-            format!("wai sync --from-main && bd sync --from-main && {}", git_add_part)
+            format!(
+                "wai sync --from-main && bd sync --from-main && {}",
+                git_add_part
+            )
         } else if beads_detected {
             format!("bd sync --from-main && {}", git_add_part)
         } else if in_worktree {

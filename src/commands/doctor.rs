@@ -250,7 +250,10 @@ fn render_human(checks: &[CheckResult], summary: &Summary) -> Result<()> {
 
     println!();
     println!("  {} Workspace Health", "◆".cyan());
-    println!("  {} For repo hygiene and agent workflow conventions, run 'wai way'", "·".dimmed());
+    println!(
+        "  {} For repo hygiene and agent workflow conventions, run 'wai way'",
+        "·".dimmed()
+    );
     println!();
 
     for check in checks {
@@ -1575,9 +1578,9 @@ fn check_agent_instructions(project_root: &Path) -> Vec<CheckResult> {
     let mut results = Vec::new();
 
     let skill_names = detect_installed_skill_names(project_root);
-    let has_ro5_skill = skill_names.iter().any(|s| {
-        s == "ro5" || s == "rule-of-5" || s == "rule-of-5-universal"
-    });
+    let has_ro5_skill = skill_names
+        .iter()
+        .any(|s| s == "ro5" || s == "rule-of-5" || s == "rule-of-5-universal");
 
     // Check AGENTS.md
     let agents_md = project_root.join("AGENTS.md");
@@ -1597,8 +1600,7 @@ fn check_agent_instructions(project_root: &Path) -> Vec<CheckResult> {
                     .map(|p| p.def.name.as_str())
                     .collect();
                 let skill_names = detect_installed_skill_names(project_root);
-                let skill_name_refs: Vec<&str> =
-                    skill_names.iter().map(|s| s.as_str()).collect();
+                let skill_name_refs: Vec<&str> = skill_names.iter().map(|s| s.as_str()).collect();
                 inject_managed_block(&agents_md, &plugin_names, &skill_name_refs)
                     .into_diagnostic()?;
                 Ok(())
@@ -1656,8 +1658,7 @@ fn check_agent_instructions(project_root: &Path) -> Vec<CheckResult> {
                     .map(|p| p.def.name.as_str())
                     .collect();
                 let skill_names = detect_installed_skill_names(project_root);
-                let skill_name_refs: Vec<&str> =
-                    skill_names.iter().map(|s| s.as_str()).collect();
+                let skill_name_refs: Vec<&str> = skill_names.iter().map(|s| s.as_str()).collect();
                 inject_managed_block(&agents_md, &plugin_names, &skill_name_refs)
                     .into_diagnostic()?;
                 Ok(())
@@ -1683,8 +1684,7 @@ fn check_agent_instructions(project_root: &Path) -> Vec<CheckResult> {
                     .map(|p| p.def.name.as_str())
                     .collect();
                 let skill_names = detect_installed_skill_names(project_root);
-                let skill_name_refs: Vec<&str> =
-                    skill_names.iter().map(|s| s.as_str()).collect();
+                let skill_name_refs: Vec<&str> = skill_names.iter().map(|s| s.as_str()).collect();
                 inject_managed_block(&claude_md, &plugin_names, &skill_name_refs)
                     .into_diagnostic()?;
                 Ok(())
@@ -1742,8 +1742,7 @@ fn check_agent_instructions(project_root: &Path) -> Vec<CheckResult> {
                     .map(|p| p.def.name.as_str())
                     .collect();
                 let skill_names = detect_installed_skill_names(project_root);
-                let skill_name_refs: Vec<&str> =
-                    skill_names.iter().map(|s| s.as_str()).collect();
+                let skill_name_refs: Vec<&str> = skill_names.iter().map(|s| s.as_str()).collect();
                 inject_managed_block(&claude_md, &plugin_names, &skill_name_refs)
                     .into_diagnostic()?;
                 Ok(())

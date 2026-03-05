@@ -19,48 +19,20 @@ Available for all commands:
 | `--yes` | Auto-confirm actions with defaults |
 | `--safe` | Run in read-only safe mode |
 
-## Initialization
+---
+
+## Workspace & Initialization
+
+Commands for managing the wai workspace and checking repo hygiene.
 
 | Command | Description |
 |---------|-------------|
 | `wai init [--name <name>]` | Initialize wai in current directory |
 | `wai tutorial` | Run interactive quickstart tutorial |
-
-## Creating Items
-
-| Command | Description |
-|---------|-------------|
-| `wai new project <name> [--template <tpl>]` | Create a new project |
-| `wai new area <name>` | Create a new area |
-| `wai new resource <name>` | Create a new resource |
-
-## Adding Artifacts
-
-| Command | Description |
-|---------|-------------|
-| `wai add research <content>` | Add research notes to current project |
-| `wai add research --file <path>` | Import research from file |
-| `wai add research --tags <tags>` | Add tagged research notes |
-| `wai add research --bead <id>` | Link artifact to a beads issue ID |
-| `wai add research --project <name>` | Add to specific project |
-| `wai add plan <content>` | Add a plan document |
-| `wai add plan --file <path>` | Import plan from file |
-| `wai add plan --tags <tags>` | Add tagged plan document |
-| `wai add plan --bead <id>` | Link artifact to a beads issue ID |
-| `wai add design <content>` | Add a design document |
-| `wai add design --file <path>` | Import design from file |
-| `wai add design --tags <tags>` | Add tagged design document |
-| `wai add design --bead <id>` | Link artifact to a beads issue ID |
-
-## Diagnostics
-
-| Command | Description |
-|---------|-------------|
-| `wai doctor` | Diagnose **wai workspace** health (requires initialization) |
-| `wai doctor --fix` | Auto-repair detected workspace issues |
-| `wai way` | Check **repository best practices** for AI development |
-| `wai way --fix <CHECK>` | Scaffold missing items for a check (e.g. `skills`) |
-| `wai way --json` | Output best practices check as JSON |
+| `wai ls [--root <dir>] [--depth <n>] [--timeout <sec>]` | List all wai workspaces under a root directory |
+| `wai doctor [--fix]` | Diagnose and repair **wai workspace** health |
+| `wai way [--fix <CHECK>]` | Check and scaffold **repository best practices** |
+| `wai import <path>` | Import existing tool configs (.claude/, .cursorrules) |
 
 ### Choosing the Right Tool
 
@@ -69,180 +41,120 @@ Available for all commands:
 
 ---
 
-## Agent Configuration
+## Projects & Artifacts
 
-> **⚠️ WARNING:** `wai sync` is **destructive** to your target files. It will overwrite any manual changes in `.cursorrules`, `.claude/config.json`, and other tool-specific config files with the sources from your `.wai/` directory.
+Manage PARA items (Projects, Areas, Resources, Archives) and their associated artifacts.
 
-| Command | Description |
-|---------|-------------|
-| `wai sync` | **Overwrite** agent configs to tool-specific locations |
-| `wai sync --status` | **Recommended:** Check sync status without modifying |
-| `wai sync --dry-run` | Preview operations without making any changes |
-| `wai config add <type> <file>` | Add agent config (skill/rule/context) |
-| `wai config list` | List all agent config files |
-| `wai config edit <path>` | **Safe:** Edit config file in $EDITOR |
-| `wai import <path>` | Import existing tool configs (.claude/, .cursorrules) |
-
----
-
-## Viewing & Navigating
+### Items & Phases
 
 | Command | Description |
 |---------|-------------|
+| `wai new project <name>` | Create a new project (also `new area`, `new resource`) |
+| `wai move <item> <category>` | Move an item between PARA categories |
 | `wai status [--json]` | Check project status and suggest next steps |
-| `wai show` | Show overview of all PARA categories (projects, areas, resources, archives) |
-| `wai show <name>` | Show details for a specific project, area, or resource |
-| `wai ls [--root <dir>] [--depth <n>]` | List all wai workspaces under a root directory with phase and beads counts |
-| `wai move <item> <category>` | Move an item between PARA categories (projects, areas, resources, archives) |
+| `wai show [<name>]` | Show PARA overview or details for a specific item |
+| `wai phase [show\|next\|back\|set]` | Show or change the current project phase |
 
-## Searching & Timeline
+**Available phases:** `research`, `design`, `plan`, `implement`, `review`, `archive`
+
+### Adding Artifacts
+
+| Command | Description |
+|---------|-------------|
+| `wai add research <content>` | Add research notes (also `plan`, `design`) |
+| `wai add <type> --file <path>` | Import artifact from file |
+| `wai add <type> --tags <tags>` | Add tagged artifact (frontmatter-based) |
+| `wai add <type> --bead <id>` | Link artifact to a beads issue ID |
+| `wai add <type> --project <name>` | Add to specific project (instead of current) |
+
+#### Choosing an Artifact Type
+
+Wai encourages capturing the right kind of documentation at each stage:
+
+- **Research** (`wai add research`) — Use for gathering information, exploring problem spaces, and evaluating options.
+  - *Example:* "Evaluated two DB engines; chose PostgreSQL for its JSONB support."
+- **Design** (`wai add design`) — Use for making architectural decisions and defining system structure.
+  - *Example:* "Proposed microservices architecture with EventBridge for communication."
+- **Plan** (`wai add plan`) — Use for breaking down implementation into specific, actionable steps.
+  - *Example:* "Step 1: Scaffold auth service. Step 2: Implement JWT middleware."
+
+### Searching & Timeline
 
 | Command | Description |
 |---------|-------------|
 | `wai search <query>` | Search across all artifacts |
 | `wai search --type <type>` | Filter by type (research/plan/design/handoff) |
 | `wai search --in <project>` | Search within specific project |
-| `wai search --regex` | Use regex patterns |
-| `wai search -n <limit>` | Limit number of results |
-| `wai search --tag <tag>` | Filter by tag (repeatable: `--tag foo --tag bar`) |
+| `wai search --tag <tag>` | Filter by tag (repeatable) |
+| `wai search --regex` | Use regex patterns for query |
 | `wai search --latest` | Return only the most recently dated match |
 | `wai search -C <n>` | Show N lines of context around each match |
+| `wai search --include-memories` | Include `bd memories` in search results |
 | `wai timeline <project>` | View chronological project timeline |
-| `wai timeline --from <date>` | Show entries from date onward (YYYY-MM-DD) |
-| `wai timeline --to <date>` | Show entries up to date (YYYY-MM-DD) |
-| `wai timeline --reverse` | Show oldest first |
+| `wai timeline --from <date>` | Filter by date range (YYYY-MM-DD) |
 
-## Project Phases
+---
 
-| Command | Description |
-|---------|-------------|
-| `wai phase` | Show current phase with history |
-| `wai phase show` | Display current phase |
-| `wai phase next` | Advance to next phase |
-| `wai phase back` | Return to previous phase |
-| `wai phase set <phase>` | Jump to specific phase |
+## Agent Configuration
 
-Available phases: `research`, `design`, `plan`, `implement`, `review`, `archive`
-
-## Resources
+Manage how AI agents interact with your project through skills, rules, and context.
 
 | Command | Description |
 |---------|-------------|
-| `wai resource add skill <name>` | Add a skill resource |
-| `wai resource list skills [--json]` | List all skills |
-| `wai resource import skills [--from <path>]` | Import skills from directory |
+| `wai sync` | **Overwrite** agent configs to tool-specific locations |
+| `wai sync --status` | Check sync status without modifying files |
+| `wai sync --from-main` | Sync resources from main git worktree |
+| `wai config list` | List all agent config files |
+| `wai config add <type> <file>` | Add agent config (skill/rule/context) |
+| `wai config edit <path>` | **Safe:** Edit config file in $EDITOR |
+| `wai resource list skills` | List all available skills |
+| `wai resource add skill <name>` | Scaffold a new skill (also `install`, `export`) |
 
-## Session Management
+> **⚠️ WARNING:** `wai sync` is **destructive** to your target files. It will overwrite manual changes in `.cursorrules`, `.claude/config.json`, etc., with the sources from your `.wai/` directory.
 
-| Command | Description |
-|---------|-------------|
-| `wai prime [--project <name>]` | Orient at session start: phase, last handoff, suggested next step |
-| `wai close [--project <name>]` | Wrap up session: create handoff and show next steps |
-| `wai handoff create <project>` | Generate handoff document with plugin context |
+---
 
-`wai prime` detects an in-progress session (via a `.pending-resume` signal) and shows a "RESUMING" banner with the exact next steps from the previous handoff. `wai close` creates the handoff and prints the resume checklist — run it before every `/clear` or end of session.
+## AI-Driven Workflows
 
-## Plugins
+Advanced reasoning, session management, and automated pipelines.
 
-| Command | Description |
-|---------|-------------|
-| `wai plugin list` | List all plugins (built-in and custom) |
-| `wai plugin enable <name>` | Enable a plugin |
-| `wai plugin disable <name>` | Disable a plugin |
-| `wai <plugin> <command> [args...]` | Pass-through to plugin commands |
-
-### Built-in Plugins
-
-- **beads** — Commands: `list`, `show`, `ready`
-- **git** — Provides context via hooks
-- **openspec** — Integrated into status display
-
-## AI-Powered Features
-
-### Why — Reasoning Oracle
+### Reasoning & Reflection
 
 | Command | Description |
 |---------|-------------|
 | `wai why <query>` | Ask why a decision was made (LLM-powered) |
 | `wai why <file-path>` | Explain a file's history and rationale |
-| `wai why --no-llm <query>` | Force fallback to `wai search` (offline/testing) |
-| `wai why --json <query>` | Output machine-readable JSON |
+| `wai reflect` | Synthesize session context into a resource file |
+| `wai reflect --save-memories` | Save reflection bullets to bd memories |
 
-`wai why` queries your accumulated artifacts using an LLM to synthesize a coherent narrative explaining why decisions were made. Falls back to `wai search` when no LLM is configured.
-
-**Configuration** (`.wai/config.toml`):
-```toml
-[llm]
-llm     = "claude"        # Backend: "claude" or "ollama" (auto-detected if omitted)
-model   = "haiku"         # Claude: "haiku"/"sonnet"; Ollama: "llama3.1:8b"
-api_key = "sk-ant-..."    # Claude API key (or ANTHROPIC_API_KEY env var)
-fallback = "search"       # On LLM unavailable: "search" (default) or "error"
-```
-
-The legacy `[why]` section name is still accepted for backwards compatibility.
-
-**LLM Backends:**
-- **Claude** — set `ANTHROPIC_API_KEY` or add `api_key` to `[llm]` config
-- **Ollama** — install from https://ollama.com and run a local model
-
-### Reflect — Project Pattern Synthesis
+### Session Management
 
 | Command | Description |
 |---------|-------------|
-| `wai reflect` | Synthesize session context into a resource file |
-| `wai reflect --conversation <file>` | Include conversation transcript as richest input |
-| `wai reflect --output <target>` | Target: `claude.md`, `agents.md`, or `both` |
-| `wai reflect --dry-run` | Preview the resource file path without writing |
-| `wai reflect --save-memories` | Extract top-level bullets and save each to bd memories |
+| `wai prime [--project <name>]` | Orient at session start: phase, last handoff, next step |
+| `wai close [--project <name>]` | Wrap up session: create handoff and next steps |
+| `wai handoff create <project>` | Generate handoff document with plugin context |
 
-`wai reflect` reads accumulated handoffs, research, and optional conversation transcript, then asks an LLM to extract project-specific conventions and gotchas. Writes the result to `.wai/resources/reflections/<date>-<project>.md` with YAML front-matter. A slim `WAI:REFLECT:REF` pointer block in `CLAUDE.md`/`AGENTS.md` tells agents where to find the patterns.
-
-On first run, any existing `WAI:REFLECT` block is automatically migrated to a `*-migrated.md` resource file and replaced with the slim reference block.
-
-**Context sources (ranked by richness):**
-1. Conversation transcript (`--conversation <file>`) — raw session detail
-2. Handoff artifacts — session summaries and next steps
-3. Research/design/plan artifacts — curated decisions
-
-Reuses the `[llm]` config — no separate setup required.
-
----
-
-## Pipelines
-
-Pipelines chain skills into ordered stages, tracking run state and automatically tagging artifacts.
+### Pipelines
 
 | Command | Description |
 |---------|-------------|
 | `wai pipeline init <name>` | Scaffold a new TOML pipeline definition |
-| `wai pipeline start <name> --topic=<slug>` | Start a run; writes run ID to `.wai/.pipeline-run` |
+| `wai pipeline start <name>` | Start a run; writes run ID to `.wai/.pipeline-run` |
 | `wai pipeline next` | Advance to the next step in the active run |
 | `wai pipeline current` | Show the current step of the active run |
-| `wai pipeline suggest "<query>"` | Get a skill suggestion for a topic |
-| `wai pipeline status <name>` | Show all runs with per-stage completion and artifact paths |
-| `wai pipeline list` | List all defined pipelines |
+| `wai pipeline status <name>` | Show run status (use `--run <id>` for details) |
+| `wai pipeline suggest` | Get a skill suggestion for a topic |
 
-**Pipelines** are defined as TOML files in `.wai/resources/pipelines/`:
+### Plugins
 
-```bash
-wai pipeline init review
-# Edit .wai/resources/pipelines/review.toml to define stages
-```
+| Command | Description |
+|---------|-------------|
+| `wai plugin list` | List all plugins (built-in and custom) |
+| `wai plugin enable <name>` | Enable a plugin |
+| `wai <plugin> <command>` | Pass-through to plugin commands (e.g. `wai beads list`) |
 
-**Run IDs** are generated as `<pipeline>-<date>-<topic>` (e.g. `review-2026-02-28-auth-refactor`).
-
-### WAI_PIPELINE_RUN
-
-`wai pipeline start` writes the active run ID to `.wai/.pipeline-run` — `wai add` picks it up automatically. You can also set it manually:
-
-```bash
-wai pipeline start review --topic=auth-refactor
-# Run ID is now active — all wai add calls tag artifacts with pipeline-run:<run-id>
-wai add research "Findings from auth review"
-wai pipeline next
-```
-
-When `WAI_PIPELINE_RUN` env var is set (or `.wai/.pipeline-run` exists), every `wai add research/plan/design` call automatically adds a `pipeline-run:<run-id>` tag to the artifact.
+---
 
 ## Examples
 
@@ -269,31 +181,6 @@ wai search "api.*error" --regex -n 10
 # View project history
 wai timeline my-feature
 wai timeline my-feature --from 2026-02-01 --to 2026-02-15
-```
-
-### Configuration Management
-
-```bash
-# Add and sync configs
-wai config add skill my-skill.md
-wai sync --status
-wai sync
-
-# Verify with doctor
-wai doctor
-```
-
-### Repository Best Practices
-
-```bash
-# Check repository setup
-wai way
-
-# Get JSON output for CI integration
-wai way --json | jq '.summary'
-
-# Track best practice adoption
-wai way --json | jq '.checks[] | select(.status == "info") | .name'
 ```
 
 ### JSON Output for Automation

@@ -42,7 +42,11 @@ pub fn run(cli: Cli) -> Result<()> {
         Some(Commands::Show { name }) => show::run(name),
         Some(Commands::Move(args)) => move_cmd::run(args),
         Some(Commands::Phase(sub)) => phase::run(sub),
-        Some(Commands::Sync { status, dry_run, from_main }) => sync::run(status, dry_run, from_main),
+        Some(Commands::Sync {
+            status,
+            dry_run,
+            from_main,
+        }) => sync::run(status, dry_run, from_main),
         Some(Commands::Config(cmd)) => config_cmd::run(cmd),
         Some(Commands::Handoff(cmd)) => handoff::run(cmd),
         Some(Commands::Search {
@@ -55,7 +59,17 @@ pub fn run(cli: Cli) -> Result<()> {
             latest,
             context,
             include_memories,
-        }) => search::run(query, type_filter, project, regex, limit, tag, latest, context, include_memories),
+        }) => search::run(
+            query,
+            type_filter,
+            project,
+            regex,
+            limit,
+            tag,
+            latest,
+            context,
+            include_memories,
+        ),
         Some(Commands::Timeline {
             project,
             from,
@@ -76,7 +90,11 @@ pub fn run(cli: Cli) -> Result<()> {
         Some(Commands::Pipeline(cmd)) => pipeline::run(cmd),
         Some(Commands::Close { project, remember }) => close::run(project, remember),
         Some(Commands::Prime { project }) => prime::run(project),
-        Some(Commands::Ls { root, depth, timeout }) => ls::run(root, depth, timeout),
+        Some(Commands::Ls {
+            root,
+            depth,
+            timeout,
+        }) => ls::run(root, depth, timeout),
         Some(Commands::Tutorial) => crate::tutorial::run(),
         Some(Commands::Why {
             query,
@@ -91,7 +109,16 @@ pub fn run(cli: Cli) -> Result<()> {
             yes,
             inject_content,
             save_memories,
-        }) => reflect::run(project, conversation, output, dry_run, yes, inject_content, cli.verbose, save_memories),
+        }) => reflect::run(
+            project,
+            conversation,
+            output,
+            dry_run,
+            yes,
+            inject_content,
+            cli.verbose,
+            save_memories,
+        ),
         Some(Commands::External(args)) => run_external(args),
         None => show_welcome(),
     }
@@ -261,7 +288,8 @@ fn run_external(args: Vec<String>) -> Result<()> {
             .any(|p| p.def.name == *plugin_name && p.detected)
     });
 
-    if !is_known_plugin && let Some(suggestion) = engine.suggest_typo(plugin_name, &valid_commands) {
+    if !is_known_plugin && let Some(suggestion) = engine.suggest_typo(plugin_name, &valid_commands)
+    {
         miette::bail!(
             "{}. {}",
             suggestion.message(),

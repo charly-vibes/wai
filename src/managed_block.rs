@@ -423,7 +423,6 @@ pub fn read_reflect_block(path: &Path) -> Option<String> {
     Some(content[start..end].to_string())
 }
 
-
 #[cfg(test)]
 mod wai_block_tests {
     use super::*;
@@ -681,7 +680,11 @@ mod wai_block_tests {
 
     #[test]
     fn search_before_research_present_with_companions() {
-        for plugins in [&["beads"][..], &["openspec"][..], &["beads", "openspec"][..]] {
+        for plugins in [
+            &["beads"][..],
+            &["openspec"][..],
+            &["beads", "openspec"][..],
+        ] {
             let output = wai_block_content(plugins, &[]);
             assert!(
                 output.contains(SEARCH_INSTRUCTION),
@@ -853,5 +856,4 @@ mod reflect_tests {
         let got = read_reflect_block(&path).unwrap();
         assert!(got.contains("inner content"));
     }
-
 }

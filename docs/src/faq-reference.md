@@ -104,23 +104,25 @@ Wai will **overwrite** them on the next sync. Always edit source files in `.wai/
 
 ### How do I create a custom plugin?
 
-Create a YAML file in `.wai/plugins/`:
+Create a TOML file in `.wai/plugins/`:
 
-```yaml
-name: my-tool
-description: My tool integration
-detector:
-  type: directory
-  path: .mytool
-commands:
-  - name: status
-    description: Show status
-    command: mytool status
-    read_only: true
-hooks:
-  - type: on_status
-    command: mytool stats
-    inject_as: mytool_stats
+```toml
+name = "my-tool"
+description = "My tool integration"
+
+[detector]
+type = "directory"
+path = ".mytool"
+
+[[commands]]
+name = "status"
+description = "Show status"
+passthrough = "mytool status"
+read_only = true
+
+[hooks.on_status]
+command = "mytool stats"
+inject_as = "mytool_stats"
 ```
 
 See [Plugin System](./concepts/plugins.md) for complete guide.
@@ -133,7 +135,7 @@ No, built-in plugins (git, beads, openspec) cannot be disabled. They're only act
 
 Common reasons:
 1. Detector path doesn't exist (e.g., `.mytool/` directory missing)
-2. YAML syntax error in plugin definition
+2. TOML syntax error in plugin definition
 3. Plugin tool not installed or not in PATH
 
 Run `wai doctor` to diagnose plugin issues.

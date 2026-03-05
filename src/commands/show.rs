@@ -133,10 +133,7 @@ fn collect_item_contents(dir: &std::path::Path) -> Result<Vec<ShowItemEntry>> {
     Ok(result)
 }
 
-fn collect_entries(
-    dir: &std::path::Path,
-    read_phase: bool,
-) -> Result<Vec<ShowEntry>> {
+fn collect_entries(dir: &std::path::Path, read_phase: bool) -> Result<Vec<ShowEntry>> {
     if !dir.exists() {
         return Ok(Vec::new());
     }

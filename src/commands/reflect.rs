@@ -89,8 +89,7 @@ pub fn write_reflect_resource(
     // `-migrated.md` and are left untouched.
     let existing_path = find_existing_reflection(&refl_dir, &name_slug);
 
-    let path = existing_path
-        .unwrap_or_else(|| refl_dir.join(format!("{}-{}.md", date, name_slug)));
+    let path = existing_path.unwrap_or_else(|| refl_dir.join(format!("{}-{}.md", date, name_slug)));
 
     let mut front_matter = format!(
         "---\ndate: \"{}\"\nproject: \"{}\"\nsessions_analyzed: {}\ntype: reflection\n---\n\n",
@@ -114,10 +113,7 @@ fn find_existing_reflection(refl_dir: &Path, slug: &str) -> Option<PathBuf> {
         if path.extension().and_then(|e| e.to_str()) != Some("md") {
             continue;
         }
-        let stem = path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("");
+        let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
         // Skip migrated files.
         if stem.ends_with("-migrated") {
             continue;
@@ -466,7 +462,10 @@ pub fn read_previous_reflections(project_root: &Path, budget: usize) -> Vec<Refl
         }
         let trimmed = content[..take].to_string();
         used += trimmed.len();
-        result.push(ReflectionEntry { rel_path, content: trimmed });
+        result.push(ReflectionEntry {
+            rel_path,
+            content: trimmed,
+        });
     }
     result
 }
@@ -681,7 +680,11 @@ pub fn build_reflect_prompt(ctx: &ReflectContext, today: &str) -> String {
             "# Previous Reflections\n\nExtend and correct these — do not repeat them verbatim:\n",
         );
         for r in &ctx.previous_reflections {
-            section.push_str(&format!("\n## {}\n```\n{}\n```\n", r.rel_path, escape_fences(&r.content)));
+            section.push_str(&format!(
+                "\n## {}\n```\n{}\n```\n",
+                r.rel_path,
+                escape_fences(&r.content)
+            ));
         }
         parts.push(section);
     }
@@ -905,10 +908,7 @@ pub fn run(
                 .filter(|e| e.path().is_dir())
                 .collect();
             if projects.len() == 1 {
-                projects[0]
-                    .file_name()
-                    .to_str()
-                    .map(|s| s.to_string())
+                projects[0].file_name().to_str().map(|s| s.to_string())
             } else {
                 None
             }
@@ -964,7 +964,10 @@ pub fn run(
             // Find and replace the REFLECT:START/END block with the REF block.
             let reflect_start_marker = "<!-- WAI:REFLECT:START -->";
             let reflect_end_marker = "<!-- WAI:REFLECT:END -->";
-            if let (Some(s), Some(e)) = (existing.find(reflect_start_marker), existing.find(reflect_end_marker)) {
+            if let (Some(s), Some(e)) = (
+                existing.find(reflect_start_marker),
+                existing.find(reflect_end_marker),
+            ) {
                 if s < e {
                     let end_pos = e + reflect_end_marker.len();
                     // Check if a REF block already exists after the old block.
@@ -1037,7 +1040,10 @@ pub fn run(
                 "  {} Once the agent provides the REFLECT content, run:",
                 "○".dimmed()
             );
-            println!("  {}   wai reflect --inject-content '<content>'", "○".dimmed());
+            println!(
+                "  {}   wai reflect --inject-content '<content>'",
+                "○".dimmed()
+            );
             return Ok(());
         }
         raw
@@ -1059,7 +1065,8 @@ pub fn run(
 
     // Write resource file.
     let project_str = project_name.as_deref().unwrap_or("project");
-    let resource_path = write_reflect_resource(&project_root, project_str, &new_content, ctx.handoff_count)?;
+    let resource_path =
+        write_reflect_resource(&project_root, project_str, &new_content, ctx.handoff_count)?;
 
     // Update .reflect-meta for the resolved project.
     if let Some(ref name) = project_name {
@@ -1089,9 +1096,16 @@ pub fn run(
     if save_memories {
         let bullets = extract_top_level_bullets(&new_content);
         if bullets.is_empty() {
-            println!("  {} --save-memories: no top-level bullets found in reflection", "○".dimmed());
+            println!(
+                "  {} --save-memories: no top-level bullets found in reflection",
+                "○".dimmed()
+            );
         } else {
-            println!("  {} Saving {} bullet(s) to bd memories …", "◆".cyan(), bullets.len());
+            println!(
+                "  {} Saving {} bullet(s) to bd memories …",
+                "◆".cyan(),
+                bullets.len()
+            );
             let mut saved = 0u32;
             for bullet in &bullets {
                 match store_memory(&project_root, bullet) {
@@ -1638,12 +1652,21 @@ mod tests {
         assert_eq!(entries.len(), 1, "expected exactly one reflection file");
 
         let content = fs::read_to_string(entries[0].path()).unwrap();
-        assert!(content.contains("sessions_analyzed: 3"), "missing sessions_analyzed");
-        assert!(content.contains("project: \"my-proj\""), "missing project field");
+        assert!(
+            content.contains("sessions_analyzed: 3"),
+            "missing sessions_analyzed"
+        );
+        assert!(
+            content.contains("project: \"my-proj\""),
+            "missing project field"
+        );
         assert!(content.contains("type: reflection"), "missing type field");
         assert!(content.contains("body text"), "missing content body");
         let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
-        assert!(content.contains(&format!("date: \"{}\"", today)), "missing date field");
+        assert!(
+            content.contains(&format!("date: \"{}\"", today)),
+            "missing date field"
+        );
     }
 
     #[test]
@@ -1661,9 +1684,15 @@ mod tests {
         let filename = entries[0].file_name();
         let name = filename.to_string_lossy();
         // slug::slugify("My Project") == "my-project"
-        assert!(name.contains("my-project"), "filename should contain slugified name, got: {name}");
+        assert!(
+            name.contains("my-project"),
+            "filename should contain slugified name, got: {name}"
+        );
         let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
-        assert!(name.contains(&today), "filename should contain date, got: {name}");
+        assert!(
+            name.contains(&today),
+            "filename should contain date, got: {name}"
+        );
         assert!(name.ends_with(".md"), "filename should end with .md");
     }
 
@@ -1672,10 +1701,16 @@ mod tests {
         let dir = tmp();
         // reflections dir does not exist yet — function must create it
         let refl_dir = crate::config::reflections_dir(dir.path());
-        assert!(!refl_dir.exists(), "precondition: reflections dir should not exist yet");
+        assert!(
+            !refl_dir.exists(),
+            "precondition: reflections dir should not exist yet"
+        );
 
         write_reflect_resource(dir.path(), "proj", "content", 0).unwrap();
-        assert!(refl_dir.exists(), "reflections dir should have been created");
+        assert!(
+            refl_dir.exists(),
+            "reflections dir should have been created"
+        );
         assert_eq!(
             fs::read_dir(&refl_dir).unwrap().count(),
             1,
@@ -1703,12 +1738,22 @@ mod tests {
             .map(|e| e.file_name().to_string_lossy().to_string())
             .collect();
 
-        assert_eq!(names.len(), 1, "expected exactly one reflection file, got: {names:?}");
+        assert_eq!(
+            names.len(),
+            1,
+            "expected exactly one reflection file, got: {names:?}"
+        );
 
         // The file should contain the content from the latest call.
         let content = fs::read_to_string(&path3).unwrap();
-        assert!(content.contains("third"), "file should contain latest content");
-        assert!(!content.contains("first"), "file should not contain stale content");
+        assert!(
+            content.contains("third"),
+            "file should contain latest content"
+        );
+        assert!(
+            !content.contains("first"),
+            "file should not contain stale content"
+        );
     }
 
     // ── Integration test: migration path (6.6) ───────────────────────────────
@@ -1767,7 +1812,10 @@ mod tests {
         // 1. A resource file was created in .wai/resources/reflections/ with
         //    a filename matching *-migrated.md.
         let refl_dir = crate::config::reflections_dir(dir.path());
-        assert!(refl_dir.exists(), "reflections dir should have been created");
+        assert!(
+            refl_dir.exists(),
+            "reflections dir should have been created"
+        );
         let migrated_files: Vec<_> = fs::read_dir(&refl_dir)
             .unwrap()
             .filter_map(|e| e.ok())
@@ -1785,8 +1833,7 @@ mod tests {
 
         // 2. The resource file contains `type: reflection-migrated` in its
         //    YAML front-matter.
-        let migrated_content =
-            fs::read_to_string(migrated_files[0].path()).unwrap();
+        let migrated_content = fs::read_to_string(migrated_files[0].path()).unwrap();
         assert!(
             migrated_content.contains("type: reflection-migrated"),
             "migrated file should have type: reflection-migrated in front-matter, got:\n{}",
@@ -1794,8 +1841,7 @@ mod tests {
         );
 
         // 3. CLAUDE.md no longer contains WAI:REFLECT:START (old block replaced).
-        let claude_content =
-            fs::read_to_string(dir.path().join("CLAUDE.md")).unwrap();
+        let claude_content = fs::read_to_string(dir.path().join("CLAUDE.md")).unwrap();
         assert!(
             !claude_content.contains("WAI:REFLECT:START"),
             "CLAUDE.md should no longer have WAI:REFLECT:START after migration"

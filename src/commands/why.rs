@@ -1397,7 +1397,10 @@ mod tests {
             is_file_query: false,
             artifacts: vec![],
             git_context: None,
-            meta: ProjectMeta { current_phase: None, recent_commits: vec![] },
+            meta: ProjectMeta {
+                current_phase: None,
+                recent_commits: vec![],
+            },
             truncated: false,
             memories: Some("- Use bd CLI for integration".to_string()),
         };
@@ -1928,10 +1931,7 @@ Research → Design → Implementation\n\
 
         let config = crate::config::ProjectConfig::load(tmp.path()).unwrap();
         // mark_privacy_notice_shown writes to [llm] on fresh configs (no legacy [why]).
-        assert_eq!(
-            config.llm_config().privacy_notice_shown,
-            Some(true)
-        );
+        assert_eq!(config.llm_config().privacy_notice_shown, Some(true));
     }
 
     #[test]

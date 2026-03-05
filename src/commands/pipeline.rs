@@ -84,9 +84,7 @@ pub fn run(cmd: PipelineCommands) -> Result<()> {
         PipelineCommands::Start { name, topic } => cmd_start(&name, topic.as_deref()),
         PipelineCommands::Next => cmd_next(),
         PipelineCommands::Current => cmd_current(),
-        PipelineCommands::Suggest { description } => {
-            cmd_suggest(description.as_deref())
-        }
+        PipelineCommands::Suggest { description } => cmd_suggest(description.as_deref()),
     }
 }
 
@@ -107,10 +105,7 @@ fn cmd_list() -> Result<()> {
     if !pipelines.exists() {
         println!();
         println!("  {} No pipelines defined", "○".dimmed());
-        println!(
-            "  {} Create one with: wai pipeline init <name>",
-            "→".cyan()
-        );
+        println!("  {} Create one with: wai pipeline init <name>", "→".cyan());
         println!();
         return Ok(());
     }
@@ -129,10 +124,7 @@ fn cmd_list() -> Result<()> {
     if names.is_empty() {
         println!();
         println!("  {} No pipelines defined", "○".dimmed());
-        println!(
-            "  {} Create one with: wai pipeline init <name>",
-            "→".cyan()
-        );
+        println!("  {} Create one with: wai pipeline init <name>", "→".cyan());
         println!();
         return Ok(());
     }
@@ -304,12 +296,13 @@ fn cmd_next() -> Result<()> {
             run_id
         );
     }
-    let run: PipelineRun = serde_yml::from_str(&fs::read_to_string(&run_path).into_diagnostic()?)
-        .map_err(|e| miette::miette!("Failed to parse run state for '{}': {}", run_id, e))?;
+    let run: PipelineRun =
+        serde_yml::from_str(&fs::read_to_string(&run_path).into_diagnostic()?)
+            .map_err(|e| miette::miette!("Failed to parse run state for '{}': {}", run_id, e))?;
 
     // 3. Load pipeline definition
-    let def_path = crate::config::pipelines_dir(&project_root)
-        .join(format!("{}.toml", run.pipeline));
+    let def_path =
+        crate::config::pipelines_dir(&project_root).join(format!("{}.toml", run.pipeline));
     let definition = load_pipeline_toml(&def_path)?;
 
     // 4. Check not already complete
@@ -362,12 +355,13 @@ fn cmd_current() -> Result<()> {
             run_id
         );
     }
-    let run: PipelineRun = serde_yml::from_str(&fs::read_to_string(&run_path).into_diagnostic()?)
-        .map_err(|e| miette::miette!("Failed to parse run state for '{}': {}", run_id, e))?;
+    let run: PipelineRun =
+        serde_yml::from_str(&fs::read_to_string(&run_path).into_diagnostic()?)
+            .map_err(|e| miette::miette!("Failed to parse run state for '{}': {}", run_id, e))?;
 
     // 3. Load pipeline definition
-    let def_path = crate::config::pipelines_dir(&project_root)
-        .join(format!("{}.toml", run.pipeline));
+    let def_path =
+        crate::config::pipelines_dir(&project_root).join(format!("{}.toml", run.pipeline));
     let definition = load_pipeline_toml(&def_path)?;
 
     // 4. Print current step (or completion block if the run is done)
@@ -450,12 +444,7 @@ fn cmd_suggest(description: Option<&str>) -> Result<()> {
 
 /// Score a pipeline by counting how many query words appear in its name + description.
 fn score_pipeline(name: &str, def: &PipelineDefinition, words: &[&str]) -> usize {
-    let haystack = format!(
-        "{} {}",
-        name,
-        def.description.as_deref().unwrap_or("")
-    )
-    .to_lowercase();
+    let haystack = format!("{} {}", name, def.description.as_deref().unwrap_or("")).to_lowercase();
     words.iter().filter(|w| haystack.contains(*w)).count()
 }
 
@@ -471,7 +460,10 @@ fn resolve_active_run_id(project_root: &Path) -> Result<String> {
     // Fall back to .last-run pointer file
     let last_run = crate::config::last_run_path(project_root);
     if last_run.exists() {
-        let run_id = fs::read_to_string(&last_run).into_diagnostic()?.trim().to_string();
+        let run_id = fs::read_to_string(&last_run)
+            .into_diagnostic()?
+            .trim()
+            .to_string();
         if !run_id.is_empty() {
             return Ok(run_id);
         }
@@ -561,8 +553,8 @@ pub fn render_prompt(prompt: &str, topic: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::NamedTempFile;
     use std::io::Write;
+    use tempfile::NamedTempFile;
 
     // ── render_prompt ──────────────────────────────────────────────────────
 

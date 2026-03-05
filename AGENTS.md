@@ -194,6 +194,7 @@ context before starting research or creating tickets.
 
 
 
+
 <!-- WAI:REFLECT:REF:START -->
 ## Accumulated Project Patterns
 

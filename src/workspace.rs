@@ -2,8 +2,8 @@ use miette::{IntoDiagnostic, Result};
 use std::path::Path;
 
 use crate::config::{
-    AGENT_CONFIG_DIR, ARCHIVES_DIR, AREAS_DIR, CONFIG_DIR, CONTEXT_DIR, PLUGINS_DIR, PROJECTS_DIR,
-    ProjectConfig, PATTERNS_DIR, REFLECTIONS_DIR, RESOURCES_DIR, RULES_DIR, SKILLS_DIR,
+    AGENT_CONFIG_DIR, ARCHIVES_DIR, AREAS_DIR, CONFIG_DIR, CONTEXT_DIR, PATTERNS_DIR, PLUGINS_DIR,
+    PROJECTS_DIR, ProjectConfig, REFLECTIONS_DIR, RESOURCES_DIR, RULES_DIR, SKILLS_DIR,
     TEMPLATES_DIR, agent_config_dir,
 };
 use crate::managed_block::inject_managed_block;

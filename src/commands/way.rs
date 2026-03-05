@@ -106,7 +106,10 @@ fn fix_skills(repo_root: &Path) -> Result<()> {
     println!();
     println!(
         "  Scaffolding recommended skills into {}:",
-        skills_dir.strip_prefix(repo_root).unwrap_or(&skills_dir).display()
+        skills_dir
+            .strip_prefix(repo_root)
+            .unwrap_or(&skills_dir)
+            .display()
     );
     println!("    • rule-of-5-universal — iterative quality review workflow");
     println!("    • commit — structured, deliberate commit workflow");
@@ -144,11 +147,11 @@ fn render_human(checks: &[CheckResult], summary: &Summary, verbose: u8) -> Resul
     use miette::IntoDiagnostic;
 
     println!();
+    println!("  {} Repo Hygiene & Agent Workflow Conventions", "◆".cyan());
     println!(
-        "  {} Repo Hygiene & Agent Workflow Conventions",
-        "◆".cyan()
+        "  {} For wai workspace health, run 'wai doctor'",
+        "·".dimmed()
     );
-    println!("  {} For wai workspace health, run 'wai doctor'", "·".dimmed());
     println!();
 
     for check in checks {
@@ -302,7 +305,12 @@ fn hook_exists_nonempty(repo_root: &Path) -> bool {
 /// Return the `core.hooksPath` git config value if set, else `None`.
 fn git_core_hooks_path(repo_root: &Path) -> Option<String> {
     let output = std::process::Command::new("git")
-        .args(["-C", &repo_root.to_string_lossy(), "config", "core.hooksPath"])
+        .args([
+            "-C",
+            &repo_root.to_string_lossy(),
+            "config",
+            "core.hooksPath",
+        ])
         .output()
         .ok()?;
     if output.status.success() {
@@ -588,9 +596,8 @@ fn check_documentation(repo_root: &Path) -> CheckResult {
         suggestions.push("docs/ folder with content".to_string());
     }
     if doc_tool.is_none() {
-        suggestions.push(
-            "language doc tool (e.g. cargo doc, mkdocs, sphinx, typedoc, godoc)".to_string(),
-        );
+        suggestions
+            .push("language doc tool (e.g. cargo doc, mkdocs, sphinx, typedoc, godoc)".to_string());
     }
     if justfile.exists() && !has_just_docs {
         suggestions.push("just docs recipe".to_string());
@@ -1395,8 +1402,7 @@ fn check_beads(repo_root: &Path) -> CheckResult {
             intent,
             success_criteria,
             suggestion: Some(
-                "Initialize beads issue tracking — https://github.com/steveyegge/beads"
-                    .to_string(),
+                "Initialize beads issue tracking — https://github.com/steveyegge/beads".to_string(),
             ),
         }
     }
@@ -1408,9 +1414,8 @@ fn check_openspec(repo_root: &Path) -> CheckResult {
         "Formal change proposals prevent architectural drift and create a reviewable design record."
             .to_string(),
     );
-    let success_criteria = Some(
-        "An openspec workspace (openspec/) exists for managing change proposals.".to_string(),
-    );
+    let success_criteria =
+        Some("An openspec workspace (openspec/) exists for managing change proposals.".to_string());
 
     let openspec_dir = repo_root.join("openspec");
     if openspec_dir.exists() && openspec_dir.is_dir() {

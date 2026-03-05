@@ -4,13 +4,14 @@ use owo_colors::OwoColorize;
 use std::fs;
 use std::path::Path;
 
-use crate::config::{ProjectConfig, STATE_FILE, find_project_root, last_run_path, pipelines_dir, projects_dir};
+use crate::config::{
+    ProjectConfig, STATE_FILE, find_project_root, last_run_path, pipelines_dir, projects_dir,
+};
 use crate::context::current_context;
 use crate::error::WaiError;
 use crate::json::{
-    HookOutput, StatusChange, StatusChangeSection, StatusOpenSpec, StatusPayload,
-    StatusPipeline, StatusPipelineActive, StatusPipelineAvailable, StatusPlugin,
-    StatusProject, Suggestion,
+    HookOutput, StatusChange, StatusChangeSection, StatusOpenSpec, StatusPayload, StatusPipeline,
+    StatusPipelineActive, StatusPipelineAvailable, StatusPlugin, StatusProject, Suggestion,
 };
 use crate::openspec;
 use crate::output::print_json;
@@ -52,10 +53,13 @@ fn detect_pipeline_state(workspace_root: &Path) -> PipelineStatusInfo {
         if run_path.exists() {
             if let Ok(content) = fs::read_to_string(&run_path) {
                 if let Ok(run) = serde_yml::from_str::<PipelineRun>(&content) {
-                    let def_path = pipelines_dir(workspace_root)
-                        .join(format!("{}.toml", run.pipeline));
+                    let def_path =
+                        pipelines_dir(workspace_root).join(format!("{}.toml", run.pipeline));
                     if let Ok(def) = load_pipeline_toml(&def_path) {
-                        return PipelineStatusInfo::Active { run, definition: def };
+                        return PipelineStatusInfo::Active {
+                            run,
+                            definition: def,
+                        };
                     }
                 }
             }
@@ -70,9 +74,7 @@ fn detect_pipeline_state(workspace_root: &Path) -> PipelineStatusInfo {
         if let Ok(entries) = fs::read_dir(&pipelines) {
             for entry in entries.flatten() {
                 let path = entry.path();
-                if path.is_file()
-                    && path.extension().and_then(|e| e.to_str()) == Some("toml")
-                {
+                if path.is_file() && path.extension().and_then(|e| e.to_str()) == Some("toml") {
                     if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
                         match load_pipeline_toml(&path) {
                             Ok(def) => available.push((name.to_string(), def)),

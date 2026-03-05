@@ -74,9 +74,7 @@ impl ProjectConfig {
             return std::borrow::Cow::Borrowed(llm);
         }
         if self.why.is_some() {
-            eprintln!(
-                "  [wai] Deprecation: rename [why] to [llm] in .wai/config.toml"
-            );
+            eprintln!("  [wai] Deprecation: rename [why] to [llm] in .wai/config.toml");
         }
         match &self.why {
             Some(why) => std::borrow::Cow::Borrowed(why),
@@ -376,5 +374,9 @@ pub fn read_pipeline_run_state(project_root: &Path) -> Option<String> {
     let path = pipeline_run_file(project_root);
     let content = std::fs::read_to_string(&path).ok()?;
     let trimmed = content.trim().to_string();
-    if trimmed.is_empty() { None } else { Some(trimmed) }
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed)
+    }
 }

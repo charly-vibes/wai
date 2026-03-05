@@ -321,10 +321,15 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
             about: "Wrap up a session: create a handoff and show next steps",
             examples: &[
                 ("wai close", "Close current session (auto-detects project)"),
-                ("wai close --project my-app", "Close a specific project's session"),
+                (
+                    "wai close --project my-app",
+                    "Close a specific project's session",
+                ),
             ],
             options: &[],
-            advanced_options: &["-p, --project <NAME>    Project name (auto-detected when only one exists)"],
+            advanced_options: &[
+                "-p, --project <NAME>    Project name (auto-detected when only one exists)",
+            ],
             env_vars: &[("NO_COLOR", "Disable colored output")],
             internals: &[
                 "Creates a handoff artifact under .wai/projects/<name>/",
@@ -334,11 +339,19 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
         "prime" => Some(HelpContent {
             about: "Orient yourself at session start: project, phase, last handoff, and suggested next step",
             examples: &[
-                ("wai prime", "Orient for current session (auto-detects project)"),
-                ("wai prime --project my-app", "Orient for a specific project"),
+                (
+                    "wai prime",
+                    "Orient for current session (auto-detects project)",
+                ),
+                (
+                    "wai prime --project my-app",
+                    "Orient for a specific project",
+                ),
             ],
             options: &[],
-            advanced_options: &["-p, --project <NAME>    Project name (auto-detected when only one exists)"],
+            advanced_options: &[
+                "-p, --project <NAME>    Project name (auto-detected when only one exists)",
+            ],
             env_vars: &[("NO_COLOR", "Disable colored output")],
             internals: &[
                 "Detects .wai/.pending-resume and shows RESUMING banner when present",
@@ -348,9 +361,15 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
         "why" => Some(HelpContent {
             about: "Ask why a decision was made (LLM-powered reasoning oracle)",
             examples: &[
-                ("wai why \"why use TOML for config?\"", "Ask a natural language question"),
+                (
+                    "wai why \"why use TOML for config?\"",
+                    "Ask a natural language question",
+                ),
                 ("wai why src/config.rs", "Explain a specific file's history"),
-                ("wai why --no-llm \"auth design\"", "Force fallback to wai search"),
+                (
+                    "wai why --no-llm \"auth design\"",
+                    "Force fallback to wai search",
+                ),
             ],
             options: &[],
             advanced_options: &[
@@ -370,9 +389,15 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
         "reflect" => Some(HelpContent {
             about: "Synthesize session context into project-specific AI guidance",
             examples: &[
-                ("wai reflect", "Synthesize and inject into CLAUDE.md/AGENTS.md"),
+                (
+                    "wai reflect",
+                    "Synthesize and inject into CLAUDE.md/AGENTS.md",
+                ),
                 ("wai reflect --dry-run", "Preview changes without writing"),
-                ("wai reflect --conversation chat.md", "Include conversation transcript"),
+                (
+                    "wai reflect --conversation chat.md",
+                    "Include conversation transcript",
+                ),
                 ("wai reflect --output agents.md", "Write only to AGENTS.md"),
             ],
             options: &[],
@@ -425,12 +450,27 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
             about: "Manage resources (skills, rules, context)",
             examples: &[
                 ("wai resource add skill my-skill", "Add a new skill"),
-                ("wai resource add skill issue/gather --template gather", "Add skill from template"),
+                (
+                    "wai resource add skill issue/gather --template gather",
+                    "Add skill from template",
+                ),
                 ("wai resource list skills", "List all skills"),
-                ("wai resource install issue/gather --global", "Install skill globally"),
-                ("wai resource export issue/gather --output skills.tar.gz", "Export skills to archive"),
-                ("wai resource import skills --from ./other", "Import skills from directory"),
-                ("wai resource import archive skills.tar.gz", "Import skills from archive"),
+                (
+                    "wai resource install issue/gather --global",
+                    "Install skill globally",
+                ),
+                (
+                    "wai resource export issue/gather --output skills.tar.gz",
+                    "Export skills to archive",
+                ),
+                (
+                    "wai resource import skills --from ./other",
+                    "Import skills from directory",
+                ),
+                (
+                    "wai resource import archive skills.tar.gz",
+                    "Import skills from archive",
+                ),
             ],
             options: &[],
             advanced_options: &[
@@ -451,8 +491,14 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
             about: "Show repo hygiene and agent workflow conventions — skills, rules, best practices",
             examples: &[
                 ("wai way", "Show hygiene status for the current repo"),
-                ("wai way --fix skills", "Scaffold missing recommended agent skills"),
-                ("wai way --json", "Machine-readable output for CI integration"),
+                (
+                    "wai way --fix skills",
+                    "Scaffold missing recommended agent skills",
+                ),
+                (
+                    "wai way --json",
+                    "Machine-readable output for CI integration",
+                ),
             ],
             options: &[],
             advanced_options: &[

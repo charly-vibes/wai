@@ -4,7 +4,7 @@ plugins = []
 name = "wai"
 version = "2026.2.1"
 description = ""
-tool_commit = "2c9beed"
+tool_commit = "f190810"
 
 [llm]
 privacy_notice_shown = true

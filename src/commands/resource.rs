@@ -196,7 +196,10 @@ pub fn parse_skill_frontmatter(path: &Path) -> Option<SkillMetadata> {
 pub fn run_add(cmd: ResourceAddCommands) -> Result<()> {
     match cmd {
         ResourceAddCommands::Skill { name, template } => {
-            eprintln!("⚠ 'wai resource add skill' is deprecated. Use: wai add skill {}", name);
+            eprintln!(
+                "⚠ 'wai resource add skill' is deprecated. Use: wai add skill {}",
+                name
+            );
             add_skill(&name, template.as_deref())
         }
     }

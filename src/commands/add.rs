@@ -3,8 +3,8 @@ use cliclack::log;
 use miette::{IntoDiagnostic, Result};
 use std::io::IsTerminal;
 
-use crate::cli::AddCommands;
 use super::resource;
+use crate::cli::AddCommands;
 use crate::config::{
     DESIGNS_DIR, PLANS_DIR, RESEARCH_DIR, archives_dir, areas_dir, projects_dir,
     read_pipeline_run_state, resources_dir,
@@ -325,9 +325,15 @@ mod tests {
 
         std::fs::write(research_dir.join(&filename), &file_content).unwrap();
         let written = std::fs::read_to_string(research_dir.join(&filename)).unwrap();
-        assert!(written.contains("bead: wai-p94k"), "bead field missing from frontmatter");
+        assert!(
+            written.contains("bead: wai-p94k"),
+            "bead field missing from frontmatter"
+        );
         assert!(written.contains("---"), "frontmatter delimiters missing");
-        assert!(!written.contains("tags:"), "tags should not appear when not provided");
+        assert!(
+            !written.contains("tags:"),
+            "tags should not appear when not provided"
+        );
     }
 
     #[test]
@@ -364,7 +370,10 @@ mod tests {
         }
         file_content.push_str("notes\n");
 
-        assert!(!file_content.contains("---"), "no frontmatter should be written");
+        assert!(
+            !file_content.contains("---"),
+            "no frontmatter should be written"
+        );
     }
 }
 

@@ -230,11 +230,7 @@ pub fn run(
                 } else {
                     // Context line — print dim.
                     let padded_num = format!("{:>width$}", abs_line_num, width = line_num_width);
-                    println!(
-                        "    {}:  {}",
-                        padded_num.dimmed(),
-                        ctx_line.dimmed(),
-                    );
+                    println!("    {}:  {}", padded_num.dimmed(), ctx_line.dimmed(),);
                 }
             }
 
@@ -262,10 +258,7 @@ pub fn run(
     // bd memories section — shown when --include-memories is passed
     if include_memories && !context.json {
         if let Some(mem_raw) = fetch_memories_for_query(&project_root, &query) {
-            let mem_lines: Vec<&str> = mem_raw
-                .lines()
-                .filter(|l| !l.trim().is_empty())
-                .collect();
+            let mem_lines: Vec<&str> = mem_raw.lines().filter(|l| !l.trim().is_empty()).collect();
             if !mem_lines.is_empty() {
                 println!();
                 println!("  {} Memories", "◆".cyan());

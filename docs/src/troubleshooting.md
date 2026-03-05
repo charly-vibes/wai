@@ -127,31 +127,33 @@ wai plugin list
 
 ### Custom plugin not loading
 
-**Problem:** YAML plugin in `.wai/plugins/` not appearing.
+**Problem:** TOML plugin in `.wai/plugins/` not appearing.
 
 **Solution:**
 ```bash
-# Check YAML syntax
-cat .wai/plugins/my-plugin.yml
+# Check TOML syntax
+cat .wai/plugins/my-plugin.toml
 
-# Verify file extension (.yml or .yaml)
+# Verify file extension (.toml)
 ls .wai/plugins/
 
-# Check for YAML errors
+# Check for TOML errors
 wai doctor
 
 # Example valid plugin:
-cat > .wai/plugins/example.yml << 'EOF'
-name: example
-description: Example plugin
-detector:
-  type: directory
-  path: .example
-commands:
-  - name: status
-    description: Show status
-    command: example status
-    read_only: true
+cat > .wai/plugins/example.toml << 'EOF'
+name = "example"
+description = "Example plugin"
+
+[detector]
+type = "directory"
+path = ".example"
+
+[[commands]]
+name = "status"
+description = "Show status"
+passthrough = "example status"
+read_only = true
 EOF
 ```
 

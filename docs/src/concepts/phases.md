@@ -35,3 +35,22 @@ Each phase has associated artifact types. Wai encourages capturing the right kin
 - **Research** phase → `wai add research "..."`
 - **Design** phase → `wai add design "..."`
 - **Plan** phase → `wai add plan "..."`
+
+## Archive Phase vs. Category
+
+The word "archive" is used in two ways in wai, and they serve different purposes:
+
+### 1. The Archive **Phase** (`wai phase set archive`)
+This is a **status** for a project. It indicates that the project is complete, all final handoffs are generated, and no further work is planned. It stays in its current PARA category (usually **Projects**).
+
+**Use when:** A project is finished but you still want it to appear in `wai status` and your active workspace overview.
+
+### 2. The Archives **Category** (`wai move my-project archives`)
+This is a **storage location**. Moving an item to archives reclassifies it in the PARA system, moving its directory from `.wai/projects/` to `.wai/archives/`.
+
+**Use when:** You want to declutter your workspace. Archived items are hidden from default `wai status` views and most context suggestions, but remain fully searchable.
+
+**Recommended Workflow:**
+1. Set phase to `archive` when the work is done.
+2. Generate a final handoff (`wai close`).
+3. Move to the `archives` category when you no longer need it in your active projects list.

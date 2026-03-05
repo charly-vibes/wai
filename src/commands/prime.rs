@@ -46,8 +46,7 @@ pub fn run(project: Option<String>) -> Result<()> {
         return Ok(());
     }
 
-    let project_name =
-        resolve_project_named(&project_root, project, "wai prime --project <name>")?;
+    let project_name = resolve_project_named(&project_root, project, "wai prime --project <name>")?;
 
     // Read phase
     let proj_dir = projects_dir(&project_root).join(&project_name);
@@ -161,7 +160,10 @@ pub fn run(project: Option<String>) -> Result<()> {
 
     // Worktree sync suggestion
     if detect_main_worktree_root(&project_root).is_some() {
-        println!("{} In a git worktree — run `wai sync --from-main` to sync areas/resources", "→".cyan());
+        println!(
+            "{} In a git worktree — run `wai sync --from-main` to sync areas/resources",
+            "→".cyan()
+        );
     }
 
     // Suggested next via bd ready --json
@@ -181,21 +183,24 @@ fn render_json(
     hook_outputs: &[crate::plugin::HookOutput],
     spec_status: Option<crate::openspec::OpenSpecStatus>,
 ) -> Result<()> {
-    let (resume, handoff_summary, next_steps) = if let Some((handoff_path, _, snippet)) =
-        resume_info
-    {
-        let steps = extract_next_steps(&handoff_path);
-        (true, Some(snippet), steps)
-    } else {
-        // Normal path: read latest handoff for summary only (no next steps shown).
-        let summary = find_latest_handoff(project_root, project_name)?
-            .map(|hp| {
-                let (_, snippet) = read_handoff_summary(&hp);
-                if snippet.is_empty() { None } else { Some(snippet) }
-            })
-            .flatten();
-        (false, summary, Vec::new())
-    };
+    let (resume, handoff_summary, next_steps) =
+        if let Some((handoff_path, _, snippet)) = resume_info {
+            let steps = extract_next_steps(&handoff_path);
+            (true, Some(snippet), steps)
+        } else {
+            // Normal path: read latest handoff for summary only (no next steps shown).
+            let summary = find_latest_handoff(project_root, project_name)?
+                .map(|hp| {
+                    let (_, snippet) = read_handoff_summary(&hp);
+                    if snippet.is_empty() {
+                        None
+                    } else {
+                        Some(snippet)
+                    }
+                })
+                .flatten();
+            (false, summary, Vec::new())
+        };
 
     let beads = hook_outputs
         .iter()

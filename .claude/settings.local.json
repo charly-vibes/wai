@@ -39,7 +39,11 @@
       "Bash(git status:*)",
       "Bash(git log:*)",
       "Bash(git diff:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(bd sync:*)",
+      "Bash(bd migrate:*)",
+      "WebFetch(domain:forum.cursor.com)",
+      "Bash(bd:*)"
     ]
   }
 }

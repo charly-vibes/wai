@@ -100,6 +100,31 @@ This file references agent context files managed by wai.
 - .wai/resources/agent-config/context/project-context.md
 ```
 
+## Specialized Targets
+
+Wai provides built-in specialized targets that handle complex tool-specific transformations automatically.
+
+### Claude Code (`claude-code`)
+
+The `claude-code` target is a high-level projection that translates **hierarchical skills** into Claude Code custom slash commands.
+
+Instead of manual file mapping, use the special `target: claude-code`:
+
+```yaml
+projections:
+  - target: claude-code
+```
+
+**How it works:**
+1. **Source Discovery**: It automatically scans `.wai/resources/agent-config/skills/` for hierarchical directories (e.g., `skills/git/commit/SKILL.md`).
+2. **Translation**:
+   - It translates the directory hierarchy into a human-readable skill name (e.g., `git/commit` → `Git: Commit`).
+   - It updates the frontmatter of the destination file to match Claude Code's expected format (including `name`, `description`, and `category`).
+3. **Destination**: Files are synced to `.claude/commands/<category>/<action>.md`.
+4. **Smart Syncing**: `wai sync --status` uses file modification times (mtime) to detect if Claude Code commands are out of date with your source skills.
+
+**Note:** "Flat" skills (e.g., `skills/my-skill/SKILL.md`) are skipped by this target. Only hierarchical skills (e.g., `skills/category/action/SKILL.md`) are processed to ensure clean command grouping in Claude Code.
+
 ## Configuration Format
 
 Full `.projections.yml` example:
@@ -230,6 +255,13 @@ If you manually edit a synced target file (e.g., `.cursorrules`, `.claude/skills
 - Edit target files directly (`.cursorrules`, `.claude/skills/`, etc.)
 - Manually create files in target directories
 - Expect wai to merge changes from targets back to sources
+
+### Missing Source Files
+
+If a source file listed in `.projections.yml` is missing:
+1. **Sync behavior**: `wai sync` will skip the missing file and continue with the remaining sources. For `inline` strategies, the output file will be generated without the missing content.
+2. **Reporting**: `wai sync --status` will not show a specific error, but the `target` may appear as "out of sync".
+3. **Diagnosis**: Run `wai doctor` to identify exactly which source files are missing from your configuration.
 
 ### Recovering Manual Edits
 

@@ -371,9 +371,8 @@ pub fn execute_passthrough(
     extra_args: &[String],
 ) -> std::io::Result<std::process::ExitStatus> {
     let context = current_context();
-    let parts = shell_words::split(passthrough).map_err(|e| {
-        std::io::Error::new(std::io::ErrorKind::InvalidInput, e.to_string())
-    })?;
+    let parts = shell_words::split(passthrough)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e.to_string()))?;
     if parts.is_empty() {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,

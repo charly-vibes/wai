@@ -381,7 +381,9 @@ fn stale_phase_suggestions_include_archive_and_advance() {
         .find(|d| matches!(d.pattern, WorkflowPattern::StalePhase { .. }))
         .expect("StalePhase should be present");
     assert!(
-        d.suggestions.iter().any(|s| s.command.contains("phase next")),
+        d.suggestions
+            .iter()
+            .any(|s| s.command.contains("phase next")),
         "StalePhase suggestions should include 'wai phase next'"
     );
     assert!(
@@ -411,7 +413,9 @@ fn looks_complete_suggestions_include_archive_and_advance() {
         "LooksComplete suggestions should include 'wai move'"
     );
     assert!(
-        d.suggestions.iter().any(|s| s.command.contains("phase next")),
+        d.suggestions
+            .iter()
+            .any(|s| s.command.contains("phase next")),
         "LooksComplete suggestions should include 'wai phase next'"
     );
 }

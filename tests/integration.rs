@@ -2256,9 +2256,13 @@ fn way_works_without_wai_init() {
     let tmp = TempDir::new().unwrap();
 
     // Don't init workspace - way should still work
-    wai_cmd(tmp.path()).args(["way"]).assert().success().stdout(
-        predicate::str::contains("Repo Hygiene & Agent Workflow Conventions"),
-    );
+    wai_cmd(tmp.path())
+        .args(["way"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Repo Hygiene & Agent Workflow Conventions",
+        ));
 }
 
 #[test]
@@ -2291,7 +2295,11 @@ fn way_always_exits_zero_all_passing() {
     fs::write(tmp.path().join("justfile"), "test:\n\techo test").unwrap();
     fs::write(tmp.path().join("prek.toml"), "[hooks]").unwrap();
     fs::create_dir_all(tmp.path().join(".git/hooks")).unwrap();
-    fs::write(tmp.path().join(".git/hooks/pre-commit"), "#!/bin/sh\nprek run").unwrap();
+    fs::write(
+        tmp.path().join(".git/hooks/pre-commit"),
+        "#!/bin/sh\nprek run",
+    )
+    .unwrap();
     fs::write(tmp.path().join(".editorconfig"), "root = true").unwrap();
     fs::write(tmp.path().join("README.md"), "# Test").unwrap();
     fs::write(tmp.path().join("LICENSE"), "MIT").unwrap();
@@ -2386,7 +2394,11 @@ fn way_complete_repository_all_pass() {
     fs::write(tmp.path().join("justfile"), "test:\n\techo test").unwrap();
     fs::write(tmp.path().join("prek.toml"), "[hooks]").unwrap();
     fs::create_dir_all(tmp.path().join(".git/hooks")).unwrap();
-    fs::write(tmp.path().join(".git/hooks/pre-commit"), "#!/bin/sh\nprek run").unwrap();
+    fs::write(
+        tmp.path().join(".git/hooks/pre-commit"),
+        "#!/bin/sh\nprek run",
+    )
+    .unwrap();
     fs::write(tmp.path().join(".editorconfig"), "root = true").unwrap();
     fs::write(tmp.path().join("README.md"), "# Test").unwrap();
     fs::write(tmp.path().join("LICENSE"), "MIT").unwrap();
@@ -2414,7 +2426,11 @@ fn way_complete_repository_minimal_suggestions() {
     fs::write(tmp.path().join("justfile"), "test:\n\techo test").unwrap();
     fs::write(tmp.path().join("prek.toml"), "[hooks]").unwrap();
     fs::create_dir_all(tmp.path().join(".git/hooks")).unwrap();
-    fs::write(tmp.path().join(".git/hooks/pre-commit"), "#!/bin/sh\nprek run").unwrap();
+    fs::write(
+        tmp.path().join(".git/hooks/pre-commit"),
+        "#!/bin/sh\nprek run",
+    )
+    .unwrap();
     fs::write(tmp.path().join(".editorconfig"), "root = true").unwrap();
     fs::write(tmp.path().join("README.md"), "# Test").unwrap();
     fs::write(tmp.path().join("LICENSE"), "MIT").unwrap();
@@ -2515,7 +2531,9 @@ fn way_check_git_hooks_prek_not_installed() {
         .success()
         .stdout(
             predicate::str::contains("Pre-commit quality gates")
-                .and(predicate::str::contains("prek.toml found but hooks not installed"))
+                .and(predicate::str::contains(
+                    "prek.toml found but hooks not installed",
+                ))
                 .and(predicate::str::contains("\"info\"")),
         );
 }
@@ -2537,7 +2555,9 @@ fn way_check_git_hooks_precommit() {
         .success()
         .stdout(
             predicate::str::contains("Pre-commit quality gates")
-                .and(predicate::str::contains("pre-commit detected and installed"))
+                .and(predicate::str::contains(
+                    "pre-commit detected and installed",
+                ))
                 .and(predicate::str::contains("\"pass\"")),
         );
 }
@@ -2564,7 +2584,11 @@ fn way_check_git_hooks_precommit_not_installed() {
 #[test]
 fn way_check_git_hooks_lefthook_installed() {
     let tmp = TempDir::new().unwrap();
-    fs::write(tmp.path().join("lefthook.yml"), "pre-commit:\n  commands: {}").unwrap();
+    fs::write(
+        tmp.path().join("lefthook.yml"),
+        "pre-commit:\n  commands: {}",
+    )
+    .unwrap();
     fs::create_dir_all(tmp.path().join(".git/hooks")).unwrap();
     fs::write(
         tmp.path().join(".git/hooks/pre-commit"),
@@ -2586,7 +2610,11 @@ fn way_check_git_hooks_lefthook_installed() {
 #[test]
 fn way_check_git_hooks_lefthook_not_installed() {
     let tmp = TempDir::new().unwrap();
-    fs::write(tmp.path().join("lefthook.yml"), "pre-commit:\n  commands: {}").unwrap();
+    fs::write(
+        tmp.path().join("lefthook.yml"),
+        "pre-commit:\n  commands: {}",
+    )
+    .unwrap();
 
     wai_cmd(tmp.path())
         .args(["way", "--json"])
@@ -3140,7 +3168,9 @@ fn way_check_test_coverage_tarpaulin_with_threshold() {
         .success()
         .stdout(
             predicate::str::contains("Test coverage")
-                .and(predicate::str::contains("tarpaulin configured (threshold enforced)"))
+                .and(predicate::str::contains(
+                    "tarpaulin configured (threshold enforced)",
+                ))
                 .and(predicate::str::contains("\"pass\"")),
         );
 }
@@ -3226,8 +3256,7 @@ fn way_check_beads_absent() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("Issue tracking")
-                .and(predicate::str::contains("\"info\"")),
+            predicate::str::contains("Issue tracking").and(predicate::str::contains("\"info\"")),
         );
 }
 
@@ -3258,8 +3287,7 @@ fn way_check_openspec_absent() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("Change proposals")
-                .and(predicate::str::contains("\"info\"")),
+            predicate::str::contains("Change proposals").and(predicate::str::contains("\"info\"")),
         );
 }
 
@@ -4064,7 +4092,9 @@ fn resource_add_skill_deprecated_still_works_and_warns() {
         .args(["resource", "add", "skill", "my-skill"])
         .assert()
         .success()
-        .stderr(predicate::str::contains("deprecated").and(predicate::str::contains("wai add skill")));
+        .stderr(
+            predicate::str::contains("deprecated").and(predicate::str::contains("wai add skill")),
+        );
 }
 
 #[test]
@@ -5332,9 +5362,16 @@ fn reflect_with_mock_llm_writes_claude_md_and_reflect_meta() {
         .unwrap()
         .filter_map(|e| e.ok())
         .collect();
-    assert_eq!(entries.len(), 1, "expected exactly one reflection resource file");
+    assert_eq!(
+        entries.len(),
+        1,
+        "expected exactly one reflection resource file"
+    );
     let resource_content = fs::read_to_string(entries[0].path()).unwrap();
-    assert!(resource_content.contains("Use TDD always"), "resource file should contain reflect content");
+    assert!(
+        resource_content.contains("Use TDD always"),
+        "resource file should contain reflect content"
+    );
 
     // .reflect-meta should be created.
     let meta_path = tmp.path().join(".wai/projects/test-proj/.reflect-meta");
@@ -5588,9 +5625,7 @@ fn pipeline_init_creates_toml_file() {
         .success()
         .stdout(predicate::str::contains("my-workflow"));
 
-    let toml_path = tmp
-        .path()
-        .join(".wai/resources/pipelines/my-workflow.toml");
+    let toml_path = tmp.path().join(".wai/resources/pipelines/my-workflow.toml");
     assert!(toml_path.exists(), "Expected TOML file at {:?}", toml_path);
 
     let content = fs::read_to_string(&toml_path).unwrap();
@@ -5631,14 +5666,20 @@ fn pipeline_init_creates_pipelines_dir_if_absent() {
     init_workspace(tmp.path());
 
     let pipelines_dir = tmp.path().join(".wai/resources/pipelines");
-    assert!(!pipelines_dir.exists(), "Pipelines dir should not exist yet");
+    assert!(
+        !pipelines_dir.exists(),
+        "Pipelines dir should not exist yet"
+    );
 
     wai_cmd(tmp.path())
         .args(["pipeline", "init", "new-pipe"])
         .assert()
         .success();
 
-    assert!(pipelines_dir.exists(), "Pipelines dir should have been created");
+    assert!(
+        pipelines_dir.exists(),
+        "Pipelines dir should have been created"
+    );
 }
 
 #[test]
@@ -5682,9 +5723,7 @@ fn pipeline_init_template_is_valid_toml() {
         .assert()
         .success();
 
-    let toml_path = tmp
-        .path()
-        .join(".wai/resources/pipelines/valid-check.toml");
+    let toml_path = tmp.path().join(".wai/resources/pipelines/valid-check.toml");
     let content = fs::read_to_string(&toml_path).unwrap();
 
     // Verify the generated file parses as valid TOML
@@ -5738,26 +5777,40 @@ fn pipeline_start_creates_run_state() {
     let entries: Vec<_> = fs::read_dir(&runs_dir)
         .unwrap()
         .flatten()
-        .filter(|e| {
-            e.path()
-                .extension()
-                .and_then(|x| x.to_str())
-                == Some("yml")
-        })
+        .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("yml"))
         .collect();
-    assert_eq!(entries.len(), 1, "Exactly one run state file should be written");
+    assert_eq!(
+        entries.len(),
+        1,
+        "Exactly one run state file should be written"
+    );
 
     // The run state file name should contain the pipeline name and topic slug
     let run_file = &entries[0].path();
     let stem = run_file.file_stem().unwrap().to_string_lossy().to_string();
-    assert!(stem.contains("my-pipe"), "Run ID should contain pipeline name, got: {stem}");
-    assert!(stem.contains("auth-refactor"), "Run ID should contain topic slug, got: {stem}");
+    assert!(
+        stem.contains("my-pipe"),
+        "Run ID should contain pipeline name, got: {stem}"
+    );
+    assert!(
+        stem.contains("auth-refactor"),
+        "Run ID should contain topic slug, got: {stem}"
+    );
 
     // The run state YAML should parse and have correct fields
     let content = fs::read_to_string(run_file).unwrap();
-    assert!(content.contains("pipeline: my-pipe"), "Run state should record pipeline name");
-    assert!(content.contains("auth-refactor"), "Run state should record topic");
-    assert!(content.contains("current_step: 0"), "New run should start at step 0");
+    assert!(
+        content.contains("pipeline: my-pipe"),
+        "Run state should record pipeline name"
+    );
+    assert!(
+        content.contains("auth-refactor"),
+        "Run state should record topic"
+    );
+    assert!(
+        content.contains("current_step: 0"),
+        "New run should start at step 0"
+    );
 }
 
 #[test]
@@ -5772,13 +5825,25 @@ fn pipeline_start_writes_last_run_file() {
         .success();
 
     let last_run_path = tmp.path().join(".wai/resources/pipelines/.last-run");
-    assert!(last_run_path.exists(), ".last-run pointer file should be written");
+    assert!(
+        last_run_path.exists(),
+        ".last-run pointer file should be written"
+    );
 
     let run_id = fs::read_to_string(&last_run_path).unwrap();
     let run_id = run_id.trim();
-    assert!(!run_id.is_empty(), ".last-run should contain a non-empty run ID");
-    assert!(run_id.starts_with("my-pipe"), "Run ID should start with pipeline name, got: {run_id}");
-    assert!(run_id.contains("feature-x"), "Run ID should contain topic slug, got: {run_id}");
+    assert!(
+        !run_id.is_empty(),
+        ".last-run should contain a non-empty run ID"
+    );
+    assert!(
+        run_id.starts_with("my-pipe"),
+        "Run ID should start with pipeline name, got: {run_id}"
+    );
+    assert!(
+        run_id.contains("feature-x"),
+        "Run ID should contain topic slug, got: {run_id}"
+    );
 }
 
 #[test]
@@ -5873,7 +5938,10 @@ fn pipeline_next_advances_to_second_step() {
     );
 
     // The run state file should have current_step incremented to 1
-    let run_file = tmp.path().join(".wai/pipeline-runs").join(format!("{}.yml", run_id));
+    let run_file = tmp
+        .path()
+        .join(".wai/pipeline-runs")
+        .join(format!("{}.yml", run_id));
     let content = fs::read_to_string(&run_file).unwrap();
     assert!(
         content.contains("current_step: 1"),
@@ -5970,8 +6038,7 @@ fn pipeline_next_errors_when_run_already_complete() {
         .assert()
         .failure()
         .stderr(
-            predicate::str::contains("already complete")
-                .or(predicate::str::contains("complete")),
+            predicate::str::contains("already complete").or(predicate::str::contains("complete")),
         );
 }
 
@@ -6024,7 +6091,10 @@ fn pipeline_current_reprints_step_prompt() {
     let last_run_path = tmp.path().join(".wai/resources/pipelines/.last-run");
     let run_id = fs::read_to_string(&last_run_path).unwrap();
     let run_id = run_id.trim().to_string();
-    let run_file = tmp.path().join(".wai/pipeline-runs").join(format!("{}.yml", run_id));
+    let run_file = tmp
+        .path()
+        .join(".wai/pipeline-runs")
+        .join(format!("{}.yml", run_id));
     let content = fs::read_to_string(&run_file).unwrap();
     assert!(
         content.contains("current_step: 0"),
@@ -6126,7 +6196,9 @@ fn pipeline_current_on_complete_run_prints_done() {
     let stripped = strip_ansi(&stdout);
 
     assert!(
-        stripped.contains("complete") || stripped.contains("done") || stripped.contains("wai close"),
+        stripped.contains("complete")
+            || stripped.contains("done")
+            || stripped.contains("wai close"),
         "Output should indicate the pipeline is complete, got:\n{stripped}"
     );
 }
@@ -6184,7 +6256,11 @@ fn pipeline_suggest_with_description_ranks_keyword_match_first() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
     write_pipeline_toml_with_desc(tmp.path(), "auth", "Authentication and login workflow");
-    write_pipeline_toml_with_desc(tmp.path(), "database", "Database migration and schema changes");
+    write_pipeline_toml_with_desc(
+        tmp.path(),
+        "database",
+        "Database migration and schema changes",
+    );
 
     let output = wai_cmd(tmp.path())
         .args(["pipeline", "suggest", "auth login"])
@@ -6199,7 +6275,9 @@ fn pipeline_suggest_with_description_ranks_keyword_match_first() {
 
     // "auth" should appear before "database" in the output
     let auth_pos = stripped.find("auth").expect("'auth' should be in output");
-    let db_pos = stripped.find("database").expect("'database' should be in output");
+    let db_pos = stripped
+        .find("database")
+        .expect("'database' should be in output");
     assert!(
         auth_pos < db_pos,
         "'auth' should appear before 'database' when query matches 'auth login', got:\n{stripped}"
@@ -6231,8 +6309,14 @@ fn pipeline_suggest_no_match_still_shows_all_alphabetically() {
     let stripped = strip_ansi(&stdout);
 
     // Both should appear
-    assert!(stripped.contains("apple"), "Output should contain 'apple', got:\n{stripped}");
-    assert!(stripped.contains("zebra"), "Output should contain 'zebra', got:\n{stripped}");
+    assert!(
+        stripped.contains("apple"),
+        "Output should contain 'apple', got:\n{stripped}"
+    );
+    assert!(
+        stripped.contains("zebra"),
+        "Output should contain 'zebra', got:\n{stripped}"
+    );
 
     // Alphabetically "apple" comes before "zebra" when scores are tied at 0
     let apple_pos = stripped.find("apple").unwrap();
@@ -6291,8 +6375,14 @@ fn pipeline_suggest_empty_string_treated_as_no_description() {
     let stripped = strip_ansi(&stdout);
 
     // Should show both pipelines
-    assert!(stripped.contains("alpha"), "Output should contain 'alpha', got:\n{stripped}");
-    assert!(stripped.contains("beta"), "Output should contain 'beta', got:\n{stripped}");
+    assert!(
+        stripped.contains("alpha"),
+        "Output should contain 'alpha', got:\n{stripped}"
+    );
+    assert!(
+        stripped.contains("beta"),
+        "Output should contain 'beta', got:\n{stripped}"
+    );
 
     // Alphabetically: "alpha" before "beta"
     let alpha_pos = stripped.find("alpha").unwrap();

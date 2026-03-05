@@ -33,9 +33,28 @@ cargo install --path .
 
 This installs the `wai` binary to `~/.cargo/bin/`.
 
+> **⚠️ WARNING:** Ensure `~/.cargo/bin/` is in your PATH and has precedence. If you've previously installed `wai` via a package manager, the cargo version might be shadowed.
+
 ## Verify Installation
 
 ```bash
-wai --version
-wai --help
+which wai        # Check which binary is being used
+wai --version    # Check version
+wai --help       # Check help
 ```
+
+## Common Installation Issues
+
+### "wai: command not found"
+
+**Problem:** The directory containing the `wai` binary is not in your shell's PATH.
+
+**Solution (macOS/Linux):**
+Add this to your shell profile (`.bashrc`, `.zshrc`, or `.profile`):
+```bash
+export PATH="$HOME/.cargo/bin:$PATH"
+```
+
+**Solution (Windows):**
+Add `%USERPROFILE%\.cargo\bin` to your User PATH environment variable.
+

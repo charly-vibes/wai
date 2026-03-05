@@ -23,7 +23,7 @@
 
 # Reference
 
-- [FAQ](./faq.md)
+- [FAQ Reference](./faq-reference.md)
 
 # Contributing
 
