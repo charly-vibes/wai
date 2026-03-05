@@ -190,6 +190,7 @@ The legacy `[why]` section name is still accepted for backwards compatibility.
 | `wai reflect --conversation <file>` | Include conversation transcript as richest input |
 | `wai reflect --output <target>` | Target: `claude.md`, `agents.md`, or `both` |
 | `wai reflect --dry-run` | Preview the resource file path without writing |
+| `wai reflect --save-memories` | Extract top-level bullets and save each to bd memories |
 
 `wai reflect` reads accumulated handoffs, research, and optional conversation transcript, then asks an LLM to extract project-specific conventions and gotchas. Writes the result to `.wai/resources/reflections/<date>-<project>.md` with YAML front-matter. A slim `WAI:REFLECT:REF` pointer block in `CLAUDE.md`/`AGENTS.md` tells agents where to find the patterns.
 

@@ -428,6 +428,7 @@ wai reflect                          # Auto-detect project and output targets
 wai reflect --conversation chat.md   # Include conversation transcript (richest input)
 wai reflect --output agents.md       # Write only to AGENTS.md
 wai reflect --dry-run                # Preview changes without writing
+wai reflect --save-memories          # Save top-level bullet points to bd memories
 ```
 
 `wai reflect` reads your handoffs, research, and optional conversation transcript, then asks an LLM to extract project-specific conventions, gotchas, and patterns. The result is written to `.wai/resources/reflections/<date>-<project>.md`. A slim `WAI:REFLECT:REF` pointer block in `CLAUDE.md`/`AGENTS.md` tells agents where to find the patterns. On first run, any existing `WAI:REFLECT` block is automatically migrated to a resource file.
