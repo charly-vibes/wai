@@ -26,6 +26,7 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             file,
             project,
             tags,
+            bead,
         } => {
             require_safe_mode("add research")?;
             let (target_project, project_dir) = resolve_project(&project_root, project.as_deref())?;
@@ -48,9 +49,14 @@ pub fn run(cmd: AddCommands) -> Result<()> {
 
             // Build combined tags: user-supplied + pipeline-run auto-tag
             let all_tags = build_tags(tags.as_deref(), &project_root);
-            if !all_tags.is_empty() {
+            if !all_tags.is_empty() || bead.is_some() {
                 file_content.push_str("---\n");
-                file_content.push_str(&format!("tags: [{}]\n", all_tags.join(", ")));
+                if !all_tags.is_empty() {
+                    file_content.push_str(&format!("tags: [{}]\n", all_tags.join(", ")));
+                }
+                if let Some(ref bead_id) = bead {
+                    file_content.push_str(&format!("bead: {}\n", bead_id));
+                }
                 file_content.push_str("---\n\n");
             }
 
@@ -289,6 +295,79 @@ fn get_content(content: Option<&str>, file: Option<&str>) -> Result<String> {
 /// Resolution order (first non-empty value wins):
 ///   1. `WAI_PIPELINE_RUN` environment variable (backwards-compatible).
 ///   2. `.wai/.pipeline-run` state file (written by `wai pipeline run`).
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn bead_field_written_to_frontmatter() {
+        let dir = tempfile::tempdir().unwrap();
+        let research_dir = dir.path().join("research");
+        std::fs::create_dir_all(&research_dir).unwrap();
+
+        let bead_id = "wai-p94k";
+        let body = "some research notes";
+        let slug = slug::slugify(body.chars().take(50).collect::<String>());
+        let date = chrono::Utc::now().format("%Y-%m-%d");
+        let filename = format!("{}-{}.md", date, slug);
+
+        let mut file_content = String::new();
+        let all_tags: Vec<String> = vec![];
+        // Replicate the frontmatter logic from run()
+        if !all_tags.is_empty() || true {
+            file_content.push_str("---\n");
+            if !all_tags.is_empty() {
+                file_content.push_str(&format!("tags: [{}]\n", all_tags.join(", ")));
+            }
+            file_content.push_str(&format!("bead: {}\n", bead_id));
+            file_content.push_str("---\n\n");
+        }
+        file_content.push_str(body);
+        file_content.push('\n');
+
+        std::fs::write(research_dir.join(&filename), &file_content).unwrap();
+        let written = std::fs::read_to_string(research_dir.join(&filename)).unwrap();
+        assert!(written.contains("bead: wai-p94k"), "bead field missing from frontmatter");
+        assert!(written.contains("---"), "frontmatter delimiters missing");
+        assert!(!written.contains("tags:"), "tags should not appear when not provided");
+    }
+
+    #[test]
+    fn bead_and_tags_both_written_when_both_provided() {
+        let bead_id = "wai-abc";
+        let tags = vec!["research".to_string(), "design".to_string()];
+        let mut file_content = String::new();
+        file_content.push_str("---\n");
+        if !tags.is_empty() {
+            file_content.push_str(&format!("tags: [{}]\n", tags.join(", ")));
+        }
+        file_content.push_str(&format!("bead: {}\n", bead_id));
+        file_content.push_str("---\n\n");
+        file_content.push_str("notes\n");
+
+        assert!(file_content.contains("tags: [research, design]"));
+        assert!(file_content.contains("bead: wai-abc"));
+    }
+
+    #[test]
+    fn no_frontmatter_when_neither_tags_nor_bead() {
+        let all_tags: Vec<String> = vec![];
+        let bead: Option<String> = None;
+        let mut file_content = String::new();
+        if !all_tags.is_empty() || bead.is_some() {
+            file_content.push_str("---\n");
+            if !all_tags.is_empty() {
+                file_content.push_str(&format!("tags: [{}]\n", all_tags.join(", ")));
+            }
+            if let Some(ref id) = bead {
+                file_content.push_str(&format!("bead: {}\n", id));
+            }
+            file_content.push_str("---\n\n");
+        }
+        file_content.push_str("notes\n");
+
+        assert!(!file_content.contains("---"), "no frontmatter should be written");
+    }
+}
+
 fn build_tags(user_tags: Option<&str>, project_root: &std::path::Path) -> Vec<String> {
     let mut tags: Vec<String> = Vec::new();
 

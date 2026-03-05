@@ -447,6 +447,10 @@ pub enum AddCommands {
         /// Add tags
         #[arg(short, long)]
         tags: Option<String>,
+
+        /// Link to a bead/issue ID (adds bead field to frontmatter)
+        #[arg(long)]
+        bead: Option<String>,
     },
 
     /// Add a plan document
