@@ -336,8 +336,9 @@ pub fn format_json(response: &ParsedResponse, query: &str) -> String {
     serde_json::to_string_pretty(&v).unwrap_or_else(|_| response.raw.clone())
 }
 
-// Approximate character budget: 100K tokens × 4 chars/token
-const MAX_CONTEXT_CHARS: usize = 400_000;
+// Hard character budget for LLM context. Keeps prompts within a safe size
+// for all supported backends and prevents runaway costs from massive local files.
+const MAX_CONTEXT_CHARS: usize = 100_000;
 const MAX_ARTIFACTS_WHEN_TRUNCATING: usize = 50;
 
 // ── Data types ────────────────────────────────────────────────────────────────
@@ -716,16 +717,37 @@ pub fn build_prompt(ctx: &GatheredContext) -> String {
         parts.push(format!("# Project Context\n{}\n", meta_lines.join("\n")));
     }
 
-    // Artifacts — wrap in code fences and escape injection attempts
+    // Artifacts — wrap in code fences and escape injection attempts.
+    // Each artifact's content is individually capped at MAX_CONTEXT_CHARS so
+    // a single massive file cannot blow out the prompt budget.
     if !ctx.artifacts.is_empty() {
         let mut artifact_text = String::from("# Available Artifacts\n");
+        let mut chars_used: usize = artifact_text.len();
         for artifact in &ctx.artifacts {
-            artifact_text.push_str(&format!(
-                "\n## {} ({})\n```\n{}\n```\n",
+            let raw = escape_artifact(&artifact.content);
+            let (body, note) = if chars_used + raw.len() > MAX_CONTEXT_CHARS {
+                let budget = MAX_CONTEXT_CHARS.saturating_sub(chars_used);
+                if budget == 0 {
+                    break;
+                }
+                let over = raw.len() - budget;
+                let truncated = &raw[..budget];
+                (
+                    truncated.to_string(),
+                    format!("\n[... truncated: {} chars over budget ...]", over),
+                )
+            } else {
+                (raw, String::new())
+            };
+            let block = format!(
+                "\n## {} ({})\n```\n{}{}\n```\n",
                 artifact.rel_path,
                 artifact.kind.label(),
-                escape_artifact(&artifact.content),
-            ));
+                body,
+                note,
+            );
+            chars_used += block.len();
+            artifact_text.push_str(&block);
         }
         parts.push(artifact_text);
     }
