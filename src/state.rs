@@ -121,7 +121,12 @@ impl ProjectState {
 
     pub fn save(&self, state_path: &Path) -> Result<(), WaiError> {
         let content = serde_yml::to_string(self)?;
-        std::fs::write(state_path, content)?;
+        // Write atomically: write to a temp file in the same directory, then
+        // rename so readers never see a partial state file.
+        let dir = state_path.parent().unwrap_or_else(|| Path::new("."));
+        let tmp_path = dir.join("state.yml.tmp");
+        std::fs::write(&tmp_path, &content)?;
+        std::fs::rename(&tmp_path, state_path)?;
         Ok(())
     }
 
