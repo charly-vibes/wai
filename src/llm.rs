@@ -437,7 +437,7 @@ impl LlmClient for AgentBackend {
 ///   - `"claude"`     → Claude API (requires `ANTHROPIC_API_KEY`)
 ///   - `"claude-cli"` → Claude CLI binary; warns if inside a Claude Code session
 ///   - `"agent"`      → AgentBackend; warns if no agent session detected
-///                      (detection: WAI_AGENT, CLAUDECODE, or CURSOR_AGENT non-empty)
+///     (detection: WAI_AGENT, CLAUDECODE, or CURSOR_AGENT non-empty)
 ///   - `"ollama"`     → Ollama local model
 ///
 /// Auto-detect priority:

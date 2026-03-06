@@ -190,15 +190,14 @@ fn render_json(
         } else {
             // Normal path: read latest handoff for summary only (no next steps shown).
             let summary = find_latest_handoff(project_root, project_name)?
-                .map(|hp| {
+                .and_then(|hp| {
                     let (_, snippet) = read_handoff_summary(&hp);
                     if snippet.is_empty() {
                         None
                     } else {
                         Some(snippet)
                     }
-                })
-                .flatten();
+                });
             (false, summary, Vec::new())
         };
 

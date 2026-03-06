@@ -979,20 +979,20 @@ pub fn run(args: ReflectArgs) -> Result<()> {
             if let (Some(s), Some(e)) = (
                 existing.find(reflect_start_marker),
                 existing.find(reflect_end_marker),
-            ) {
-                if s < e {
-                    let end_pos = e + reflect_end_marker.len();
-                    // Check if a REF block already exists after the old block.
-                    let tail = &existing[end_pos..];
-                    let already_has_ref = tail.contains(REFLECT_REF_START);
-                    let mut new_content = String::with_capacity(existing.len());
-                    new_content.push_str(&existing[..s]);
-                    if !already_has_ref {
-                        new_content.push_str(&ref_block);
-                    }
-                    new_content.push_str(&existing[end_pos..]);
-                    std::fs::write(target, new_content).into_diagnostic()?;
+            )
+                && s < e
+            {
+                let end_pos = e + reflect_end_marker.len();
+                // Check if a REF block already exists after the old block.
+                let tail = &existing[end_pos..];
+                let already_has_ref = tail.contains(REFLECT_REF_START);
+                let mut new_content = String::with_capacity(existing.len());
+                new_content.push_str(&existing[..s]);
+                if !already_has_ref {
+                    new_content.push_str(&ref_block);
                 }
+                new_content.push_str(&existing[end_pos..]);
+                std::fs::write(target, new_content).into_diagnostic()?;
             }
 
             if !migration_notice_printed {
@@ -1001,23 +1001,23 @@ pub fn run(args: ReflectArgs) -> Result<()> {
         }
 
         // Write migrated resource file if we found content and no migrated file exists.
-        if let Some(content) = first_content {
-            if !migrated_exists {
-                std::fs::create_dir_all(&refl_dir).into_diagnostic()?;
-                let project_slug = project_name
-                    .as_deref()
-                    .map(|n| slug::slugify(n))
-                    .unwrap_or_else(|| "project".to_string());
-                let migrated_filename = format!("{}-{}-migrated.md", today, project_slug);
-                let migrated_path = refl_dir.join(&migrated_filename);
-                let front_matter = format!(
-                    "---\ndate: \"{}\"\nproject: \"{}\"\ntype: reflection-migrated\n---\n\n{}",
-                    today,
-                    project_name.as_deref().unwrap_or("unknown"),
-                    content.trim()
-                );
-                std::fs::write(&migrated_path, front_matter).into_diagnostic()?;
-            }
+        if let Some(content) = first_content
+            && !migrated_exists
+        {
+            std::fs::create_dir_all(&refl_dir).into_diagnostic()?;
+            let project_slug = project_name
+                .as_deref()
+                .map(slug::slugify)
+                .unwrap_or_else(|| "project".to_string());
+            let migrated_filename = format!("{}-{}-migrated.md", today, project_slug);
+            let migrated_path = refl_dir.join(&migrated_filename);
+            let front_matter = format!(
+                "---\ndate: \"{}\"\nproject: \"{}\"\ntype: reflection-migrated\n---\n\n{}",
+                today,
+                project_name.as_deref().unwrap_or("unknown"),
+                content.trim()
+            );
+            std::fs::write(&migrated_path, front_matter).into_diagnostic()?;
         }
 
         if migration_notice_printed {

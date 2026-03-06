@@ -223,10 +223,10 @@ pub fn run(args: SearchArgs) -> Result<()> {
             let first_line_num = line_num.saturating_sub(pre_count); // 1-based number of first context line
 
             // Insert separator when this block is not adjacent to the previous one.
-            if let Some(prev_end) = last_shown_end {
-                if first_line_num > prev_end + 1 {
-                    println!("    {}", "--".dimmed());
-                }
+            if let Some(prev_end) = last_shown_end
+                && first_line_num > prev_end + 1
+            {
+                println!("    {}", "--".dimmed());
             }
 
             // Print pre-context lines (dim).
@@ -269,18 +269,18 @@ pub fn run(args: SearchArgs) -> Result<()> {
     }
 
     // bd memories section — shown when --include-memories is passed
-    if include_memories && !context.json {
-        if let Some(mem_raw) = fetch_memories_for_query(&project_root, &query) {
-            let mem_lines: Vec<&str> = mem_raw.lines().filter(|l| !l.trim().is_empty()).collect();
-            if !mem_lines.is_empty() {
-                println!();
-                println!("  {} Memories", "◆".cyan());
-                println!();
-                for line in &mem_lines {
-                    println!("  {}  {}", "[mem]".dimmed(), line);
-                }
-                println!();
+    if include_memories && !context.json
+        && let Some(mem_raw) = fetch_memories_for_query(&project_root, &query)
+    {
+        let mem_lines: Vec<&str> = mem_raw.lines().filter(|l| !l.trim().is_empty()).collect();
+        if !mem_lines.is_empty() {
+            println!();
+            println!("  {} Memories", "◆".cyan());
+            println!();
+            for line in &mem_lines {
+                println!("  {}  {}", "[mem]".dimmed(), line);
             }
+            println!();
         }
     }
 

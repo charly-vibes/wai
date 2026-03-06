@@ -399,14 +399,14 @@ fn check_git_hooks(repo_root: &Path) -> CheckResult {
                 suggestion: None,
             };
         }
-        return CheckResult {
+        CheckResult {
             name: name.to_string(),
             status: Status::Info,
             message: "prek.toml found but hooks not installed — run: prek install".to_string(),
             intent,
             success_criteria,
             suggestion: None,
-        };
+        }
     } else if lefthook_config.exists() || lefthook_config_yaml.exists() {
         if hook_contains(repo_root, "lefthook") {
             CheckResult {
@@ -1207,14 +1207,45 @@ fn check_test_coverage(repo_root: &Path) -> CheckResult {
             }
         };
     }
-    if let Ok(pyproject) = std::fs::read_to_string(repo_root.join("pyproject.toml")) {
-        if pyproject.contains("[tool.coverage.report]") {
-            let has_threshold = pyproject.contains("fail_under");
+    if let Ok(pyproject) = std::fs::read_to_string(repo_root.join("pyproject.toml"))
+        && pyproject.contains("[tool.coverage.report]")
+    {
+        let has_threshold = pyproject.contains("fail_under");
+        return if has_threshold {
+            CheckResult {
+                name: name.to_string(),
+                status: Status::Pass,
+                message: "coverage.py configured (threshold enforced)".to_string(),
+                intent,
+                success_criteria,
+                suggestion: None,
+            }
+        } else {
+            CheckResult {
+                name: name.to_string(),
+                status: Status::Pass,
+                message: "coverage.py configured".to_string(),
+                intent,
+                success_criteria,
+                suggestion: Some(
+                    "Add `fail_under` to [tool.coverage.report] in pyproject.toml — https://coverage.readthedocs.io".to_string(),
+                ),
+            }
+        };
+    }
+
+    // JavaScript / TypeScript — vitest
+    for config_name in &["vitest.config.ts", "vitest.config.js", "vitest.config.mts"] {
+        let config_path = repo_root.join(config_name);
+        if let Ok(content) = std::fs::read_to_string(&config_path)
+            && content.contains("coverage")
+        {
+            let has_threshold = content.contains("thresholds");
             return if has_threshold {
                 CheckResult {
                     name: name.to_string(),
                     status: Status::Pass,
-                    message: "coverage.py configured (threshold enforced)".to_string(),
+                    message: "vitest coverage configured (threshold enforced)".to_string(),
                     intent,
                     success_criteria,
                     suggestion: None,
@@ -1223,45 +1254,14 @@ fn check_test_coverage(repo_root: &Path) -> CheckResult {
                 CheckResult {
                     name: name.to_string(),
                     status: Status::Pass,
-                    message: "coverage.py configured".to_string(),
+                    message: "vitest coverage configured".to_string(),
                     intent,
                     success_criteria,
                     suggestion: Some(
-                        "Add `fail_under` to [tool.coverage.report] in pyproject.toml — https://coverage.readthedocs.io".to_string(),
+                        "Add `thresholds` to the coverage block in vitest.config — https://vitest.dev/config/#coverage".to_string(),
                     ),
                 }
             };
-        }
-    }
-
-    // JavaScript / TypeScript — vitest
-    for config_name in &["vitest.config.ts", "vitest.config.js", "vitest.config.mts"] {
-        let config_path = repo_root.join(config_name);
-        if let Ok(content) = std::fs::read_to_string(&config_path) {
-            if content.contains("coverage") {
-                let has_threshold = content.contains("thresholds");
-                return if has_threshold {
-                    CheckResult {
-                        name: name.to_string(),
-                        status: Status::Pass,
-                        message: "vitest coverage configured (threshold enforced)".to_string(),
-                        intent,
-                        success_criteria,
-                        suggestion: None,
-                    }
-                } else {
-                    CheckResult {
-                        name: name.to_string(),
-                        status: Status::Pass,
-                        message: "vitest coverage configured".to_string(),
-                        intent,
-                        success_criteria,
-                        suggestion: Some(
-                            "Add `thresholds` to the coverage block in vitest.config — https://vitest.dev/config/#coverage".to_string(),
-                        ),
-                    }
-                };
-            }
         }
     }
 
@@ -1310,31 +1310,31 @@ fn check_test_coverage(repo_root: &Path) -> CheckResult {
             }
         };
     }
-    if let Ok(pkg) = std::fs::read_to_string(repo_root.join("package.json")) {
-        if pkg.contains("\"nyc\"") || pkg.contains("\"c8\"") {
-            let has_threshold = pkg.contains("branches") || pkg.contains("lines");
-            return if has_threshold {
-                CheckResult {
-                    name: name.to_string(),
-                    status: Status::Pass,
-                    message: "nyc/c8 configured (threshold enforced)".to_string(),
-                    intent,
-                    success_criteria,
-                    suggestion: None,
-                }
-            } else {
-                CheckResult {
-                    name: name.to_string(),
-                    status: Status::Pass,
-                    message: "nyc/c8 configured".to_string(),
-                    intent,
-                    success_criteria,
-                    suggestion: Some(
-                        "Add branch/line thresholds to nyc or c8 config — https://github.com/istanbuljs/nyc · https://github.com/bcoe/c8".to_string(),
-                    ),
-                }
-            };
-        }
+    if let Ok(pkg) = std::fs::read_to_string(repo_root.join("package.json"))
+        && (pkg.contains("\"nyc\"") || pkg.contains("\"c8\""))
+    {
+        let has_threshold = pkg.contains("branches") || pkg.contains("lines");
+        return if has_threshold {
+            CheckResult {
+                name: name.to_string(),
+                status: Status::Pass,
+                message: "nyc/c8 configured (threshold enforced)".to_string(),
+                intent,
+                success_criteria,
+                suggestion: None,
+            }
+        } else {
+            CheckResult {
+                name: name.to_string(),
+                status: Status::Pass,
+                message: "nyc/c8 configured".to_string(),
+                intent,
+                success_criteria,
+                suggestion: Some(
+                    "Add branch/line thresholds to nyc or c8 config — https://github.com/istanbuljs/nyc · https://github.com/bcoe/c8".to_string(),
+                ),
+            }
+        };
     }
 
     // Any language — codecov / coveralls

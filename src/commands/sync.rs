@@ -77,10 +77,9 @@ fn claude_code_needs_sync(config_dir: &std::path::Path, cc_dir: &std::path::Path
                 if let Ok(dst_meta) = std::fs::metadata(&dest) {
                     if let (Ok(src_mtime), Ok(dst_mtime)) =
                         (src_meta.modified(), dst_meta.modified())
+                        && src_mtime > dst_mtime
                     {
-                        if src_mtime > dst_mtime {
-                            return true; // Source newer than destination
-                        }
+                        return true; // Source newer than destination
                     }
                 } else {
                     return true; // Can't read dest metadata → conservative

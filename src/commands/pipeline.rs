@@ -389,12 +389,12 @@ fn cmd_suggest(description: Option<&str>) -> Result<()> {
         for entry in fs::read_dir(&pipelines).into_diagnostic()? {
             let entry = entry.into_diagnostic()?;
             let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) == Some("toml") {
-                if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
-                    match load_pipeline_toml(&path) {
-                        Ok(def) => found.push((name.to_string(), def)),
-                        Err(e) => eprintln!("warning: skipping {}: {}", path.display(), e),
-                    }
+            if path.extension().and_then(|e| e.to_str()) == Some("toml")
+                && let Some(name) = path.file_stem().and_then(|s| s.to_str())
+            {
+                match load_pipeline_toml(&path) {
+                    Ok(def) => found.push((name.to_string(), def)),
+                    Err(e) => eprintln!("warning: skipping {}: {}", path.display(), e),
                 }
             }
         }
@@ -452,10 +452,10 @@ fn score_pipeline(name: &str, def: &PipelineDefinition, words: &[&str]) -> usize
 /// fall back to the `.last-run` pointer file at `.wai/resources/pipelines/.last-run`.
 fn resolve_active_run_id(project_root: &Path) -> Result<String> {
     // Try env var first
-    if let Ok(run_id) = std::env::var("WAI_PIPELINE_RUN") {
-        if !run_id.is_empty() {
-            return Ok(run_id);
-        }
+    if let Ok(run_id) = std::env::var("WAI_PIPELINE_RUN")
+        && !run_id.is_empty()
+    {
+        return Ok(run_id);
     }
     // Fall back to .last-run pointer file
     let last_run = crate::config::last_run_path(project_root);

@@ -50,18 +50,17 @@ fn detect_pipeline_state(workspace_root: &Path) -> PipelineStatusInfo {
         let run_path = workspace_root
             .join(".wai/pipeline-runs")
             .join(format!("{}.yml", rid));
-        if run_path.exists() {
-            if let Ok(content) = fs::read_to_string(&run_path) {
-                if let Ok(run) = serde_yml::from_str::<PipelineRun>(&content) {
-                    let def_path =
-                        pipelines_dir(workspace_root).join(format!("{}.toml", run.pipeline));
-                    if let Ok(def) = load_pipeline_toml(&def_path) {
-                        return PipelineStatusInfo::Active {
-                            run,
-                            definition: def,
-                        };
-                    }
-                }
+        if run_path.exists()
+            && let Ok(content) = fs::read_to_string(&run_path)
+            && let Ok(run) = serde_yml::from_str::<PipelineRun>(&content)
+        {
+            let def_path =
+                pipelines_dir(workspace_root).join(format!("{}.toml", run.pipeline));
+            if let Ok(def) = load_pipeline_toml(&def_path) {
+                return PipelineStatusInfo::Active {
+                    run,
+                    definition: def,
+                };
             }
         }
         // Stale pointer — fall through to available pipelines
@@ -74,12 +73,12 @@ fn detect_pipeline_state(workspace_root: &Path) -> PipelineStatusInfo {
         if let Ok(entries) = fs::read_dir(&pipelines) {
             for entry in entries.flatten() {
                 let path = entry.path();
-                if path.is_file() && path.extension().and_then(|e| e.to_str()) == Some("toml") {
-                    if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
-                        match load_pipeline_toml(&path) {
-                            Ok(def) => available.push((name.to_string(), def)),
-                            Err(e) => eprintln!("warning: {}: {}", path.display(), e),
-                        }
+                if path.is_file() && path.extension().and_then(|e| e.to_str()) == Some("toml")
+                    && let Some(name) = path.file_stem().and_then(|s| s.to_str())
+                {
+                    match load_pipeline_toml(&path) {
+                        Ok(def) => available.push((name.to_string(), def)),
+                        Err(e) => eprintln!("warning: {}: {}", path.display(), e),
                     }
                 }
             }
@@ -427,17 +426,16 @@ fn render_json(project_root: &std::path::Path, _project_name: &str) -> Result<()
 
     // Gather workflow suggestions from pattern detection
     let mut workflow_suggestions: Vec<Suggestion> = Vec::new();
-    if proj_dir.exists() {
-        if let Ok(entries) = std::fs::read_dir(&proj_dir) {
-            for entry in entries.filter_map(|e| e.ok()) {
-                if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
-                    if let Some(name) = entry.file_name().to_str() {
-                        if let Some(ctx) = workflows::scan_project(project_root, name) {
-                            for detection in workflows::detect_patterns(&ctx) {
-                                workflow_suggestions.extend(detection.suggestions);
-                            }
-                        }
-                    }
+    if proj_dir.exists()
+        && let Ok(entries) = std::fs::read_dir(&proj_dir)
+    {
+        for entry in entries.filter_map(|e| e.ok()) {
+            if entry.file_type().map(|t| t.is_dir()).unwrap_or(false)
+                && let Some(name) = entry.file_name().to_str()
+                && let Some(ctx) = workflows::scan_project(project_root, name)
+            {
+                for detection in workflows::detect_patterns(&ctx) {
+                    workflow_suggestions.extend(detection.suggestions);
                 }
             }
         }

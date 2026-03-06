@@ -1482,10 +1482,10 @@ fn check_agent_tool_coverage(project_root: &Path) -> Vec<CheckResult> {
 
     // If the projections file exists and is explicitly empty, the user has intentionally
     // opted out of projections — skip the per-directory coverage warnings entirely.
-    if let Some(ref p) = projections_opt {
-        if p.is_empty() {
-            return vec![];
-        }
+    if let Some(ref p) = projections_opt
+        && p.is_empty()
+    {
+        return vec![];
     }
 
     let projections = projections_opt.unwrap_or_default();
