@@ -7,7 +7,11 @@
 use cliclack::log;
 use miette::{IntoDiagnostic, Result};
 use serde::Deserialize;
+use std::io::IsTerminal;
 use std::path::Path;
+
+use crate::context::current_context;
+use crate::error::WaiError;
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct Projection {
@@ -26,6 +30,72 @@ pub(crate) fn ensure_parent_dirs(path: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Check whether a non-empty directory is safe to remove, prompting if needed.
+///
+/// Safe to remove silently when:
+/// - The directory is empty, or
+/// - The directory contains a `.wai/` subdirectory (previously managed by wai).
+///
+/// Otherwise:
+/// - In interactive mode, ask the user for confirmation.
+/// - In non-interactive mode (`--no-input` or stdin is not a TTY), return an error.
+fn check_unmanaged_dir(target: &Path) -> Result<()> {
+    // Collect entries; if we can't read the dir, let the caller handle it.
+    let entries: Vec<_> = match std::fs::read_dir(target) {
+        Ok(rd) => rd.filter_map(|e| e.ok()).collect(),
+        Err(_) => return Ok(()),
+    };
+
+    // Empty → always safe.
+    if entries.is_empty() {
+        return Ok(());
+    }
+
+    // Contains a .wai/ marker → managed by wai, safe.
+    if target.join(".wai").is_dir() {
+        return Ok(());
+    }
+
+    // Non-empty, unmanaged directory — need confirmation.
+    let ctx = current_context();
+
+    // --yes flag bypasses the prompt.
+    if ctx.yes {
+        return Ok(());
+    }
+
+    if ctx.no_input || !std::io::stdin().is_terminal() {
+        return Err(WaiError::NonInteractive {
+            message: format!(
+                "Directory '{}' contains unmanaged data. \
+                 Re-run interactively or pass --yes to confirm removal.",
+                target.display()
+            ),
+        }
+        .into());
+    }
+
+    // Interactive prompt.
+    let confirmed = cliclack::confirm(format!(
+        "Directory '{}' contains unmanaged data. Remove it?",
+        target.display()
+    ))
+    .interact()
+    .into_diagnostic()?;
+
+    if confirmed {
+        Ok(())
+    } else {
+        Err(WaiError::NonInteractive {
+            message: format!(
+                "Aborted: directory '{}' was not removed.",
+                target.display()
+            ),
+        }
+        .into())
+    }
+}
+
 /// Execute a symlink projection.
 ///
 /// - File source → file symlink at target pointing to source.
@@ -42,6 +112,7 @@ pub(crate) fn execute_symlink(
     // Remove any existing target before recreating.
     if target.symlink_metadata().is_ok() {
         if target.is_dir() && !target.is_symlink() {
+            check_unmanaged_dir(&target)?;
             std::fs::remove_dir_all(&target).into_diagnostic()?;
         } else {
             std::fs::remove_file(&target).into_diagnostic()?;
@@ -476,6 +547,40 @@ mod tests {
         execute_symlink(&root, &config, &proj).unwrap();
         assert!(root.join("f.md").is_symlink());
         assert_eq!(fs::read_to_string(root.join("f.md")).unwrap(), "new");
+    }
+
+    // ── safety check tests ────────────────────────────────────────────────────
+
+    #[test]
+    fn check_unmanaged_dir_empty_is_safe() {
+        let tmp = TempDir::new().unwrap();
+        let empty_dir = tmp.path().join("empty");
+        fs::create_dir_all(&empty_dir).unwrap();
+        // Empty directory must never fail regardless of TTY state.
+        check_unmanaged_dir(&empty_dir).unwrap();
+    }
+
+    #[test]
+    fn check_unmanaged_dir_wai_marker_is_safe() {
+        let tmp = TempDir::new().unwrap();
+        let managed = tmp.path().join("managed");
+        fs::create_dir_all(managed.join(".wai")).unwrap();
+        fs::write(managed.join("data.txt"), "important").unwrap();
+        // Has .wai/ → treated as managed, must succeed.
+        check_unmanaged_dir(&managed).unwrap();
+    }
+
+    #[test]
+    fn check_unmanaged_dir_non_empty_non_interactive_fails() {
+        let tmp = TempDir::new().unwrap();
+        let unmanaged = tmp.path().join("unmanaged");
+        fs::create_dir_all(&unmanaged).unwrap();
+        fs::write(unmanaged.join("secret.txt"), "precious").unwrap();
+
+        // In tests stdin is not a TTY and no_input defaults to false,
+        // so is_terminal() returns false → NonInteractive error.
+        let result = check_unmanaged_dir(&unmanaged);
+        assert!(result.is_err(), "should fail for non-empty unmanaged dir in non-interactive mode");
     }
 
     // ── copy tests ────────────────────────────────────────────────────────────
