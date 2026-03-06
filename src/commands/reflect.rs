@@ -877,16 +877,28 @@ pub fn extract_top_level_bullets(content: &str) -> Vec<String> {
         .collect()
 }
 
-pub fn run(
-    project: Option<String>,
-    conversation: Option<PathBuf>,
-    output: Option<String>,
-    dry_run: bool,
-    _yes: bool,
-    inject_content: Option<String>,
-    _verbose: u8,
-    save_memories: bool,
-) -> Result<()> {
+pub struct ReflectArgs {
+    pub project: Option<String>,
+    pub conversation: Option<PathBuf>,
+    pub output: Option<String>,
+    pub dry_run: bool,
+    pub yes: bool,
+    pub inject_content: Option<String>,
+    pub verbose: u8,
+    pub save_memories: bool,
+}
+
+pub fn run(args: ReflectArgs) -> Result<()> {
+    let ReflectArgs {
+        project,
+        conversation,
+        output,
+        dry_run,
+        yes: _yes,
+        inject_content,
+        verbose: _verbose,
+        save_memories,
+    } = args;
     let project_root = super::require_project()?;
 
     let today = chrono::Local::now().format("%Y-%m-%d").to_string();

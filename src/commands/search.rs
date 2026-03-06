@@ -12,17 +12,30 @@ use super::require_project;
 
 const DEFAULT_LIMIT: usize = 20;
 
-pub fn run(
-    query: String,
-    type_filter: Option<String>,
-    project: Option<String>,
-    use_regex: bool,
-    limit: Option<usize>,
-    tag_filter: Vec<String>,
-    latest: bool,
-    context_size: usize,
-    include_memories: bool,
-) -> Result<()> {
+pub struct SearchArgs {
+    pub query: String,
+    pub type_filter: Option<String>,
+    pub project: Option<String>,
+    pub use_regex: bool,
+    pub limit: Option<usize>,
+    pub tag_filter: Vec<String>,
+    pub latest: bool,
+    pub context_size: usize,
+    pub include_memories: bool,
+}
+
+pub fn run(args: SearchArgs) -> Result<()> {
+    let SearchArgs {
+        query,
+        type_filter,
+        project,
+        use_regex,
+        limit,
+        tag_filter,
+        latest,
+        context_size,
+        include_memories,
+    } = args;
     let display_limit = limit.unwrap_or(DEFAULT_LIMIT);
     let project_root = require_project()?;
     let context = current_context();

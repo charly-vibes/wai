@@ -59,17 +59,17 @@ pub fn run(cli: Cli) -> Result<()> {
             latest,
             context,
             include_memories,
-        }) => search::run(
+        }) => search::run(search::SearchArgs {
             query,
             type_filter,
             project,
-            regex,
+            use_regex: regex,
             limit,
-            tag,
+            tag_filter: tag,
             latest,
-            context,
+            context_size: context,
             include_memories,
-        ),
+        }),
         Some(Commands::Timeline {
             project,
             from,
@@ -109,16 +109,16 @@ pub fn run(cli: Cli) -> Result<()> {
             yes,
             inject_content,
             save_memories,
-        }) => reflect::run(
+        }) => reflect::run(reflect::ReflectArgs {
             project,
             conversation,
             output,
             dry_run,
             yes,
             inject_content,
-            cli.verbose,
+            verbose: cli.verbose,
             save_memories,
-        ),
+        }),
         Some(Commands::External(args)) => run_external(args),
         None => show_welcome(),
     }

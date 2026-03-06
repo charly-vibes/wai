@@ -1036,7 +1036,17 @@ pub fn run(query: String, no_llm: bool, json: bool, verbose: u8) -> Result<()> {
     let project_root = require_project()?;
 
     if no_llm {
-        return super::search::run(query, None, None, false, None, Vec::new(), false, 0, false);
+        return super::search::run(super::search::SearchArgs {
+            query,
+            type_filter: None,
+            project: None,
+            use_regex: false,
+            limit: None,
+            tag_filter: Vec::new(),
+            latest: false,
+            context_size: 0,
+            include_memories: false,
+        });
     }
 
     let ctx = gather_context(&project_root, &query);
@@ -1112,7 +1122,17 @@ pub fn run(query: String, no_llm: bool, json: bool, verbose: u8) -> Result<()> {
             if let Some(hint) = explicit_backend_agent_hint(&why_cfg) {
                 eprintln!("  {} {}", "→".cyan(), hint);
             }
-            return super::search::run(query, None, None, false, None, Vec::new(), false, 0, false);
+            return super::search::run(super::search::SearchArgs {
+            query,
+            type_filter: None,
+            project: None,
+            use_regex: false,
+            limit: None,
+            tag_filter: Vec::new(),
+            latest: false,
+            context_size: 0,
+            include_memories: false,
+        });
         }
     };
 
@@ -1158,7 +1178,17 @@ pub fn run(query: String, no_llm: bool, json: bool, verbose: u8) -> Result<()> {
             if let Some(h) = explicit_backend_agent_hint(&why_cfg) {
                 eprintln!("  {} {}", "→".cyan(), h);
             }
-            return super::search::run(query, None, None, false, None, Vec::new(), false, 0, false);
+            return super::search::run(super::search::SearchArgs {
+            query,
+            type_filter: None,
+            project: None,
+            use_regex: false,
+            limit: None,
+            tag_filter: Vec::new(),
+            latest: false,
+            context_size: 0,
+            include_memories: false,
+        });
         }
     };
     let elapsed_ms = start.elapsed().as_millis();
