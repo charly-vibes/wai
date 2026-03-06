@@ -57,8 +57,13 @@ pub struct ProjectConfig {
     pub llm: Option<LlmConfig>,
     /// Legacy `[why]` section kept for backwards-compatible deserialisation.
     ///
-    /// New code should always write to `llm`. This field is only populated
-    /// when loading a config that was written by an older version of wai.
+    /// **Deprecated.** New code must always write to `llm`. This field is only
+    /// populated when loading a config written by an older version of wai.
+    /// [`ProjectConfig::llm_config`] emits a deprecation warning to stderr when
+    /// this field is non-`None`. Users should rename `[why]` to `[llm]` in
+    /// their `.wai/config.toml`. Support for `[why]` will be removed in a
+    /// future minor version.
+    ///
     /// Use [`ProjectConfig::llm_config`] to access the effective settings.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub why: Option<LlmConfig>,
@@ -86,7 +91,8 @@ impl ProjectConfig {
 /// Configuration for the LLM backend used by `wai why` and `wai reflect`.
 ///
 /// Stored under `[llm]` in `.wai/config.toml`. The legacy `[why]` section is
-/// still accepted for backwards compatibility.
+/// still accepted for backwards compatibility but is deprecated — a warning is
+/// printed to stderr when it is detected. Rename `[why]` to `[llm]` to silence it.
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
 pub struct LlmConfig {
     /// LLM backend to use: "claude" or "ollama". Omit for auto-detection.

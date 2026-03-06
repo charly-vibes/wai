@@ -893,16 +893,11 @@ fn show_privacy_notice() {
 /// blocks the query from proceeding.
 pub fn mark_privacy_notice_shown(project_root: &std::path::Path) {
     if let Ok(mut config) = ProjectConfig::load(project_root) {
-        // Write to whichever section is present. If only the legacy `[why]`
-        // section exists, update it in place so we don't silently migrate the
-        // config format. Otherwise use (or create) the canonical `[llm]` section.
-        if config.llm.is_none() && config.why.is_some() {
-            let why_cfg = config.why.get_or_insert_with(LlmConfig::default);
-            why_cfg.privacy_notice_shown = Some(true);
-        } else {
-            let llm_cfg = config.llm.get_or_insert_with(LlmConfig::default);
-            llm_cfg.privacy_notice_shown = Some(true);
-        }
+        // Always write to the canonical `[llm]` section. The legacy `[why]`
+        // section is deprecated; `llm_config()` already emits a warning when
+        // it is detected. Do not perpetuate it by writing back to it.
+        let llm_cfg = config.llm.get_or_insert_with(LlmConfig::default);
+        llm_cfg.privacy_notice_shown = Some(true);
         let _ = config.save(project_root);
     }
 }
