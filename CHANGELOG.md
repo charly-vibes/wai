@@ -5,6 +5,23 @@ All notable changes to wai will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Calendar Versioning](https://calver.org/) (YYYY.M.MICRO).
 
+## [2026.3.2] - 2026-03-06
+
+### Added
+- **Safety check for symlink directory removal** — `wai sync` now checks if a target directory contains unmanaged data before removing it; prompts in interactive mode, fails in non-interactive
+- **Plugin execution timeouts** — external plugin commands are now terminated after 30 seconds to prevent indefinite hangs
+
+### Fixed
+- **Atomic state file writes** — `state.yml` is now written via temp file + rename to prevent corruption on concurrent access
+- **LLM context character budget** — `wai why` enforces a 100,000-character limit on artifact content added to prompts, truncating with a clear marker
+
+### Changed
+- **Deprecated `[why]` config section** — `[why]` in `.wai/config.toml` is deprecated in favour of `[llm]`; a warning is printed at runtime and the legacy write path has been removed
+- **Refactored `search` and `reflect` commands** — internal argument structs replace bare parameter lists (fixes `too_many_arguments` Clippy warning)
+- **Clippy cleanup** — resolved 22 warnings across 10 files (collapsible `if`, redundant closures, doc comment indentation)
+
+---
+
 ## [2026.3.1] - 2026-03-05
 
 ### Added
