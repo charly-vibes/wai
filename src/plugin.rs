@@ -2,6 +2,10 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::Path;
 use std::process::Command;
+use std::sync::mpsc;
+use std::time::Duration;
+
+const PLUGIN_TIMEOUT: Duration = Duration::from_secs(30);
 
 use crate::config::plugins_dir;
 use crate::context::current_context;
@@ -197,26 +201,67 @@ pub fn detect_plugins(project_root: &Path) -> Vec<ActivePlugin> {
 }
 
 /// Execute a plugin hook and return its output.
+///
+/// Enforces a 30-second timeout: if the child process does not complete within
+/// that window it is killed and `None` is returned.
 pub fn execute_hook(project_root: &Path, hook: &HookDef) -> Option<HookOutput> {
+    use std::sync::{Arc, Mutex};
+
     let parts = shell_words::split(&hook.command).ok()?;
     if parts.is_empty() {
         return None;
     }
 
-    let output = Command::new(&parts[0])
+    let child = Command::new(&parts[0])
         .args(&parts[1..])
         .current_dir(project_root)
-        .output()
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
         .ok()?;
 
-    if !output.status.success() || output.stdout.is_empty() {
-        return None;
-    }
+    // Wrap in Arc<Mutex<>> so both the waiter thread and the timeout path can
+    // access the child handle.
+    let child = Arc::new(Mutex::new(child));
+    let child_thread = Arc::clone(&child);
 
-    Some(HookOutput {
-        label: hook.inject_as.clone(),
-        content: String::from_utf8_lossy(&output.stdout).to_string(),
-    })
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        // `wait_with_output` consumes the Child, but we hold it behind a Mutex.
+        // Instead, use `wait` to get the exit status, then read stdout separately.
+        let result = child_thread.lock().unwrap().wait();
+        let _ = tx.send(result);
+    });
+
+    match rx.recv_timeout(PLUGIN_TIMEOUT) {
+        Ok(Ok(status)) => {
+            // Collect stdout from the child's piped handle.
+            let mut guard = child.lock().unwrap();
+            let stdout = guard.stdout.take();
+            drop(guard);
+            let content = if let Some(mut out) = stdout {
+                use std::io::Read;
+                let mut buf = String::new();
+                out.read_to_string(&mut buf).ok();
+                buf
+            } else {
+                String::new()
+            };
+            if !status.success() || content.is_empty() {
+                return None;
+            }
+            Some(HookOutput {
+                label: hook.inject_as.clone(),
+                content,
+            })
+        }
+        Ok(Err(_)) => None,
+        Err(_) => {
+            // Timed out — terminate the child process.
+            let _ = child.lock().unwrap().kill();
+            None
+        }
+    }
 }
 
 /// Run all hooks for a given event across all detected plugins.
@@ -392,12 +437,34 @@ pub fn execute_passthrough(
         }));
     }
 
+    use std::sync::{Arc, Mutex};
+
     let mut cmd = Command::new(&parts[0]);
     cmd.args(&parts[1..]);
     cmd.args(extra_args);
     cmd.current_dir(project_root);
 
-    cmd.status()
+    let child = cmd.spawn()?;
+    let child = Arc::new(Mutex::new(child));
+    let child_thread = Arc::clone(&child);
+
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        let result = child_thread.lock().unwrap().wait();
+        let _ = tx.send(result);
+    });
+
+    match rx.recv_timeout(PLUGIN_TIMEOUT) {
+        Ok(result) => result,
+        Err(_) => {
+            // Timed out — kill the child and report an error.
+            let _ = child.lock().unwrap().kill();
+            Err(std::io::Error::new(
+                std::io::ErrorKind::TimedOut,
+                "plugin command exceeded 30-second timeout",
+            ))
+        }
+    }
 }
 
 #[cfg(test)]
