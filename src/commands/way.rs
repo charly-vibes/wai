@@ -68,6 +68,8 @@ pub fn run(fix: Option<String>) -> Result<()> {
         check_task_runner(&repo_root),
         check_git_hooks(&repo_root),
         check_editorconfig(&repo_root),
+        check_typos(&repo_root),
+        check_vale(&repo_root),
         check_documentation(&repo_root),
         check_ai_instructions(&repo_root),
         check_llm_txt(&repo_root),
@@ -1490,6 +1492,99 @@ fn check_gh_cli() -> CheckResult {
             success_criteria,
             suggestion: Some("Run 'gh auth login' to authenticate".to_string()),
         },
+    }
+}
+
+fn check_typos(repo_root: &Path) -> CheckResult {
+    let name = "Spell checking";
+    let intent = Some(
+        "Catch typos in source code, comments, and documentation before they reach history."
+            .to_string(),
+    );
+    let success_criteria =
+        Some("A typos configuration exists to enforce spell checking.".to_string());
+
+    let configs = [
+        repo_root.join("typos.toml"),
+        repo_root.join("_typos.toml"),
+        repo_root.join(".typos.toml"),
+    ];
+
+    if let Some(found) = configs.iter().find(|p| p.exists()) {
+        return CheckResult {
+            name: name.to_string(),
+            status: Status::Pass,
+            message: format!(
+                "typos configured ({})",
+                found.file_name().unwrap_or_default().to_string_lossy()
+            ),
+            intent,
+            success_criteria,
+            suggestion: None,
+        };
+    }
+
+    // Check pyproject.toml for [tool.typos]
+    if let Ok(content) = std::fs::read_to_string(repo_root.join("pyproject.toml"))
+        && content.contains("[tool.typos]")
+    {
+        return CheckResult {
+            name: name.to_string(),
+            status: Status::Pass,
+            message: "typos configured (pyproject.toml)".to_string(),
+            intent,
+            success_criteria,
+            suggestion: None,
+        };
+    }
+
+    CheckResult {
+        name: name.to_string(),
+        status: Status::Info,
+        message: "No typos configuration detected".to_string(),
+        intent,
+        success_criteria,
+        suggestion: Some(
+            "Add _typos.toml to catch spelling errors in code — https://github.com/crate-ci/typos"
+                .to_string(),
+        ),
+    }
+}
+
+fn check_vale(repo_root: &Path) -> CheckResult {
+    let name = "Prose linting";
+    let intent = Some(
+        "Enforce writing style and consistency across documentation and markdown files."
+            .to_string(),
+    );
+    let success_criteria =
+        Some("A vale configuration exists to enforce prose style rules.".to_string());
+
+    let configs = [repo_root.join(".vale.ini"), repo_root.join("vale.ini")];
+
+    if let Some(found) = configs.iter().find(|p| p.exists()) {
+        return CheckResult {
+            name: name.to_string(),
+            status: Status::Pass,
+            message: format!(
+                "vale configured ({})",
+                found.file_name().unwrap_or_default().to_string_lossy()
+            ),
+            intent,
+            success_criteria,
+            suggestion: None,
+        };
+    }
+
+    CheckResult {
+        name: name.to_string(),
+        status: Status::Info,
+        message: "No vale configuration detected".to_string(),
+        intent,
+        success_criteria,
+        suggestion: Some(
+            "Add .vale.ini to lint prose in markdown and docs — https://vale.sh".to_string(),
+        ),
     }
 }
 
