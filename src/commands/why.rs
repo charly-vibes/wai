@@ -1118,16 +1118,16 @@ pub fn run(query: String, no_llm: bool, json: bool, verbose: u8) -> Result<()> {
                 eprintln!("  {} {}", "→".cyan(), hint);
             }
             return super::search::run(super::search::SearchArgs {
-            query,
-            type_filter: None,
-            project: None,
-            use_regex: false,
-            limit: None,
-            tag_filter: Vec::new(),
-            latest: false,
-            context_size: 0,
-            include_memories: false,
-        });
+                query,
+                type_filter: None,
+                project: None,
+                use_regex: false,
+                limit: None,
+                tag_filter: Vec::new(),
+                latest: false,
+                context_size: 0,
+                include_memories: false,
+            });
         }
     };
 
@@ -1174,16 +1174,16 @@ pub fn run(query: String, no_llm: bool, json: bool, verbose: u8) -> Result<()> {
                 eprintln!("  {} {}", "→".cyan(), h);
             }
             return super::search::run(super::search::SearchArgs {
-            query,
-            type_filter: None,
-            project: None,
-            use_regex: false,
-            limit: None,
-            tag_filter: Vec::new(),
-            latest: false,
-            context_size: 0,
-            include_memories: false,
-        });
+                query,
+                type_filter: None,
+                project: None,
+                use_regex: false,
+                limit: None,
+                tag_filter: Vec::new(),
+                latest: false,
+                context_size: 0,
+                include_memories: false,
+            });
         }
     };
     let elapsed_ms = start.elapsed().as_millis();

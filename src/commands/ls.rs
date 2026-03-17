@@ -44,9 +44,7 @@ pub fn run(root: Option<PathBuf>, depth: Option<usize>, timeout_secs: u64) -> Re
 
     // When using default root, also check ancestor directories of cwd so workspaces
     // deeper than max_depth are never silently omitted.
-    if !explicit_root
-        && let Ok(cwd) = std::env::current_dir()
-    {
+    if !explicit_root && let Ok(cwd) = std::env::current_dir() {
         for ancestor in find_ancestor_workspaces(&cwd) {
             if !workspaces.contains(&ancestor) {
                 workspaces.push(ancestor);

@@ -979,8 +979,7 @@ pub fn run(args: ReflectArgs) -> Result<()> {
             if let (Some(s), Some(e)) = (
                 existing.find(reflect_start_marker),
                 existing.find(reflect_end_marker),
-            )
-                && s < e
+            ) && s < e
             {
                 let end_pos = e + reflect_end_marker.len();
                 // Check if a REF block already exists after the old block.

@@ -54,8 +54,7 @@ fn detect_pipeline_state(workspace_root: &Path) -> PipelineStatusInfo {
             && let Ok(content) = fs::read_to_string(&run_path)
             && let Ok(run) = serde_yml::from_str::<PipelineRun>(&content)
         {
-            let def_path =
-                pipelines_dir(workspace_root).join(format!("{}.toml", run.pipeline));
+            let def_path = pipelines_dir(workspace_root).join(format!("{}.toml", run.pipeline));
             if let Ok(def) = load_pipeline_toml(&def_path) {
                 return PipelineStatusInfo::Active {
                     run,
@@ -73,7 +72,8 @@ fn detect_pipeline_state(workspace_root: &Path) -> PipelineStatusInfo {
         if let Ok(entries) = fs::read_dir(&pipelines) {
             for entry in entries.flatten() {
                 let path = entry.path();
-                if path.is_file() && path.extension().and_then(|e| e.to_str()) == Some("toml")
+                if path.is_file()
+                    && path.extension().and_then(|e| e.to_str()) == Some("toml")
                     && let Some(name) = path.file_stem().and_then(|s| s.to_str())
                 {
                     match load_pipeline_toml(&path) {

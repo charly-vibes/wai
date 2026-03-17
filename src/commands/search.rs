@@ -269,7 +269,8 @@ pub fn run(args: SearchArgs) -> Result<()> {
     }
 
     // bd memories section — shown when --include-memories is passed
-    if include_memories && !context.json
+    if include_memories
+        && !context.json
         && let Some(mem_raw) = fetch_memories_for_query(&project_root, &query)
     {
         let mem_lines: Vec<&str> = mem_raw.lines().filter(|l| !l.trim().is_empty()).collect();

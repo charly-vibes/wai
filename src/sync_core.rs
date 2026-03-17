@@ -87,10 +87,7 @@ fn check_unmanaged_dir(target: &Path) -> Result<()> {
         Ok(())
     } else {
         Err(WaiError::NonInteractive {
-            message: format!(
-                "Aborted: directory '{}' was not removed.",
-                target.display()
-            ),
+            message: format!("Aborted: directory '{}' was not removed.", target.display()),
         }
         .into())
     }
@@ -580,7 +577,10 @@ mod tests {
         // In tests stdin is not a TTY and no_input defaults to false,
         // so is_terminal() returns false → NonInteractive error.
         let result = check_unmanaged_dir(&unmanaged);
-        assert!(result.is_err(), "should fail for non-empty unmanaged dir in non-interactive mode");
+        assert!(
+            result.is_err(),
+            "should fail for non-empty unmanaged dir in non-interactive mode"
+        );
     }
 
     // ── copy tests ────────────────────────────────────────────────────────────
