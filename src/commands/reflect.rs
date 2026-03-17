@@ -1803,16 +1803,16 @@ mod tests {
         let original_dir = std::env::current_dir().unwrap();
         std::env::set_current_dir(dir.path()).unwrap();
 
-        let result = run(
-            None,
-            None,
-            None,
-            false,
-            true,
-            Some("# Patterns\ntest content from inject".to_string()),
-            0,
-            false,
-        );
+        let result = run(ReflectArgs {
+            project: None,
+            conversation: None,
+            output: None,
+            dry_run: false,
+            yes: true,
+            inject_content: Some("# Patterns\ntest content from inject".to_string()),
+            verbose: 0,
+            save_memories: false,
+        });
 
         // Restore working directory before asserting, so failures don't break
         // other serial tests.
