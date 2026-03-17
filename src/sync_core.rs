@@ -574,8 +574,15 @@ mod tests {
         fs::create_dir_all(&unmanaged).unwrap();
         fs::write(unmanaged.join("secret.txt"), "precious").unwrap();
 
-        // In tests stdin is not a TTY and no_input defaults to false,
-        // so is_terminal() returns false → NonInteractive error.
+        // Force no_input so the check never tries to prompt regardless of TTY state.
+        crate::context::set_context(crate::context::CliContext {
+            no_input: true,
+            json: false,
+            yes: false,
+            safe: false,
+            verbose: 0,
+            quiet: false,
+        });
         let result = check_unmanaged_dir(&unmanaged);
         assert!(
             result.is_err(),
