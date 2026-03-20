@@ -78,7 +78,7 @@ pub fn run(cli: Cli) -> Result<()> {
         }) => timeline::run(project, from, to, reverse),
         Some(Commands::Plugin(cmd)) => plugin::run(cmd),
         Some(Commands::Doctor { fix }) => doctor::run(fix),
-        Some(Commands::Way { fix }) => way::run(fix),
+        Some(Commands::Way { topic, fix }) => way::run(topic, fix),
         Some(Commands::Import { path }) => import::run(path),
         Some(Commands::Resource(cmd)) => match cmd {
             crate::cli::ResourceCommands::Add(add_cmd) => resource::run_add(add_cmd),

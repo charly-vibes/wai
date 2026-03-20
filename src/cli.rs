@@ -211,6 +211,10 @@ pub enum Commands {
             Use --json for machine-readable output suitable for CI integration and automation."
     )]
     Way {
+        /// Topic to discuss interactively (e.g. ci, hooks, coverage)
+        #[arg(value_name = "TOPIC")]
+        topic: Option<String>,
+
         /// Scaffold missing items for a check: skills
         #[arg(long, value_name = "CHECK")]
         fix: Option<String>,
