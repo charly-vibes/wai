@@ -5,6 +5,28 @@ All notable changes to wai will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Calendar Versioning](https://calver.org/) (YYYY.M.MICRO).
 
+## [2026.3.4] - 2026-03-20
+
+### Added
+- **Interactive topic guides** — `wai way <topic>` prints an LLM facilitation guide that instructs an AI assistant to walk the user through setting up a specific aspect of their repository interactively, one decision at a time. 9 topics available: `ai`, `ci`, `coverage`, `devxp`, `docs`, `gh`, `hooks`, `issues`, `specs`. Each guide detects current repo state, provides a TL;DR for fast LLM orientation, and includes structured discussion topics with trade-offs and guidelines.
+
+---
+
+## [2026.3.3] - 2026-03-14
+
+### Added
+- **Typos and vale checks in `wai way`** — spell checking (`typos`) and prose linting (`vale`) are now included in the repo hygiene check matrix
+- **Lefthook git hooks** — added `lefthook.yml` for local CI checks (format, lint)
+- **LLM discoverability** — added `llms.txt` for machine-readable project context
+- **LLM authorship disclaimer** — added AI attribution notice to README and docs
+
+### Fixed
+- **Test TTY hang** — set `no_input` context in unmanaged directory test to avoid blocking on TTY
+- **Reflect test** — updated to use `ReflectArgs` struct
+- **Formatting** — applied `cargo fmt` to resolve style drift
+
+---
+
 ## [2026.3.2] - 2026-03-06
 
 ### Added
