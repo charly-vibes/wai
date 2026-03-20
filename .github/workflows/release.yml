@@ -178,12 +178,12 @@ jobs:
           VERSION="${{ steps.pkg.outputs.version }}"
           git clone "https://x-access-token:${TAP_GITHUB_TOKEN}@github.com/charly-vibes/homebrew-charly.git" /tmp/tap
           python3 scripts/update-homebrew.py \
-            /tmp/tap/Formulas/wai.rb \
+            /tmp/tap/Formula/wai.rb \
             "${VERSION}" "${TAG}" dist/checksums.txt
           cd /tmp/tap
           git config user.email "github-actions@github.com"
           git config user.name "GitHub Actions"
-          git add Formulas/wai.rb
+          git add Formula/wai.rb
           git diff --staged --quiet || git commit -m "Update wai to ${VERSION}"
           git push
 
