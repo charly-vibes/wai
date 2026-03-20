@@ -1377,6 +1377,13 @@ fn render_human(checks: &[CheckResult], summary: &Summary, verbose: u8) -> Resul
         outro(summary_line.green().to_string()).into_diagnostic()?;
     }
 
+    println!(
+        "  {} Deep-dive into any area: {}",
+        "·".dimmed(),
+        format!("wai way <{}>", AVAILABLE_TOPICS.join("|")).dimmed()
+    );
+    println!();
+
     Ok(())
 }
 
