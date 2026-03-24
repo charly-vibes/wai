@@ -5,6 +5,13 @@ All notable changes to wai will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Calendar Versioning](https://calver.org/) (YYYY.M.MICRO).
 
+## [2026.3.5] - 2026-03-24
+
+### Added
+- **Shell linting check in `wai way`** — detects shell scripts (`.sh`/`.bash` files in root, `scripts/`, `bin/`) and GitHub Actions workflows, then checks for `actionlint` and `shellcheck` availability. Recommends the appropriate tool based on what's present — actionlint for workflow YAML with embedded `run:` blocks, shellcheck for standalone scripts.
+
+---
+
 ## [2026.3.4] - 2026-03-20
 
 ### Added
