@@ -21,6 +21,10 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
             env_vars: &[
                 ("NO_COLOR", "Disable colored output"),
                 ("WAI_LOG", "Set log level (trace, debug, info, warn, error)"),
+                (
+                    "WAI_PROJECT",
+                    "Session-scoped project binding (overrides auto-detect)",
+                ),
             ],
             internals: &[
                 "Reads .wai/projects/*/.state for phase info",
@@ -83,6 +87,10 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
             ],
             env_vars: &[
                 ("NO_COLOR", "Disable colored output"),
+                (
+                    "WAI_PROJECT",
+                    "Fallback project when --project not specified",
+                ),
                 (
                     "WAI_PIPELINE_RUN",
                     "Auto-tag artifact with pipeline-run:<id> when set",
@@ -576,6 +584,9 @@ pub fn render_main_help(verbose: u8) -> String {
         out.push_str("\nENVIRONMENT:\n");
         out.push_str("  NO_COLOR          Disable colored output\n");
         out.push_str("  WAI_LOG           Set log level (trace, debug, info, warn, error)\n");
+        out.push_str(
+            "  WAI_PROJECT       Session-scoped project binding (overrides auto-detect)\n",
+        );
         out.push_str("  EDITOR            Editor for interactive editing commands\n");
         out.push_str("  WAI_PIPELINE_RUN  Auto-tag `wai add` artifacts with pipeline-run:<id>\n");
     }
