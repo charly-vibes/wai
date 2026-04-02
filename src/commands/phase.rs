@@ -9,7 +9,7 @@ use crate::json::Suggestion;
 use crate::plugin;
 use crate::state::{Phase, ProjectState};
 
-use super::{print_suggestions, require_project, resolve_project};
+use super::{ProjectSource, print_suggestions, require_project, resolve_project};
 
 pub fn run(args: PhaseArgs) -> Result<()> {
     let project_root = require_project()?;
@@ -26,7 +26,13 @@ pub fn run(args: PhaseArgs) -> Result<()> {
         PhaseCommands::Show => {
             let state = ProjectState::load(&state_path)?;
             println!();
-            println!("  {} Project: {}", "◆".cyan(), project_name.bold());
+            let source_hint = format_source(resolved.source);
+            println!(
+                "  {} Project: {}{}",
+                "◆".cyan(),
+                project_name.bold(),
+                source_hint
+            );
             println!(
                 "  {} Current phase: {}",
                 "◆".cyan(),
@@ -226,6 +232,14 @@ fn get_phase_suggestions(phase: Phase) -> Vec<Suggestion> {
                 command: "wai show".to_string(),
             },
         ],
+    }
+}
+
+fn format_source(source: ProjectSource) -> String {
+    match source {
+        ProjectSource::Flag => format!(" {}", "[via --project]".dimmed()),
+        ProjectSource::EnvVar => format!(" {}", "[via WAI_PROJECT]".dimmed()),
+        ProjectSource::AutoDetect | ProjectSource::Interactive => String::new(),
     }
 }
 

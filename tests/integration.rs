@@ -6805,3 +6805,71 @@ fn project_use_fish_shell_syntax() {
         stdout
     );
 }
+
+// ─── Resolution Source Display ───────────────────────────────────────────────
+
+#[test]
+fn phase_show_displays_via_wai_project_indicator() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "alpha");
+    create_project(tmp.path(), "beta");
+
+    let out = wai_cmd(tmp.path())
+        .env("WAI_PROJECT", "alpha")
+        .args(["phase", "show"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let stdout = strip_ansi(&String::from_utf8_lossy(&out));
+    assert!(
+        stdout.contains("[via WAI_PROJECT]"),
+        "expected [via WAI_PROJECT] in: {}",
+        stdout
+    );
+}
+
+#[test]
+fn phase_show_displays_via_project_flag_indicator() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "alpha");
+    create_project(tmp.path(), "beta");
+
+    let out = wai_cmd(tmp.path())
+        .args(["phase", "--project", "alpha", "show"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let stdout = strip_ansi(&String::from_utf8_lossy(&out));
+    assert!(
+        stdout.contains("[via --project]"),
+        "expected [via --project] in: {}",
+        stdout
+    );
+}
+
+#[test]
+fn phase_show_no_indicator_for_auto_detect() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "only");
+
+    let out = wai_cmd(tmp.path())
+        .args(["phase", "show"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let stdout = strip_ansi(&String::from_utf8_lossy(&out));
+    assert!(
+        !stdout.contains("[via"),
+        "expected no [via] indicator for auto-detect in: {}",
+        stdout
+    );
+}
