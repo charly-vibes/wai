@@ -41,7 +41,7 @@ pub fn run(cli: Cli) -> Result<()> {
         Some(Commands::Add(cmd)) => add::run(cmd),
         Some(Commands::Show { name }) => show::run(name),
         Some(Commands::Move(args)) => move_cmd::run(args),
-        Some(Commands::Phase(sub)) => phase::run(sub),
+        Some(Commands::Phase(args)) => phase::run(args),
         Some(Commands::Sync {
             status,
             dry_run,
@@ -438,6 +438,120 @@ pub(crate) fn resolve_project_named(
             }
             let selected: String = sel.interact().into_diagnostic()?;
             Ok(selected)
+        }
+    }
+}
+
+/// How a project was resolved by [`resolve_project`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ProjectSource {
+    /// Explicit `--project` CLI flag.
+    Flag,
+    /// `WAI_PROJECT` environment variable.
+    EnvVar,
+    /// Auto-detected (exactly one project exists).
+    AutoDetect,
+    /// User selected interactively via cliclack prompt.
+    Interactive,
+}
+
+/// Result of project resolution: the project name and how it was resolved.
+#[derive(Debug, Clone)]
+pub(crate) struct ResolvedProject {
+    pub name: String,
+    #[allow(dead_code)] // Used by wai-82uh (resolution source display)
+    pub source: ProjectSource,
+}
+
+/// Unified project resolution with deterministic priority order:
+///
+/// 1. `explicit` — the `--project` CLI flag (highest priority)
+/// 2. `WAI_PROJECT` environment variable (empty string treated as unset)
+/// 3. Auto-detect when exactly one project in `.wai/projects/`
+/// 4. Interactive selector when TTY available and `--no-input` not set
+/// 5. Error with guidance
+///
+/// Validates that the resolved project directory exists.
+pub(crate) fn resolve_project(
+    project_root: &Path,
+    explicit: Option<&str>,
+) -> Result<ResolvedProject> {
+    // 1. Explicit --project flag
+    if let Some(name) = explicit {
+        let proj_dir = projects_dir(project_root).join(name);
+        if !proj_dir.exists() {
+            let available = list_projects(project_root);
+            let available_str = if available.is_empty() {
+                "none".to_string()
+            } else {
+                available.join(", ")
+            };
+            miette::bail!(
+                "Project '{}' not found. Available projects: {}",
+                name,
+                available_str
+            );
+        }
+        return Ok(ResolvedProject {
+            name: name.to_string(),
+            source: ProjectSource::Flag,
+        });
+    }
+
+    // 2. WAI_PROJECT environment variable (empty string treated as unset)
+    if let Ok(env_name) = std::env::var("WAI_PROJECT")
+        && !env_name.is_empty()
+    {
+        let proj_dir = projects_dir(project_root).join(&env_name);
+        if !proj_dir.exists() {
+            let available = list_projects(project_root);
+            let available_str = if available.is_empty() {
+                "none".to_string()
+            } else {
+                available.join(", ")
+            };
+            miette::bail!(
+                "WAI_PROJECT='{}' but project not found. Available projects: {}",
+                env_name,
+                available_str
+            );
+        }
+        return Ok(ResolvedProject {
+            name: env_name,
+            source: ProjectSource::EnvVar,
+        });
+    }
+
+    // 3-5. Auto-detect / interactive / error
+    let mut projects = list_projects(project_root);
+    projects.sort();
+
+    match projects.len() {
+        0 => miette::bail!("No projects found. Create one with `wai new project <name>`."),
+        1 => Ok(ResolvedProject {
+            name: projects.remove(0),
+            source: ProjectSource::AutoDetect,
+        }),
+        _ => {
+            let ctx = current_context();
+            if ctx.no_input || !std::io::stdin().is_terminal() {
+                return Err(WaiError::NonInteractive {
+                    message: format!(
+                        "Multiple projects found ({}). Use `--project <name>` or `export WAI_PROJECT=<name>` to specify one.",
+                        projects.join(", ")
+                    ),
+                }
+                .into());
+            }
+            let mut sel = cliclack::select("Multiple projects found — which one?");
+            for name in &projects {
+                sel = sel.item(name.clone(), name.as_str(), "");
+            }
+            let selected: String = sel.interact().into_diagnostic()?;
+            Ok(ResolvedProject {
+                name: selected,
+                source: ProjectSource::Interactive,
+            })
         }
     }
 }

@@ -83,8 +83,7 @@ pub enum Commands {
     Status,
 
     /// Show or change the current project phase
-    #[command(subcommand)]
-    Phase(PhaseCommands),
+    Phase(PhaseArgs),
 
     /// Sync agent configs to tool-specific locations.
     ///
@@ -523,6 +522,16 @@ pub struct MoveArgs {
 
     /// Target category (archives, projects, areas, resources)
     pub target: String,
+}
+
+#[derive(clap::Args)]
+pub struct PhaseArgs {
+    /// Project name (auto-detected when only one project exists)
+    #[arg(short, long)]
+    pub project: Option<String>,
+
+    #[command(subcommand)]
+    pub command: Option<PhaseCommands>,
 }
 
 #[derive(Subcommand)]

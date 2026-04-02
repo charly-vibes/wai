@@ -6630,3 +6630,109 @@ success_criteria = "CODEOWNERS file exists in the repo root or .github/ director
         .success()
         .stdout(predicate::str::contains("\"my-check\""));
 }
+
+// ─── Project Resolution (WAI_PROJECT env var) ────────────────────────────────
+
+#[test]
+fn phase_show_single_project_auto_detects() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "only-project");
+
+    wai_cmd(tmp.path())
+        .args(["phase", "show"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("only-project"));
+}
+
+#[test]
+fn phase_show_multiple_projects_no_context_errors_non_interactive() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "alpha");
+    create_project(tmp.path(), "beta");
+
+    // Without WAI_PROJECT or --project, non-interactive should error
+    wai_cmd(tmp.path())
+        .args(["--no-input", "phase", "show"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("alpha").and(predicate::str::contains("beta")));
+}
+
+#[test]
+fn phase_show_wai_project_env_selects_project() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "alpha");
+    create_project(tmp.path(), "beta");
+
+    wai_cmd(tmp.path())
+        .env("WAI_PROJECT", "beta")
+        .args(["phase", "show"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("beta"));
+}
+
+#[test]
+fn phase_show_wai_project_invalid_errors() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "alpha");
+
+    wai_cmd(tmp.path())
+        .env("WAI_PROJECT", "nonexistent")
+        .args(["phase", "show"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("nonexistent"));
+}
+
+#[test]
+fn phase_show_wai_project_empty_treated_as_unset() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "only-project");
+
+    // Empty WAI_PROJECT should fall through to auto-detect
+    wai_cmd(tmp.path())
+        .env("WAI_PROJECT", "")
+        .args(["phase", "show"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("only-project"));
+}
+
+#[test]
+fn phase_show_project_flag_overrides_wai_project_env() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "alpha");
+    create_project(tmp.path(), "beta");
+
+    // --project flag should win over WAI_PROJECT env
+    wai_cmd(tmp.path())
+        .env("WAI_PROJECT", "alpha")
+        .args(["phase", "--project", "beta", "show"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("beta"));
+}
+
+#[test]
+fn phase_show_project_flag_invalid_errors() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "alpha");
+
+    wai_cmd(tmp.path())
+        .args(["phase", "--project", "nonexistent", "show"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("nonexistent"));
+}
+
+// Test for close/prime WAI_PROJECT migration lives in wai-ophm ticket.
+// Phase commands are the focus of wai-lrl9.

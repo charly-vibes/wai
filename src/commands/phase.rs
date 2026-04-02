@@ -2,20 +2,25 @@ use cliclack::log;
 use miette::{IntoDiagnostic, Result};
 use owo_colors::OwoColorize;
 
-use crate::cli::PhaseCommands;
+use crate::cli::{PhaseArgs, PhaseCommands};
 use crate::config::{STATE_FILE, projects_dir};
 use crate::context::require_safe_mode;
 use crate::json::Suggestion;
 use crate::plugin;
 use crate::state::{Phase, ProjectState};
 
-use super::{print_suggestions, require_project};
+use super::{print_suggestions, require_project, resolve_project};
 
-pub fn run(cmd: PhaseCommands) -> Result<()> {
+pub fn run(args: PhaseArgs) -> Result<()> {
     let project_root = require_project()?;
 
-    // Find the first project to operate on
-    let (project_name, state_path) = find_active_project(&project_root)?;
+    let resolved = resolve_project(&project_root, args.project.as_deref())?;
+    let project_name = &resolved.name;
+    let state_path = projects_dir(&project_root)
+        .join(project_name)
+        .join(STATE_FILE);
+
+    let cmd = args.command.unwrap_or(PhaseCommands::Show);
 
     match cmd {
         PhaseCommands::Show => {
@@ -132,23 +137,6 @@ pub fn run(cmd: PhaseCommands) -> Result<()> {
             Ok(())
         }
     }
-}
-
-fn find_active_project(project_root: &std::path::Path) -> Result<(String, std::path::PathBuf)> {
-    let proj_dir = projects_dir(project_root);
-    if proj_dir.exists() {
-        for entry in std::fs::read_dir(&proj_dir).into_diagnostic()? {
-            let entry = entry.into_diagnostic()?;
-            if entry.file_type().into_diagnostic()?.is_dir() {
-                let state_path = entry.path().join(STATE_FILE);
-                if let Some(name) = entry.file_name().to_str() {
-                    return Ok((name.to_string(), state_path));
-                }
-            }
-        }
-    }
-
-    Err(crate::error::WaiError::NoProjectContext.into())
 }
 
 /// Generate phase-specific suggestions based on the current phase
