@@ -2,5 +2,6 @@
   "database": "dolt",
   "backend": "dolt",
   "dolt_mode": "server",
-  "dolt_database": "wai"
+  "dolt_database": "wai",
+  "project_id": "b38ae8d8-63f5-4a94-9061-83ab7dbd59e6"
 }
