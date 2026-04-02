@@ -400,7 +400,6 @@ pub(crate) enum ProjectSource {
 #[derive(Debug, Clone)]
 pub(crate) struct ResolvedProject {
     pub name: String,
-    #[allow(dead_code)] // Used by wai-82uh (resolution source display)
     pub source: ProjectSource,
 }
 

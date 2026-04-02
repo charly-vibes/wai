@@ -36,7 +36,8 @@ pub fn run(cmd: ProjectCommands) -> Result<()> {
 
     match cmd {
         ProjectCommands::Use { name } => {
-            let projects = list_projects(&project_root);
+            let mut projects = list_projects(&project_root);
+            projects.sort();
 
             if let Some(name) = name {
                 // Validate project exists
@@ -54,12 +55,15 @@ pub fn run(cmd: ProjectCommands) -> Result<()> {
                     );
                 }
 
-                // Detect shell and print appropriate export syntax
+                // Detect shell and print appropriate export syntax.
+                // NOTE: $SHELL is the login shell, not necessarily the running shell.
+                // A more robust approach would check $FISH_VERSION, $ZSH_VERSION, etc.
+                // but that requires per-shell detection logic — keep simple for now.
                 let shell = std::env::var("SHELL").unwrap_or_default();
                 if shell.ends_with("/fish") || shell.ends_with("\\fish") {
-                    println!("set -gx WAI_PROJECT {}", name);
+                    println!("set -gx WAI_PROJECT '{}'", name);
                 } else {
-                    println!("export WAI_PROJECT={}", name);
+                    println!("export WAI_PROJECT='{}'", name);
                 }
 
                 // Print hint to stderr when stdout is a terminal

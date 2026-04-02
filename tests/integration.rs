@@ -6734,6 +6734,50 @@ fn phase_show_project_flag_invalid_errors() {
         .stderr(predicate::str::contains("nonexistent"));
 }
 
+#[test]
+fn phase_next_project_flag_only_mutates_target() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "alpha");
+    create_project(tmp.path(), "beta");
+
+    // Advance alpha to design
+    wai_cmd(tmp.path())
+        .args(["phase", "--project", "alpha", "next"])
+        .assert()
+        .success();
+
+    // Alpha should now be in design
+    let out = wai_cmd(tmp.path())
+        .args(["phase", "--project", "alpha", "show"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let stdout = strip_ansi(&String::from_utf8_lossy(&out));
+    assert!(
+        stdout.contains("design"),
+        "expected alpha in design phase: {}",
+        stdout
+    );
+
+    // Beta should still be in research (unaffected)
+    let out = wai_cmd(tmp.path())
+        .args(["phase", "--project", "beta", "show"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let stdout = strip_ansi(&String::from_utf8_lossy(&out));
+    assert!(
+        stdout.contains("research"),
+        "expected beta still in research phase: {}",
+        stdout
+    );
+}
+
 // ─── wai project use ─────────────────────────────────────────────────────────
 
 #[test]
@@ -6751,7 +6795,7 @@ fn project_use_valid_prints_export() {
         .clone();
     let stdout = String::from_utf8_lossy(&out);
     assert!(
-        stdout.contains("WAI_PROJECT=myproj"),
+        stdout.contains("WAI_PROJECT='myproj'"),
         "expected WAI_PROJECT=myproj in: {}",
         stdout
     );
@@ -6800,7 +6844,7 @@ fn project_use_fish_shell_syntax() {
         .clone();
     let stdout = String::from_utf8_lossy(&out);
     assert!(
-        stdout.contains("set -gx WAI_PROJECT myproj"),
+        stdout.contains("set -gx WAI_PROJECT 'myproj'"),
         "expected fish syntax in: {}",
         stdout
     );
