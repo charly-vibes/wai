@@ -883,6 +883,16 @@ pub enum PipelineCommands {
         /// Optional description to filter/rank pipelines by keyword overlap
         description: Option<String>,
     },
+
+    /// Record human approval for the current pipeline step
+    ///
+    /// Sets an approval timestamp in the run state. Required by steps that
+    /// declare an approval gate. Approval is invalidated if new artifacts
+    /// are created for the step after approval.
+    ///
+    /// EXAMPLES
+    ///   wai pipeline approve
+    Approve,
 }
 
 /// Returns the names of all top-level wai subcommands, derived from the [`Cli`] struct.

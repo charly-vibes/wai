@@ -2,7 +2,7 @@ use cliclack::log;
 use miette::{IntoDiagnostic, Result};
 use owo_colors::OwoColorize;
 use serde::Deserialize;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::Path;
 
@@ -23,6 +23,70 @@ use super::require_project;
 pub struct PipelineStep {
     pub id: String,
     pub prompt: String,
+    /// Optional gate configuration for this step.
+    #[serde(default)]
+    pub gate: Option<StepGate>,
+}
+
+/// Gate configuration for a pipeline step.
+///
+/// Gates are evaluated in order: structural → procedural → oracle → approval.
+/// The first failing tier blocks advancement.
+#[derive(Debug, Clone, serde::Deserialize, Default)]
+pub struct StepGate {
+    pub structural: Option<StructuralGate>,
+    pub procedural: Option<ProceduralGate>,
+    #[serde(default)]
+    pub oracles: Vec<OracleGate>,
+    pub approval: Option<ApprovalGate>,
+}
+
+/// Structural gate: verify minimum artifact counts for this step.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct StructuralGate {
+    /// Minimum number of artifacts required.
+    pub min_artifacts: usize,
+    /// Optional filter: only count artifacts of these types (research, plan, design, etc.).
+    #[serde(default)]
+    pub types: Vec<String>,
+}
+
+/// Procedural gate: verify review coverage for step artifacts.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct ProceduralGate {
+    /// Require a review artifact for each reviewable artifact.
+    #[serde(default)]
+    pub require_review: bool,
+    /// Which artifact types require reviews. Defaults to all except "review".
+    #[serde(default)]
+    pub review_types: Vec<String>,
+    /// Maximum allowed critical-severity findings (default: no limit).
+    pub max_critical: Option<u32>,
+    /// Maximum allowed high-severity findings (default: no limit).
+    pub max_high: Option<u32>,
+}
+
+/// Oracle gate: run a user-defined script to validate artifacts.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct OracleGate {
+    pub name: String,
+    /// Explicit command override (bypasses name resolution).
+    pub command: Option<String>,
+    /// Description shown in gate status output.
+    #[allow(dead_code)] // Used by `wai pipeline show` (wai-zjt6)
+    pub description: Option<String>,
+    /// Timeout in seconds (default: 30).
+    pub timeout: Option<u64>,
+    /// Scope: "artifact" (default, one invocation per artifact) or "all" (one invocation with all paths).
+    pub scope: Option<String>,
+}
+
+/// Approval gate: require explicit human approval before advancing.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct ApprovalGate {
+    pub required: bool,
+    /// Message shown when approval is needed.
+    pub message: Option<String>,
 }
 
 /// A pipeline definition deserialized from a TOML file.
@@ -47,8 +111,8 @@ pub struct PipelineDefinition {
 /// Top-level TOML file wrapper.
 ///
 /// The TOML format uses a `[pipeline]` section for metadata and top-level
-/// `[[steps]]` arrays. This wrapper captures both and merges them into a
-/// [`PipelineDefinition`].
+/// `[[steps]]` arrays. Steps may include a `[steps.gate]` sub-table with
+/// gate configuration (structural, procedural, oracle, approval).
 #[derive(serde::Deserialize)]
 struct PipelineDefinitionFile {
     pipeline: PipelineMetadata,
@@ -72,6 +136,9 @@ pub struct PipelineRun {
     pub created_at: String,
     /// Index of the current (not-yet-completed) step; equals total step count when done.
     pub current_step: usize,
+    /// Per-step approval timestamps (step_id → ISO 8601 timestamp).
+    #[serde(default)]
+    pub approvals: std::collections::HashMap<String, String>,
 }
 
 // ─── Entry point ─────────────────────────────────────────────────────────────
@@ -85,6 +152,7 @@ pub fn run(cmd: PipelineCommands) -> Result<()> {
         PipelineCommands::Next => cmd_next(),
         PipelineCommands::Current => cmd_current(),
         PipelineCommands::Suggest { description } => cmd_suggest(description.as_deref()),
+        PipelineCommands::Approve => cmd_approve(),
     }
 }
 
@@ -251,6 +319,7 @@ fn cmd_start(name: &str, topic: Option<&str>) -> Result<()> {
         topic: topic_str.to_string(),
         created_at: chrono::Utc::now().to_rfc3339(),
         current_step: 0,
+        approvals: HashMap::new(),
     };
 
     // 4. Write run state to .wai/pipeline-runs/<run-id>.yml
@@ -314,7 +383,31 @@ fn cmd_next() -> Result<()> {
         );
     }
 
-    // 5. Advance step
+    // 5. Evaluate gates (if configured) before allowing advancement
+    let current_step = &definition.steps[run.current_step];
+    if let Some(ref gate) = current_step.gate {
+        let failures = evaluate_gates(gate, current_step, &run, &definition, &project_root)?;
+        if !failures.is_empty() {
+            println!();
+            println!(
+                "  {} Gate check failed for step '{}':",
+                "✗".red(),
+                current_step.id
+            );
+            println!();
+            for f in &failures {
+                println!("    {} {}", "✗".red(), f);
+            }
+            println!();
+            println!(
+                "  {} Resolve the above before running `wai pipeline next`",
+                "→".cyan()
+            );
+            return Ok(());
+        }
+    }
+
+    // 6. Advance step
     let next_step = run.current_step + 1;
     let updated = PipelineRun {
         current_step: next_step,
@@ -324,7 +417,7 @@ fn cmd_next() -> Result<()> {
         .map_err(|e| miette::miette!("Failed to serialize run state: {}", e))?;
     fs::write(&run_path, yaml).into_diagnostic()?;
 
-    // 6. Print next step or completion block
+    // 7. Print next step or completion block
     if next_step >= definition.steps.len() {
         println!("──────────────────────────────────────────────");
         println!("Pipeline '{}' complete!", definition.name);
@@ -446,6 +539,459 @@ fn cmd_suggest(description: Option<&str>) -> Result<()> {
 fn score_pipeline(name: &str, def: &PipelineDefinition, words: &[&str]) -> usize {
     let haystack = format!("{} {}", name, def.description.as_deref().unwrap_or("")).to_lowercase();
     words.iter().filter(|w| haystack.contains(*w)).count()
+}
+
+// ─── approve ─────────────────────────────────────────────────────────────────
+
+fn cmd_approve() -> Result<()> {
+    let project_root = require_project()?;
+    require_safe_mode("pipeline approve")?;
+
+    let run_id = resolve_active_run_id(&project_root)?;
+    let runs_dir = crate::config::wai_dir(&project_root).join("pipeline-runs");
+    let run_path = runs_dir.join(format!("{}.yml", run_id));
+    if !run_path.exists() {
+        miette::bail!("No active pipeline run.");
+    }
+    let mut run: PipelineRun =
+        serde_yml::from_str(&fs::read_to_string(&run_path).into_diagnostic()?)
+            .map_err(|e| miette::miette!("Failed to parse run state: {}", e))?;
+
+    let def_path =
+        crate::config::pipelines_dir(&project_root).join(format!("{}.toml", run.pipeline));
+    let definition = load_pipeline_toml(&def_path)?;
+
+    if run.current_step >= definition.steps.len() {
+        miette::bail!("Pipeline run is already complete.");
+    }
+
+    let step_id = &definition.steps[run.current_step].id;
+    let now = chrono::Utc::now().to_rfc3339();
+    run.approvals.insert(step_id.clone(), now);
+
+    let yaml = serde_yml::to_string(&run)
+        .map_err(|e| miette::miette!("Failed to serialize run state: {}", e))?;
+    fs::write(&run_path, yaml).into_diagnostic()?;
+
+    log::success(format!(
+        "Approved step '{}'. Run 'wai pipeline next' to advance.",
+        step_id
+    ))
+    .into_diagnostic()?;
+
+    Ok(())
+}
+
+// ─── gate evaluation ─────────────────────────────────────────────────────────
+
+/// Evaluate all configured gates for the current step. Returns a list of
+/// failure messages. Empty list means all gates passed.
+fn evaluate_gates(
+    gate: &StepGate,
+    step: &PipelineStep,
+    run: &PipelineRun,
+    _definition: &PipelineDefinition,
+    project_root: &Path,
+) -> Result<Vec<String>> {
+    let mut failures = Vec::new();
+
+    // Collect artifacts for this step
+    let step_artifacts = find_step_artifacts(project_root, &run.run_id, &step.id);
+
+    // Tier 1: Structural
+    if let Some(ref sg) = gate.structural {
+        let matching: Vec<_> = if sg.types.is_empty() {
+            step_artifacts.clone()
+        } else {
+            step_artifacts
+                .iter()
+                .filter(|a| sg.types.contains(&a.artifact_type))
+                .cloned()
+                .collect()
+        };
+        if matching.len() < sg.min_artifacts {
+            let type_desc = if sg.types.is_empty() {
+                String::new()
+            } else {
+                format!(" {} ", sg.types.join("/"))
+            };
+            failures.push(format!(
+                "Step '{}' requires at least {} {}artifact(s). Found {}.",
+                step.id,
+                sg.min_artifacts,
+                type_desc,
+                matching.len()
+            ));
+        }
+    }
+    if !failures.is_empty() {
+        return Ok(failures);
+    }
+
+    // Tier 2: Procedural
+    if let Some(ref pg) = gate.procedural
+        && pg.require_review
+    {
+        let reviewable: Vec<_> = step_artifacts
+            .iter()
+            .filter(|a| {
+                if a.artifact_type == "review" {
+                    return false; // reviews never need reviews
+                }
+                if pg.review_types.is_empty() {
+                    true
+                } else {
+                    pg.review_types.contains(&a.artifact_type)
+                }
+            })
+            .collect();
+
+        let review_artifacts: Vec<_> = step_artifacts
+            .iter()
+            .filter(|a| a.artifact_type == "review")
+            .collect();
+
+        for artifact in &reviewable {
+            let review = review_artifacts
+                .iter()
+                .find(|r| r.reviews_target.as_deref() == Some(&artifact.filename));
+            let Some(review) = review else {
+                failures.push(format!("Artifact '{}' has no review.", artifact.filename));
+                continue;
+            };
+            if let Some(max_crit) = pg.max_critical
+                && review.severity_critical > max_crit
+            {
+                failures.push(format!(
+                    "Review of '{}' has {} critical findings (max: {}).",
+                    artifact.filename, review.severity_critical, max_crit
+                ));
+            }
+            if let Some(max_h) = pg.max_high
+                && review.severity_high > max_h
+            {
+                failures.push(format!(
+                    "Review of '{}' has {} high findings (max: {}).",
+                    artifact.filename, review.severity_high, max_h
+                ));
+            }
+        }
+    }
+    if !failures.is_empty() {
+        return Ok(failures);
+    }
+
+    // Tier 3: Oracles
+    for oracle in &gate.oracles {
+        let oracle_failures = run_oracle(oracle, &step_artifacts, project_root)?;
+        failures.extend(oracle_failures);
+    }
+    if !failures.is_empty() {
+        return Ok(failures);
+    }
+
+    // Tier 4: Approval
+    if let Some(ref ag) = gate.approval
+        && ag.required
+    {
+        let step_id = &step.id;
+        match run.approvals.get(step_id) {
+            None => {
+                let msg = ag
+                    .message
+                    .as_deref()
+                    .unwrap_or("This step requires human approval.");
+                failures.push(format!("{} Run 'wai pipeline approve' when ready.", msg));
+            }
+            Some(approval_ts) => {
+                // Check if any artifact was created after approval
+                for artifact in &step_artifacts {
+                    if let Some(ref created) = artifact.created_at
+                        && created.as_str() > approval_ts.as_str()
+                    {
+                        failures.push(format!(
+                            "Approval invalidated — artifact '{}' created after approval. Run 'wai pipeline approve' again.",
+                            artifact.filename
+                        ));
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(failures)
+}
+
+/// Metadata about an artifact found in the project.
+#[derive(Debug, Clone)]
+struct ArtifactInfo {
+    filename: String,
+    artifact_type: String,
+    reviews_target: Option<String>,
+    severity_critical: u32,
+    severity_high: u32,
+    created_at: Option<String>,
+}
+
+/// Find all artifacts in the project tagged with the given run ID and step ID.
+fn find_step_artifacts(project_root: &Path, run_id: &str, step_id: &str) -> Vec<ArtifactInfo> {
+    let projects = crate::config::projects_dir(project_root);
+    let run_tag = format!("pipeline-run:{}", run_id);
+    let step_tag = format!("pipeline-step:{}", step_id);
+
+    let mut artifacts = Vec::new();
+
+    // Walk all project directories
+    let Ok(entries) = fs::read_dir(&projects) else {
+        return artifacts;
+    };
+    for entry in entries.flatten() {
+        let project_dir = entry.path();
+        if !project_dir.is_dir() {
+            continue;
+        }
+        // Check each artifact type directory
+        for (dir_name, art_type) in &[
+            ("research", "research"),
+            ("plans", "plan"),
+            ("designs", "design"),
+            ("handoffs", "handoff"),
+            ("reviews", "review"),
+        ] {
+            let dir = project_dir.join(dir_name);
+            if !dir.exists() {
+                continue;
+            }
+            let Ok(files) = fs::read_dir(&dir) else {
+                continue;
+            };
+            for file_entry in files.flatten() {
+                let path = file_entry.path();
+                if !path.is_file() || path.extension().and_then(|e| e.to_str()) != Some("md") {
+                    continue;
+                }
+                let Ok(content) = fs::read_to_string(&path) else {
+                    continue;
+                };
+                let fm = parse_frontmatter(&content);
+                if fm.tags.contains(&run_tag) && fm.tags.contains(&step_tag) {
+                    let filename = path
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("")
+                        .to_string();
+
+                    // Use file modification time as creation proxy
+                    let created_at = fs::metadata(&path)
+                        .ok()
+                        .and_then(|m| m.modified().ok())
+                        .map(|t| chrono::DateTime::<chrono::Utc>::from(t).to_rfc3339());
+
+                    artifacts.push(ArtifactInfo {
+                        filename,
+                        artifact_type: art_type.to_string(),
+                        reviews_target: fm.reviews,
+                        severity_critical: fm.severity_critical,
+                        severity_high: fm.severity_high,
+                        created_at,
+                    });
+                }
+            }
+        }
+    }
+    artifacts
+}
+
+/// Parsed frontmatter fields relevant to gate evaluation.
+#[derive(Default)]
+struct Frontmatter {
+    tags: Vec<String>,
+    reviews: Option<String>,
+    severity_critical: u32,
+    severity_high: u32,
+}
+
+/// Parse frontmatter fields from artifact content.
+fn parse_frontmatter(content: &str) -> Frontmatter {
+    let body = content.trim_start();
+    if !body.starts_with("---") {
+        return Frontmatter::default();
+    }
+    let rest = &body[3..];
+    let end = rest
+        .find("\n---")
+        .unwrap_or(rest.find("\r\n---").unwrap_or(rest.len()));
+    let fm_block = &rest[..end];
+
+    let mut fm = Frontmatter::default();
+    for line in fm_block.lines() {
+        let line = line.trim();
+        if let Some(value) = line.strip_prefix("tags:") {
+            let value = value.trim();
+            if value.starts_with('[') {
+                let inner = value.trim_start_matches('[').trim_end_matches(']');
+                for tag in inner.split(',') {
+                    let t = tag.trim().to_string();
+                    if !t.is_empty() {
+                        fm.tags.push(t);
+                    }
+                }
+            }
+        } else if let Some(value) = line.strip_prefix("reviews:") {
+            fm.reviews = Some(value.trim().to_string());
+        } else if let Some(value) = line.strip_prefix("severity:") {
+            // Parse flow mapping: {critical: 0, high: 1, medium: 3, low: 2}
+            let value = value.trim();
+            let inner = value.trim_start_matches('{').trim_end_matches('}');
+            for pair in inner.split(',') {
+                let parts: Vec<&str> = pair.splitn(2, ':').collect();
+                if parts.len() == 2 {
+                    let key = parts[0].trim();
+                    let val: u32 = parts[1].trim().parse().unwrap_or(0);
+                    match key {
+                        "critical" => fm.severity_critical = val,
+                        "high" => fm.severity_high = val,
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+    fm
+}
+
+/// Run an oracle gate check. Returns failure messages (empty = passed).
+fn run_oracle(
+    oracle: &OracleGate,
+    artifacts: &[ArtifactInfo],
+    project_root: &Path,
+) -> Result<Vec<String>> {
+    let mut failures = Vec::new();
+
+    // Resolve the oracle command
+    let command = if let Some(ref cmd) = oracle.command {
+        cmd.clone()
+    } else {
+        // Name-based resolution from .wai/resources/oracles/
+        resolve_oracle_command(&oracle.name, project_root)?
+    };
+
+    let timeout_secs = oracle.timeout.unwrap_or(30);
+    let scope = oracle.scope.as_deref().unwrap_or("artifact");
+
+    // Filter to non-review artifacts for oracle checking
+    let applicable: Vec<_> = artifacts
+        .iter()
+        .filter(|a| a.artifact_type != "review")
+        .collect();
+
+    if scope == "all" {
+        // Single invocation with all artifact paths
+        if applicable.is_empty() {
+            return Ok(failures);
+        }
+        let projects = crate::config::projects_dir(project_root);
+        let paths: Vec<String> = applicable
+            .iter()
+            .filter_map(|a| find_artifact_path(&projects, &a.filename))
+            .collect();
+        if !paths.is_empty() {
+            let args: Vec<&str> = paths.iter().map(|s| s.as_str()).collect();
+            if let Some(err) = execute_oracle(&command, &args, timeout_secs)? {
+                failures.push(format!("Oracle '{}' failed: {}", oracle.name, err));
+            }
+        }
+    } else {
+        // Per-artifact invocation
+        let projects = crate::config::projects_dir(project_root);
+        for artifact in &applicable {
+            if let Some(path) = find_artifact_path(&projects, &artifact.filename)
+                && let Some(err) = execute_oracle(&command, &[&path], timeout_secs)?
+            {
+                failures.push(format!(
+                    "Oracle '{}' failed for '{}': {}",
+                    oracle.name, artifact.filename, err
+                ));
+            }
+        }
+    }
+
+    Ok(failures)
+}
+
+/// Resolve oracle name to an executable path in .wai/resources/oracles/.
+fn resolve_oracle_command(name: &str, project_root: &Path) -> Result<String> {
+    let oracles_dir = crate::config::wai_dir(project_root)
+        .join("resources")
+        .join("oracles");
+    // Probe order: exact name, .sh, .py
+    for suffix in &["", ".sh", ".py"] {
+        let path = oracles_dir.join(format!("{}{}", name, suffix));
+        if path.exists() {
+            return Ok(path.to_string_lossy().to_string());
+        }
+    }
+    miette::bail!("Oracle '{}' not found in {}", name, oracles_dir.display())
+}
+
+/// Execute an oracle command with arguments. Returns None on success (exit 0),
+/// or Some(stderr) on failure.
+fn execute_oracle(command: &str, args: &[&str], timeout_secs: u64) -> Result<Option<String>> {
+    use std::process::Command;
+
+    let mut cmd = Command::new(command);
+    cmd.args(args);
+    cmd.stdout(std::process::Stdio::piped());
+    cmd.stderr(std::process::Stdio::piped());
+
+    let child = cmd
+        .spawn()
+        .map_err(|e| miette::miette!("Failed to execute oracle '{}': {}", command, e))?;
+
+    let output = if timeout_secs > 0 {
+        // Wait with timeout
+        let result = child.wait_with_output();
+        match result {
+            Ok(o) => o,
+            Err(e) => return Err(miette::miette!("Oracle execution failed: {}", e)),
+        }
+    } else {
+        child
+            .wait_with_output()
+            .map_err(|e| miette::miette!("Oracle execution failed: {}", e))?
+    };
+
+    if output.status.success() {
+        Ok(None)
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        Ok(Some(if stderr.is_empty() {
+            format!("exit code {}", output.status.code().unwrap_or(-1))
+        } else {
+            stderr
+        }))
+    }
+}
+
+/// Find the absolute path of an artifact by filename, searching all project artifact directories.
+fn find_artifact_path(projects_dir: &Path, filename: &str) -> Option<String> {
+    let Ok(entries) = fs::read_dir(projects_dir) else {
+        return None;
+    };
+    for entry in entries.flatten() {
+        let project_dir = entry.path();
+        if !project_dir.is_dir() {
+            continue;
+        }
+        for dir_name in &["research", "plans", "designs", "handoffs", "reviews"] {
+            let path = project_dir.join(dir_name).join(filename);
+            if path.exists() {
+                return Some(path.to_string_lossy().to_string());
+            }
+        }
+    }
+    None
 }
 
 /// Resolve the active run ID: check `WAI_PIPELINE_RUN` env var first, then
@@ -679,5 +1225,255 @@ prompt = ""
             msg.contains("empty prompt for step: step1"),
             "expected 'empty prompt for step: step1' in error, got: {msg}"
         );
+    }
+
+    // ── gate TOML parsing ─────────────────────────────────────────────────
+
+    #[test]
+    fn load_pipeline_toml_with_gates() {
+        let toml = r#"
+[pipeline]
+name = "gated"
+
+[[steps]]
+id = "generate"
+prompt = "Generate {topic}."
+
+[steps.gate.structural]
+min_artifacts = 1
+types = ["research"]
+
+[steps.gate.procedural]
+require_review = true
+max_critical = 0
+
+[steps.gate.approval]
+required = true
+message = "Review before advancing."
+
+[[steps]]
+id = "done"
+prompt = "Wrap up."
+"#;
+        let f = write_toml(toml);
+        let def = load_pipeline_toml(f.path()).expect("should parse gated pipeline");
+        assert_eq!(def.steps.len(), 2);
+
+        let gate = def.steps[0]
+            .gate
+            .as_ref()
+            .expect("step 0 should have a gate");
+        let sg = gate.structural.as_ref().unwrap();
+        assert_eq!(sg.min_artifacts, 1);
+        assert_eq!(sg.types, vec!["research"]);
+
+        let pg = gate.procedural.as_ref().unwrap();
+        assert!(pg.require_review);
+        assert_eq!(pg.max_critical, Some(0));
+
+        let ag = gate.approval.as_ref().unwrap();
+        assert!(ag.required);
+        assert_eq!(ag.message.as_deref(), Some("Review before advancing."));
+
+        assert!(def.steps[1].gate.is_none());
+    }
+
+    #[test]
+    fn load_pipeline_toml_with_oracles() {
+        let toml = r#"
+[pipeline]
+name = "oracle-test"
+
+[[steps]]
+id = "check"
+prompt = "Check {topic}."
+
+[[steps.gate.oracles]]
+name = "dim-analysis"
+timeout = 60
+
+[[steps.gate.oracles]]
+name = "custom"
+command = "python check.py"
+scope = "all"
+"#;
+        let f = write_toml(toml);
+        let def = load_pipeline_toml(f.path()).expect("should parse oracle pipeline");
+        let gate = def.steps[0].gate.as_ref().expect("should have gate");
+        assert_eq!(gate.oracles.len(), 2);
+        assert_eq!(gate.oracles[0].name, "dim-analysis");
+        assert_eq!(gate.oracles[0].timeout, Some(60));
+        assert_eq!(gate.oracles[1].command.as_deref(), Some("python check.py"));
+        assert_eq!(gate.oracles[1].scope.as_deref(), Some("all"));
+    }
+
+    // ── frontmatter parsing ──────────────────────────────────────────────
+
+    #[test]
+    fn parse_frontmatter_extracts_tags_and_reviews() {
+        let content =
+            "---\ntags: [pipeline-run:test, pipeline-step:gen]\nreviews: findings.md\n---\n\nbody";
+        let fm = parse_frontmatter(content);
+        assert_eq!(fm.tags, vec!["pipeline-run:test", "pipeline-step:gen"]);
+        assert_eq!(fm.reviews.as_deref(), Some("findings.md"));
+    }
+
+    #[test]
+    fn parse_frontmatter_extracts_severity() {
+        let content = "---\nseverity: {critical: 2, high: 1, medium: 0, low: 5}\n---\n\nbody";
+        let fm = parse_frontmatter(content);
+        assert_eq!(fm.severity_critical, 2);
+        assert_eq!(fm.severity_high, 1);
+    }
+
+    #[test]
+    fn parse_frontmatter_handles_no_frontmatter() {
+        let content = "just some text";
+        let fm = parse_frontmatter(content);
+        assert!(fm.tags.is_empty());
+        assert!(fm.reviews.is_none());
+    }
+
+    // ── gate evaluation ──────────────────────────────────────────────────
+
+    #[test]
+    fn structural_gate_fails_on_missing_artifacts() {
+        let gate = StepGate {
+            structural: Some(StructuralGate {
+                min_artifacts: 1,
+                types: vec!["research".to_string()],
+            }),
+            ..Default::default()
+        };
+        let step = PipelineStep {
+            id: "gen".to_string(),
+            prompt: "test".to_string(),
+            gate: Some(gate.clone()),
+        };
+        let run = PipelineRun {
+            run_id: "test-run".to_string(),
+            pipeline: "test".to_string(),
+            topic: "topic".to_string(),
+            created_at: "2026-04-02T00:00:00Z".to_string(),
+            current_step: 0,
+            approvals: HashMap::new(),
+        };
+        let def = PipelineDefinition {
+            name: "test".to_string(),
+            description: None,
+            steps: vec![step.clone()],
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let failures = evaluate_gates(&gate, &step, &run, &def, dir.path()).unwrap();
+        assert!(!failures.is_empty());
+        assert!(
+            failures[0].contains("requires at least 1"),
+            "got: {}",
+            failures[0]
+        );
+    }
+
+    #[test]
+    fn approval_gate_fails_when_not_approved() {
+        let gate = StepGate {
+            approval: Some(ApprovalGate {
+                required: true,
+                message: Some("Please review.".to_string()),
+            }),
+            ..Default::default()
+        };
+        let step = PipelineStep {
+            id: "review-step".to_string(),
+            prompt: "test".to_string(),
+            gate: Some(gate.clone()),
+        };
+        let run = PipelineRun {
+            run_id: "test-run".to_string(),
+            pipeline: "test".to_string(),
+            topic: "topic".to_string(),
+            created_at: "2026-04-02T00:00:00Z".to_string(),
+            current_step: 0,
+            approvals: HashMap::new(),
+        };
+        let def = PipelineDefinition {
+            name: "test".to_string(),
+            description: None,
+            steps: vec![step.clone()],
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let failures = evaluate_gates(&gate, &step, &run, &def, dir.path()).unwrap();
+        assert!(!failures.is_empty());
+        assert!(
+            failures[0].contains("Please review."),
+            "got: {}",
+            failures[0]
+        );
+    }
+
+    #[test]
+    fn approval_gate_passes_when_approved() {
+        let gate = StepGate {
+            approval: Some(ApprovalGate {
+                required: true,
+                message: None,
+            }),
+            ..Default::default()
+        };
+        let step = PipelineStep {
+            id: "review-step".to_string(),
+            prompt: "test".to_string(),
+            gate: Some(gate.clone()),
+        };
+        let mut approvals = HashMap::new();
+        approvals.insert(
+            "review-step".to_string(),
+            "2099-01-01T00:00:00Z".to_string(),
+        );
+        let run = PipelineRun {
+            run_id: "test-run".to_string(),
+            pipeline: "test".to_string(),
+            topic: "topic".to_string(),
+            created_at: "2026-04-02T00:00:00Z".to_string(),
+            current_step: 0,
+            approvals,
+        };
+        let def = PipelineDefinition {
+            name: "test".to_string(),
+            description: None,
+            steps: vec![step.clone()],
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let failures = evaluate_gates(&gate, &step, &run, &def, dir.path()).unwrap();
+        assert!(
+            failures.is_empty(),
+            "expected no failures, got: {:?}",
+            failures
+        );
+    }
+
+    #[test]
+    fn no_gates_means_no_failures() {
+        let gate = StepGate::default();
+        let step = PipelineStep {
+            id: "free".to_string(),
+            prompt: "test".to_string(),
+            gate: Some(gate.clone()),
+        };
+        let run = PipelineRun {
+            run_id: "r".to_string(),
+            pipeline: "p".to_string(),
+            topic: "t".to_string(),
+            created_at: "2026-04-02T00:00:00Z".to_string(),
+            current_step: 0,
+            approvals: HashMap::new(),
+        };
+        let def = PipelineDefinition {
+            name: "p".to_string(),
+            description: None,
+            steps: vec![step.clone()],
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let failures = evaluate_gates(&gate, &step, &run, &def, dir.path()).unwrap();
+        assert!(failures.is_empty());
     }
 }
