@@ -6873,3 +6873,49 @@ fn phase_show_no_indicator_for_auto_detect() {
         stdout
     );
 }
+
+// ─── Doctor WAI_PROJECT checks ───────────────────────────────────────────────
+
+#[test]
+fn doctor_warns_wai_project_nonexistent() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproj");
+
+    let out = wai_cmd(tmp.path())
+        .env("WAI_PROJECT", "nonexistent")
+        .args(["doctor"])
+        .assert()
+        .get_output()
+        .stdout
+        .clone();
+    let stdout = strip_ansi(&String::from_utf8_lossy(&out));
+    assert!(
+        stdout.contains("WAI_PROJECT"),
+        "expected WAI_PROJECT warning in: {}",
+        stdout
+    );
+}
+
+#[test]
+fn doctor_warns_wai_project_empty() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproj");
+
+    let out = wai_cmd(tmp.path())
+        .env("WAI_PROJECT", "")
+        .args(["doctor"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let stdout = strip_ansi(&String::from_utf8_lossy(&out));
+    // Empty WAI_PROJECT should either not warn or show a hint — no crash
+    assert!(
+        !stdout.contains("not found"),
+        "empty WAI_PROJECT should not trigger not-found in: {}",
+        stdout
+    );
+}

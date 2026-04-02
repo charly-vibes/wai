@@ -84,6 +84,7 @@ pub fn run(fix: bool) -> Result<()> {
     checks.extend(check_agent_instructions(&project_root));
     checks.extend(check_readme_badge(&project_root));
     checks.extend(check_claude_session_hook());
+    checks.extend(check_wai_project_env(&project_root));
 
     let summary = Summary {
         pass: checks.iter().filter(|c| c.status == Status::Pass).count(),
@@ -1748,6 +1749,59 @@ fn check_agent_instructions(project_root: &Path) -> Vec<CheckResult> {
                 Ok(())
             })),
         });
+    }
+
+    results
+}
+
+fn check_wai_project_env(project_root: &Path) -> Vec<CheckResult> {
+    let mut results = Vec::new();
+
+    match std::env::var("WAI_PROJECT") {
+        Ok(val) if val.is_empty() => {
+            results.push(CheckResult {
+                name: "WAI_PROJECT env var".to_string(),
+                status: Status::Warn,
+                message: "WAI_PROJECT is set to an empty string (treated as unset)".to_string(),
+                fix: Some("unset WAI_PROJECT".to_string()),
+                fix_fn: None,
+            });
+        }
+        Ok(val) => {
+            let proj_dir = projects_dir(project_root).join(&val);
+            if proj_dir.exists() {
+                results.push(CheckResult {
+                    name: "WAI_PROJECT env var".to_string(),
+                    status: Status::Pass,
+                    message: format!("WAI_PROJECT='{}' points to a valid project", val),
+                    fix: None,
+                    fix_fn: None,
+                });
+            } else {
+                let available = super::list_projects(project_root);
+                results.push(CheckResult {
+                    name: "WAI_PROJECT env var".to_string(),
+                    status: Status::Warn,
+                    message: format!(
+                        "WAI_PROJECT='{}' but project not found. Available: {}",
+                        val,
+                        if available.is_empty() {
+                            "none".to_string()
+                        } else {
+                            available.join(", ")
+                        }
+                    ),
+                    fix: Some(format!(
+                        "unset WAI_PROJECT  # or: export WAI_PROJECT={}",
+                        available.first().unwrap_or(&"<name>".to_string())
+                    )),
+                    fix_fn: None,
+                });
+            }
+        }
+        Err(_) => {
+            // WAI_PROJECT not set — nothing to check
+        }
     }
 
     results
