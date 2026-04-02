@@ -24,12 +24,12 @@ Phases 4, 6, and 7 can proceed in parallel after phase 3.
 - [ ] 3.7 Add tests for each gate tier individually and combined evaluation order
 
 ## 4. Oracle system
-- [ ] 4.1 Implement oracle name resolution: `.wai/resources/oracles/<name>` with extension probing
-- [ ] 4.2 Support explicit `command` override in TOML
-- [ ] 4.3 Execute oracles with configurable timeout (default 30s)
-- [ ] 4.4 Create `.wai/resources/oracles/` directory in workspace setup
-- [ ] 4.5 Scaffold `README.md` and `example-check.sh` when `wai pipeline init` creates a gated pipeline
-- [ ] 4.6 Add tests for resolution, execution, timeout, and failure reporting
+- [x] 4.1 Implement oracle name resolution: `.wai/resources/oracles/<name>` with extension probing
+- [x] 4.2 Support explicit `command` override in TOML
+- [x] 4.3 Execute oracles with configurable timeout (default 30s)
+- [x] 4.4 Create `.wai/resources/oracles/` directory in workspace setup
+- [x] 4.5 Scaffold `README.md` and `example-check.sh` when `wai pipeline init` creates a gated pipeline
+- [x] 4.6 Add tests for resolution, execution, timeout, and failure reporting
 
 ## 5. New pipeline commands
 - [x] 5.1 `wai pipeline show <name>` — detailed view with steps, gates, oracles

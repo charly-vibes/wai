@@ -191,7 +191,7 @@ pub fn ensure_workspace_current(project_root: &Path) -> Result<Vec<WorkspaceActi
 
     // Create resource subdirectories
     let resources = wai_dir.join(RESOURCES_DIR);
-    let resource_subdirs = [TEMPLATES_DIR, PATTERNS_DIR, REFLECTIONS_DIR];
+    let resource_subdirs = [TEMPLATES_DIR, PATTERNS_DIR, REFLECTIONS_DIR, "oracles"];
 
     for subdir in &resource_subdirs {
         let subdir_path = resources.join(subdir);

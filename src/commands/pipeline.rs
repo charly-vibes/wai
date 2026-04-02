@@ -293,6 +293,56 @@ fn cmd_init(name: &str) -> Result<()> {
 
     fs::write(&file_path, template).into_diagnostic()?;
 
+    // Scaffold oracles directory with README if not present
+    let oracles_dir = crate::config::wai_dir(&project_root)
+        .join("resources")
+        .join("oracles");
+    fs::create_dir_all(&oracles_dir).into_diagnostic()?;
+    let readme_path = oracles_dir.join("README.md");
+    if !readme_path.exists() {
+        let readme = "# Oracle Scripts\n\n\
+            Oracle scripts are user-defined validators run during pipeline gate checks.\n\n\
+            ## Convention\n\n\
+            - Place scripts here: `.wai/resources/oracles/<name>[.sh|.py]`\n\
+            - Scripts must be executable (`chmod +x`)\n\
+            - Exit 0 = pass, non-zero = fail\n\
+            - Write failure reasons to stderr\n\
+            - Default scope: one invocation per artifact (`<script> <artifact-path>`)\n\
+            - Cross-artifact scope: `scope = \"all\"` passes all paths at once\n\n\
+            ## Example\n\n\
+            ```bash\n\
+            #!/usr/bin/env bash\n\
+            # example-check.sh — verify artifact contains required sections\n\
+            grep -q '## Constraints' \"$1\" || { echo 'Missing ## Constraints section' >&2; exit 1; }\n\
+            ```\n\n\
+            Configure in your pipeline TOML:\n\
+            ```toml\n\
+            [[steps.gate.oracles]]\n\
+            name = \"example-check\"\n\
+            ```\n";
+        fs::write(&readme_path, readme).into_diagnostic()?;
+    }
+    let example_path = oracles_dir.join("example-check.sh");
+    if !example_path.exists() {
+        let example = "#!/usr/bin/env bash\n\
+            # example-check.sh — sample oracle that verifies artifact has content\n\
+            # Exit 0 = pass, non-zero = fail. Stderr is shown on failure.\n\
+            set -euo pipefail\n\n\
+            FILE=\"$1\"\n\
+            if [ ! -s \"$FILE\" ]; then\n\
+            \x20   echo \"Artifact is empty: $FILE\" >&2\n\
+            \x20   exit 1\n\
+            fi\n";
+        fs::write(&example_path, example).into_diagnostic()?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(&example_path).into_diagnostic()?.permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(&example_path, perms).into_diagnostic()?;
+        }
+    }
+
     log::success(format!("Created pipeline: {}", file_path.display())).into_diagnostic()?;
     println!(
         "  {} Edit the prompts, then start with: wai pipeline start {} --topic=<your-topic>",
@@ -2353,5 +2403,82 @@ prompt = "Do {topic}."
             format_gate_summary(&Some(gate)),
             "[structural + procedural + oracle + approval]"
         );
+    }
+
+    // ── oracle resolution tests ───────────────────────────────────────────
+
+    #[test]
+    fn resolve_oracle_exact_name() {
+        let dir = tempfile::tempdir().unwrap();
+        let wai = dir.path().join(".wai").join("resources").join("oracles");
+        fs::create_dir_all(&wai).unwrap();
+        fs::write(wai.join("check"), "#!/bin/sh\nexit 0\n").unwrap();
+        let result = resolve_oracle_command("check", dir.path());
+        assert!(result.is_ok(), "expected Ok, got: {:?}", result);
+        assert!(result.unwrap().contains("check"));
+    }
+
+    #[test]
+    fn resolve_oracle_sh_extension() {
+        let dir = tempfile::tempdir().unwrap();
+        let wai = dir.path().join(".wai").join("resources").join("oracles");
+        fs::create_dir_all(&wai).unwrap();
+        fs::write(wai.join("check.sh"), "#!/bin/sh\nexit 0\n").unwrap();
+        let result = resolve_oracle_command("check", dir.path());
+        assert!(result.is_ok());
+        assert!(result.unwrap().contains("check.sh"));
+    }
+
+    #[test]
+    fn resolve_oracle_py_extension() {
+        let dir = tempfile::tempdir().unwrap();
+        let wai = dir.path().join(".wai").join("resources").join("oracles");
+        fs::create_dir_all(&wai).unwrap();
+        fs::write(wai.join("check.py"), "#!/usr/bin/env python3\n").unwrap();
+        let result = resolve_oracle_command("check", dir.path());
+        assert!(result.is_ok());
+        assert!(result.unwrap().contains("check.py"));
+    }
+
+    #[test]
+    fn resolve_oracle_not_found() {
+        let dir = tempfile::tempdir().unwrap();
+        let wai = dir.path().join(".wai").join("resources").join("oracles");
+        fs::create_dir_all(&wai).unwrap();
+        let result = resolve_oracle_command("nonexistent", dir.path());
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("not found"), "got: {msg}");
+    }
+
+    #[test]
+    fn resolve_oracle_probes_in_order() {
+        // When both .sh and .py exist, .sh should win (probed first)
+        let dir = tempfile::tempdir().unwrap();
+        let wai = dir.path().join(".wai").join("resources").join("oracles");
+        fs::create_dir_all(&wai).unwrap();
+        fs::write(wai.join("check.sh"), "#!/bin/sh\n").unwrap();
+        fs::write(wai.join("check.py"), "#!/usr/bin/env python3\n").unwrap();
+        let result = resolve_oracle_command("check", dir.path()).unwrap();
+        assert!(
+            result.contains("check.sh"),
+            "expected .sh to win probe order, got: {result}"
+        );
+    }
+
+    #[test]
+    fn execute_oracle_success() {
+        let result = execute_oracle("true", &[], 30).unwrap();
+        assert!(
+            result.is_none(),
+            "expected None (success), got: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn execute_oracle_failure() {
+        let result = execute_oracle("false", &[], 30).unwrap();
+        assert!(result.is_some(), "expected Some (failure)");
     }
 }
