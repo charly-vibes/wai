@@ -8,13 +8,14 @@ use crate::plugin::{detect_main_worktree_root, store_memory};
 
 use super::handoff::create_handoff;
 use super::reflect::{count_handoffs_since, read_reflect_meta};
-use super::{require_project, resolve_project_named};
+use super::{require_project, resolve_project};
 
 pub fn run(project: Option<String>, remember: bool) -> Result<()> {
     let project_root = require_project()?;
     require_safe_mode("create handoff")?;
 
-    let project_name = resolve_project_named(&project_root, project, "wai close --project <name>")?;
+    let resolved = resolve_project(&project_root, project.as_deref())?;
+    let project_name = resolved.name;
 
     let handoff_path = create_handoff(&project_root, &project_name)?;
 

@@ -4848,7 +4848,7 @@ fn prime_multiple_projects_no_input_fails() {
         .args(["prime", "--no-input"])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("prime --project"));
+        .stderr(predicate::str::contains("--project <name>"));
 }
 
 #[test]

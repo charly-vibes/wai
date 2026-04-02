@@ -381,67 +381,6 @@ pub(crate) fn beads_counts(content: &str) -> Option<(u64, u64)> {
     }
 }
 
-/// Resolve a project name within `.wai/projects/`.
-///
-/// When `project` is `Some`, validates that the named project directory exists.
-/// When `project` is `None` and exactly one project is found, returns it
-/// automatically. When multiple projects exist in a non-interactive context,
-/// returns a [`WaiError::NonInteractive`] error carrying `command_hint` so the
-/// caller's error message names the appropriate `--project` flag.
-///
-/// `command_hint` is embedded in the non-interactive error message, e.g.
-/// `"wai close --project <name>"`.
-pub(crate) fn resolve_project_named(
-    project_root: &Path,
-    project: Option<String>,
-    command_hint: &str,
-) -> Result<String> {
-    if let Some(name) = project {
-        let proj_dir = projects_dir(project_root).join(&name);
-        if !proj_dir.exists() {
-            let available = list_projects(project_root);
-            let available_str = if available.is_empty() {
-                "none".to_string()
-            } else {
-                available.join(", ")
-            };
-            miette::bail!(
-                "Project '{}' not found. Available projects: {}",
-                name,
-                available_str
-            );
-        }
-        return Ok(name);
-    }
-
-    let mut projects = list_projects(project_root);
-    projects.sort();
-
-    match projects.len() {
-        0 => miette::bail!("No projects found. Create one with `wai new project <name>`."),
-        1 => Ok(projects.remove(0)),
-        _ => {
-            let ctx = current_context();
-            if ctx.no_input || !std::io::stdin().is_terminal() {
-                return Err(WaiError::NonInteractive {
-                    message: format!(
-                        "Multiple projects found ({}). Use `{}` to specify one.",
-                        projects.join(", "),
-                        command_hint
-                    ),
-                }
-                .into());
-            }
-            let mut sel = cliclack::select("Multiple projects found — which one?");
-            for name in &projects {
-                sel = sel.item(name.clone(), name.as_str(), "");
-            }
-            let selected: String = sel.interact().into_diagnostic()?;
-            Ok(selected)
-        }
-    }
-}
-
 /// How a project was resolved by [`resolve_project`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ProjectSource {

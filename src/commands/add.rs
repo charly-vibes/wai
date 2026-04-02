@@ -1,21 +1,16 @@
 use chrono::Utc;
 use cliclack::log;
 use miette::{IntoDiagnostic, Result};
-use std::io::IsTerminal;
 
 use super::resource;
 use crate::cli::AddCommands;
-use crate::config::{
-    DESIGNS_DIR, PLANS_DIR, RESEARCH_DIR, archives_dir, areas_dir, projects_dir,
-    read_pipeline_run_state, resources_dir,
-};
+use crate::config::{DESIGNS_DIR, PLANS_DIR, RESEARCH_DIR, projects_dir, read_pipeline_run_state};
 use crate::context::{current_context, require_safe_mode};
-use crate::error::WaiError;
 use crate::json::Suggestion;
 use crate::state::Phase;
 use crate::workflows;
 
-use super::{print_suggestions, require_project};
+use super::{print_suggestions, require_project, resolve_project};
 
 pub fn run(cmd: AddCommands) -> Result<()> {
     let project_root = require_project()?;
@@ -29,7 +24,9 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             bead,
         } => {
             require_safe_mode("add research")?;
-            let (target_project, project_dir) = resolve_project(&project_root, project.as_deref())?;
+            let resolved = resolve_project(&project_root, project.as_deref())?;
+            let target_project = resolved.name;
+            let project_dir = projects_dir(&project_root).join(&target_project);
             let dir = project_dir.join(RESEARCH_DIR);
 
             let body = get_content(content.as_deref(), file.as_deref())?;
@@ -123,7 +120,9 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             tags,
         } => {
             require_safe_mode("add plan")?;
-            let (target_project, project_dir) = resolve_project(&project_root, project.as_deref())?;
+            let resolved = resolve_project(&project_root, project.as_deref())?;
+            let target_project = resolved.name;
+            let project_dir = projects_dir(&project_root).join(&target_project);
             let dir = project_dir.join(PLANS_DIR);
 
             let body = get_content(content.as_deref(), file.as_deref())?;
@@ -165,7 +164,9 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             tags,
         } => {
             require_safe_mode("add design")?;
-            let (target_project, project_dir) = resolve_project(&project_root, project.as_deref())?;
+            let resolved = resolve_project(&project_root, project.as_deref())?;
+            let target_project = resolved.name;
+            let project_dir = projects_dir(&project_root).join(&target_project);
             let dir = project_dir.join(DESIGNS_DIR);
 
             let body = get_content(content.as_deref(), file.as_deref())?;
@@ -201,79 +202,6 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             Ok(())
         }
         AddCommands::Skill { name, template } => resource::add_skill(&name, template.as_deref()),
-    }
-}
-
-fn resolve_project(
-    project_root: &std::path::Path,
-    explicit: Option<&str>,
-) -> Result<(String, std::path::PathBuf)> {
-    // All PARA category directories to search (explicit lookup)
-    let all_dirs = [
-        projects_dir(project_root),
-        areas_dir(project_root),
-        resources_dir(project_root),
-        archives_dir(project_root),
-    ];
-
-    if let Some(name) = explicit {
-        for base in &all_dirs {
-            let dir = base.join(name);
-            if dir.exists() {
-                return Ok((name.to_string(), dir));
-            }
-        }
-        return Err(WaiError::ProjectNotFound {
-            name: name.to_string(),
-        }
-        .into());
-    }
-
-    // Auto-discovery: only search active work (projects + areas).
-    // Resources and archives contain infrastructure dirs that would pollute
-    // the count and cause false "multiple projects" errors.
-    let auto_dirs = [projects_dir(project_root), areas_dir(project_root)];
-
-    // Collect all project directories across PARA categories
-    let mut projects: Vec<(String, std::path::PathBuf)> = Vec::new();
-    for base in &auto_dirs {
-        if !base.exists() {
-            continue;
-        }
-        for entry in std::fs::read_dir(base).into_diagnostic()? {
-            let entry = entry.into_diagnostic()?;
-            if entry.file_type().into_diagnostic()?.is_dir()
-                && let Some(name) = entry.file_name().to_str()
-            {
-                projects.push((name.to_string(), entry.path()));
-            }
-        }
-    }
-    projects.sort_by(|a, b| a.0.cmp(&b.0));
-
-    match projects.len() {
-        0 => Err(WaiError::NoProjectContext.into()),
-        1 => Ok(projects.remove(0)),
-        _ => {
-            let ctx = crate::context::current_context();
-            if ctx.no_input || !std::io::stdin().is_terminal() {
-                let names: Vec<_> = projects.iter().map(|(n, _)| n.as_str()).collect();
-                return Err(WaiError::NonInteractive {
-                    message: format!(
-                        "Multiple projects found ({}). Use --project <name> to specify one.",
-                        names.join(", ")
-                    ),
-                }
-                .into());
-            }
-            // Interactive selection via cliclack
-            let mut sel = cliclack::select("Multiple projects found — which one?");
-            for (name, path) in &projects {
-                sel = sel.item((name.clone(), path.clone()), name.as_str(), "");
-            }
-            let selected: (String, std::path::PathBuf) = sel.interact().into_diagnostic()?;
-            Ok(selected)
-        }
     }
 }
 

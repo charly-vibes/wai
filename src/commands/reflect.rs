@@ -904,30 +904,11 @@ pub fn run(args: ReflectArgs) -> Result<()> {
     let today = chrono::Local::now().format("%Y-%m-%d").to_string();
 
     // Resolve project_name early as Option<String>.
-    let project_name: Option<String> = if let Some(ref name) = project {
-        let project_dir = crate::config::projects_dir(&project_root).join(name);
-        if project_dir.exists() {
-            Some(name.clone())
-        } else {
-            None
-        }
-    } else {
-        // Auto-detect the single project if only one exists.
-        let projects_dir = crate::config::projects_dir(&project_root);
-        if let Ok(entries) = std::fs::read_dir(&projects_dir) {
-            let projects: Vec<_> = entries
-                .filter_map(|e| e.ok())
-                .filter(|e| e.path().is_dir())
-                .collect();
-            if projects.len() == 1 {
-                projects[0].file_name().to_str().map(|s| s.to_string())
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    };
+    // Uses unified resolution but falls back to None rather than erroring,
+    // since reflect can operate without a specific project.
+    let project_name: Option<String> = super::resolve_project(&project_root, project.as_deref())
+        .ok()
+        .map(|r| r.name);
 
     // Detect output targets (CLAUDE.md / AGENTS.md).
     let targets = detect_output_targets(&project_root, output.as_deref())?;

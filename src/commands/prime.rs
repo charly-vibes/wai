@@ -13,7 +13,7 @@ use crate::plugin;
 use crate::plugin::{detect_main_worktree_root, fetch_memories};
 use crate::state::ProjectState;
 
-use super::{beads_counts, beads_summary, list_projects, require_project, resolve_project_named};
+use super::{beads_counts, beads_summary, list_projects, require_project, resolve_project};
 
 /// Maximum age of a `.pending-resume` file before it is considered stale.
 const RESUME_WINDOW: Duration = Duration::from_secs(12 * 60 * 60);
@@ -46,7 +46,8 @@ pub fn run(project: Option<String>) -> Result<()> {
         return Ok(());
     }
 
-    let project_name = resolve_project_named(&project_root, project, "wai prime --project <name>")?;
+    let resolved = resolve_project(&project_root, project.as_deref())?;
+    let project_name = resolved.name;
 
     // Read phase
     let proj_dir = projects_dir(&project_root).join(&project_name);
