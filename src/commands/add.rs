@@ -342,7 +342,11 @@ fn parse_severity(input: &str) -> Result<SeverityCounts> {
 
 /// Validate that a review target artifact exists in the project directory.
 /// Searches across all artifact type directories (research, plans, designs, handoffs, reviews).
+/// Rejects targets containing path separators to prevent directory traversal.
 fn validate_review_target(project_dir: &std::path::Path, target: &str) -> Result<()> {
+    if target.contains('/') || target.contains('\\') {
+        miette::bail!("review target must be a filename, not a path: '{}'", target);
+    }
     let dirs = [
         crate::config::RESEARCH_DIR,
         crate::config::PLANS_DIR,
@@ -542,6 +546,14 @@ current_step: 0
         std::fs::write(research.join("2026-04-02-findings.md"), "content").unwrap();
 
         assert!(super::validate_review_target(project, "2026-04-02-findings.md").is_ok());
+    }
+
+    #[test]
+    fn validate_review_target_rejects_path_traversal() {
+        let dir = tempfile::tempdir().unwrap();
+        let result = super::validate_review_target(dir.path(), "../../etc/passwd");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not a path"));
     }
 
     #[test]
