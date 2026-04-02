@@ -262,34 +262,39 @@ fn cmd_init(name: &str) -> Result<()> {
         );
     }
 
-    // The template uses {topic} as the variable substitution placeholder.
-    // We build this as a plain string (no format!) to avoid escaping collisions.
-    let template = concat!(
-        "# Step prompts are navigation hints. Instructions for HOW to do the\n",
-        "# work belong in skills.\n",
-        "[pipeline]\n",
-        "name = \"PIPELINE_NAME\"\n",
-        "description = \"Describe what this pipeline does\"\n",
-        "\n",
-        "[[steps]]\n",
-        "id = \"step-one\"\n",
-        "prompt = \"\"\"\n",
-        "{topic}: TODO describe step one task.\n",
-        "Use skill `<skill-name>` if available.\n",
-        "Record findings: `wai add research \"...\"`\n",
-        "Advance: `wai pipeline next`\n",
-        "\"\"\"\n",
-        "\n",
-        "[[steps]]\n",
-        "id = \"step-two\"\n",
-        "prompt = \"\"\"\n",
-        "{topic}: TODO describe step two task.\n",
-        "Use skill `<skill-name>` if available.\n",
-        "Record decisions: `wai add design \"...\"`\n",
-        "Advance: `wai pipeline next`\n",
-        "\"\"\"\n",
-    );
-    let template = template.replace("PIPELINE_NAME", name);
+    // Check for built-in template, otherwise use generic scaffold
+    let template = if let Some(builtin) = get_builtin_template(name) {
+        builtin.to_string()
+    } else {
+        // The template uses {topic} as the variable substitution placeholder.
+        // We build this as a plain string (no format!) to avoid escaping collisions.
+        let tmpl = concat!(
+            "# Step prompts are navigation hints. Instructions for HOW to do the\n",
+            "# work belong in skills.\n",
+            "[pipeline]\n",
+            "name = \"PIPELINE_NAME\"\n",
+            "description = \"Describe what this pipeline does\"\n",
+            "\n",
+            "[[steps]]\n",
+            "id = \"step-one\"\n",
+            "prompt = \"\"\"\n",
+            "{topic}: TODO describe step one task.\n",
+            "Use skill `<skill-name>` if available.\n",
+            "Record findings: `wai add research \"...\"`\n",
+            "Advance: `wai pipeline next`\n",
+            "\"\"\"\n",
+            "\n",
+            "[[steps]]\n",
+            "id = \"step-two\"\n",
+            "prompt = \"\"\"\n",
+            "{topic}: TODO describe step two task.\n",
+            "Use skill `<skill-name>` if available.\n",
+            "Record decisions: `wai add design \"...\"`\n",
+            "Advance: `wai pipeline next`\n",
+            "\"\"\"\n",
+        );
+        tmpl.replace("PIPELINE_NAME", name)
+    };
 
     fs::write(&file_path, template).into_diagnostic()?;
 
@@ -1203,6 +1208,20 @@ fn cmd_validate(name: Option<&str>) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Returns a built-in template if one exists for the given name.
+fn get_builtin_template(name: &str) -> Option<&'static str> {
+    match name {
+        "scientific-research" => Some(include_str!("../templates/scientific-research.toml")),
+        _ => None,
+    }
+}
+
+/// Returns names of all available built-in templates.
+#[cfg(test)]
+fn builtin_template_names() -> &'static [&'static str] {
+    &["scientific-research"]
 }
 
 /// List all pipeline names found in the pipelines directory.
@@ -2480,5 +2499,29 @@ prompt = "Do {topic}."
     fn execute_oracle_failure() {
         let result = execute_oracle("false", &[], 30).unwrap();
         assert!(result.is_some(), "expected Some (failure)");
+    }
+
+    // ── built-in templates ────────────────────────────────────────────────
+
+    #[test]
+    fn builtin_template_scientific_research_exists() {
+        let template = get_builtin_template("scientific-research");
+        assert!(template.is_some(), "expected scientific-research template");
+        let content = template.unwrap();
+        assert!(content.contains("[pipeline]"));
+        assert!(content.contains("scientific-research"));
+        assert!(content.contains("[pipeline.metadata]"));
+    }
+
+    #[test]
+    fn builtin_template_unknown_returns_none() {
+        assert!(get_builtin_template("nonexistent").is_none());
+    }
+
+    #[test]
+    fn builtin_template_names_not_empty() {
+        let names = builtin_template_names();
+        assert!(!names.is_empty());
+        assert!(names.contains(&"scientific-research"));
     }
 }

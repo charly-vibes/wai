@@ -4,24 +4,24 @@ Phase 3 is prerequisite for phase 5 (commands wrap the gate engine).
 Phases 4, 6, and 7 can proceed in parallel after phase 3.
 
 ## 1. Step-level artifact tagging
-- [ ] 1.1 Read `current_step` from run state in `wai add` and inject `pipeline-step:<step-id>` tag
-- [ ] 1.2 Add tests for step-level tag injection alongside existing run-level tag tests
+- [x] 1.1 Read `current_step` from run state in `wai add` and inject `pipeline-step:<step-id>` tag
+- [x] 1.2 Add tests for step-level tag injection alongside existing run-level tag tests
 
 ## 2. Review artifact type
-- [ ] 2.1 Add `review` artifact type with `REVIEWS_DIR` constant and directory creation in workspace
-- [ ] 2.2 Implement `wai add review "..." --reviews <artifact-filename>` command
-- [ ] 2.3 Parse and validate review frontmatter: `reviews`, `verdict`, `severity`, `produced_by`
-- [ ] 2.4 Include review artifacts in `wai search` and `wai timeline`
-- [ ] 2.5 Add tests for review creation, frontmatter validation, and search integration
+- [x] 2.1 Add `review` artifact type with `REVIEWS_DIR` constant and directory creation in workspace
+- [x] 2.2 Implement `wai add review "..." --reviews <artifact-filename>` command
+- [x] 2.3 Parse and validate review frontmatter: `reviews`, `verdict`, `severity`, `produced_by`
+- [x] 2.4 Include review artifacts in `wai search` and `wai timeline`
+- [x] 2.5 Add tests for review creation, frontmatter validation, and search integration
 
 ## 3. Gate protocol engine
-- [ ] 3.1 Define gate TOML schema in pipeline parser (structural, procedural, oracle, approval sections)
-- [ ] 3.2 Implement structural gate: query artifacts by step + run tags, check count and types
-- [ ] 3.3 Implement procedural gate: find review artifacts matching each step artifact, check verdict/severity
-- [ ] 3.4 Implement oracle gate: resolve command, execute with artifact path, handle exit code and timeout
-- [ ] 3.5 Implement approval gate: check run state for approval timestamp
-- [ ] 3.6 Integrate gate evaluation into `wai pipeline next` — block on first failure with reason
-- [ ] 3.7 Add tests for each gate tier individually and combined evaluation order
+- [x] 3.1 Define gate TOML schema in pipeline parser (structural, procedural, oracle, approval sections)
+- [x] 3.2 Implement structural gate: query artifacts by step + run tags, check count and types
+- [x] 3.3 Implement procedural gate: find review artifacts matching each step artifact, check verdict/severity
+- [x] 3.4 Implement oracle gate: resolve command, execute with artifact path, handle exit code and timeout
+- [x] 3.5 Implement approval gate: check run state for approval timestamp
+- [x] 3.6 Integrate gate evaluation into `wai pipeline next` — block on first failure with reason
+- [x] 3.7 Add tests for each gate tier individually and combined evaluation order
 
 ## 4. Oracle system
 - [x] 4.1 Implement oracle name resolution: `.wai/resources/oracles/<name>` with extension probing
@@ -48,7 +48,7 @@ Phases 4, 6, and 7 can proceed in parallel after phase 3.
 - [x] 6.6 Add tests for metadata parsing, block generation, staleness detection
 
 ## 7. Pipeline init scaffolding
-- [ ] 7.1 Update `wai pipeline init` to accept built-in template names (e.g., `scientific-research`)
-- [ ] 7.2 Ship `scientific-research` as a built-in template
-- [ ] 7.3 Scaffold oracle directory and example files for gated pipelines
-- [ ] 7.4 Add tests for template scaffolding
+- [x] 7.1 Update `wai pipeline init` to accept built-in template names (e.g., `scientific-research`)
+- [x] 7.2 Ship `scientific-research` as a built-in template
+- [x] 7.3 Scaffold oracle directory and example files for gated pipelines
+- [x] 7.4 Add tests for template scaffolding

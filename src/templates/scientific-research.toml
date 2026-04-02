@@ -1,0 +1,188 @@
+# Scientific Research Workflow
+#
+# Structured pipeline for AI-assisted scientific research with intermediate
+# validation. Based on epistemological framework for mitigating context drift,
+# sycophancy, and unverified logical leaps in generative research.
+#
+# Designed for: frontier-level theoretical/computational research where an
+# LLM generates mathematical derivations, proofs, or data analysis across
+# many subtasks and the human supervisor needs systematic validation.
+#
+# Usage: wai pipeline start scientific-research --topic="<research objective>"
+
+[pipeline]
+name = "scientific-research"
+description = "AI-assisted scientific research with intermediate validation and artifact accrual"
+
+[pipeline.metadata]
+when = "Frontier-level research requiring systematic validation"
+skills = ["design-practice", "ro5"]
+
+[[steps]]
+id = "describe"
+prompt = """
+{topic}: Capture the research problem neutrally.
+
+Focus ONLY on observed symptoms, signals, metrics, boundary conditions, and
+known constraints. Do NOT propose solutions, hypotheses, or interpretations yet.
+
+Deliverables:
+- Neutral problem statement (what is observed, not why)
+- Known physical/mathematical constraints and boundary conditions
+- Data sources and their reliability
+- Success criteria: what would a valid result look like?
+
+Use skill `design-practice` (Describe phase) if available.
+Record findings: `wai add research "..."`
+Advance: `wai pipeline next`
+"""
+
+[[steps]]
+id = "diagnose"
+prompt = """
+{topic}: Generate and test competing hypotheses.
+
+Generate at least THREE distinct hypotheses for the research question.
+For each hypothesis:
+- State the prediction it makes
+- Identify what evidence would confirm OR refute it
+- Perform negative progress: rule out false leads via component isolation,
+  boundary case analysis, or algorithmic bisection
+
+Do NOT converge on a single hypothesis yet. The goal is to map the full
+hypothesis space and eliminate invalid paths with evidence.
+
+Use skill `design-practice` (Diagnose phase) if available.
+Record findings: `wai add research "..."`
+Advance: `wai pipeline next`
+"""
+
+[[steps]]
+id = "delimit"
+prompt = """
+{topic}: Define explicit boundaries and scope.
+
+This step is the primary defense against context drift. Document:
+- Scope: what IS included in this research
+- Non-goals: what is explicitly OUT of scope (be specific)
+- Constraints: computational, time, data, or methodological limits
+- Assumptions: what are we taking as given without re-deriving
+
+Write these as a scope document that the agent can reference throughout
+the remaining steps. If later work drifts outside these boundaries,
+halt and revisit this document.
+
+Use skill `design-practice` (Delimit phase) if available.
+Record decisions: `wai add design "..."`
+Advance: `wai pipeline next`
+"""
+
+[[steps]]
+id = "direction"
+prompt = """
+{topic}: Select the research approach.
+
+Build a Decision Matrix comparing the surviving hypotheses/approaches:
+- Include a "do nothing" / "null hypothesis" baseline
+- Score each approach against: feasibility, rigor, falsifiability, compute cost
+- Facts fill cells; subjective judgments are flagged explicitly
+
+Select the approach. Justify the selection against the matrix.
+Document what would cause you to revisit this decision.
+
+Use skill `design-practice` (Direction phase) if available.
+Record decisions: `wai add design "..."`
+Advance: `wai pipeline next`
+"""
+
+[[steps]]
+id = "decompose"
+prompt = """
+{topic}: Break the research into a master task tree.
+
+Decompose the selected approach into discrete, independently verifiable subtasks.
+For each subtask:
+- Unique ID and clear description
+- Input dependencies (which prior subtasks must complete first)
+- Expected output format and validation criteria
+- Known edge cases or failure modes
+
+Create beads issues for each subtask with dependencies:
+  bd create --title="<subtask>" --description="<details>" --type=task
+  bd dep add <blocked> <blocker>
+
+This is the task tree the Generate-Validate-Accrue loop will execute against.
+
+Record plan: `wai add plan "..."`
+Advance: `wai pipeline next`
+"""
+
+[[steps]]
+id = "generate-validate-accrue"
+prompt = """
+{topic}: Execute subtasks with intermediate validation.
+
+For EACH subtask in the task tree (from decompose step):
+
+1. GENERATE: Execute the subtask. Produce the mathematical derivation,
+   code, data analysis, or theoretical argument.
+
+2. VALIDATE: Run /ro5 on the generated artifact. All five passes:
+   - Accuracy: verify facts, citations, mathematical correctness
+   - Completeness: check for skipped steps, missing edge cases
+   - Clarity: ensure unambiguous terminology and notation
+   - Actionability: confirm output is usable by the next subtask
+   - Integration: check consistency with ALL previously accrued artifacts
+
+3. ACCRUE: If validation passes, commit the artifact to the project:
+   wai add research "<subtask findings>"
+   bd close <subtask-id>
+   If validation fails, fix and re-validate before accruing.
+
+CRITICAL: Do not skip validation. Do not accrue unvalidated artifacts.
+If a subtask's output contradicts a previously accrued artifact, HALT
+and surface the contradiction to the human supervisor.
+
+Repeat for each subtask. Advance only when ALL subtasks are complete.
+Advance: `wai pipeline next`
+"""
+
+[[steps]]
+id = "synthesize"
+prompt = """
+{topic}: Assemble the final output from accrued artifacts.
+
+Review all accrued artifacts from the generate-validate-accrue step.
+Synthesize them into a coherent final output (paper, report, derivation).
+
+Check for:
+- Logical flow: does each section follow from the previous?
+- Notation consistency: are variables/symbols used consistently throughout?
+- Gap detection: are there logical leaps between accrued artifacts?
+- Boundary conditions: does the final result satisfy the constraints from delimit?
+
+Record synthesis: `wai add research "..."`
+Advance: `wai pipeline next`
+"""
+
+[[steps]]
+id = "final-review"
+prompt = """
+{topic}: Full review of the synthesized output.
+
+Run /ro5 on the complete synthesized output. This is the final quality gate.
+
+Additionally verify:
+- The result satisfies the success criteria defined in the describe step
+- The scope document from delimit was respected (no drift)
+- The decision matrix from direction is still valid given results
+- All beads subtasks are closed
+
+If critical issues found: route back to generate-validate-accrue for the
+specific subtask that introduced the error.
+
+If review passes: the research output is ready for human review / publication.
+
+Record final assessment: `wai add research "..."`
+Pipeline complete.
+"""
