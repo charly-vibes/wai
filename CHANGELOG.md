@@ -5,6 +5,41 @@ All notable changes to wai will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Calendar Versioning](https://calver.org/) (YYYY.M.MICRO).
 
+## [2026.4.1] - 2026-04-02
+
+### Added
+
+#### Pipeline Gates
+- **Gate protocol engine** — 4-tier validation system (artifact, review, oracle, custom) for enforcing quality checks at pipeline step boundaries
+- **`wai pipeline show`** — display pipeline definition with steps and gate requirements
+- **`wai pipeline gates`** — list all gates for a pipeline with validation tier details
+- **`wai pipeline check`** — check gate satisfaction status for the current run
+- **`wai pipeline validate`** — run full gate validation before advancing to next step
+- **Oracle system** — LLM-powered validation with workspace scaffolding and structured prompts
+- **Built-in gate templates** — reusable gate definitions for common validation patterns
+- **Step-level artifact tagging** — pipeline steps can declare required artifact types
+- **Metadata parsing** — structured gate metadata with managed block integration
+- **Pipeline doctor checks** — `wai doctor` validates pipeline gate configurations
+
+#### Unified Project Resolution
+- **`wai project use <name>`** — session-scoped project binding via `WAI_PROJECT` env var
+- **`WAI_PROJECT` environment variable** — set active project without `--project` flag on every command
+- **Resolution source indicator** — `wai phase show` displays how the project was resolved (flag, env, default)
+- **Unified `resolve_project()`** — all commands now use consistent project resolution logic
+- **Doctor checks** — `wai doctor` validates `WAI_PROJECT` configuration
+
+#### Review Artifacts
+- **Review artifact type** — `wai add review` with structured frontmatter for capturing review findings
+
+### Fixed
+- **Path traversal in reviews** — `--reviews` target now rejects path traversal attempts
+- **Ro5 review findings** — addressed issues found during Rule of 5 quality pass
+
+### Changed
+- **Refactored project resolution** — migrated all commands from ad-hoc resolution to unified `resolve_project()`
+
+---
+
 ## [2026.3.5] - 2026-03-24
 
 ### Added
