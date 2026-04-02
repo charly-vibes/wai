@@ -893,6 +893,64 @@ pub enum PipelineCommands {
     /// EXAMPLES
     ///   wai pipeline approve
     Approve,
+
+    /// Show detailed pipeline definition with steps and gate configuration
+    ///
+    /// Displays the pipeline name, description, metadata (when, skills),
+    /// step list with gate summary per step, and oracle directory path.
+    ///
+    /// EXAMPLES
+    ///   wai pipeline show scientific-research
+    Show {
+        /// Pipeline name to display
+        name: String,
+    },
+
+    /// Show gate requirements and live status for a pipeline step
+    ///
+    /// With an active run (and no arguments), shows live status for the
+    /// current step. Without an active run, the pipeline name is required
+    /// and --step selects the step to display.
+    ///
+    /// EXAMPLES
+    ///   wai pipeline gates
+    ///   wai pipeline gates scientific-research --step=generate
+    Gates {
+        /// Pipeline name (required if no active run)
+        name: Option<String>,
+
+        /// Step ID to display gates for
+        #[arg(long)]
+        step: Option<String>,
+    },
+
+    /// Evaluate all gates for the current step without advancing
+    ///
+    /// Runs structural, procedural, oracle, and approval gate checks
+    /// and reports per-tier status. Does NOT advance the step.
+    /// Use --oracle to run a single oracle against all applicable artifacts.
+    ///
+    /// EXAMPLES
+    ///   wai pipeline check
+    ///   wai pipeline check --oracle=dimensional-analysis
+    Check {
+        /// Run only this oracle against all applicable artifacts
+        #[arg(long)]
+        oracle: Option<String>,
+    },
+
+    /// Validate pipeline TOML definitions for correctness
+    ///
+    /// Checks TOML structure, gate configuration, oracle paths, and metadata.
+    /// Validates a specific pipeline by name, or all pipelines if no name given.
+    ///
+    /// EXAMPLES
+    ///   wai pipeline validate scientific-research
+    ///   wai pipeline validate
+    Validate {
+        /// Pipeline name (validates all if omitted)
+        name: Option<String>,
+    },
 }
 
 /// Returns the names of all top-level wai subcommands, derived from the [`Cli`] struct.

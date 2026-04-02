@@ -32,12 +32,12 @@ Phases 4, 6, and 7 can proceed in parallel after phase 3.
 - [ ] 4.6 Add tests for resolution, execution, timeout, and failure reporting
 
 ## 5. New pipeline commands
-- [ ] 5.1 `wai pipeline show <name>` — detailed view with steps, gates, oracles
-- [ ] 5.2 `wai pipeline gates [pipeline-name] [--step=<id>]` — gate requirements and live status
-- [ ] 5.3 `wai pipeline check [--oracle=<name>]` — dry-run gate evaluation without advancing
-- [ ] 5.4 `wai pipeline approve` — set approval timestamp in run state
-- [ ] 5.5 `wai pipeline validate [name]` — validate TOML structure, gate config, oracle paths, metadata
-- [ ] 5.6 Add tests for each new command
+- [x] 5.1 `wai pipeline show <name>` — detailed view with steps, gates, oracles
+- [x] 5.2 `wai pipeline gates [pipeline-name] [--step=<id>]` — gate requirements and live status
+- [x] 5.3 `wai pipeline check [--oracle=<name>]` — dry-run gate evaluation without advancing
+- [x] 5.4 `wai pipeline approve` — set approval timestamp in run state
+- [x] 5.5 `wai pipeline validate [name]` — validate TOML structure, gate config, oracle paths, metadata
+- [x] 5.6 Add tests for each new command
 
 ## 6. Pipeline metadata and managed block
 - [x] 6.1 Add `[pipeline.metadata]` parsing to pipeline TOML schema (`when`, `skills` fields)

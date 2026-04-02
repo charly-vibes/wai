@@ -170,6 +170,10 @@ pub fn run(cmd: PipelineCommands) -> Result<()> {
         PipelineCommands::Current => cmd_current(),
         PipelineCommands::Suggest { description } => cmd_suggest(description.as_deref()),
         PipelineCommands::Approve => cmd_approve(),
+        PipelineCommands::Show { name } => cmd_show(&name),
+        PipelineCommands::Gates { name, step } => cmd_gates(name.as_deref(), step.as_deref()),
+        PipelineCommands::Check { oracle } => cmd_check(oracle.as_deref()),
+        PipelineCommands::Validate { name } => cmd_validate(name.as_deref()),
     }
 }
 
@@ -621,6 +625,552 @@ fn cmd_approve() -> Result<()> {
     .into_diagnostic()?;
 
     Ok(())
+}
+
+// ─── show ─────────────────────────────────────────────────────────────────────
+
+fn cmd_show(name: &str) -> Result<()> {
+    let project_root = require_project()?;
+    let def_path = pipelines_dir(&project_root).join(format!("{}.toml", name));
+    if !def_path.exists() {
+        let available = list_pipeline_names(&project_root);
+        if available.is_empty() {
+            miette::bail!("Pipeline '{}' not found. No pipelines defined.", name);
+        } else {
+            miette::bail!(
+                "Pipeline '{}' not found. Available: {}",
+                name,
+                available.join(", ")
+            );
+        }
+    }
+    let def = load_pipeline_toml(&def_path)?;
+
+    // Header
+    println!();
+    println!("  {} {}", "◆".cyan(), def.name.bold());
+    if let Some(ref desc) = def.description {
+        println!("  {}", desc.dimmed());
+    }
+
+    // Metadata
+    if let Some(ref meta) = def.metadata {
+        println!();
+        if let Some(ref when) = meta.when {
+            println!("  {} When: {}", "•".dimmed(), when);
+        }
+        if !meta.skills.is_empty() {
+            println!("  {} Skills: {}", "•".dimmed(), meta.skills.join(", "));
+        }
+    }
+
+    // Steps
+    println!();
+    println!("  {} Steps ({}):", "◆".cyan(), def.steps.len());
+    for (i, step) in def.steps.iter().enumerate() {
+        let gate_summary = format_gate_summary(&step.gate);
+        if gate_summary.is_empty() {
+            println!(
+                "    {}. {} {}",
+                i + 1,
+                step.id.bold(),
+                "(no gates)".dimmed()
+            );
+        } else {
+            println!(
+                "    {}. {} {}",
+                i + 1,
+                step.id.bold(),
+                gate_summary.dimmed()
+            );
+        }
+    }
+
+    // Oracle directory
+    let oracles_dir = crate::config::wai_dir(&project_root)
+        .join("resources")
+        .join("oracles");
+    println!();
+    println!("  {} Oracles: {}", "•".dimmed(), oracles_dir.display());
+    println!();
+
+    Ok(())
+}
+
+/// Format a one-line gate summary for a step.
+fn format_gate_summary(gate: &Option<StepGate>) -> String {
+    let Some(g) = gate else {
+        return String::new();
+    };
+    let mut parts = Vec::new();
+    if g.structural.is_some() {
+        parts.push("structural");
+    }
+    if g.procedural.is_some() {
+        parts.push("procedural");
+    }
+    if !g.oracles.is_empty() {
+        parts.push("oracle");
+    }
+    if g.approval.is_some() {
+        parts.push("approval");
+    }
+    if parts.is_empty() {
+        String::new()
+    } else {
+        format!("[{}]", parts.join(" + "))
+    }
+}
+
+// ─── gates ────────────────────────────────────────────────────────────────────
+
+fn cmd_gates(name: Option<&str>, step_filter: Option<&str>) -> Result<()> {
+    let project_root = require_project()?;
+
+    // Try to resolve active run for live status
+    let active_run = resolve_active_run_id(&project_root).ok();
+
+    if let Some(ref run_id) = active_run
+        && name.is_none()
+    {
+        // Active run, no explicit pipeline name — show live status for current step
+        let runs_dir = crate::config::wai_dir(&project_root).join("pipeline-runs");
+        let run_path = runs_dir.join(format!("{}.yml", run_id));
+        let run: PipelineRun =
+            serde_yml::from_str(&fs::read_to_string(&run_path).into_diagnostic()?)
+                .map_err(|e| miette::miette!("Failed to parse run state: {}", e))?;
+        let def_path = pipelines_dir(&project_root).join(format!("{}.toml", run.pipeline));
+        let definition = load_pipeline_toml(&def_path)?;
+
+        if run.current_step >= definition.steps.len() {
+            miette::bail!("Pipeline run is complete.");
+        }
+
+        let step = &definition.steps[run.current_step];
+        print_gate_status(step, Some(&run), Some(&definition), &project_root)?;
+    } else if let Some(pipeline_name) = name {
+        // Show gate definitions (not live status)
+        let def_path = pipelines_dir(&project_root).join(format!("{}.toml", pipeline_name));
+        if !def_path.exists() {
+            miette::bail!(
+                "Pipeline '{}' not found. Specify a pipeline name: wai pipeline gates <name>",
+                pipeline_name
+            );
+        }
+        let definition = load_pipeline_toml(&def_path)?;
+
+        if let Some(step_id) = step_filter {
+            let step = definition
+                .steps
+                .iter()
+                .find(|s| s.id == step_id)
+                .ok_or_else(|| {
+                    miette::miette!(
+                        "Step '{}' not found in pipeline '{}'. Steps: {}",
+                        step_id,
+                        pipeline_name,
+                        definition
+                            .steps
+                            .iter()
+                            .map(|s| s.id.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )
+                })?;
+            print_gate_status(step, None, None, &project_root)?;
+        } else {
+            // Show all steps' gates
+            for step in &definition.steps {
+                print_gate_status(step, None, None, &project_root)?;
+            }
+        }
+    } else {
+        miette::bail!("No active pipeline run. Specify a pipeline name: wai pipeline gates <name>");
+    }
+
+    Ok(())
+}
+
+/// Print gate status for a single step.
+fn print_gate_status(
+    step: &PipelineStep,
+    run: Option<&PipelineRun>,
+    _definition: Option<&PipelineDefinition>,
+    project_root: &Path,
+) -> Result<()> {
+    println!();
+    println!("  {} Step: {}", "◆".cyan(), step.id.bold());
+
+    let Some(ref gate) = step.gate else {
+        println!(
+            "    {} No gates configured for step '{}'.",
+            "•".dimmed(),
+            step.id
+        );
+        println!();
+        return Ok(());
+    };
+
+    let live = run.is_some();
+    let step_artifacts = if live {
+        let r = run.unwrap();
+        find_step_artifacts(project_root, &r.run_id, &step.id)
+    } else {
+        Vec::new()
+    };
+
+    // Structural
+    if let Some(ref sg) = gate.structural {
+        let type_desc = if sg.types.is_empty() {
+            "any".to_string()
+        } else {
+            sg.types.join("/")
+        };
+        if live {
+            let matching: Vec<_> = if sg.types.is_empty() {
+                step_artifacts.clone()
+            } else {
+                step_artifacts
+                    .iter()
+                    .filter(|a| sg.types.contains(&a.artifact_type))
+                    .cloned()
+                    .collect()
+            };
+            let passed = matching.len() >= sg.min_artifacts;
+            if passed {
+                println!(
+                    "    {} Structural: min {} {} artifact(s) — found {}",
+                    "✓".green(),
+                    sg.min_artifacts,
+                    type_desc,
+                    matching.len()
+                );
+            } else {
+                println!(
+                    "    {} Structural: min {} {} artifact(s) — found {}",
+                    "✗".red(),
+                    sg.min_artifacts,
+                    type_desc,
+                    matching.len()
+                );
+            }
+        } else {
+            println!(
+                "    {} Structural: min {} {} artifact(s)",
+                "•".dimmed(),
+                sg.min_artifacts,
+                type_desc
+            );
+        }
+    }
+
+    // Procedural
+    if let Some(ref pg) = gate.procedural
+        && pg.require_review
+    {
+        let type_desc = if pg.review_types.is_empty() {
+            "all (except review)".to_string()
+        } else {
+            pg.review_types.join("/")
+        };
+        if live {
+            let reviewable: Vec<_> = step_artifacts
+                .iter()
+                .filter(|a| {
+                    if a.artifact_type == "review" {
+                        return false;
+                    }
+                    if pg.review_types.is_empty() {
+                        true
+                    } else {
+                        pg.review_types.contains(&a.artifact_type)
+                    }
+                })
+                .collect();
+            let reviews: Vec<_> = step_artifacts
+                .iter()
+                .filter(|a| a.artifact_type == "review")
+                .collect();
+            let missing: Vec<_> = reviewable
+                .iter()
+                .filter(|a| {
+                    !reviews
+                        .iter()
+                        .any(|r| r.reviews_target.as_deref() == Some(&a.filename))
+                })
+                .collect();
+            let passed = missing.is_empty();
+            if passed {
+                println!(
+                    "    {} Procedural: require review for {} types — {} unreviewed",
+                    "✓".green(),
+                    type_desc,
+                    missing.len()
+                );
+            } else {
+                println!(
+                    "    {} Procedural: require review for {} types — {} unreviewed",
+                    "✗".red(),
+                    type_desc,
+                    missing.len()
+                );
+            }
+        } else {
+            println!(
+                "    {} Procedural: require review for {} types",
+                "•".dimmed(),
+                type_desc
+            );
+        }
+        if let Some(mc) = pg.max_critical {
+            println!("      {} max_critical: {}", "•".dimmed(), mc);
+        }
+        if let Some(mh) = pg.max_high {
+            println!("      {} max_high: {}", "•".dimmed(), mh);
+        }
+    }
+
+    // Oracles
+    for oracle in &gate.oracles {
+        let scope = oracle.scope.as_deref().unwrap_or("artifact");
+        let desc = oracle.description.as_deref().unwrap_or("");
+        if !desc.is_empty() {
+            println!(
+                "    {} Oracle: {} — {} (scope: {})",
+                "•".dimmed(),
+                oracle.name,
+                desc,
+                scope
+            );
+        } else {
+            println!(
+                "    {} Oracle: {} (scope: {})",
+                "•".dimmed(),
+                oracle.name,
+                scope
+            );
+        }
+    }
+
+    // Approval
+    if let Some(ref ag) = gate.approval
+        && ag.required
+    {
+        if live {
+            let r = run.unwrap();
+            let approved = r.approvals.contains_key(&step.id);
+            let msg = ag.message.as_deref().unwrap_or("required");
+            if approved {
+                println!("    {} Approval: {} (approved)", "✓".green(), msg);
+            } else {
+                println!("    {} Approval: {} (pending)", "✗".red(), msg);
+            }
+        } else {
+            println!(
+                "    {} Approval: {}",
+                "•".dimmed(),
+                ag.message.as_deref().unwrap_or("required")
+            );
+        }
+    }
+
+    println!();
+    Ok(())
+}
+
+// ─── check ────────────────────────────────────────────────────────────────────
+
+fn cmd_check(oracle_name: Option<&str>) -> Result<()> {
+    let project_root = require_project()?;
+    let run_id = resolve_active_run_id(&project_root)?;
+
+    let runs_dir = crate::config::wai_dir(&project_root).join("pipeline-runs");
+    let run_path = runs_dir.join(format!("{}.yml", run_id));
+    if !run_path.exists() {
+        miette::bail!("No active pipeline run.");
+    }
+    let run: PipelineRun = serde_yml::from_str(&fs::read_to_string(&run_path).into_diagnostic()?)
+        .map_err(|e| miette::miette!("Failed to parse run state: {}", e))?;
+
+    let def_path = pipelines_dir(&project_root).join(format!("{}.toml", run.pipeline));
+    let definition = load_pipeline_toml(&def_path)?;
+
+    if run.current_step >= definition.steps.len() {
+        miette::bail!("Pipeline run is complete.");
+    }
+
+    let step = &definition.steps[run.current_step];
+
+    if let Some(oracle_filter) = oracle_name {
+        // Single oracle mode
+        let step_artifacts = find_step_artifacts(&project_root, &run.run_id, &step.id);
+        let oracle = step
+            .gate
+            .as_ref()
+            .and_then(|g| g.oracles.iter().find(|o| o.name == oracle_filter));
+
+        let Some(oracle) = oracle else {
+            miette::bail!(
+                "Oracle '{}' not configured for step '{}'. Available oracles: {}",
+                oracle_filter,
+                step.id,
+                step.gate
+                    .as_ref()
+                    .map(|g| g
+                        .oracles
+                        .iter()
+                        .map(|o| o.name.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", "))
+                    .unwrap_or_default()
+            );
+        };
+
+        let failures = run_oracle(oracle, &step_artifacts, &project_root)?;
+        println!();
+        if failures.is_empty() {
+            println!("  {} Oracle '{}': PASS", "✓".green(), oracle_filter);
+        } else {
+            for f in &failures {
+                println!("  {} {}", "✗".red(), f);
+            }
+        }
+        println!();
+        return Ok(());
+    }
+
+    // Full gate check
+    let Some(ref gate) = step.gate else {
+        println!();
+        println!("  No gates configured for step '{}'. Result: PASS", step.id);
+        println!();
+        return Ok(());
+    };
+
+    let failures = evaluate_gates(gate, step, &run, &definition, &project_root)?;
+
+    println!();
+    println!("  {} Gate check for step '{}':", "◆".cyan(), step.id);
+    println!();
+
+    if failures.is_empty() {
+        println!("  {} Result: PASS", "✓".green());
+    } else {
+        for f in &failures {
+            println!("  {} {}", "✗".red(), f);
+        }
+        println!();
+        println!(
+            "  {} Result: BLOCKED — resolve {} failure(s)",
+            "✗".red(),
+            failures.len()
+        );
+    }
+    println!();
+
+    Ok(())
+}
+
+// ─── validate ─────────────────────────────────────────────────────────────────
+
+fn cmd_validate(name: Option<&str>) -> Result<()> {
+    let project_root = require_project()?;
+    let pipelines = pipelines_dir(&project_root);
+
+    if !pipelines.exists() {
+        miette::bail!("No pipelines directory found.");
+    }
+
+    let targets: Vec<(String, std::path::PathBuf)> = if let Some(name) = name {
+        let path = pipelines.join(format!("{}.toml", name));
+        if !path.exists() {
+            let available = list_pipeline_names(&project_root);
+            miette::bail!(
+                "Pipeline '{}' not found. Available: {}",
+                name,
+                available.join(", ")
+            );
+        }
+        vec![(name.to_string(), path)]
+    } else {
+        // Validate all
+        let mut targets = Vec::new();
+        for entry in fs::read_dir(&pipelines).into_diagnostic()?.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) == Some("toml")
+                && let Some(stem) = path.file_stem().and_then(|s| s.to_str())
+            {
+                targets.push((stem.to_string(), path));
+            }
+        }
+        targets.sort_by(|a, b| a.0.cmp(&b.0));
+        targets
+    };
+
+    let mut had_errors = false;
+
+    for (pname, path) in &targets {
+        match load_pipeline_toml(path) {
+            Err(e) => {
+                log::error(format!("{}: {}", pname, e)).into_diagnostic()?;
+                had_errors = true;
+            }
+            Ok(def) => {
+                let issues = validate_pipeline(&def, &project_root);
+                let errors: Vec<_> = issues
+                    .iter()
+                    .filter(|i| i.level == ValidationLevel::Error)
+                    .collect();
+                let warnings: Vec<_> = issues
+                    .iter()
+                    .filter(|i| i.level == ValidationLevel::Warn)
+                    .collect();
+
+                if errors.is_empty() && warnings.is_empty() {
+                    let gate_count = def.steps.iter().filter(|s| s.gate.is_some()).count();
+                    log::success(format!(
+                        "{}: {} steps, {} gated",
+                        pname,
+                        def.steps.len(),
+                        gate_count
+                    ))
+                    .into_diagnostic()?;
+                } else {
+                    for e in &errors {
+                        log::error(format!("{}: {}", pname, e.message)).into_diagnostic()?;
+                        had_errors = true;
+                    }
+                    for w in &warnings {
+                        log::warning(format!("{}: {}", pname, w.message)).into_diagnostic()?;
+                    }
+                }
+            }
+        }
+    }
+
+    if had_errors {
+        std::process::exit(1);
+    }
+
+    Ok(())
+}
+
+/// List all pipeline names found in the pipelines directory.
+fn list_pipeline_names(project_root: &Path) -> Vec<String> {
+    let pipelines = pipelines_dir(project_root);
+    let mut names = Vec::new();
+    if let Ok(entries) = fs::read_dir(&pipelines) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) == Some("toml")
+                && let Some(stem) = path.file_stem().and_then(|s| s.to_str())
+            {
+                names.push(stem.to_string());
+            }
+        }
+    }
+    names.sort();
+    names
 }
 
 // ─── gate evaluation ─────────────────────────────────────────────────────────
@@ -1746,6 +2296,62 @@ prompt = "Do {topic}."
         assert!(
             !issues.iter().any(|i| i.message.contains("custom")),
             "should not warn about oracle with explicit command"
+        );
+    }
+
+    // ── format_gate_summary ───────────────────────────────────────────────
+
+    #[test]
+    fn format_gate_summary_none_gate() {
+        assert_eq!(format_gate_summary(&None), "");
+    }
+
+    #[test]
+    fn format_gate_summary_empty_gate() {
+        let gate = StepGate::default();
+        assert_eq!(format_gate_summary(&Some(gate)), "");
+    }
+
+    #[test]
+    fn format_gate_summary_structural_only() {
+        let gate = StepGate {
+            structural: Some(StructuralGate {
+                min_artifacts: 1,
+                types: vec![],
+            }),
+            ..Default::default()
+        };
+        assert_eq!(format_gate_summary(&Some(gate)), "[structural]");
+    }
+
+    #[test]
+    fn format_gate_summary_all_tiers() {
+        let gate = StepGate {
+            structural: Some(StructuralGate {
+                min_artifacts: 1,
+                types: vec![],
+            }),
+            procedural: Some(ProceduralGate {
+                require_review: true,
+                review_types: vec![],
+                max_critical: None,
+                max_high: None,
+            }),
+            oracles: vec![OracleGate {
+                name: "check".to_string(),
+                command: None,
+                description: None,
+                timeout: None,
+                scope: None,
+            }],
+            approval: Some(ApprovalGate {
+                required: true,
+                message: None,
+            }),
+        };
+        assert_eq!(
+            format_gate_summary(&Some(gate)),
+            "[structural + procedural + oracle + approval]"
         );
     }
 }
