@@ -282,6 +282,67 @@ mod tests {
     }
 
     #[test]
+    fn step_tag_injected_when_pipeline_run_active() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+
+        // Create .wai directory structure
+        let wai = root.join(".wai");
+        std::fs::create_dir_all(wai.join("pipeline-runs")).unwrap();
+        std::fs::create_dir_all(wai.join("resources/pipelines")).unwrap();
+
+        // Write a pipeline definition
+        let toml_content = r#"[pipeline]
+name = "test-pipe"
+
+[[steps]]
+id = "research"
+prompt = "Do research on {topic}."
+
+[[steps]]
+id = "implement"
+prompt = "Implement {topic}."
+"#;
+        std::fs::write(wai.join("resources/pipelines/test-pipe.toml"), toml_content).unwrap();
+
+        // Write a run state at step 0
+        let run_yaml = r#"run_id: "test-pipe-2026-04-02-qcd"
+pipeline: "test-pipe"
+topic: "qcd"
+created_at: "2026-04-02T00:00:00Z"
+current_step: 0
+"#;
+        std::fs::write(
+            wai.join("pipeline-runs/test-pipe-2026-04-02-qcd.yml"),
+            run_yaml,
+        )
+        .unwrap();
+
+        // Write .pipeline-run pointer
+        std::fs::write(wai.join(".pipeline-run"), "test-pipe-2026-04-02-qcd").unwrap();
+
+        let tags = super::build_tags(None, root);
+        assert!(
+            tags.contains(&"pipeline-run:test-pipe-2026-04-02-qcd".to_string()),
+            "expected pipeline-run tag, got: {:?}",
+            tags
+        );
+        assert!(
+            tags.contains(&"pipeline-step:research".to_string()),
+            "expected pipeline-step:research tag, got: {:?}",
+            tags
+        );
+    }
+
+    #[test]
+    fn step_tag_not_injected_when_no_run() {
+        let dir = tempfile::tempdir().unwrap();
+        let tags = super::build_tags(Some("custom"), dir.path());
+        assert_eq!(tags, vec!["custom".to_string()]);
+        assert!(!tags.iter().any(|t| t.starts_with("pipeline-step:")));
+    }
+
+    #[test]
     fn no_frontmatter_when_neither_tags_nor_bead() {
         let all_tags: Vec<String> = vec![];
         let bead: Option<String> = None;
@@ -323,9 +384,31 @@ fn build_tags(user_tags: Option<&str>, project_root: &std::path::Path) -> Vec<St
         .filter(|v| !v.is_empty())
         .or_else(|| read_pipeline_run_state(project_root));
 
-    if let Some(run_id) = active_run {
+    if let Some(ref run_id) = active_run {
         tags.push(format!("pipeline-run:{}", run_id));
+
+        // Also inject pipeline-step:<step-id> from the run state + definition.
+        if let Some(step_id) = resolve_current_step_id(project_root, run_id) {
+            tags.push(format!("pipeline-step:{}", step_id));
+        }
     }
 
     tags
+}
+
+/// Resolve the current step ID by reading the pipeline run state and definition.
+///
+/// Returns `None` gracefully if anything fails (missing files, parse errors,
+/// step index out of bounds), so it never breaks artifact creation.
+fn resolve_current_step_id(project_root: &std::path::Path, run_id: &str) -> Option<String> {
+    let runs_dir = crate::config::wai_dir(project_root).join("pipeline-runs");
+    let run_path = runs_dir.join(format!("{}.yml", run_id));
+    let content = std::fs::read_to_string(&run_path).ok()?;
+    let run: super::pipeline::PipelineRun = serde_yml::from_str(&content).ok()?;
+
+    let def_path =
+        crate::config::pipelines_dir(project_root).join(format!("{}.toml", run.pipeline));
+    let definition = super::pipeline::load_pipeline_toml(&def_path).ok()?;
+
+    definition.steps.get(run.current_step).map(|s| s.id.clone())
 }
