@@ -104,6 +104,7 @@ pub fn run(args: SearchArgs) -> Result<()> {
                 "plan" | "plans" => path_str.contains("/plans/"),
                 "design" | "designs" => path_str.contains("/designs/"),
                 "handoff" | "handoffs" => path_str.contains("/handoffs/"),
+                "review" | "reviews" => path_str.contains("/reviews/"),
                 _ => true,
             };
             if !matches {

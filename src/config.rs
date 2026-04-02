@@ -45,6 +45,7 @@ pub const RESEARCH_DIR: &str = "research";
 pub const PLANS_DIR: &str = "plans";
 pub const DESIGNS_DIR: &str = "designs";
 pub const HANDOFFS_DIR: &str = "handoffs";
+pub const REVIEWS_DIR: &str = "reviews";
 pub const STATE_FILE: &str = ".state";
 
 #[derive(Debug, Serialize, Deserialize, Default)]

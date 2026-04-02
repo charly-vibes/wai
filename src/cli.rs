@@ -502,6 +502,40 @@ pub enum AddCommands {
         tags: Option<String>,
     },
 
+    /// Add a review artifact for an existing artifact
+    Review {
+        /// Review content
+        content: Option<String>,
+
+        /// Import from file
+        #[arg(short, long)]
+        file: Option<String>,
+
+        /// Associate with a project
+        #[arg(short, long)]
+        project: Option<String>,
+
+        /// Comma-separated tags written as YAML frontmatter
+        #[arg(short, long)]
+        tags: Option<String>,
+
+        /// Target artifact filename this review covers (required)
+        #[arg(long)]
+        reviews: String,
+
+        /// Review verdict: pass, fail, or needs-work
+        #[arg(long)]
+        verdict: Option<String>,
+
+        /// Severity counts as comma-separated level:count pairs (e.g. critical:0,high:1,medium:3,low:2)
+        #[arg(long)]
+        severity: Option<String>,
+
+        /// Skill that produced this review (informational only)
+        #[arg(long)]
+        produced_by: Option<String>,
+    },
+
     /// Scaffold a new agent skill file
     ///
     /// Skill names may be flat ("my-skill") or hierarchical ("category/action").

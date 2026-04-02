@@ -76,6 +76,7 @@ pub fn run(project: String, from: Option<String>, to: Option<String>, reverse: b
             "plans" => "plan",
             "designs" => "design",
             "handoffs" => "handoff",
+            "reviews" => "review",
             _ => "other",
         };
 
@@ -165,6 +166,7 @@ fn format_type(t: &str) -> String {
         "plan" => "plan".blue().to_string(),
         "design" => "design".magenta().to_string(),
         "handoff" => "handoff".green().to_string(),
+        "review" => "review".cyan().to_string(),
         _ => t.dimmed().to_string(),
     }
 }

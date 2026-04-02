@@ -4,7 +4,9 @@ use miette::{IntoDiagnostic, Result};
 
 use super::resource;
 use crate::cli::AddCommands;
-use crate::config::{DESIGNS_DIR, PLANS_DIR, RESEARCH_DIR, projects_dir, read_pipeline_run_state};
+use crate::config::{
+    DESIGNS_DIR, PLANS_DIR, RESEARCH_DIR, REVIEWS_DIR, projects_dir, read_pipeline_run_state,
+};
 use crate::context::{current_context, require_safe_mode};
 use crate::json::Suggestion;
 use crate::state::Phase;
@@ -201,8 +203,167 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             }
             Ok(())
         }
+        AddCommands::Review {
+            content,
+            file,
+            project,
+            tags,
+            reviews,
+            verdict,
+            severity,
+            produced_by,
+        } => {
+            require_safe_mode("add review")?;
+            let resolved = resolve_project(&project_root, project.as_deref())?;
+            let target_project = resolved.name;
+            let project_dir = projects_dir(&project_root).join(&target_project);
+
+            // Validate the target artifact exists in the current project
+            validate_review_target(&project_dir, &reviews)?;
+
+            // Validate verdict if provided
+            if let Some(ref v) = verdict {
+                match v.as_str() {
+                    "pass" | "fail" | "needs-work" => {}
+                    _ => {
+                        miette::bail!(
+                            "Invalid verdict '{}'. Valid values: pass, fail, needs-work",
+                            v
+                        );
+                    }
+                }
+            }
+
+            // Parse severity if provided
+            let severity_map = severity.as_deref().map(parse_severity).transpose()?;
+
+            let dir = project_dir.join(REVIEWS_DIR);
+            let body = get_content(content.as_deref(), file.as_deref())?;
+            let slug = slug::slugify(body.chars().take(50).collect::<String>());
+            let date = Utc::now().format("%Y-%m-%d");
+            let base_filename = format!("{}-{}.md", date, slug);
+
+            let mut filename = base_filename.clone();
+            let mut counter = 2;
+            while dir.join(&filename).exists() {
+                filename = format!("{}-{}-{}.md", date, slug, counter);
+                counter += 1;
+            }
+
+            let mut file_content = String::new();
+            let all_tags = build_tags(tags.as_deref(), &project_root);
+
+            // Reviews always have frontmatter (at minimum the reviews field)
+            file_content.push_str("---\n");
+            file_content.push_str(&format!("reviews: {}\n", reviews));
+            if let Some(ref v) = verdict {
+                file_content.push_str(&format!("verdict: {}\n", v));
+            }
+            if let Some(ref sev) = severity_map {
+                file_content.push_str(&format!(
+                    "severity: {{critical: {}, high: {}, medium: {}, low: {}}}\n",
+                    sev.critical, sev.high, sev.medium, sev.low
+                ));
+            }
+            if let Some(ref pb) = produced_by {
+                file_content.push_str(&format!("produced_by: {}\n", pb));
+            }
+            if !all_tags.is_empty() {
+                file_content.push_str(&format!("tags: [{}]\n", all_tags.join(", ")));
+            }
+            file_content.push_str("---\n\n");
+            file_content.push_str(&body);
+            file_content.push('\n');
+
+            std::fs::create_dir_all(&dir).into_diagnostic()?;
+            std::fs::write(dir.join(&filename), &file_content).into_diagnostic()?;
+            if !current_context().quiet {
+                log::success(format!("Added review to '{}'", target_project)).into_diagnostic()?;
+            }
+            Ok(())
+        }
         AddCommands::Skill { name, template } => resource::add_skill(&name, template.as_deref()),
     }
+}
+
+/// Parsed severity counts for review frontmatter.
+#[derive(Debug)]
+struct SeverityCounts {
+    critical: u32,
+    high: u32,
+    medium: u32,
+    low: u32,
+}
+
+/// Parse severity string like "critical:0,high:1,medium:3,low:2".
+/// Omitted levels default to 0.
+fn parse_severity(input: &str) -> Result<SeverityCounts> {
+    let mut counts = SeverityCounts {
+        critical: 0,
+        high: 0,
+        medium: 0,
+        low: 0,
+    };
+    for pair in input.split(',') {
+        let pair = pair.trim();
+        if pair.is_empty() {
+            continue;
+        }
+        let parts: Vec<&str> = pair.splitn(2, ':').collect();
+        if parts.len() != 2 {
+            miette::bail!(
+                "Invalid severity format '{}'. Expected level:count (e.g. critical:0,high:1)",
+                pair
+            );
+        }
+        let level = parts[0].trim();
+        let count: u32 = parts[1].trim().parse().map_err(|_| {
+            miette::miette!(
+                "Invalid count '{}' for severity level '{}'",
+                parts[1].trim(),
+                level
+            )
+        })?;
+        match level {
+            "critical" => counts.critical = count,
+            "high" => counts.high = count,
+            "medium" => counts.medium = count,
+            "low" => counts.low = count,
+            _ => {
+                miette::bail!(
+                    "Unknown severity level '{}'. Valid levels: critical, high, medium, low",
+                    level
+                );
+            }
+        }
+    }
+    Ok(counts)
+}
+
+/// Validate that a review target artifact exists in the project directory.
+/// Searches across all artifact type directories (research, plans, designs, handoffs, reviews).
+fn validate_review_target(project_dir: &std::path::Path, target: &str) -> Result<()> {
+    let dirs = [
+        crate::config::RESEARCH_DIR,
+        crate::config::PLANS_DIR,
+        crate::config::DESIGNS_DIR,
+        crate::config::HANDOFFS_DIR,
+        crate::config::REVIEWS_DIR,
+    ];
+    for dir_name in &dirs {
+        if project_dir.join(dir_name).join(target).exists() {
+            return Ok(());
+        }
+    }
+    let project_name = project_dir
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown");
+    Err(miette::miette!(
+        "artifact '{}' not found in project '{}'",
+        target,
+        project_name
+    ))
 }
 
 fn get_content(content: Option<&str>, file: Option<&str>) -> Result<String> {
@@ -340,6 +501,55 @@ current_step: 0
         let tags = super::build_tags(Some("custom"), dir.path());
         assert_eq!(tags, vec!["custom".to_string()]);
         assert!(!tags.iter().any(|t| t.starts_with("pipeline-step:")));
+    }
+
+    #[test]
+    fn parse_severity_valid() {
+        let sev = super::parse_severity("critical:0,high:1,medium:3,low:2").unwrap();
+        assert_eq!(sev.critical, 0);
+        assert_eq!(sev.high, 1);
+        assert_eq!(sev.medium, 3);
+        assert_eq!(sev.low, 2);
+    }
+
+    #[test]
+    fn parse_severity_partial() {
+        let sev = super::parse_severity("critical:2").unwrap();
+        assert_eq!(sev.critical, 2);
+        assert_eq!(sev.high, 0);
+        assert_eq!(sev.medium, 0);
+        assert_eq!(sev.low, 0);
+    }
+
+    #[test]
+    fn parse_severity_rejects_bad_level() {
+        let result = super::parse_severity("urgent:1");
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Unknown severity level")
+        );
+    }
+
+    #[test]
+    fn validate_review_target_finds_artifact() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path();
+        let research = project.join("research");
+        std::fs::create_dir_all(&research).unwrap();
+        std::fs::write(research.join("2026-04-02-findings.md"), "content").unwrap();
+
+        assert!(super::validate_review_target(project, "2026-04-02-findings.md").is_ok());
+    }
+
+    #[test]
+    fn validate_review_target_rejects_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        let result = super::validate_review_target(dir.path(), "nonexistent.md");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not found"));
     }
 
     #[test]
