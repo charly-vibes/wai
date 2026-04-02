@@ -1,0 +1,23 @@
+# Step prompts are navigation hints. Instructions for HOW to do the
+# work belong in skills.
+[pipeline]
+name = "my-workflow"
+description = "Describe what this pipeline does"
+
+[[steps]]
+id = "step-one"
+prompt = """
+{topic}: TODO describe step one task.
+Use skill `<skill-name>` if available.
+Record findings: `wai add research "..."`
+Advance: `wai pipeline next`
+"""
+
+[[steps]]
+id = "step-two"
+prompt = """
+{topic}: TODO describe step two task.
+Use skill `<skill-name>` if available.
+Record decisions: `wai add design "..."`
+Advance: `wai pipeline next`
+"""
