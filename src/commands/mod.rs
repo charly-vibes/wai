@@ -23,6 +23,7 @@ mod phase;
 mod pipeline;
 mod plugin;
 mod prime;
+mod project;
 mod reflect;
 mod resource;
 mod search;
@@ -90,6 +91,7 @@ pub fn run(cli: Cli) -> Result<()> {
         Some(Commands::Pipeline(cmd)) => pipeline::run(cmd),
         Some(Commands::Close { project, remember }) => close::run(project, remember),
         Some(Commands::Prime { project }) => prime::run(project),
+        Some(Commands::Project(cmd)) => project::run(cmd),
         Some(Commands::Ls {
             root,
             depth,

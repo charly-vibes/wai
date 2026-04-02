@@ -250,6 +250,10 @@ pub enum Commands {
         project: Option<String>,
     },
 
+    /// Manage project context
+    #[command(subcommand)]
+    Project(ProjectCommands),
+
     /// List all wai projects across workspaces
     #[command(
         about = "List all wai projects across workspaces",
@@ -532,6 +536,23 @@ pub struct PhaseArgs {
 
     #[command(subcommand)]
     pub command: Option<PhaseCommands>,
+}
+
+#[derive(Subcommand)]
+#[command(allow_external_subcommands = true)]
+pub enum ProjectCommands {
+    /// Set WAI_PROJECT for the current shell session
+    ///
+    /// Prints the appropriate export statement for your shell.
+    /// Use with eval: eval $(wai project use my-project)
+    Use {
+        /// Project name (omit to list available projects)
+        name: Option<String>,
+    },
+
+    /// Catch-all for wrong-order detection (e.g., `wai project new` → `wai new project`)
+    #[command(external_subcommand)]
+    External(Vec<String>),
 }
 
 #[derive(Subcommand)]

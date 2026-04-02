@@ -6734,5 +6734,74 @@ fn phase_show_project_flag_invalid_errors() {
         .stderr(predicate::str::contains("nonexistent"));
 }
 
-// Test for close/prime WAI_PROJECT migration lives in wai-ophm ticket.
-// Phase commands are the focus of wai-lrl9.
+// ─── wai project use ─────────────────────────────────────────────────────────
+
+#[test]
+fn project_use_valid_prints_export() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproj");
+
+    let out = wai_cmd(tmp.path())
+        .args(["project", "use", "myproj"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let stdout = String::from_utf8_lossy(&out);
+    assert!(
+        stdout.contains("WAI_PROJECT=myproj"),
+        "expected WAI_PROJECT=myproj in: {}",
+        stdout
+    );
+}
+
+#[test]
+fn project_use_invalid_errors() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproj");
+
+    wai_cmd(tmp.path())
+        .args(["project", "use", "nonexistent"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("nonexistent"));
+}
+
+#[test]
+fn project_use_no_args_lists_projects() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "alpha");
+    create_project(tmp.path(), "beta");
+
+    wai_cmd(tmp.path())
+        .args(["project", "use"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("alpha").and(predicate::str::contains("beta")));
+}
+
+#[test]
+fn project_use_fish_shell_syntax() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproj");
+
+    let out = wai_cmd(tmp.path())
+        .env("SHELL", "/usr/bin/fish")
+        .args(["project", "use", "myproj"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let stdout = String::from_utf8_lossy(&out);
+    assert!(
+        stdout.contains("set -gx WAI_PROJECT myproj"),
+        "expected fish syntax in: {}",
+        stdout
+    );
+}
