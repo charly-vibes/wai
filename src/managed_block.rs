@@ -3,7 +3,20 @@ use std::path::Path;
 const WAI_START: &str = "<!-- WAI:START -->";
 const WAI_END: &str = "<!-- WAI:END -->";
 
-pub fn wai_block_content(detected_plugins: &[&str], installed_skills: &[&str]) -> String {
+/// Info about an installed pipeline with metadata, for managed block generation.
+#[derive(Debug, Clone)]
+pub struct InstalledPipeline {
+    pub name: String,
+    pub description: String,
+    pub when: String,
+    pub step_count: usize,
+}
+
+pub fn wai_block_content(
+    detected_plugins: &[&str],
+    installed_skills: &[&str],
+    installed_pipelines: &[InstalledPipeline],
+) -> String {
     let has_beads = detected_plugins.contains(&"beads");
     let has_openspec = detected_plugins.contains(&"openspec");
     let has_companions = has_beads || has_openspec;
@@ -264,6 +277,28 @@ pub fn wai_block_content(detected_plugins: &[&str], installed_skills: &[&str]) -
         );
     }
 
+    // Available Pipelines (only when pipelines with metadata exist)
+    if !installed_pipelines.is_empty() {
+        block.push_str(
+            "\n\
+             ## Available Pipelines\n\
+             \n\
+             | Pipeline | When to Use | Start |\n\
+             |----------|-------------|-------|\n",
+        );
+        for p in installed_pipelines {
+            block.push_str(&format!(
+                "| {} | {} | `wai pipeline start {} --topic=<topic>` |\n",
+                p.name, p.when, p.name,
+            ));
+        }
+        block.push_str(
+            "\n> Pipeline steps may have gates that enforce artifact creation, review \
+             coverage, and oracle checks before advancement. \
+             Run `wai pipeline gates <name>` for details.\n",
+        );
+    }
+
     // Structure + footer
     block.push_str(
         "\n\
@@ -289,8 +324,9 @@ pub fn inject_managed_block(
     path: &Path,
     detected_plugins: &[&str],
     installed_skills: &[&str],
+    installed_pipelines: &[InstalledPipeline],
 ) -> Result<InjectResult, std::io::Error> {
-    let wai_block = wai_block_content(detected_plugins, installed_skills);
+    let wai_block = wai_block_content(detected_plugins, installed_skills, installed_pipelines);
     let ref_block = format!(
         "{}\n{}{}\n",
         REFLECT_REF_START,
@@ -347,6 +383,18 @@ pub fn inject_managed_block(
         std::fs::write(path, &new_content)?;
         Ok(InjectResult::Created)
     }
+}
+
+/// Extract the actual WAI block content (between WAI:START and WAI:END, inclusive).
+/// Returns `None` if the file does not exist or has no block.
+pub fn read_managed_block(path: &Path) -> Option<String> {
+    let content = std::fs::read_to_string(path).ok()?;
+    let start = content.find(WAI_START)?;
+    let end = content.find(WAI_END)? + WAI_END.len();
+    if start > end {
+        return None;
+    }
+    Some(content[start..end].to_string())
 }
 
 pub fn has_managed_block(path: &Path) -> bool {
@@ -431,7 +479,7 @@ mod wai_block_tests {
 
     #[test]
     fn openspec_checklist_step_present_when_openspec_detected() {
-        let output = wai_block_content(&["openspec"], &[]);
+        let output = wai_block_content(&["openspec"], &[], &[]);
         assert!(
             output.contains("openspec tasks.md"),
             "expected 'openspec tasks.md' in output"
@@ -440,7 +488,7 @@ mod wai_block_tests {
 
     #[test]
     fn openspec_checklist_step_absent_without_openspec() {
-        let output = wai_block_content(&[], &[]);
+        let output = wai_block_content(&[], &[], &[]);
         assert!(
             !output.contains("openspec tasks.md"),
             "unexpected 'openspec tasks.md' in output without openspec"
@@ -449,7 +497,7 @@ mod wai_block_tests {
 
     #[test]
     fn openspec_checklist_step_ordering() {
-        let output = wai_block_content(&["beads", "openspec"], &[]);
+        let output = wai_block_content(&["beads", "openspec"], &[], &[]);
         let bd_sync_pos = output
             .find("bd sync --from-main")
             .expect("bd sync --from-main not found");
@@ -469,7 +517,7 @@ mod wai_block_tests {
 
     #[test]
     fn openspec_archive_step_present_when_openspec_detected() {
-        let output = wai_block_content(&["openspec"], &[]);
+        let output = wai_block_content(&["openspec"], &[], &[]);
         assert!(
             output.contains("openspec archive"),
             "expected 'openspec archive' in output"
@@ -478,7 +526,7 @@ mod wai_block_tests {
 
     #[test]
     fn openspec_archive_step_absent_without_openspec() {
-        let output = wai_block_content(&[], &[]);
+        let output = wai_block_content(&[], &[], &[]);
         assert!(
             !output.contains("openspec archive"),
             "unexpected 'openspec archive' in output without openspec"
@@ -487,7 +535,7 @@ mod wai_block_tests {
 
     #[test]
     fn openspec_archive_step_after_tasks_step() {
-        let output = wai_block_content(&["openspec"], &[]);
+        let output = wai_block_content(&["openspec"], &[], &[]);
         let tasks_pos = output
             .find("openspec tasks.md")
             .expect("openspec tasks.md not found");
@@ -504,7 +552,7 @@ mod wai_block_tests {
 
     #[test]
     fn tracking_section_present_when_both_beads_and_openspec() {
-        let output = wai_block_content(&["beads", "openspec"], &[]);
+        let output = wai_block_content(&["beads", "openspec"], &[], &[]);
         assert!(
             output.contains("Tracking Work Across Tools"),
             "expected 'Tracking Work Across Tools' in output"
@@ -513,7 +561,7 @@ mod wai_block_tests {
 
     #[test]
     fn tracking_section_absent_with_only_beads() {
-        let output = wai_block_content(&["beads"], &[]);
+        let output = wai_block_content(&["beads"], &[], &[]);
         assert!(
             !output.contains("Tracking Work Across Tools"),
             "unexpected 'Tracking Work Across Tools' with beads only"
@@ -522,7 +570,7 @@ mod wai_block_tests {
 
     #[test]
     fn tracking_section_absent_with_only_openspec() {
-        let output = wai_block_content(&["openspec"], &[]);
+        let output = wai_block_content(&["openspec"], &[], &[]);
         assert!(
             !output.contains("Tracking Work Across Tools"),
             "unexpected 'Tracking Work Across Tools' with openspec only"
@@ -531,7 +579,7 @@ mod wai_block_tests {
 
     #[test]
     fn tracking_section_between_capturing_work_and_ending_session() {
-        let output = wai_block_content(&["beads", "openspec"], &[]);
+        let output = wai_block_content(&["beads", "openspec"], &[], &[]);
         let capturing_pos = output
             .find("## Capturing Work")
             .expect("## Capturing Work not found");
@@ -555,7 +603,7 @@ mod wai_block_tests {
 
     #[test]
     fn pre_claim_note_present_with_beads() {
-        let output = wai_block_content(&["beads"], &[]);
+        let output = wai_block_content(&["beads"], &[], &[]);
         assert!(
             output.contains("already implemented"),
             "expected 'already implemented' near bd ready line"
@@ -564,7 +612,7 @@ mod wai_block_tests {
 
     #[test]
     fn pre_claim_note_absent_without_beads() {
-        let output = wai_block_content(&[], &[]);
+        let output = wai_block_content(&[], &[], &[]);
         assert!(
             !output.contains("already implemented"),
             "unexpected 'already implemented' without beads"
@@ -575,7 +623,7 @@ mod wai_block_tests {
 
     #[test]
     fn bd_close_line_mentions_epic_with_beads() {
-        let output = wai_block_content(&["beads"], &[]);
+        let output = wai_block_content(&["beads"], &[], &[]);
         let bd_close_line = output
             .lines()
             .find(|l| l.contains("bd close <id>"))
@@ -588,7 +636,7 @@ mod wai_block_tests {
 
     #[test]
     fn bd_close_line_absent_without_beads() {
-        let output = wai_block_content(&[], &[]);
+        let output = wai_block_content(&[], &[], &[]);
         assert!(
             !output.contains("bd close <id>"),
             "unexpected 'bd close <id>' without beads"
@@ -599,7 +647,7 @@ mod wai_block_tests {
 
     #[test]
     fn tdd_disclaimer_present_with_companion_tools() {
-        let output = wai_block_content(&["beads", "openspec"], &[]);
+        let output = wai_block_content(&["beads", "openspec"], &[], &[]);
         assert!(
             output.contains("CRITICAL"),
             "expected CRITICAL disclaimer in output with companion tools"
@@ -616,7 +664,7 @@ mod wai_block_tests {
 
     #[test]
     fn tdd_disclaimer_present_with_beads_only() {
-        let output = wai_block_content(&["beads"], &[]);
+        let output = wai_block_content(&["beads"], &[], &[]);
         assert!(
             output.contains("CRITICAL"),
             "expected CRITICAL disclaimer in output with beads"
@@ -625,7 +673,7 @@ mod wai_block_tests {
 
     #[test]
     fn tdd_disclaimer_absent_without_companion_tools() {
-        let output = wai_block_content(&[], &[]);
+        let output = wai_block_content(&[], &[], &[]);
         assert!(
             !output.contains("Tidy First"),
             "unexpected 'Tidy First' in output without companion tools"
@@ -634,7 +682,7 @@ mod wai_block_tests {
 
     #[test]
     fn tdd_disclaimer_before_when_to_use_what() {
-        let output = wai_block_content(&["beads"], &[]);
+        let output = wai_block_content(&["beads"], &[], &[]);
         let critical_pos = output
             .find("CRITICAL")
             .expect("CRITICAL not found in output");
@@ -652,7 +700,7 @@ mod wai_block_tests {
     #[test]
     fn ro5_reminder_present_when_skill_installed() {
         for name in &["ro5", "rule-of-5", "rule-of-5-universal"] {
-            let output = wai_block_content(&[], &[name]);
+            let output = wai_block_content(&[], &[name], &[]);
             assert!(
                 output.contains("/ro5"),
                 "expected '/ro5' in output when skill '{name}' installed"
@@ -666,7 +714,7 @@ mod wai_block_tests {
 
     #[test]
     fn ro5_reminder_absent_without_skill() {
-        let output = wai_block_content(&["beads", "openspec"], &[]);
+        let output = wai_block_content(&["beads", "openspec"], &[], &[]);
         assert!(
             !output.contains("/ro5"),
             "unexpected '/ro5' in output without ro5 skill"
@@ -685,7 +733,7 @@ mod wai_block_tests {
             &["openspec"][..],
             &["beads", "openspec"][..],
         ] {
-            let output = wai_block_content(plugins, &[]);
+            let output = wai_block_content(plugins, &[], &[]);
             assert!(
                 output.contains(SEARCH_INSTRUCTION),
                 "expected search-before-research instruction with plugins {:?}",
@@ -696,7 +744,7 @@ mod wai_block_tests {
 
     #[test]
     fn search_before_research_absent_without_companions() {
-        let output = wai_block_content(&[], &[]);
+        let output = wai_block_content(&[], &[], &[]);
         assert!(
             !output.contains(SEARCH_INSTRUCTION),
             "unexpected search-before-research instruction without companion tools"
@@ -705,7 +753,7 @@ mod wai_block_tests {
 
     #[test]
     fn search_before_research_after_tdd_disclaimer() {
-        let output = wai_block_content(&["beads"], &[]);
+        let output = wai_block_content(&["beads"], &[], &[]);
         let tdd_pos = output.find("CRITICAL").expect("CRITICAL not found");
         let search_pos = output
             .find(SEARCH_INSTRUCTION)
@@ -714,6 +762,108 @@ mod wai_block_tests {
             search_pos > tdd_pos,
             "search-before-research should appear after TDD disclaimer"
         );
+    }
+
+    // Pipeline section tests
+
+    #[test]
+    fn pipeline_section_present_when_pipelines_installed() {
+        let pipelines = vec![InstalledPipeline {
+            name: "scientific-research".to_string(),
+            description: "AI-assisted research".to_string(),
+            when: "Frontier-level research requiring systematic validation".to_string(),
+            step_count: 8,
+        }];
+        let output = wai_block_content(&[], &[], &pipelines);
+        assert!(
+            output.contains("## Available Pipelines"),
+            "expected 'Available Pipelines' section"
+        );
+        assert!(
+            output.contains("scientific-research"),
+            "expected pipeline name in output"
+        );
+        assert!(
+            output.contains("Frontier-level research"),
+            "expected 'when' description in output"
+        );
+        assert!(
+            output.contains("wai pipeline start scientific-research --topic=<topic>"),
+            "expected start command in output"
+        );
+    }
+
+    #[test]
+    fn pipeline_section_absent_when_no_pipelines() {
+        let output = wai_block_content(&[], &[], &[]);
+        assert!(
+            !output.contains("Available Pipelines"),
+            "unexpected 'Available Pipelines' section without pipelines"
+        );
+    }
+
+    #[test]
+    fn pipeline_section_includes_gate_note() {
+        let pipelines = vec![InstalledPipeline {
+            name: "test".to_string(),
+            description: "Test pipeline".to_string(),
+            when: "Testing".to_string(),
+            step_count: 2,
+        }];
+        let output = wai_block_content(&[], &[], &pipelines);
+        assert!(
+            output.contains("gates"),
+            "expected gate note in pipeline section"
+        );
+    }
+
+    #[test]
+    fn pipeline_section_between_quick_ref_and_structure() {
+        let pipelines = vec![InstalledPipeline {
+            name: "test".to_string(),
+            description: "Test".to_string(),
+            when: "Testing".to_string(),
+            step_count: 1,
+        }];
+        let output = wai_block_content(&[], &[], &pipelines);
+        let quick_ref_pos = output
+            .find("## Quick Reference")
+            .expect("Quick Reference not found");
+        let pipeline_pos = output
+            .find("## Available Pipelines")
+            .expect("Available Pipelines not found");
+        let structure_pos = output.find("## Structure").expect("Structure not found");
+        assert!(
+            pipeline_pos > quick_ref_pos,
+            "Available Pipelines should appear after Quick Reference"
+        );
+        assert!(
+            pipeline_pos < structure_pos,
+            "Available Pipelines should appear before Structure"
+        );
+    }
+
+    #[test]
+    fn pipeline_section_lists_multiple_pipelines() {
+        let pipelines = vec![
+            InstalledPipeline {
+                name: "alpha".to_string(),
+                description: "Alpha workflow".to_string(),
+                when: "When alpha".to_string(),
+                step_count: 3,
+            },
+            InstalledPipeline {
+                name: "beta".to_string(),
+                description: "Beta workflow".to_string(),
+                when: "When beta".to_string(),
+                step_count: 5,
+            },
+        ];
+        let output = wai_block_content(&[], &[], &pipelines);
+        assert!(output.contains("alpha"));
+        assert!(output.contains("beta"));
+        assert!(output.contains("When alpha"));
+        assert!(output.contains("When beta"));
     }
 }
 
@@ -751,7 +901,7 @@ mod reflect_ref_tests {
         let dir = tmp();
         let path = dir.path().join("CLAUDE.md");
         std::fs::write(&path, "# Header\n").unwrap();
-        inject_managed_block(&path, &[], &[]).unwrap();
+        inject_managed_block(&path, &[], &[], &[]).unwrap();
         let content = std::fs::read_to_string(&path).unwrap();
         assert!(
             content.contains(REFLECT_REF_START),
@@ -768,7 +918,7 @@ mod reflect_ref_tests {
         let dir = tmp();
         let path = dir.path().join("CLAUDE.md");
         std::fs::write(&path, "# Header\n").unwrap();
-        inject_managed_block(&path, &[], &[]).unwrap();
+        inject_managed_block(&path, &[], &[], &[]).unwrap();
         let content = std::fs::read_to_string(&path).unwrap();
         let wai_end_pos = content.find(WAI_END).expect("WAI:END not found");
         let ref_start_pos = content
@@ -790,7 +940,7 @@ mod reflect_ref_tests {
              <!-- WAI:REFLECT:REF:START -->\nold content\n<!-- WAI:REFLECT:REF:END -->\n",
         )
         .unwrap();
-        inject_managed_block(&path, &[], &[]).unwrap();
+        inject_managed_block(&path, &[], &[], &[]).unwrap();
         let content = std::fs::read_to_string(&path).unwrap();
         let count = content.matches(REFLECT_REF_START).count();
         assert_eq!(count, 1, "should not duplicate REFLECT:REF block");

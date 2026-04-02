@@ -40,12 +40,12 @@ Phases 4, 6, and 7 can proceed in parallel after phase 3.
 - [ ] 5.6 Add tests for each new command
 
 ## 6. Pipeline metadata and managed block
-- [ ] 6.1 Add `[pipeline.metadata]` parsing to pipeline TOML schema (`when`, `skills` fields)
-- [ ] 6.2 Update `wai_block_content()` to read installed pipelines and generate "Available Pipelines" table
-- [ ] 6.3 Implement managed block staleness detection in `wai doctor` (diff generated vs actual)
-- [ ] 6.4 Run `wai pipeline validate` as part of `wai doctor`
-- [ ] 6.5 Validate before `wai pipeline start` — block on errors, warn on warnings
-- [ ] 6.6 Add tests for metadata parsing, block generation, staleness detection
+- [x] 6.1 Add `[pipeline.metadata]` parsing to pipeline TOML schema (`when`, `skills` fields)
+- [x] 6.2 Update `wai_block_content()` to read installed pipelines and generate "Available Pipelines" table
+- [x] 6.3 Implement managed block staleness detection in `wai doctor` (diff generated vs actual)
+- [x] 6.4 Run `wai pipeline validate` as part of `wai doctor`
+- [x] 6.5 Validate before `wai pipeline start` — block on errors, warn on warnings
+- [x] 6.6 Add tests for metadata parsing, block generation, staleness detection
 
 ## 7. Pipeline init scaffolding
 - [ ] 7.1 Update `wai pipeline init` to accept built-in template names (e.g., `scientific-research`)

@@ -82,6 +82,8 @@ pub fn run(fix: bool) -> Result<()> {
     checks.extend(check_project_state(&project_root));
     checks.extend(check_custom_plugins(&project_root));
     checks.extend(check_agent_instructions(&project_root));
+    checks.extend(check_managed_block_staleness(&project_root));
+    checks.extend(check_pipeline_definitions(&project_root));
     checks.extend(check_readme_badge(&project_root));
     checks.extend(check_claude_session_hook());
     checks.extend(check_wai_project_env(&project_root));
@@ -1602,8 +1604,13 @@ fn check_agent_instructions(project_root: &Path) -> Vec<CheckResult> {
                     .collect();
                 let skill_names = detect_installed_skill_names(project_root);
                 let skill_name_refs: Vec<&str> = skill_names.iter().map(|s| s.as_str()).collect();
-                inject_managed_block(&agents_md, &plugin_names, &skill_name_refs)
-                    .into_diagnostic()?;
+                inject_managed_block(
+                    &agents_md,
+                    &plugin_names,
+                    &skill_name_refs,
+                    &crate::workspace::detect_installed_pipelines(project_root),
+                )
+                .into_diagnostic()?;
                 Ok(())
             })),
         });
@@ -1629,8 +1636,13 @@ fn check_agent_instructions(project_root: &Path) -> Vec<CheckResult> {
                     let skill_names = detect_installed_skill_names(project_root);
                     let skill_name_refs: Vec<&str> =
                         skill_names.iter().map(|s| s.as_str()).collect();
-                    inject_managed_block(&agents_md, &plugin_names, &skill_name_refs)
-                        .into_diagnostic()?;
+                    inject_managed_block(
+                        &agents_md,
+                        &plugin_names,
+                        &skill_name_refs,
+                        &crate::workspace::detect_installed_pipelines(project_root),
+                    )
+                    .into_diagnostic()?;
                     Ok(())
                 })),
             });
@@ -1660,8 +1672,13 @@ fn check_agent_instructions(project_root: &Path) -> Vec<CheckResult> {
                     .collect();
                 let skill_names = detect_installed_skill_names(project_root);
                 let skill_name_refs: Vec<&str> = skill_names.iter().map(|s| s.as_str()).collect();
-                inject_managed_block(&agents_md, &plugin_names, &skill_name_refs)
-                    .into_diagnostic()?;
+                inject_managed_block(
+                    &agents_md,
+                    &plugin_names,
+                    &skill_name_refs,
+                    &crate::workspace::detect_installed_pipelines(project_root),
+                )
+                .into_diagnostic()?;
                 Ok(())
             })),
         });
@@ -1686,8 +1703,13 @@ fn check_agent_instructions(project_root: &Path) -> Vec<CheckResult> {
                     .collect();
                 let skill_names = detect_installed_skill_names(project_root);
                 let skill_name_refs: Vec<&str> = skill_names.iter().map(|s| s.as_str()).collect();
-                inject_managed_block(&claude_md, &plugin_names, &skill_name_refs)
-                    .into_diagnostic()?;
+                inject_managed_block(
+                    &claude_md,
+                    &plugin_names,
+                    &skill_name_refs,
+                    &crate::workspace::detect_installed_pipelines(project_root),
+                )
+                .into_diagnostic()?;
                 Ok(())
             })),
         });
@@ -1713,8 +1735,13 @@ fn check_agent_instructions(project_root: &Path) -> Vec<CheckResult> {
                     let skill_names = detect_installed_skill_names(project_root);
                     let skill_name_refs: Vec<&str> =
                         skill_names.iter().map(|s| s.as_str()).collect();
-                    inject_managed_block(&claude_md, &plugin_names, &skill_name_refs)
-                        .into_diagnostic()?;
+                    inject_managed_block(
+                        &claude_md,
+                        &plugin_names,
+                        &skill_name_refs,
+                        &crate::workspace::detect_installed_pipelines(project_root),
+                    )
+                    .into_diagnostic()?;
                     Ok(())
                 })),
             });
@@ -1744,11 +1771,237 @@ fn check_agent_instructions(project_root: &Path) -> Vec<CheckResult> {
                     .collect();
                 let skill_names = detect_installed_skill_names(project_root);
                 let skill_name_refs: Vec<&str> = skill_names.iter().map(|s| s.as_str()).collect();
-                inject_managed_block(&claude_md, &plugin_names, &skill_name_refs)
-                    .into_diagnostic()?;
+                inject_managed_block(
+                    &claude_md,
+                    &plugin_names,
+                    &skill_name_refs,
+                    &crate::workspace::detect_installed_pipelines(project_root),
+                )
+                .into_diagnostic()?;
                 Ok(())
             })),
         });
+    }
+
+    results
+}
+
+/// Check managed block staleness by comparing generated vs actual content.
+fn check_managed_block_staleness(project_root: &Path) -> Vec<CheckResult> {
+    use crate::managed_block::{read_managed_block, wai_block_content};
+    use crate::workspace::{detect_installed_pipelines, detect_installed_skill_names};
+
+    let mut results = Vec::new();
+
+    let plugins = plugin::detect_plugins(project_root);
+    let plugin_names: Vec<&str> = plugins
+        .iter()
+        .filter(|p| p.detected)
+        .map(|p| p.def.name.as_str())
+        .collect();
+    let skill_names = detect_installed_skill_names(project_root);
+    let skill_name_refs: Vec<&str> = skill_names.iter().map(|s| s.as_str()).collect();
+    let installed_pipelines = detect_installed_pipelines(project_root);
+
+    let expected = wai_block_content(&plugin_names, &skill_name_refs, &installed_pipelines);
+
+    for filename in &["CLAUDE.md", "AGENTS.md"] {
+        let path = project_root.join(filename);
+        if let Some(actual) = read_managed_block(&path)
+            && actual != expected
+        {
+            results.push(CheckResult {
+                name: format!("Managed block staleness: {}", filename),
+                status: Status::Warn,
+                message: format!(
+                    "{} managed block outdated — run 'wai init --update' to refresh",
+                    filename
+                ),
+                fix: Some("Run: wai init".to_string()),
+                fix_fn: None,
+            });
+        }
+    }
+
+    results
+}
+
+/// Validate pipeline TOML definitions for correctness.
+fn check_pipeline_definitions(project_root: &Path) -> Vec<CheckResult> {
+    use crate::config::pipelines_dir;
+
+    let mut results = Vec::new();
+    let pipelines = pipelines_dir(project_root);
+    if !pipelines.exists() {
+        return results;
+    }
+    let Ok(entries) = std::fs::read_dir(&pipelines) else {
+        return results;
+    };
+
+    let mut names_seen: Vec<(String, String)> = Vec::new(); // (name, file)
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("toml") {
+            continue;
+        }
+        let file_stem = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("?")
+            .to_string();
+
+        let content = match std::fs::read_to_string(&path) {
+            Ok(c) => c,
+            Err(e) => {
+                results.push(CheckResult {
+                    name: format!("Pipeline: {}", file_stem),
+                    status: Status::Fail,
+                    message: format!("Cannot read: {}", e),
+                    fix: None,
+                    fix_fn: None,
+                });
+                continue;
+            }
+        };
+
+        // Try to parse the TOML
+        let parsed: Result<toml::Value, _> = toml::from_str(&content);
+        match parsed {
+            Err(e) => {
+                results.push(CheckResult {
+                    name: format!("Pipeline: {}", file_stem),
+                    status: Status::Fail,
+                    message: format!("Invalid TOML: {}", e),
+                    fix: None,
+                    fix_fn: None,
+                });
+                continue;
+            }
+            Ok(val) => {
+                // Check for pipeline name
+                let pipeline_name = val
+                    .get("pipeline")
+                    .and_then(|p| p.get("name"))
+                    .and_then(|n| n.as_str())
+                    .unwrap_or("");
+
+                if pipeline_name.is_empty() {
+                    results.push(CheckResult {
+                        name: format!("Pipeline: {}", file_stem),
+                        status: Status::Fail,
+                        message: "Missing [pipeline].name".to_string(),
+                        fix: None,
+                        fix_fn: None,
+                    });
+                    continue;
+                }
+
+                // Check for duplicate names
+                if let Some((_, prev_file)) = names_seen.iter().find(|(n, _)| n == pipeline_name) {
+                    results.push(CheckResult {
+                        name: format!("Pipeline: {}", file_stem),
+                        status: Status::Fail,
+                        message: format!(
+                            "Duplicate pipeline name '{}' (also in {})",
+                            pipeline_name, prev_file
+                        ),
+                        fix: None,
+                        fix_fn: None,
+                    });
+                } else {
+                    names_seen.push((pipeline_name.to_string(), file_stem.clone()));
+                }
+
+                // Check for metadata
+                let has_metadata = val
+                    .get("pipeline")
+                    .and_then(|p| p.get("metadata"))
+                    .and_then(|m| m.get("when"))
+                    .and_then(|w| w.as_str())
+                    .is_some();
+
+                if !has_metadata {
+                    results.push(CheckResult {
+                        name: format!("Pipeline: {}", file_stem),
+                        status: Status::Warn,
+                        message: format!(
+                            "Missing [pipeline.metadata] — pipeline '{}' won't appear in managed block",
+                            pipeline_name
+                        ),
+                        fix: None,
+                        fix_fn: None,
+                    });
+                }
+
+                // Check oracle references
+                let oracles_dir = crate::config::wai_dir(project_root)
+                    .join("resources")
+                    .join("oracles");
+                if let Some(steps) = val.get("steps").and_then(|s| s.as_array()) {
+                    for step in steps {
+                        let Some(gate) = step.get("gate") else {
+                            continue;
+                        };
+                        let Some(oracles) = gate.get("oracles").and_then(|o| o.as_array()) else {
+                            continue;
+                        };
+                        for oracle in oracles {
+                            if oracle.get("command").is_some() {
+                                continue;
+                            }
+                            let Some(name) = oracle.get("name").and_then(|n| n.as_str()) else {
+                                continue;
+                            };
+                            let found = ["", ".sh", ".py"]
+                                .iter()
+                                .any(|ext| oracles_dir.join(format!("{}{}", name, ext)).exists());
+                            if !found {
+                                results.push(CheckResult {
+                                    name: format!("Pipeline: {}", file_stem),
+                                    status: Status::Warn,
+                                    message: format!("Gate oracle '{}' — command not found", name),
+                                    fix: None,
+                                    fix_fn: None,
+                                });
+                                continue;
+                            }
+                            // Check executability
+                            let mut executable = false;
+                            for ext in &["", ".sh", ".py"] {
+                                let p = oracles_dir.join(format!("{}{}", name, ext));
+                                if p.exists() {
+                                    #[cfg(unix)]
+                                    {
+                                        use std::os::unix::fs::PermissionsExt;
+                                        if let Ok(meta) = p.metadata()
+                                            && meta.permissions().mode() & 0o111 != 0
+                                        {
+                                            executable = true;
+                                        }
+                                    }
+                                    #[cfg(not(unix))]
+                                    {
+                                        executable = true;
+                                    }
+                                    break;
+                                }
+                            }
+                            if !executable {
+                                results.push(CheckResult {
+                                    name: format!("Pipeline: {}", file_stem),
+                                    status: Status::Warn,
+                                    message: format!("Gate oracle '{}' — not executable", name),
+                                    fix: None,
+                                    fix_fn: None,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     results

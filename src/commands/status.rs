@@ -26,8 +26,8 @@ use super::pipeline::{PipelineDefinition, PipelineRun, load_pipeline_toml};
 
 enum PipelineStatusInfo {
     Active {
-        run: PipelineRun,
-        definition: PipelineDefinition,
+        run: Box<PipelineRun>,
+        definition: Box<PipelineDefinition>,
     },
     Available(Vec<(String, PipelineDefinition)>),
     None,
@@ -57,8 +57,8 @@ fn detect_pipeline_state(workspace_root: &Path) -> PipelineStatusInfo {
             let def_path = pipelines_dir(workspace_root).join(format!("{}.toml", run.pipeline));
             if let Ok(def) = load_pipeline_toml(&def_path) {
                 return PipelineStatusInfo::Active {
-                    run,
-                    definition: def,
+                    run: Box::new(run),
+                    definition: Box::new(def),
                 };
             }
         }

@@ -6,7 +6,7 @@ use crate::config::{
     PROJECTS_DIR, ProjectConfig, REFLECTIONS_DIR, RESOURCES_DIR, RULES_DIR, SKILLS_DIR,
     TEMPLATES_DIR, agent_config_dir,
 };
-use crate::managed_block::inject_managed_block;
+use crate::managed_block::{InstalledPipeline, inject_managed_block};
 use crate::plugin;
 
 /// Actions taken during workspace repair/initialization
@@ -82,6 +82,63 @@ pub fn detect_installed_skill_names(project_root: &Path) -> Vec<String> {
         .filter(|e| e.path().is_dir() && e.path().join("SKILL.md").exists())
         .filter_map(|e| e.file_name().to_str().map(|s| s.to_string()))
         .collect()
+}
+
+/// Detects installed pipelines with metadata for managed block generation.
+/// Only returns pipelines that have a `[pipeline.metadata]` section with a `when` field.
+pub fn detect_installed_pipelines(project_root: &Path) -> Vec<InstalledPipeline> {
+    let pipelines_dir = crate::config::pipelines_dir(project_root);
+    if !pipelines_dir.exists() {
+        return Vec::new();
+    }
+    let Ok(entries) = std::fs::read_dir(&pipelines_dir) else {
+        return Vec::new();
+    };
+    let mut result = Vec::new();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("toml") {
+            continue;
+        }
+        let Ok(content) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        // Minimal TOML parsing for pipeline metadata discovery.
+        // We only need name, description, metadata.when, and step count.
+        if let Ok(file) = toml::from_str::<PipelineFileForDiscovery>(&content)
+            && let Some(ref meta) = file.pipeline.metadata
+            && let Some(ref when) = meta.when
+        {
+            result.push(InstalledPipeline {
+                name: file.pipeline.name.clone(),
+                description: file.pipeline.description.clone().unwrap_or_default(),
+                when: when.clone(),
+                step_count: file.steps.len(),
+            });
+        }
+    }
+    result.sort_by(|a, b| a.name.cmp(&b.name));
+    result
+}
+
+/// Minimal TOML structure for pipeline discovery (avoids depending on commands::pipeline).
+#[derive(serde::Deserialize)]
+struct PipelineFileForDiscovery {
+    pipeline: PipelineHeaderForDiscovery,
+    #[serde(default)]
+    steps: Vec<toml::Value>,
+}
+
+#[derive(serde::Deserialize)]
+struct PipelineHeaderForDiscovery {
+    name: String,
+    description: Option<String>,
+    metadata: Option<PipelineMetadataForDiscovery>,
+}
+
+#[derive(serde::Deserialize)]
+struct PipelineMetadataForDiscovery {
+    when: Option<String>,
 }
 
 /// Ensures the workspace is current by creating/repairing all expected artifacts:
@@ -205,6 +262,9 @@ pub fn ensure_workspace_current(project_root: &Path) -> Result<Vec<WorkspaceActi
         }
     }
 
+    // Collect installed pipelines with metadata for managed block
+    let installed_pipelines = detect_installed_pipelines(project_root);
+
     // Inject/update managed blocks in agent instruction files
     let agent_files = ["AGENTS.md", "CLAUDE.md"];
     for filename in &agent_files {
@@ -212,7 +272,7 @@ pub fn ensure_workspace_current(project_root: &Path) -> Result<Vec<WorkspaceActi
 
         // For AGENTS.md and CLAUDE.md, always ensure they exist.
         if filename == &"AGENTS.md" || filename == &"CLAUDE.md" || path.exists() {
-            match inject_managed_block(&path, &detected, &skill_name_refs) {
+            match inject_managed_block(&path, &detected, &skill_name_refs, &installed_pipelines) {
                 Ok(result) => {
                     actions.push(WorkspaceAction::new(result.description(filename)));
                 }

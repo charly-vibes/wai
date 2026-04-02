@@ -106,6 +106,10 @@ pub struct PipelineDefinition {
     pub name: String,
     pub description: Option<String>,
     pub steps: Vec<PipelineStep>,
+    /// Optional metadata for discoverability (managed block, suggest).
+    #[serde(default)]
+    #[allow(dead_code)] // Read via lib workspace.rs for managed block generation
+    pub metadata: Option<PipelineMetadataSection>,
 }
 
 /// Top-level TOML file wrapper.
@@ -125,6 +129,19 @@ struct PipelineDefinitionFile {
 struct PipelineMetadata {
     name: String,
     description: Option<String>,
+    #[serde(default)]
+    metadata: Option<PipelineMetadataSection>,
+}
+
+/// Optional `[pipeline.metadata]` section for discoverability.
+#[derive(Debug, Clone, serde::Deserialize, Default)]
+#[allow(dead_code)] // Fields read via lib workspace.rs for managed block generation
+pub struct PipelineMetadataSection {
+    /// When to suggest this pipeline (human-readable description).
+    pub when: Option<String>,
+    /// Skill names this pipeline depends on.
+    #[serde(default)]
+    pub skills: Vec<String>,
 }
 
 /// Run state stored at `.wai/pipeline-runs/<run-id>.yml`.
@@ -300,6 +317,30 @@ fn cmd_start(name: &str, topic: Option<&str>) -> Result<()> {
 
     if definition.steps.is_empty() {
         miette::bail!("Pipeline '{}' has no steps defined", name);
+    }
+
+    // 1b. Validate the pipeline definition
+    let issues = validate_pipeline(&definition, &project_root);
+    let errors: Vec<_> = issues
+        .iter()
+        .filter(|i| i.level == ValidationLevel::Error)
+        .collect();
+    let warnings: Vec<_> = issues
+        .iter()
+        .filter(|i| i.level == ValidationLevel::Warn)
+        .collect();
+
+    if !errors.is_empty() {
+        for e in &errors {
+            log::error(&e.message).into_diagnostic()?;
+        }
+        miette::bail!(
+            "Pipeline '{}' has validation errors. Fix them before starting.",
+            name
+        );
+    }
+    for w in &warnings {
+        log::warning(&w.message).into_diagnostic()?;
     }
 
     // 2. Generate a unique run ID: <name>-<YYYY-MM-DD>-<topic-slug>
@@ -1067,6 +1108,7 @@ pub fn load_pipeline_toml(path: &Path) -> Result<PipelineDefinition> {
         name: file.pipeline.name,
         description: file.pipeline.description,
         steps: file.steps,
+        metadata: file.pipeline.metadata,
     };
 
     // Validate unique IDs
@@ -1085,6 +1127,62 @@ pub fn load_pipeline_toml(path: &Path) -> Result<PipelineDefinition> {
     }
 
     Ok(def)
+}
+
+/// Validation issue found during pipeline definition checking.
+#[derive(Debug)]
+pub struct ValidationIssue {
+    pub level: ValidationLevel,
+    pub message: String,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum ValidationLevel {
+    Error,
+    Warn,
+}
+
+/// Validate a pipeline definition for structural errors and warnings.
+/// Returns a list of issues. Empty list means valid.
+pub fn validate_pipeline(def: &PipelineDefinition, project_root: &Path) -> Vec<ValidationIssue> {
+    let mut issues = Vec::new();
+
+    // Check for metadata
+    if def.metadata.is_none() {
+        issues.push(ValidationIssue {
+            level: ValidationLevel::Warn,
+            message: format!(
+                "Missing [pipeline.metadata] — pipeline '{}' won't appear in managed block",
+                def.name
+            ),
+        });
+    }
+
+    // Check oracle references
+    let oracles_dir = crate::config::wai_dir(project_root)
+        .join("resources")
+        .join("oracles");
+
+    for step in &def.steps {
+        if let Some(ref gate) = step.gate {
+            for oracle in &gate.oracles {
+                if oracle.command.is_some() {
+                    continue; // explicit command, skip name resolution
+                }
+                let found = ["", ".sh", ".py"]
+                    .iter()
+                    .any(|ext| oracles_dir.join(format!("{}{}", oracle.name, ext)).exists());
+                if !found {
+                    issues.push(ValidationIssue {
+                        level: ValidationLevel::Warn,
+                        message: format!("Gate oracle '{}' — command not found", oracle.name),
+                    });
+                }
+            }
+        }
+    }
+
+    issues
 }
 
 /// Substitute `{topic}` in a prompt string with the given topic value.
@@ -1362,6 +1460,7 @@ scope = "all"
             name: "test".to_string(),
             description: None,
             steps: vec![step.clone()],
+            metadata: None,
         };
         let dir = tempfile::tempdir().unwrap();
         let failures = evaluate_gates(&gate, &step, &run, &def, dir.path()).unwrap();
@@ -1399,6 +1498,7 @@ scope = "all"
             name: "test".to_string(),
             description: None,
             steps: vec![step.clone()],
+            metadata: None,
         };
         let dir = tempfile::tempdir().unwrap();
         let failures = evaluate_gates(&gate, &step, &run, &def, dir.path()).unwrap();
@@ -1441,6 +1541,7 @@ scope = "all"
             name: "test".to_string(),
             description: None,
             steps: vec![step.clone()],
+            metadata: None,
         };
         let dir = tempfile::tempdir().unwrap();
         let failures = evaluate_gates(&gate, &step, &run, &def, dir.path()).unwrap();
@@ -1449,6 +1550,68 @@ scope = "all"
             "expected no failures, got: {:?}",
             failures
         );
+    }
+
+    // ── pipeline metadata parsing ──────────────────────────────────────
+
+    #[test]
+    fn load_pipeline_toml_with_metadata() {
+        let toml = r#"
+[pipeline]
+name = "research"
+description = "Research workflow"
+
+[pipeline.metadata]
+when = "Frontier-level research requiring systematic validation"
+skills = ["design-practice", "ro5"]
+
+[[steps]]
+id = "start"
+prompt = "Start {topic}."
+"#;
+        let f = write_toml(toml);
+        let def = load_pipeline_toml(f.path()).expect("should parse pipeline with metadata");
+        let meta = def.metadata.as_ref().expect("should have metadata");
+        assert_eq!(
+            meta.when.as_deref(),
+            Some("Frontier-level research requiring systematic validation")
+        );
+        assert_eq!(meta.skills, vec!["design-practice", "ro5"]);
+    }
+
+    #[test]
+    fn load_pipeline_toml_without_metadata() {
+        let toml = r#"
+[pipeline]
+name = "simple"
+
+[[steps]]
+id = "go"
+prompt = "Do {topic}."
+"#;
+        let f = write_toml(toml);
+        let def = load_pipeline_toml(f.path()).expect("should parse pipeline without metadata");
+        assert!(def.metadata.is_none());
+    }
+
+    #[test]
+    fn load_pipeline_toml_metadata_partial() {
+        let toml = r#"
+[pipeline]
+name = "partial"
+
+[pipeline.metadata]
+when = "Only when needed"
+
+[[steps]]
+id = "go"
+prompt = "Do {topic}."
+"#;
+        let f = write_toml(toml);
+        let def = load_pipeline_toml(f.path()).expect("should parse partial metadata");
+        let meta = def.metadata.as_ref().expect("should have metadata");
+        assert_eq!(meta.when.as_deref(), Some("Only when needed"));
+        assert!(meta.skills.is_empty());
     }
 
     #[test]
@@ -1471,9 +1634,118 @@ scope = "all"
             name: "p".to_string(),
             description: None,
             steps: vec![step.clone()],
+            metadata: None,
         };
         let dir = tempfile::tempdir().unwrap();
         let failures = evaluate_gates(&gate, &step, &run, &def, dir.path()).unwrap();
         assert!(failures.is_empty());
+    }
+
+    // ── validate_pipeline ─────────────────────────────────────────────────
+
+    #[test]
+    fn validate_warns_on_missing_metadata() {
+        let def = PipelineDefinition {
+            name: "test".to_string(),
+            description: None,
+            steps: vec![PipelineStep {
+                id: "go".to_string(),
+                prompt: "test".to_string(),
+                gate: None,
+            }],
+            metadata: None,
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let issues = validate_pipeline(&def, dir.path());
+        assert!(
+            issues
+                .iter()
+                .any(|i| i.level == ValidationLevel::Warn && i.message.contains("metadata")),
+            "expected warning about missing metadata"
+        );
+    }
+
+    #[test]
+    fn validate_no_warning_with_metadata() {
+        let def = PipelineDefinition {
+            name: "test".to_string(),
+            description: None,
+            steps: vec![PipelineStep {
+                id: "go".to_string(),
+                prompt: "test".to_string(),
+                gate: None,
+            }],
+            metadata: Some(PipelineMetadataSection {
+                when: Some("When needed".to_string()),
+                skills: vec![],
+            }),
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let issues = validate_pipeline(&def, dir.path());
+        assert!(
+            !issues.iter().any(|i| i.message.contains("metadata")),
+            "should not warn about metadata when present"
+        );
+    }
+
+    #[test]
+    fn validate_warns_on_missing_oracle() {
+        let def = PipelineDefinition {
+            name: "test".to_string(),
+            description: None,
+            steps: vec![PipelineStep {
+                id: "check".to_string(),
+                prompt: "check".to_string(),
+                gate: Some(StepGate {
+                    oracles: vec![OracleGate {
+                        name: "nonexistent-oracle".to_string(),
+                        command: None,
+                        description: None,
+                        timeout: None,
+                        scope: None,
+                    }],
+                    ..Default::default()
+                }),
+            }],
+            metadata: Some(PipelineMetadataSection::default()),
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let issues = validate_pipeline(&def, dir.path());
+        assert!(
+            issues
+                .iter()
+                .any(|i| i.level == ValidationLevel::Warn
+                    && i.message.contains("nonexistent-oracle")),
+            "expected warning about missing oracle"
+        );
+    }
+
+    #[test]
+    fn validate_skips_oracle_with_explicit_command() {
+        let def = PipelineDefinition {
+            name: "test".to_string(),
+            description: None,
+            steps: vec![PipelineStep {
+                id: "check".to_string(),
+                prompt: "check".to_string(),
+                gate: Some(StepGate {
+                    oracles: vec![OracleGate {
+                        name: "custom".to_string(),
+                        command: Some("python check.py".to_string()),
+                        description: None,
+                        timeout: None,
+                        scope: None,
+                    }],
+                    ..Default::default()
+                }),
+            }],
+            metadata: Some(PipelineMetadataSection::default()),
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let issues = validate_pipeline(&def, dir.path());
+        assert!(
+            !issues.iter().any(|i| i.message.contains("custom")),
+            "should not warn about oracle with explicit command"
+        );
     }
 }

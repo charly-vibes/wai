@@ -14,6 +14,10 @@
 name = "scientific-research"
 description = "AI-assisted scientific research with intermediate validation and artifact accrual"
 
+[pipeline.metadata]
+when = "Frontier-level research requiring systematic validation"
+skills = ["design-practice", "ro5"]
+
 [[steps]]
 id = "describe"
 prompt = """

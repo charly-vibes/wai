@@ -161,6 +161,14 @@ openspec list              # Active changes
 openspec list --specs      # Capabilities
 ```
 
+## Available Pipelines
+
+| Pipeline | When to Use | Start |
+|----------|-------------|-------|
+| scientific-research | Frontier-level research requiring systematic validation | `wai pipeline start scientific-research --topic=<topic>` |
+
+> Pipeline steps may have gates that enforce artifact creation, review coverage, and oracle checks before advancement. Run `wai pipeline gates <name>` for details.
+
 ## Structure
 
 The `.wai/` directory organizes artifacts using the PARA method:
@@ -185,6 +193,7 @@ context before starting research or creating tickets.
 > **Before research or ticket creation**: always run `wai search "<topic>"` to
 > check for known patterns. Do not rediscover what is already documented.
 <!-- WAI:REFLECT:REF:END -->
+
 
 
 
