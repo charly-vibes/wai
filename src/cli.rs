@@ -21,7 +21,10 @@ const VERSION: &str = concat!(
         Organizes artifacts using the PARA method (Projects, Areas, Resources, Archives)\n\
         with project phase tracking, agent config sync, handoff generation, and plugin integration.",
     version = VERSION,
-    after_help = "Run 'wai <command> --help' for more information on a command."
+    after_help = "ENVIRONMENT\n  \
+        WAI_PROJECT       Session-scoped project binding (set via: eval $(wai project use <name>))\n  \
+        WAI_PIPELINE_RUN  Override active pipeline run ID\n\n\
+        Run 'wai <command> --help' for more information on a command."
 )]
 pub struct Cli {
     #[command(subcommand)]
@@ -83,6 +86,9 @@ pub enum Commands {
     Status,
 
     /// Show or change the current project phase
+    ///
+    /// Resolves the target project via: --project flag, then WAI_PROJECT env var,
+    /// then auto-detect if exactly one project exists.
     Phase(PhaseArgs),
 
     /// Sync agent configs to tool-specific locations.
@@ -530,7 +536,7 @@ pub struct MoveArgs {
 
 #[derive(clap::Args)]
 pub struct PhaseArgs {
-    /// Project name (auto-detected when only one project exists)
+    /// Project name (overrides WAI_PROJECT env var; auto-detected when only one project exists)
     #[arg(short, long)]
     pub project: Option<String>,
 

@@ -68,6 +68,8 @@ Key distinction:
    - **review** → validate against plans
    - **archive** → wrap up
 5. Read existing artifacts with `wai search "<topic>"` before starting new work.
+6. If multiple projects exist, set `WAI_PROJECT` for the session:
+   `eval $(wai project use <name>)` — or use `--project <name>` per command.
 
 ## Capturing Work
 
@@ -139,6 +141,8 @@ wai why src/config.rs         # Explain a file's history
 wai reflect                   # Synthesize project patterns into CLAUDE.md
 wai close                     # Session handoff + pending-resume signal
 wai phase show                # Current phase
+wai phase --project <name> show  # Phase for specific project
+wai project use <name>        # Print export WAI_PROJECT=<name> for shell
 wai doctor                    # Workspace health
 wai pipeline list             # List pipelines
 wai pipeline run <n> --topic=<t>  # Start a run; set WAI_PIPELINE_RUN=<id>
