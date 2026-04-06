@@ -14,6 +14,7 @@
 - [Organizing with PARA](./concepts/para-method.md)
 - [Project Phases](./concepts/phases.md)
 - [Plugin System](./concepts/plugins.md)
+- [Pipelines](./concepts/pipelines.md)
 - [Agent Config Sync](./concepts/agent-config-sync.md)
 
 # Advanced
