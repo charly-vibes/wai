@@ -5,6 +5,13 @@ All notable changes to wai will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Calendar Versioning](https://calver.org/) (YYYY.M.MICRO).
 
+## [2026.4.2] - 2026-04-07
+
+### Fixed
+- **Beads CLI discoverability** — managed block now prominently shows `bd` as the CLI command throughout (detected tools, "When to Use What" table, key distinction, quick reference header) so agents stop looking for a `beads` binary that doesn't exist
+
+---
+
 ## [2026.4.1] - 2026-04-02
 
 ### Added

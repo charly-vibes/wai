@@ -44,7 +44,10 @@ pub fn wai_block_content(
              - **wai** — research, reasoning, and design decisions\n",
         );
         if has_beads {
-            block.push_str("- **beads (bd)** — issue tracking (tasks, bugs, dependencies)\n");
+            block.push_str(
+                "- **beads** — issue tracking (tasks, bugs, dependencies). \
+                 CLI command: **`bd`** (not `beads`)\n",
+            );
         }
         if has_openspec {
             block.push_str(
@@ -84,9 +87,9 @@ pub fn wai_block_content(
         );
         if has_beads {
             block.push_str(
-                "| Track work items/bugs | beads | `bd create --title=\"...\" --type=task` |\n\
-                 | Find available work | beads | `bd ready` |\n\
-                 | Manage dependencies | beads | `bd dep add <blocked> <blocker>` |\n",
+                "| Track work items/bugs | `bd` | `bd create --title=\"...\" --type=task` |\n\
+                 | Find available work | `bd` | `bd ready` |\n\
+                 | Manage dependencies | `bd` | `bd dep add <blocked> <blocker>` |\n",
             );
         }
         if has_openspec {
@@ -101,7 +104,7 @@ pub fn wai_block_content(
         );
         if has_beads {
             block.push_str(
-                "- **beads** = *what* needs to be done (concrete tasks, status tracking)\n",
+                "- **`bd`** (beads) = *what* needs to be done (concrete tasks, status tracking)\n",
             );
         }
         if has_openspec {
@@ -255,7 +258,7 @@ pub fn wai_block_content(
     if has_beads {
         block.push_str(
             "\n\
-             ### beads\n\
+             ### beads (CLI: `bd`)\n\
              ```bash\n\
              bd ready                     # Available work\n\
              bd show <id>                 # Issue details\n\

@@ -24,7 +24,7 @@ to orient yourself.
 
 Detected workflow tools:
 - **wai** — research, reasoning, and design decisions
-- **beads (bd)** — issue tracking (tasks, bugs, dependencies)
+- **beads** — issue tracking (tasks, bugs, dependencies). CLI command: **`bd`** (not `beads`)
 - **openspec** — specifications and change proposals (see `openspec/AGENTS.md`)
 
 > **CRITICAL**: Apply TDD and Tidy First throughout — not just when writing code:
@@ -42,15 +42,15 @@ Detected workflow tools:
 | Record reasoning/research | wai | `wai add research "findings"` |
 | Capture design decisions | wai | `wai add design "architecture choice"` |
 | Session context transfer | wai | `wai handoff create <project>` |
-| Track work items/bugs | beads | `bd create --title="..." --type=task` |
-| Find available work | beads | `bd ready` |
-| Manage dependencies | beads | `bd dep add <blocked> <blocker>` |
+| Track work items/bugs | `bd` | `bd create --title="..." --type=task` |
+| Find available work | `bd` | `bd ready` |
+| Manage dependencies | `bd` | `bd dep add <blocked> <blocker>` |
 | Propose system changes | openspec | Read `openspec/AGENTS.md` |
 | Define requirements | openspec | `openspec validate --strict` |
 
 Key distinction:
 - **wai** = *why* decisions were made (reasoning, context, handoffs)
-- **beads** = *what* needs to be done (concrete tasks, status tracking)
+- **`bd`** (beads) = *what* needs to be done (concrete tasks, status tracking)
 - **openspec** = *what the system should look like* (specs, requirements, proposals)
 
 ## Starting a Session
@@ -145,7 +145,7 @@ wai pipeline run <n> --topic=<t>  # Start a run; set WAI_PIPELINE_RUN=<id>
 wai pipeline advance <run-id> # Mark stage done, get next hint
 ```
 
-### beads
+### beads (CLI: `bd`)
 ```bash
 bd ready                     # Available work
 bd show <id>                 # Issue details
@@ -193,6 +193,7 @@ context before starting research or creating tickets.
 > **Before research or ticket creation**: always run `wai search "<topic>"` to
 > check for known patterns. Do not rediscover what is already documented.
 <!-- WAI:REFLECT:REF:END -->
+
 
 
 
