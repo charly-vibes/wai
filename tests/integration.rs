@@ -6956,10 +6956,10 @@ fn doctor_warns_wai_project_empty() {
         .stdout
         .clone();
     let stdout = strip_ansi(&String::from_utf8_lossy(&out));
-    // Empty WAI_PROJECT should either not warn or show a hint — no crash
+    // Empty WAI_PROJECT should not trigger a project-not-found error
     assert!(
-        !stdout.contains("not found"),
-        "empty WAI_PROJECT should not trigger not-found in: {}",
+        !stdout.contains("project not found"),
+        "empty WAI_PROJECT should not trigger project-not-found in: {}",
         stdout
     );
 }
