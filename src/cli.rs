@@ -571,7 +571,7 @@ pub struct MoveArgs {
 #[derive(clap::Args)]
 pub struct PhaseArgs {
     /// Project name (overrides WAI_PROJECT env var; auto-detected when only one project exists)
-    #[arg(short, long)]
+    #[arg(short, long, global = true)]
     pub project: Option<String>,
 
     #[command(subcommand)]
