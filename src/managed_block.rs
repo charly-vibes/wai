@@ -252,8 +252,8 @@ pub fn wai_block_content(
          wai phase show                # Current phase\n\
          wai doctor                    # Workspace health\n\
          wai pipeline list             # List pipelines\n\
-         wai pipeline run <n> --topic=<t>  # Start a run; set WAI_PIPELINE_RUN=<id>\n\
-         wai pipeline advance <run-id> # Mark stage done, get next hint\n\
+         wai pipeline start <n> --topic=<t>  # Start a run; set WAI_PIPELINE_RUN=<id>\n\
+         wai pipeline next             # Advance to next step\n\
          ```\n",
     );
     if has_beads {

@@ -141,8 +141,8 @@ wai close                     # Session handoff + pending-resume signal
 wai phase show                # Current phase
 wai doctor                    # Workspace health
 wai pipeline list             # List pipelines
-wai pipeline run <n> --topic=<t>  # Start a run; set WAI_PIPELINE_RUN=<id>
-wai pipeline advance <run-id> # Mark stage done, get next hint
+wai pipeline start <n> --topic=<t>  # Start a run; set WAI_PIPELINE_RUN=<id>
+wai pipeline next             # Advance to next step
 ```
 
 ### beads (CLI: `bd`)
