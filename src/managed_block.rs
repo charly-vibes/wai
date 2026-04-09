@@ -225,7 +225,8 @@ pub fn wai_block_content(
          \n\
          → Next session: `wai prime` shows RESUMING with exact next steps.\n\
          \n\
-         When context reaches ~40%: run `wai close`, then `/clear`.\n\
+         When context reaches ~40%: stop and tell the user — responses degrade past\n\
+         this point. Recommend `wai close` then `/clear` to resume cleanly.\n\
          Do NOT skip `wai close` — it enables resume detection.\n",
     );
 
@@ -764,6 +765,21 @@ mod wai_block_tests {
         assert!(
             search_pos > tdd_pos,
             "search-before-research should appear after TDD disclaimer"
+        );
+    }
+
+    // Context pressure warning
+
+    #[test]
+    fn context_pressure_tells_user() {
+        let output = wai_block_content(&[], &[], &[]);
+        assert!(
+            output.contains("stop and tell the user"),
+            "expected 'stop and tell the user' context pressure instruction"
+        );
+        assert!(
+            output.contains("responses degrade"),
+            "expected 'responses degrade' phrasing"
         );
     }
 
