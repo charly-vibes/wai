@@ -1,6 +1,23 @@
 # PARA Method
 
+> **Why PARA?** Without structure, project artifacts end up scattered across flat directories, wikis, Slack threads, and local notes. Finding that design decision from three weeks ago becomes an archaeological dig. PARA gives every artifact a clear home based on its lifecycle stage — active work goes in Projects, ongoing responsibilities in Areas, reference material in Resources, and completed work in Archives. You always know where to look.
+
 Wai organizes artifacts using the **PARA** method — a system for organizing digital information into four categories:
+
+```
+.wai/
+├── projects/          ← Active work with a goal and phases
+│   ├── auth-feature/     research/ designs/ plans/ handoffs/
+│   └── api-redesign/     research/ designs/ plans/ handoffs/
+├── areas/             ← Ongoing responsibilities (no end date)
+│   └── security/
+├── resources/         ← Reference material and reusable assets
+│   ├── agent-config/     skills/ rules/ context/
+│   ├── reflections/
+│   └── pipelines/
+└── archives/          ← Completed items (searchable, hidden from status)
+    └── old-feature/
+```
 
 ## Projects
 

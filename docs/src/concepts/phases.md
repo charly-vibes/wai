@@ -1,9 +1,19 @@
 # Project Phases
 
+> **Why phases?** When teams skip straight to code, they build the wrong thing — or the right thing the wrong way. Decisions get made implicitly, trade-offs go unrecorded, and the first sign of trouble triggers a rewrite. Formalizing research → design → plan → implement → review → archive doesn't slow you down; it forces the reasoning to exist *before* the code, so when you revisit the project later, the *why* is already captured.
+
 Projects in wai progress through six phases:
 
 ```
-research → design → plan → implement → review → archive
+          ┌──────────────────────────────────────────┐
+          │                                          │
+          ▼                                          │
+  ┌──────────┐   ┌────────┐   ┌──────┐   ┌─────────────┐   ┌────────┐   ┌─────────┐
+  │ research │──▶│ design │──▶│ plan │──▶│ implement   │──▶│ review │──▶│ archive │
+  └──────────┘   └────────┘   └──────┘   └─────────────┘   └────────┘   └─────────┘
+       ▲              ▲                        │
+       └──────────────┴────────────────────────┘
+                  (back-transitions allowed)
 ```
 
 ## Phases

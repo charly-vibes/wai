@@ -1,5 +1,7 @@
 # Agent Config Sync
 
+> **Why a single source of truth?** When agent instructions live in multiple files (`CLAUDE.md`, `.cursorrules`, `.gemini/`), they inevitably drift apart. One tool gets the updated security rules, another doesn't. Copy-pasting between configs is tedious and error-prone. Wai solves this by storing configs once and projecting them to each tool's expected location — edit in one place, sync everywhere.
+
 Wai maintains a single source of truth for agent configurations and syncs them to tool-specific locations using configurable projection strategies.
 
 ## Directory Structure

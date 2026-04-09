@@ -171,16 +171,17 @@ While wai detects common patterns automatically, you can create custom workflow 
 
 ### Example Custom Pattern Plugin
 
-```yaml
-name: my-workflow
-description: Custom workflow detector
-hooks:
-  - type: on_status
-    command: |
-      if [ -f .needs-review ]; then
-        echo "Ready for review - run: make review"
-      fi
-    inject_as: custom_workflow
+```toml
+name = "my-workflow"
+description = "Custom workflow detector"
+
+[hooks.on_status]
+command = """
+if [ -f .needs-review ]; then
+  echo "Ready for review - run: make review"
+fi
+"""
+inject_as = "custom_workflow"
 ```
 
 ## Best Practices

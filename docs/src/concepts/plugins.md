@@ -1,5 +1,7 @@
 # Plugin System
 
+> **Why plugins?** Every team uses different tools — issue trackers, spec managers, version control. Building all of these into wai would make it opinionated and brittle. Instead, wai auto-detects what's already in your workspace and integrates through a plugin architecture. You get seamless context (git status in handoffs, open issues in `wai status`) without wai prescribing your toolchain.
+
 Wai auto-detects and integrates with external tools through a flexible plugin architecture.
 
 ## Built-in Plugins

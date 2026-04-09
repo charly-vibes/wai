@@ -9,6 +9,8 @@
 
 `wai` is built as a modular CLI tool in Rust, focusing on local-first storage and tool-agnostic integration.
 
+For a deeper dive into the codebase structure and ADRs, see [Architecture](./architecture.md).
+
 ### Core Systems
 
 #### 1. Registry & Workspace (`src/workspace.rs`, `src/config.rs`)

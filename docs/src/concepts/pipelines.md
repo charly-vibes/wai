@@ -1,5 +1,7 @@
 # Pipelines
 
+> **Why pipelines?** Some tasks are too complex or error-prone for a single pass. When an AI agent tries to do research, validation, and synthesis all at once, errors compound — context drifts, assumptions go unchecked, and the final output is built on shaky foundations. Pipelines break these tasks into discrete steps with validation gates between them, so each step is verified before the next one begins.
+
 Pipelines are ordered, multi-step workflows that guide you through a structured process. Each step provides a prompt with deliverables and instructions, and you advance through steps sequentially.
 
 Pipelines are useful when a task is too large or too error-prone for a single pass — for example, research that spans many subtasks, or a process where intermediate validation prevents compounding errors. If your work fits naturally into wai's [project phases](./phases.md) without extra structure, you probably don't need a pipeline.

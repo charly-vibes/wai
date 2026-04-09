@@ -46,3 +46,9 @@ just check    # Run all checks (fmt + lint + test)
 ## Reporting Issues
 
 Open an issue on [GitHub](https://github.com/charly-vibes/wai/issues).
+
+## See Also
+
+- **[AGENTS.md](./AGENTS.md)** — AI agent workflow instructions, including the tool-work vs repo-maintenance distinction, TDD conventions, and session protocols.
+- **[OpenSpec](./openspec/AGENTS.md)** — How to propose and apply system changes via specifications.
+- **[Development docs](./docs/src/development.md)** — Architecture overview and code organization.
