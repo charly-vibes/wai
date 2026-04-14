@@ -26,6 +26,10 @@ pub struct PipelineStep {
     /// Optional gate configuration for this step.
     #[serde(default)]
     pub gate: Option<StepGate>,
+    /// When true, artifacts for this step are locked (SHA-256 hashed) on advancement.
+    #[serde(default)]
+    #[allow(dead_code)] // Read by pipeline lock/next commands (wai-2lwo, wai-bzrp)
+    pub lock: bool,
 }
 
 /// Gate configuration for a pipeline step.
@@ -2024,6 +2028,44 @@ scope = "all"
         assert_eq!(gate.oracles[1].scope.as_deref(), Some("all"));
     }
 
+    // ── lock field ─────────────────────────────────────────────────────
+
+    #[test]
+    fn load_pipeline_toml_lock_defaults_to_false() {
+        let toml = r#"
+[pipeline]
+name = "no-lock"
+
+[[steps]]
+id = "step1"
+prompt = "Do something."
+"#;
+        let f = write_toml(toml);
+        let def = load_pipeline_toml(f.path()).expect("should parse pipeline without lock field");
+        assert!(!def.steps[0].lock, "lock should default to false");
+    }
+
+    #[test]
+    fn load_pipeline_toml_lock_true() {
+        let toml = r#"
+[pipeline]
+name = "locked"
+
+[[steps]]
+id = "step1"
+prompt = "Do something."
+lock = true
+
+[[steps]]
+id = "step2"
+prompt = "Do something else."
+"#;
+        let f = write_toml(toml);
+        let def = load_pipeline_toml(f.path()).expect("should parse pipeline with lock = true");
+        assert!(def.steps[0].lock, "step1 lock should be true");
+        assert!(!def.steps[1].lock, "step2 lock should default to false");
+    }
+
     // ── frontmatter parsing ──────────────────────────────────────────────
 
     #[test]
@@ -2066,6 +2108,7 @@ scope = "all"
             id: "gen".to_string(),
             prompt: "test".to_string(),
             gate: Some(gate.clone()),
+            lock: false,
         };
         let run = PipelineRun {
             run_id: "test-run".to_string(),
@@ -2104,6 +2147,7 @@ scope = "all"
             id: "review-step".to_string(),
             prompt: "test".to_string(),
             gate: Some(gate.clone()),
+            lock: false,
         };
         let run = PipelineRun {
             run_id: "test-run".to_string(),
@@ -2142,6 +2186,7 @@ scope = "all"
             id: "review-step".to_string(),
             prompt: "test".to_string(),
             gate: Some(gate.clone()),
+            lock: false,
         };
         let mut approvals = HashMap::new();
         approvals.insert(
@@ -2240,6 +2285,7 @@ prompt = "Do {topic}."
             id: "free".to_string(),
             prompt: "test".to_string(),
             gate: Some(gate.clone()),
+            lock: false,
         };
         let run = PipelineRun {
             run_id: "r".to_string(),
@@ -2271,6 +2317,7 @@ prompt = "Do {topic}."
                 id: "go".to_string(),
                 prompt: "test".to_string(),
                 gate: None,
+                lock: false,
             }],
             metadata: None,
         };
@@ -2293,6 +2340,7 @@ prompt = "Do {topic}."
                 id: "go".to_string(),
                 prompt: "test".to_string(),
                 gate: None,
+                lock: false,
             }],
             metadata: Some(PipelineMetadataSection {
                 when: Some("When needed".to_string()),
@@ -2325,6 +2373,7 @@ prompt = "Do {topic}."
                     }],
                     ..Default::default()
                 }),
+                lock: false,
             }],
             metadata: Some(PipelineMetadataSection::default()),
         };
@@ -2357,6 +2406,7 @@ prompt = "Do {topic}."
                     }],
                     ..Default::default()
                 }),
+                lock: false,
             }],
             metadata: Some(PipelineMetadataSection::default()),
         };

@@ -464,6 +464,10 @@ pub enum AddCommands {
         /// Link to a bead/issue ID (adds bead field to frontmatter)
         #[arg(long)]
         bead: Option<String>,
+
+        /// Path to an artifact this corrects (creates an addendum)
+        #[arg(long)]
+        corrects: Option<String>,
     },
 
     /// Add a plan document
@@ -482,6 +486,10 @@ pub enum AddCommands {
         /// Comma-separated tags written as YAML frontmatter
         #[arg(short, long)]
         tags: Option<String>,
+
+        /// Path to an artifact this corrects (creates an addendum)
+        #[arg(long)]
+        corrects: Option<String>,
     },
 
     /// Add a design document
@@ -500,6 +508,10 @@ pub enum AddCommands {
         /// Comma-separated tags written as YAML frontmatter
         #[arg(short, long)]
         tags: Option<String>,
+
+        /// Path to an artifact this corrects (creates an addendum)
+        #[arg(long)]
+        corrects: Option<String>,
     },
 
     /// Add a review artifact for an existing artifact
@@ -534,6 +546,10 @@ pub enum AddCommands {
         /// Skill that produced this review (informational only)
         #[arg(long)]
         produced_by: Option<String>,
+
+        /// Path to an artifact this corrects (creates an addendum)
+        #[arg(long)]
+        corrects: Option<String>,
     },
 
     /// Scaffold a new agent skill file

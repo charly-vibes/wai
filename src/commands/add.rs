@@ -24,6 +24,7 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             project,
             tags,
             bead,
+            corrects,
         } => {
             require_safe_mode("add research")?;
             let resolved = resolve_project(&project_root, project.as_deref())?;
@@ -47,14 +48,26 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             let mut file_content = String::new();
 
             // Build combined tags: user-supplied + pipeline-run auto-tag
-            let all_tags = build_tags(tags.as_deref(), &project_root);
-            if !all_tags.is_empty() || bead.is_some() {
+            let mut all_tags = build_tags(tags.as_deref(), &project_root);
+            // When correcting another artifact, auto-add pipeline-addendum tag
+            if let Some(ref corrects_path) = corrects
+                && let Some(step_id) = resolve_pipeline_step_from_artifact(corrects_path)
+            {
+                let addendum_tag = format!("pipeline-addendum:{}", step_id);
+                if !all_tags.contains(&addendum_tag) {
+                    all_tags.push(addendum_tag);
+                }
+            }
+            if !all_tags.is_empty() || bead.is_some() || corrects.is_some() {
                 file_content.push_str("---\n");
                 if !all_tags.is_empty() {
                     file_content.push_str(&format!("tags: [{}]\n", all_tags.join(", ")));
                 }
                 if let Some(ref bead_id) = bead {
                     file_content.push_str(&format!("bead: {}\n", bead_id));
+                }
+                if let Some(ref corrects_path) = corrects {
+                    file_content.push_str(&format!("corrects: {}\n", corrects_path));
                 }
                 file_content.push_str("---\n\n");
             }
@@ -120,6 +133,7 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             file,
             project,
             tags,
+            corrects,
         } => {
             require_safe_mode("add plan")?;
             let resolved = resolve_project(&project_root, project.as_deref())?;
@@ -142,10 +156,23 @@ pub fn run(cmd: AddCommands) -> Result<()> {
 
             let mut file_content = String::new();
 
-            let all_tags = build_tags(tags.as_deref(), &project_root);
-            if !all_tags.is_empty() {
+            let mut all_tags = build_tags(tags.as_deref(), &project_root);
+            if let Some(ref corrects_path) = corrects
+                && let Some(step_id) = resolve_pipeline_step_from_artifact(corrects_path)
+            {
+                let addendum_tag = format!("pipeline-addendum:{}", step_id);
+                if !all_tags.contains(&addendum_tag) {
+                    all_tags.push(addendum_tag);
+                }
+            }
+            if !all_tags.is_empty() || corrects.is_some() {
                 file_content.push_str("---\n");
-                file_content.push_str(&format!("tags: [{}]\n", all_tags.join(", ")));
+                if !all_tags.is_empty() {
+                    file_content.push_str(&format!("tags: [{}]\n", all_tags.join(", ")));
+                }
+                if let Some(ref corrects_path) = corrects {
+                    file_content.push_str(&format!("corrects: {}\n", corrects_path));
+                }
                 file_content.push_str("---\n\n");
             }
 
@@ -164,6 +191,7 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             file,
             project,
             tags,
+            corrects,
         } => {
             require_safe_mode("add design")?;
             let resolved = resolve_project(&project_root, project.as_deref())?;
@@ -186,10 +214,23 @@ pub fn run(cmd: AddCommands) -> Result<()> {
 
             let mut file_content = String::new();
 
-            let all_tags = build_tags(tags.as_deref(), &project_root);
-            if !all_tags.is_empty() {
+            let mut all_tags = build_tags(tags.as_deref(), &project_root);
+            if let Some(ref corrects_path) = corrects
+                && let Some(step_id) = resolve_pipeline_step_from_artifact(corrects_path)
+            {
+                let addendum_tag = format!("pipeline-addendum:{}", step_id);
+                if !all_tags.contains(&addendum_tag) {
+                    all_tags.push(addendum_tag);
+                }
+            }
+            if !all_tags.is_empty() || corrects.is_some() {
                 file_content.push_str("---\n");
-                file_content.push_str(&format!("tags: [{}]\n", all_tags.join(", ")));
+                if !all_tags.is_empty() {
+                    file_content.push_str(&format!("tags: [{}]\n", all_tags.join(", ")));
+                }
+                if let Some(ref corrects_path) = corrects {
+                    file_content.push_str(&format!("corrects: {}\n", corrects_path));
+                }
                 file_content.push_str("---\n\n");
             }
 
@@ -212,6 +253,7 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             verdict,
             severity,
             produced_by,
+            corrects,
         } => {
             require_safe_mode("add review")?;
             let resolved = resolve_project(&project_root, project.as_deref())?;
@@ -251,7 +293,15 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             }
 
             let mut file_content = String::new();
-            let all_tags = build_tags(tags.as_deref(), &project_root);
+            let mut all_tags = build_tags(tags.as_deref(), &project_root);
+            if let Some(ref corrects_path) = corrects
+                && let Some(step_id) = resolve_pipeline_step_from_artifact(corrects_path)
+            {
+                let addendum_tag = format!("pipeline-addendum:{}", step_id);
+                if !all_tags.contains(&addendum_tag) {
+                    all_tags.push(addendum_tag);
+                }
+            }
 
             // Reviews always have frontmatter (at minimum the reviews field)
             file_content.push_str("---\n");
@@ -267,6 +317,9 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             }
             if let Some(ref pb) = produced_by {
                 file_content.push_str(&format!("produced_by: {}\n", pb));
+            }
+            if let Some(ref corrects_path) = corrects {
+                file_content.push_str(&format!("corrects: {}\n", corrects_path));
             }
             if !all_tags.is_empty() {
                 file_content.push_str(&format!("tags: [{}]\n", all_tags.join(", ")));
@@ -586,6 +639,142 @@ current_step: 0
             "no frontmatter should be written"
         );
     }
+
+    #[test]
+    fn corrects_field_written_to_frontmatter() {
+        let dir = tempfile::tempdir().unwrap();
+        let research_dir = dir.path().join("research");
+        std::fs::create_dir_all(&research_dir).unwrap();
+
+        let corrects_path = "research/2026-04-01-original.md";
+        let body = "corrected notes";
+        let slug = slug::slugify(body.chars().take(50).collect::<String>());
+        let date = chrono::Utc::now().format("%Y-%m-%d");
+        let filename = format!("{}-{}.md", date, slug);
+
+        let mut file_content = String::new();
+        let all_tags: Vec<String> = vec![];
+        let corrects: Option<String> = Some(corrects_path.to_string());
+        // Replicate the frontmatter logic for corrects
+        if !all_tags.is_empty() || corrects.is_some() {
+            file_content.push_str("---\n");
+            if !all_tags.is_empty() {
+                file_content.push_str(&format!("tags: [{}]\n", all_tags.join(", ")));
+            }
+            if let Some(ref cp) = corrects {
+                file_content.push_str(&format!("corrects: {}\n", cp));
+            }
+            file_content.push_str("---\n\n");
+        }
+        file_content.push_str(body);
+        file_content.push('\n');
+
+        std::fs::write(research_dir.join(&filename), &file_content).unwrap();
+        let written = std::fs::read_to_string(research_dir.join(&filename)).unwrap();
+        assert!(
+            written.contains("corrects: research/2026-04-01-original.md"),
+            "corrects field missing from frontmatter"
+        );
+        assert!(written.contains("---"), "frontmatter delimiters missing");
+    }
+
+    #[test]
+    fn resolve_pipeline_step_from_artifact_parses_tag() {
+        let dir = tempfile::tempdir().unwrap();
+        let artifact = dir.path().join("original.md");
+        let content =
+            "---\ntags: [pipeline-run:test-run, pipeline-step:research]\n---\n\noriginal content\n";
+        std::fs::write(&artifact, content).unwrap();
+
+        let result = super::resolve_pipeline_step_from_artifact(artifact.to_str().unwrap());
+        assert_eq!(result, Some("research".to_string()));
+    }
+
+    #[test]
+    fn resolve_pipeline_step_returns_none_without_step_tag() {
+        let dir = tempfile::tempdir().unwrap();
+        let artifact = dir.path().join("no-step.md");
+        let content = "---\ntags: [some-tag]\n---\n\ncontent\n";
+        std::fs::write(&artifact, content).unwrap();
+
+        let result = super::resolve_pipeline_step_from_artifact(artifact.to_str().unwrap());
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn resolve_pipeline_step_returns_none_without_frontmatter() {
+        let dir = tempfile::tempdir().unwrap();
+        let artifact = dir.path().join("no-fm.md");
+        std::fs::write(&artifact, "just plain content\n").unwrap();
+
+        let result = super::resolve_pipeline_step_from_artifact(artifact.to_str().unwrap());
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn resolve_pipeline_step_returns_none_for_missing_file() {
+        let result = super::resolve_pipeline_step_from_artifact("/nonexistent/path.md");
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn corrects_auto_adds_pipeline_addendum_tag() {
+        let dir = tempfile::tempdir().unwrap();
+        // Create the corrected artifact with a pipeline-step tag
+        let original = dir.path().join("original.md");
+        let original_content =
+            "---\ntags: [pipeline-run:run1, pipeline-step:implement]\n---\n\noriginal\n";
+        std::fs::write(&original, original_content).unwrap();
+
+        let corrects_path = original.to_str().unwrap();
+        let mut all_tags: Vec<String> = vec!["custom".to_string()];
+        // Replicate the corrects logic from the command handler
+        if let Some(step_id) = super::resolve_pipeline_step_from_artifact(corrects_path) {
+            let addendum_tag = format!("pipeline-addendum:{}", step_id);
+            if !all_tags.contains(&addendum_tag) {
+                all_tags.push(addendum_tag);
+            }
+        }
+
+        assert!(
+            all_tags.contains(&"pipeline-addendum:implement".to_string()),
+            "expected pipeline-addendum:implement tag, got: {:?}",
+            all_tags
+        );
+        assert!(
+            all_tags.contains(&"custom".to_string()),
+            "user tag should be preserved"
+        );
+    }
+}
+
+/// Extract `pipeline-step:<id>` tag from an artifact's YAML frontmatter.
+///
+/// Returns `None` gracefully if the file cannot be read, has no frontmatter,
+/// or contains no `pipeline-step:` tag.
+fn resolve_pipeline_step_from_artifact(path: &str) -> Option<String> {
+    let content = std::fs::read_to_string(path).ok()?;
+    if !content.starts_with("---\n") {
+        return None;
+    }
+    let end = content[4..].find("---\n")?;
+    let fm = &content[4..4 + end];
+    for line in fm.lines() {
+        if line.starts_with("tags:") {
+            for tag in line
+                .trim_start_matches("tags:")
+                .trim()
+                .trim_matches(|c| c == '[' || c == ']')
+                .split(',')
+            {
+                let tag = tag.trim();
+                if let Some(step) = tag.strip_prefix("pipeline-step:") {
+                    return Some(step.to_string());
+                }
+            }
+        }
+    }
+    None
 }
 
 fn build_tags(user_tags: Option<&str>, project_root: &std::path::Path) -> Vec<String> {
