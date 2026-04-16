@@ -967,6 +967,15 @@ pub enum PipelineCommands {
         /// Pipeline name (validates all if omitted)
         name: Option<String>,
     },
+
+    /// Lock the current step's artifacts with SHA-256 hashes
+    ///
+    /// Computes SHA-256 hashes for all artifacts tagged with the current step,
+    /// writes .lock sidecar files, and marks the step as locked in run state.
+    ///
+    /// EXAMPLES
+    ///   wai pipeline lock
+    Lock,
 }
 
 /// Returns the names of all top-level wai subcommands, derived from the [`Cli`] struct.

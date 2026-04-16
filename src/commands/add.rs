@@ -53,6 +53,7 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             if let Some(ref corrects_path) = corrects
                 && let Some(step_id) = resolve_pipeline_step_from_artifact(corrects_path)
             {
+                warn_if_unlocked(corrects_path, &step_id)?;
                 let addendum_tag = format!("pipeline-addendum:{}", step_id);
                 if !all_tags.contains(&addendum_tag) {
                     all_tags.push(addendum_tag);
@@ -160,6 +161,7 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             if let Some(ref corrects_path) = corrects
                 && let Some(step_id) = resolve_pipeline_step_from_artifact(corrects_path)
             {
+                warn_if_unlocked(corrects_path, &step_id)?;
                 let addendum_tag = format!("pipeline-addendum:{}", step_id);
                 if !all_tags.contains(&addendum_tag) {
                     all_tags.push(addendum_tag);
@@ -218,6 +220,7 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             if let Some(ref corrects_path) = corrects
                 && let Some(step_id) = resolve_pipeline_step_from_artifact(corrects_path)
             {
+                warn_if_unlocked(corrects_path, &step_id)?;
                 let addendum_tag = format!("pipeline-addendum:{}", step_id);
                 if !all_tags.contains(&addendum_tag) {
                     all_tags.push(addendum_tag);
@@ -297,6 +300,7 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             if let Some(ref corrects_path) = corrects
                 && let Some(step_id) = resolve_pipeline_step_from_artifact(corrects_path)
             {
+                warn_if_unlocked(corrects_path, &step_id)?;
                 let addendum_tag = format!("pipeline-addendum:{}", step_id);
                 if !all_tags.contains(&addendum_tag) {
                     all_tags.push(addendum_tag);
@@ -746,6 +750,136 @@ current_step: 0
             "user tag should be preserved"
         );
     }
+
+    #[test]
+    fn has_lock_file_returns_true_when_lock_exists() {
+        let dir = tempfile::tempdir().unwrap();
+        let artifact = dir.path().join("2026-04-01-research.md");
+        std::fs::write(&artifact, "content").unwrap();
+        // Create a lock sidecar
+        let lock_file = dir.path().join("2026-04-01-research.md.run-abc.lock");
+        std::fs::write(&lock_file, "").unwrap();
+
+        assert!(
+            super::has_lock_file(artifact.to_str().unwrap()),
+            "should detect lock file"
+        );
+    }
+
+    #[test]
+    fn has_lock_file_returns_false_when_no_lock() {
+        let dir = tempfile::tempdir().unwrap();
+        let artifact = dir.path().join("2026-04-01-research.md");
+        std::fs::write(&artifact, "content").unwrap();
+
+        assert!(
+            !super::has_lock_file(artifact.to_str().unwrap()),
+            "should not detect lock file when none exists"
+        );
+    }
+
+    #[test]
+    fn has_lock_file_returns_false_for_nonexistent_dir() {
+        assert!(
+            !super::has_lock_file("/nonexistent/dir/artifact.md"),
+            "should return false for nonexistent directory"
+        );
+    }
+
+    #[test]
+    fn has_lock_file_ignores_non_lock_sidecar() {
+        let dir = tempfile::tempdir().unwrap();
+        let artifact = dir.path().join("2026-04-01-research.md");
+        std::fs::write(&artifact, "content").unwrap();
+        // Create a non-lock sidecar (e.g. .bak)
+        let bak_file = dir.path().join("2026-04-01-research.md.run-abc.bak");
+        std::fs::write(&bak_file, "").unwrap();
+
+        assert!(
+            !super::has_lock_file(artifact.to_str().unwrap()),
+            "should not match non-.lock sidecar files"
+        );
+    }
+
+    #[test]
+    fn warn_if_unlocked_does_not_error_when_quiet() {
+        // When the artifact has no lock file the function should still succeed
+        // (it only prints a warning). We set quiet mode to avoid cliclack output.
+        let dir = tempfile::tempdir().unwrap();
+        let artifact = dir.path().join("artifact.md");
+        std::fs::write(&artifact, "content").unwrap();
+
+        // Set quiet context so the cliclack warning call is skipped
+        crate::context::set_context(crate::context::CliContext {
+            json: false,
+            no_input: false,
+            yes: false,
+            safe: false,
+            verbose: 0,
+            quiet: true,
+        });
+        let result = super::warn_if_unlocked(artifact.to_str().unwrap(), "research");
+        assert!(result.is_ok(), "warn_if_unlocked should not error");
+    }
+
+    #[test]
+    fn warn_if_unlocked_skips_when_locked() {
+        // When a lock file exists, warn_if_unlocked should not warn at all
+        let dir = tempfile::tempdir().unwrap();
+        let artifact = dir.path().join("artifact.md");
+        std::fs::write(&artifact, "content").unwrap();
+        let lock = dir.path().join("artifact.md.run-xyz.lock");
+        std::fs::write(&lock, "").unwrap();
+
+        // Even without quiet mode, this should succeed because the lock exists
+        // (no warning emitted)
+        let result = super::warn_if_unlocked(artifact.to_str().unwrap(), "research");
+        assert!(
+            result.is_ok(),
+            "warn_if_unlocked should not error when locked"
+        );
+    }
+}
+
+/// Check if an artifact has any associated .lock sidecar files.
+///
+/// Lock files follow the naming convention `<artifact-filename>.<run-id>.lock`
+/// in the same directory as the artifact. Returns `true` if at least one such
+/// file exists.
+fn has_lock_file(artifact_path: &str) -> bool {
+    let path = std::path::Path::new(artifact_path);
+    let dir = match path.parent() {
+        Some(d) => d,
+        None => return false,
+    };
+    let filename = match path.file_name() {
+        Some(f) => f.to_string_lossy(),
+        None => return false,
+    };
+    let prefix = format!("{}.", filename);
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.starts_with(&prefix) && name.ends_with(".lock") {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Warn when `--corrects` targets an artifact whose pipeline step is not locked.
+///
+/// This is informational only — the addendum is still created regardless.
+fn warn_if_unlocked(corrects_path: &str, step_id: &str) -> Result<()> {
+    if !has_lock_file(corrects_path) && !current_context().quiet {
+        cliclack::log::warning(format!(
+            "Step '{}' is not locked — consider editing the original artifact directly.",
+            step_id
+        ))
+        .into_diagnostic()?;
+    }
+    Ok(())
 }
 
 /// Extract `pipeline-step:<id>` tag from an artifact's YAML frontmatter.

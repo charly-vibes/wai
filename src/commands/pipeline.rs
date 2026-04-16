@@ -201,6 +201,7 @@ pub fn run(cmd: PipelineCommands) -> Result<()> {
         PipelineCommands::Gates { name, step } => cmd_gates(name.as_deref(), step.as_deref()),
         PipelineCommands::Check { oracle } => cmd_check(oracle.as_deref()),
         PipelineCommands::Validate { name } => cmd_validate(name.as_deref()),
+        PipelineCommands::Lock => cmd_lock(),
     }
 }
 
@@ -718,6 +719,114 @@ fn cmd_approve() -> Result<()> {
     .into_diagnostic()?;
 
     Ok(())
+}
+
+// ─── lock ─────────────────────────────────────────────────────────────────────
+
+fn cmd_lock() -> Result<()> {
+    let project_root = require_project()?;
+    require_safe_mode("pipeline lock")?;
+
+    // 1. Resolve active run
+    let run_id = resolve_active_run_id(&project_root)?;
+
+    // 2. Load run state
+    let runs_dir = crate::config::wai_dir(&project_root).join("pipeline-runs");
+    let run_path = runs_dir.join(format!("{}.yml", run_id));
+    if !run_path.exists() {
+        miette::bail!(
+            "Run state file not found for run '{}'. The run may have been deleted or the ID is stale.",
+            run_id
+        );
+    }
+    let run: PipelineRun =
+        serde_yml::from_str(&fs::read_to_string(&run_path).into_diagnostic()?)
+            .map_err(|e| miette::miette!("Failed to parse run state for '{}': {}", run_id, e))?;
+
+    // 3. Load pipeline definition
+    let def_path =
+        crate::config::pipelines_dir(&project_root).join(format!("{}.toml", run.pipeline));
+    let definition = load_pipeline_toml(&def_path)?;
+
+    // 4. Check not already complete
+    if run.current_step >= definition.steps.len() {
+        miette::bail!(
+            "Pipeline run '{}' is already complete. No step to lock.",
+            run_id
+        );
+    }
+
+    let current_step = &definition.steps[run.current_step];
+
+    // 5. Find artifacts tagged with this step
+    let artifact_paths = find_step_artifact_paths(&project_root, &run_id, &current_step.id);
+    if artifact_paths.is_empty() {
+        miette::bail!("Cannot lock step '{}' with no artifacts.", current_step.id);
+    }
+
+    // 6. Write lock sidecars for each artifact
+    for path in &artifact_paths {
+        write_artifact_lock(path, &run_id, &current_step.id)?;
+    }
+
+    log::success(format!(
+        "Locked {} artifacts for step '{}'",
+        artifact_paths.len(),
+        current_step.id
+    ))
+    .into_diagnostic()?;
+
+    Ok(())
+}
+
+/// Find all artifact file paths tagged with the given run ID and step ID.
+///
+/// Similar to [`find_step_artifacts`] but returns full `PathBuf`s suitable for
+/// passing to [`write_artifact_lock`].
+fn find_step_artifact_paths(
+    project_root: &Path,
+    run_id: &str,
+    step_id: &str,
+) -> Vec<std::path::PathBuf> {
+    let projects = crate::config::projects_dir(project_root);
+    let run_tag = format!("pipeline-run:{}", run_id);
+    let step_tag = format!("pipeline-step:{}", step_id);
+
+    let mut paths = Vec::new();
+
+    let Ok(entries) = fs::read_dir(&projects) else {
+        return paths;
+    };
+    for entry in entries.flatten() {
+        let project_dir = entry.path();
+        if !project_dir.is_dir() {
+            continue;
+        }
+        for dir_name in &["research", "plans", "designs", "handoffs", "reviews"] {
+            let dir = project_dir.join(dir_name);
+            if !dir.exists() {
+                continue;
+            }
+            let Ok(files) = fs::read_dir(&dir) else {
+                continue;
+            };
+            for file_entry in files.flatten() {
+                let path = file_entry.path();
+                if !path.is_file() || path.extension().and_then(|e| e.to_str()) != Some("md") {
+                    continue;
+                }
+                let Ok(content) = fs::read_to_string(&path) else {
+                    continue;
+                };
+                let fm = parse_frontmatter(&content);
+                if fm.tags.contains(&run_tag) && fm.tags.contains(&step_tag) {
+                    paths.push(path);
+                }
+            }
+        }
+    }
+    paths.sort();
+    paths
 }
 
 // ─── show ─────────────────────────────────────────────────────────────────────
@@ -3255,5 +3364,74 @@ require_input_manifest = true
             addenda.is_empty(),
             "expected no addenda for missing project dir"
         );
+    }
+
+    // ── find_step_artifact_paths ─────────────────────────────────────────
+
+    #[test]
+    fn find_step_artifact_paths_returns_matching_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_dir = dir
+            .path()
+            .join(".wai")
+            .join("projects")
+            .join("test-project");
+        let research_dir = project_dir.join("research");
+        fs::create_dir_all(&research_dir).unwrap();
+
+        // Artifact tagged with both run and step tags
+        fs::write(
+            research_dir.join("2026-04-14-findings.md"),
+            "---\ntags: [pipeline-run:run-abc, pipeline-step:generate]\n---\n\nFindings.",
+        )
+        .unwrap();
+
+        // Artifact tagged with different step — should NOT match
+        fs::write(
+            research_dir.join("2026-04-14-other.md"),
+            "---\ntags: [pipeline-run:run-abc, pipeline-step:review]\n---\n\nOther.",
+        )
+        .unwrap();
+
+        // Artifact with no pipeline tags — should NOT match
+        fs::write(
+            research_dir.join("2026-04-14-plain.md"),
+            "---\ntags: [general]\n---\n\nPlain.",
+        )
+        .unwrap();
+
+        let paths = find_step_artifact_paths(dir.path(), "run-abc", "generate");
+        assert_eq!(paths.len(), 1, "expected 1 artifact, got: {:?}", paths);
+        assert!(
+            paths[0]
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .contains("findings"),
+            "expected findings artifact, got: {:?}",
+            paths[0]
+        );
+    }
+
+    #[test]
+    fn find_step_artifact_paths_returns_empty_when_no_artifacts() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_dir = dir
+            .path()
+            .join(".wai")
+            .join("projects")
+            .join("test-project");
+        let research_dir = project_dir.join("research");
+        fs::create_dir_all(&research_dir).unwrap();
+
+        // Artifact tagged with different run
+        fs::write(
+            research_dir.join("2026-04-14-other.md"),
+            "---\ntags: [pipeline-run:other-run, pipeline-step:generate]\n---\n\nOther.",
+        )
+        .unwrap();
+
+        let paths = find_step_artifact_paths(dir.path(), "run-abc", "generate");
+        assert!(paths.is_empty(), "expected no artifacts, got: {:?}", paths);
     }
 }
