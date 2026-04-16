@@ -87,6 +87,7 @@ pub fn run(fix: bool) -> Result<()> {
     checks.extend(check_readme_badge(&project_root));
     checks.extend(check_claude_session_hook());
     checks.extend(check_wai_project_env(&project_root));
+    checks.extend(check_artifact_locks(&project_root));
 
     let summary = Summary {
         pass: checks.iter().filter(|c| c.status == Status::Pass).count(),
@@ -2058,4 +2059,237 @@ fn check_wai_project_env(project_root: &Path) -> Vec<CheckResult> {
     }
 
     results
+}
+
+fn check_artifact_locks(project_root: &Path) -> Vec<CheckResult> {
+    use super::pipeline::{artifact_hash, read_artifact_lock};
+    use walkdir::WalkDir;
+
+    let projects = projects_dir(project_root);
+    if !projects.exists() {
+        return vec![];
+    }
+
+    let lock_files: Vec<std::path::PathBuf> = WalkDir::new(&projects)
+        .follow_links(false)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            e.file_type().is_file()
+                && e.path().extension().and_then(|ext| ext.to_str()) == Some("lock")
+        })
+        .map(|e| e.path().to_path_buf())
+        .collect();
+
+    if lock_files.is_empty() {
+        return vec![];
+    }
+
+    let mut mismatches = Vec::new();
+    let mut verified = 0usize;
+
+    for lock_path in &lock_files {
+        let lock = match read_artifact_lock(lock_path) {
+            Ok(l) => l,
+            Err(_) => {
+                mismatches.push(CheckResult {
+                    name: "Artifact lock".to_string(),
+                    status: Status::Warn,
+                    message: format!(
+                        "Cannot read lock file: {}",
+                        lock_path
+                            .strip_prefix(project_root)
+                            .unwrap_or(lock_path)
+                            .display()
+                    ),
+                    fix: None,
+                    fix_fn: None,
+                });
+                continue;
+            }
+        };
+
+        let artifact_path = lock_path.parent().unwrap().join(&lock.artifact);
+        if !artifact_path.exists() {
+            mismatches.push(CheckResult {
+                name: "Artifact lock".to_string(),
+                status: Status::Warn,
+                message: format!(
+                    "Locked artifact missing: {}",
+                    artifact_path
+                        .strip_prefix(project_root)
+                        .unwrap_or(&artifact_path)
+                        .display()
+                ),
+                fix: None,
+                fix_fn: None,
+            });
+            continue;
+        }
+
+        match artifact_hash(&artifact_path) {
+            Ok(current_hash) => {
+                if current_hash != lock.lock_hash {
+                    mismatches.push(CheckResult {
+                        name: "Artifact lock".to_string(),
+                        status: Status::Warn,
+                        message: format!(
+                            "Hash mismatch: {} (run {})",
+                            lock.artifact, lock.pipeline_run
+                        ),
+                        fix: None,
+                        fix_fn: None,
+                    });
+                } else {
+                    verified += 1;
+                }
+            }
+            Err(_) => {
+                mismatches.push(CheckResult {
+                    name: "Artifact lock".to_string(),
+                    status: Status::Warn,
+                    message: format!(
+                        "Cannot hash artifact: {}",
+                        artifact_path
+                            .strip_prefix(project_root)
+                            .unwrap_or(&artifact_path)
+                            .display()
+                    ),
+                    fix: None,
+                    fix_fn: None,
+                });
+            }
+        }
+    }
+
+    if mismatches.is_empty() {
+        vec![CheckResult {
+            name: "Artifact locks".to_string(),
+            status: Status::Pass,
+            message: format!("All {} locked artifacts verified", verified),
+            fix: None,
+            fix_fn: None,
+        }]
+    } else {
+        mismatches
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    /// Helper: create a minimal wai workspace with `.wai/projects/` directory.
+    fn setup_workspace() -> TempDir {
+        let tmp = TempDir::new().expect("create tempdir");
+        let projects = tmp.path().join(".wai").join("projects").join("test-proj");
+        std::fs::create_dir_all(&projects).expect("create projects dir");
+        tmp
+    }
+
+    /// Helper: write an artifact file and a matching lock sidecar.
+    fn write_artifact_and_lock(
+        dir: &Path,
+        artifact_name: &str,
+        content: &str,
+        run_id: &str,
+        tamper: bool,
+    ) {
+        use super::super::pipeline::artifact_hash;
+
+        let artifact_path = dir.join(artifact_name);
+        std::fs::write(&artifact_path, content).expect("write artifact");
+
+        let hash = if tamper {
+            "sha256:0000000000000000000000000000000000000000000000000000000000000000".to_string()
+        } else {
+            artifact_hash(&artifact_path).expect("hash artifact")
+        };
+
+        let lock = toml::to_string_pretty(&super::super::pipeline::ArtifactLock {
+            artifact: artifact_name.to_string(),
+            locked_at: "2026-01-01T00:00:00Z".to_string(),
+            lock_hash: hash,
+            pipeline_run: run_id.to_string(),
+            pipeline_step: "step-1".to_string(),
+        })
+        .expect("serialize lock");
+
+        let lock_name = format!("{}.{}.lock", artifact_name, run_id);
+        std::fs::write(dir.join(lock_name), lock).expect("write lock");
+    }
+
+    #[test]
+    fn no_lock_files_returns_empty() {
+        let tmp = setup_workspace();
+        let results = check_artifact_locks(tmp.path());
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn valid_lock_returns_pass() {
+        let tmp = setup_workspace();
+        let proj_dir = tmp.path().join(".wai/projects/test-proj");
+        write_artifact_and_lock(
+            &proj_dir,
+            "research.md",
+            "# Research\nFindings here\n",
+            "run-1",
+            false,
+        );
+
+        let results = check_artifact_locks(tmp.path());
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].status, Status::Pass);
+        assert!(results[0].message.contains("1 locked artifacts verified"));
+    }
+
+    #[test]
+    fn tampered_artifact_returns_warn() {
+        let tmp = setup_workspace();
+        let proj_dir = tmp.path().join(".wai/projects/test-proj");
+        write_artifact_and_lock(&proj_dir, "design.md", "# Design\nChoices\n", "run-2", true);
+
+        let results = check_artifact_locks(tmp.path());
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].status, Status::Warn);
+        assert!(results[0].message.contains("Hash mismatch"));
+    }
+
+    #[test]
+    fn missing_artifact_returns_warn() {
+        let tmp = setup_workspace();
+        let proj_dir = tmp.path().join(".wai/projects/test-proj");
+        // Write only the lock, not the artifact
+        let lock = toml::to_string_pretty(&super::super::pipeline::ArtifactLock {
+            artifact: "ghost.md".to_string(),
+            locked_at: "2026-01-01T00:00:00Z".to_string(),
+            lock_hash: "sha256:abc".to_string(),
+            pipeline_run: "run-3".to_string(),
+            pipeline_step: "step-1".to_string(),
+        })
+        .expect("serialize lock");
+        std::fs::write(proj_dir.join("ghost.md.run-3.lock"), lock).expect("write lock");
+
+        let results = check_artifact_locks(tmp.path());
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].status, Status::Warn);
+        assert!(results[0].message.contains("Locked artifact missing"));
+    }
+
+    #[test]
+    fn mixed_valid_and_tampered() {
+        let tmp = setup_workspace();
+        let proj_dir = tmp.path().join(".wai/projects/test-proj");
+        write_artifact_and_lock(&proj_dir, "good.md", "valid content", "run-4", false);
+        write_artifact_and_lock(&proj_dir, "bad.md", "tampered content", "run-4", true);
+
+        let results = check_artifact_locks(tmp.path());
+        // Should only contain the mismatch warning (pass is suppressed when mismatches exist)
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].status, Status::Warn);
+        assert!(results[0].message.contains("Hash mismatch"));
+        assert!(results[0].message.contains("bad.md"));
+    }
 }
