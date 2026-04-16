@@ -143,6 +143,8 @@ wai doctor                    # Workspace health
 wai pipeline list             # List pipelines
 wai pipeline start <n> --topic=<t>  # Start a run; set WAI_PIPELINE_RUN=<id>
 wai pipeline next             # Advance to next step
+wai pipeline lock             # Lock current step's artifacts (SHA-256)
+wai pipeline verify           # Verify locked artifact integrity
 ```
 
 ### beads (CLI: `bd`)
@@ -167,7 +169,11 @@ openspec list --specs      # Capabilities
 |----------|-------------|-------|
 | scientific-research | Frontier-level research requiring systematic validation | `wai pipeline start scientific-research --topic=<topic>` |
 
-> Pipeline steps may have gates that enforce artifact creation, review coverage, and oracle checks before advancement. Run `wai pipeline gates <name>` for details.
+> Pipeline steps may have gates that enforce artifact creation, review coverage, input coverage manifests, and oracle checks before advancement. Run `wai pipeline gates <name>` for details.
+>
+> Steps with `lock = true` auto-lock artifacts (SHA-256) on advancement. Use `wai pipeline lock` to lock manually or `wai pipeline verify` to check integrity. `wai doctor` also verifies locks.
+>
+> Use `wai add <type> --corrects=<path>` to create addenda for locked artifacts instead of editing them directly.
 
 ## Structure
 
