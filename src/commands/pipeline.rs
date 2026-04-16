@@ -160,6 +160,17 @@ pub struct PipelineMetadataSection {
     pub skills: Vec<String>,
 }
 
+/// Lock metadata written to a `.lock` sidecar TOML file.
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[allow(dead_code)] // Used by pipeline lock commands (wai-yh5v, wai-bzrp)
+pub struct ArtifactLock {
+    pub artifact: String,
+    pub locked_at: String,
+    pub lock_hash: String,
+    pub pipeline_run: String,
+    pub pipeline_step: String,
+}
+
 /// Run state stored at `.wai/pipeline-runs/<run-id>.yml`.
 #[derive(Debug, serde::Serialize, Deserialize)]
 pub struct PipelineRun {
@@ -581,6 +592,17 @@ fn cmd_current() -> Result<()> {
         println!("Next: wai close");
     } else {
         print_step(&definition, run.current_step, &run.topic);
+
+        // 5. Show addenda for the current step (if any)
+        let step_id = &definition.steps[run.current_step].id;
+        let addenda = find_step_addenda(&project_root, step_id);
+        if !addenda.is_empty() {
+            println!();
+            println!("{} Addenda ({})", "◆".cyan(), addenda.len());
+            for path in &addenda {
+                println!("  {} {}", "•".dimmed(), path);
+            }
+        }
     }
 
     Ok(())
@@ -1370,10 +1392,15 @@ fn evaluate_gates(
     // Tier 3: Coverage
     if let Some(ref cg) = gate.coverage
         && cg.require_input_manifest
+        && !has_coverage_manifest(project_root, &step.id)
     {
-        // Coverage gate evaluation is a placeholder — the gate struct is parsed
-        // but enforcement logic will be added in a follow-up ticket.
-        // For now, having the gate present is informational only.
+        failures.push(format!(
+            "Coverage gate not satisfied. Create a coverage manifest (type: review, tag: coverage-manifest:{}) listing all inputs addressed.",
+            step.id
+        ));
+    }
+    if !failures.is_empty() {
+        return Ok(failures);
     }
 
     // Tier 4: Oracles
@@ -1556,6 +1583,46 @@ fn parse_frontmatter(content: &str) -> Frontmatter {
     fm
 }
 
+/// Check whether a coverage manifest artifact exists for the given step.
+///
+/// A coverage manifest is a `.md` file in any project's `reviews/` directory
+/// whose frontmatter contains the tag `coverage-manifest:<step_id>`.
+fn has_coverage_manifest(project_root: &Path, step_id: &str) -> bool {
+    let projects = crate::config::projects_dir(project_root);
+    let target_tag = format!("coverage-manifest:{}", step_id);
+
+    let Ok(entries) = fs::read_dir(&projects) else {
+        return false;
+    };
+    for entry in entries.flatten() {
+        let project_dir = entry.path();
+        if !project_dir.is_dir() {
+            continue;
+        }
+        let reviews_dir = project_dir.join("reviews");
+        if !reviews_dir.exists() {
+            continue;
+        }
+        let Ok(files) = fs::read_dir(&reviews_dir) else {
+            continue;
+        };
+        for file_entry in files.flatten() {
+            let path = file_entry.path();
+            if !path.is_file() || path.extension().and_then(|e| e.to_str()) != Some("md") {
+                continue;
+            }
+            let Ok(content) = fs::read_to_string(&path) else {
+                continue;
+            };
+            let fm = parse_frontmatter(&content);
+            if fm.tags.contains(&target_tag) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 /// Run an oracle gate check. Returns failure messages (empty = passed).
 fn run_oracle(
     oracle: &OracleGate,
@@ -1727,6 +1794,57 @@ fn print_step(definition: &PipelineDefinition, idx: usize, topic: &str) {
     println!("{}", render_prompt(&step.prompt, topic));
 }
 
+/// Find addenda for a given pipeline step by scanning artifact directories.
+///
+/// An addendum is an artifact whose YAML frontmatter contains a
+/// `pipeline-addendum:<step_id>` tag. Returns relative paths like
+/// `research/2026-04-14-correction.md`.
+fn find_step_addenda(project_root: &Path, step_id: &str) -> Vec<String> {
+    let addendum_tag = format!("pipeline-addendum:{}", step_id);
+    let projects = crate::config::projects_dir(project_root);
+
+    let mut addenda = Vec::new();
+
+    let Ok(entries) = fs::read_dir(&projects) else {
+        return addenda;
+    };
+    for entry in entries.flatten() {
+        let project_dir = entry.path();
+        if !project_dir.is_dir() {
+            continue;
+        }
+        for dir_name in &["research", "plans", "designs", "handoffs", "reviews"] {
+            let dir = project_dir.join(dir_name);
+            if !dir.exists() {
+                continue;
+            }
+            let Ok(files) = fs::read_dir(&dir) else {
+                continue;
+            };
+            for file_entry in files.flatten() {
+                let path = file_entry.path();
+                if !path.is_file() || path.extension().and_then(|e| e.to_str()) != Some("md") {
+                    continue;
+                }
+                let Ok(content) = fs::read_to_string(&path) else {
+                    continue;
+                };
+                let fm = parse_frontmatter(&content);
+                if fm.tags.contains(&addendum_tag) {
+                    let filename = path
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("")
+                        .to_string();
+                    addenda.push(format!("{}/{}", dir_name, filename));
+                }
+            }
+        }
+    }
+    addenda.sort();
+    addenda
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /// Validate that a pipeline name is non-empty, lowercase, alphanumeric + hyphens.
@@ -1834,6 +1952,17 @@ pub fn validate_pipeline(def: &PipelineDefinition, project_root: &Path) -> Vec<V
                 }
             }
         }
+
+        // Warn when lock = true but no gate is configured
+        if step.lock && step.gate.is_none() {
+            issues.push(ValidationIssue {
+                level: ValidationLevel::Warn,
+                message: format!(
+                    "step '{}' has lock = true but no gate configured — locked artifacts won't be validated before locking",
+                    step.id
+                ),
+            });
+        }
     }
 
     issues
@@ -1858,6 +1987,46 @@ pub fn artifact_hash(path: &Path) -> Result<String> {
     hasher.update(normalized.as_bytes());
     let hash = hasher.finalize();
     Ok(format!("sha256:{:x}", hash))
+}
+
+/// Write a `.lock` sidecar file for an artifact.
+///
+/// The lock file is named `<artifact>.<run-id>.lock` and placed alongside the artifact.
+/// Returns the path to the lock file.
+#[allow(dead_code)] // Used by pipeline lock commands (wai-yh5v, wai-bzrp)
+pub fn write_artifact_lock(
+    artifact_path: &Path,
+    run_id: &str,
+    step_id: &str,
+) -> Result<std::path::PathBuf> {
+    let hash = artifact_hash(artifact_path)?;
+    let lock = ArtifactLock {
+        artifact: artifact_path
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .to_string(),
+        locked_at: chrono::Utc::now().to_rfc3339(),
+        lock_hash: hash,
+        pipeline_run: run_id.to_string(),
+        pipeline_step: step_id.to_string(),
+    };
+    let lock_filename = format!(
+        "{}.{}.lock",
+        artifact_path.file_name().unwrap().to_string_lossy(),
+        run_id
+    );
+    let lock_path = artifact_path.parent().unwrap().join(&lock_filename);
+    let toml_content = toml::to_string_pretty(&lock).into_diagnostic()?;
+    fs::write(&lock_path, toml_content).into_diagnostic()?;
+    Ok(lock_path)
+}
+
+/// Read and parse a `.lock` sidecar file.
+#[allow(dead_code)] // Used by pipeline lock/verify commands (wai-yh5v, wai-rdp5)
+pub fn read_artifact_lock(lock_path: &Path) -> Result<ArtifactLock> {
+    let content = fs::read_to_string(lock_path).into_diagnostic()?;
+    toml::from_str(&content).into_diagnostic()
 }
 
 // ─── Unit tests ───────────────────────────────────────────────────────────────
@@ -2463,6 +2632,86 @@ prompt = "Do {topic}."
         );
     }
 
+    // ── validate lock-without-gate ───────────────────────────────────────
+
+    #[test]
+    fn validate_warns_lock_true_no_gate() {
+        let def = PipelineDefinition {
+            name: "test".to_string(),
+            description: None,
+            steps: vec![PipelineStep {
+                id: "locked-step".to_string(),
+                prompt: "do work".to_string(),
+                gate: None,
+                lock: true,
+            }],
+            metadata: Some(PipelineMetadataSection::default()),
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let issues = validate_pipeline(&def, dir.path());
+        assert!(
+            issues.iter().any(|i| i.level == ValidationLevel::Warn
+                && i.message.contains("locked-step")
+                && i.message.contains("lock = true but no gate")),
+            "expected warning about lock without gate, got: {:?}",
+            issues
+        );
+    }
+
+    #[test]
+    fn validate_no_warning_lock_true_with_gate() {
+        let def = PipelineDefinition {
+            name: "test".to_string(),
+            description: None,
+            steps: vec![PipelineStep {
+                id: "gated-step".to_string(),
+                prompt: "do work".to_string(),
+                gate: Some(StepGate {
+                    structural: Some(StructuralGate {
+                        min_artifacts: 1,
+                        types: vec![],
+                    }),
+                    ..Default::default()
+                }),
+                lock: true,
+            }],
+            metadata: Some(PipelineMetadataSection::default()),
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let issues = validate_pipeline(&def, dir.path());
+        assert!(
+            !issues
+                .iter()
+                .any(|i| i.message.contains("lock = true but no gate")),
+            "should not warn when gate is present, got: {:?}",
+            issues
+        );
+    }
+
+    #[test]
+    fn validate_no_warning_lock_false_no_gate() {
+        let def = PipelineDefinition {
+            name: "test".to_string(),
+            description: None,
+            steps: vec![PipelineStep {
+                id: "unlocked-step".to_string(),
+                prompt: "do work".to_string(),
+                gate: None,
+                lock: false,
+            }],
+            metadata: Some(PipelineMetadataSection::default()),
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let issues = validate_pipeline(&def, dir.path());
+        assert!(
+            !issues
+                .iter()
+                .any(|i| i.message.contains("lock = true but no gate")),
+            "should not warn when lock is false, got: {:?}",
+            issues
+        );
+    }
+
     // ── format_gate_summary ───────────────────────────────────────────────
 
     #[test]
@@ -2580,6 +2829,110 @@ require_input_manifest = true
             ..Default::default()
         };
         assert_eq!(format_gate_summary(&Some(gate)), "[coverage]");
+    }
+
+    // ── coverage gate evaluation tests ─────────────────────────────────────
+
+    /// Helper to build a standard test scaffold for coverage gate tests.
+    fn coverage_gate_scaffold(
+        require: bool,
+    ) -> (StepGate, PipelineStep, PipelineRun, PipelineDefinition) {
+        let gate = StepGate {
+            coverage: Some(CoverageGate {
+                require_input_manifest: require,
+            }),
+            ..Default::default()
+        };
+        let step = PipelineStep {
+            id: "gen".to_string(),
+            prompt: "test".to_string(),
+            gate: Some(gate.clone()),
+            lock: false,
+        };
+        let run = PipelineRun {
+            run_id: "test-run".to_string(),
+            pipeline: "test".to_string(),
+            topic: "topic".to_string(),
+            created_at: "2026-04-02T00:00:00Z".to_string(),
+            current_step: 0,
+            approvals: HashMap::new(),
+        };
+        let def = PipelineDefinition {
+            name: "test".to_string(),
+            description: None,
+            steps: vec![step.clone()],
+            metadata: None,
+        };
+        (gate, step, run, def)
+    }
+
+    #[test]
+    fn coverage_gate_passes_with_manifest() {
+        let (gate, step, run, def) = coverage_gate_scaffold(true);
+        let dir = tempfile::tempdir().unwrap();
+
+        // Create the project structure with a coverage manifest
+        let reviews_dir = dir
+            .path()
+            .join(".wai")
+            .join("projects")
+            .join("test-project")
+            .join("reviews");
+        fs::create_dir_all(&reviews_dir).unwrap();
+        fs::write(
+            reviews_dir.join("coverage-manifest.md"),
+            "---\ntags: [coverage-manifest:gen]\n---\n\nManifest body\n",
+        )
+        .unwrap();
+
+        let failures = evaluate_gates(&gate, &step, &run, &def, dir.path()).unwrap();
+        assert!(
+            failures.is_empty(),
+            "expected no failures when manifest exists, got: {:?}",
+            failures
+        );
+    }
+
+    #[test]
+    fn coverage_gate_fails_without_manifest() {
+        let (gate, step, run, def) = coverage_gate_scaffold(true);
+        let dir = tempfile::tempdir().unwrap();
+
+        // Create the project structure but no manifest
+        let reviews_dir = dir
+            .path()
+            .join(".wai")
+            .join("projects")
+            .join("test-project")
+            .join("reviews");
+        fs::create_dir_all(&reviews_dir).unwrap();
+
+        let failures = evaluate_gates(&gate, &step, &run, &def, dir.path()).unwrap();
+        assert!(!failures.is_empty(), "expected failure when no manifest");
+        assert!(
+            failures[0].contains("Coverage gate not satisfied"),
+            "got: {}",
+            failures[0]
+        );
+        assert!(
+            failures[0].contains("coverage-manifest:gen"),
+            "message should include expected tag, got: {}",
+            failures[0]
+        );
+    }
+
+    #[test]
+    fn coverage_gate_skipped_when_not_required() {
+        let (gate, step, run, def) = coverage_gate_scaffold(false);
+        let dir = tempfile::tempdir().unwrap();
+
+        // No manifest, but gate doesn't require one
+        let failures = evaluate_gates(&gate, &step, &run, &def, dir.path()).unwrap();
+        assert!(
+            failures.is_empty(),
+            "expected no failures when require_input_manifest is false, got: {:?}",
+            failures
+        );
     }
 
     // ── oracle resolution tests ───────────────────────────────────────────
@@ -2724,5 +3077,183 @@ require_input_manifest = true
         let ha = artifact_hash(&a).unwrap();
         let hb = artifact_hash(&b).unwrap();
         assert_ne!(ha, hb, "different content should produce different hashes");
+    }
+
+    // ── artifact lock sidecar ─────────────────────────────────────────────
+
+    #[test]
+    fn write_artifact_lock_creates_file_with_correct_name() {
+        let dir = tempfile::tempdir().unwrap();
+        let artifact = dir.path().join("research.md");
+        fs::write(&artifact, "# Research\nSome findings.\n").unwrap();
+
+        let lock_path = write_artifact_lock(&artifact, "run-abc", "step-1").unwrap();
+
+        assert!(lock_path.exists(), "lock file should exist");
+        assert_eq!(
+            lock_path.file_name().unwrap().to_string_lossy(),
+            "research.md.run-abc.lock"
+        );
+    }
+
+    #[test]
+    fn write_artifact_lock_roundtrips_via_read() {
+        let dir = tempfile::tempdir().unwrap();
+        let artifact = dir.path().join("design.md");
+        fs::write(&artifact, "# Design\nArchitecture notes.\n").unwrap();
+
+        let lock_path = write_artifact_lock(&artifact, "run-42", "generate").unwrap();
+        let lock = read_artifact_lock(&lock_path).unwrap();
+
+        assert_eq!(lock.artifact, "design.md");
+        assert_eq!(lock.pipeline_run, "run-42");
+        assert_eq!(lock.pipeline_step, "generate");
+        assert!(
+            lock.lock_hash.starts_with("sha256:"),
+            "hash should be prefixed with sha256:"
+        );
+        // locked_at should be a valid RFC 3339 timestamp
+        assert!(
+            chrono::DateTime::parse_from_rfc3339(&lock.locked_at).is_ok(),
+            "locked_at should be valid RFC 3339: {}",
+            lock.locked_at
+        );
+    }
+
+    #[test]
+    fn write_artifact_lock_hash_matches_artifact_hash() {
+        let dir = tempfile::tempdir().unwrap();
+        let artifact = dir.path().join("notes.md");
+        fs::write(&artifact, "Some content\nwith lines.\n").unwrap();
+
+        let expected_hash = artifact_hash(&artifact).unwrap();
+        let lock_path = write_artifact_lock(&artifact, "run-x", "review").unwrap();
+        let lock = read_artifact_lock(&lock_path).unwrap();
+
+        assert_eq!(
+            lock.lock_hash, expected_hash,
+            "lock hash should match artifact_hash"
+        );
+    }
+
+    #[test]
+    fn write_artifact_lock_includes_run_id_in_filename() {
+        let dir = tempfile::tempdir().unwrap();
+        let artifact = dir.path().join("plan.md");
+        fs::write(&artifact, "# Plan\n").unwrap();
+
+        let lock_path = write_artifact_lock(&artifact, "my-run-id", "step-0").unwrap();
+        let filename = lock_path.file_name().unwrap().to_string_lossy();
+
+        assert!(
+            filename.contains("my-run-id"),
+            "filename should contain run-id, got: {filename}"
+        );
+        assert!(
+            filename.ends_with(".lock"),
+            "filename should end with .lock, got: {filename}"
+        );
+    }
+
+    // ── find_step_addenda ────────────────────────────────────────────────
+
+    #[test]
+    fn find_step_addenda_returns_matching_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_dir = dir
+            .path()
+            .join(".wai")
+            .join("projects")
+            .join("test-project");
+        let research_dir = project_dir.join("research");
+        fs::create_dir_all(&research_dir).unwrap();
+
+        fs::write(
+            research_dir.join("2026-04-14-correction.md"),
+            "---\ntags: [pipeline-addendum:implement]\n---\n\nCorrection notes.",
+        )
+        .unwrap();
+
+        fs::write(
+            research_dir.join("2026-04-14-other.md"),
+            "---\ntags: [pipeline-addendum:review]\n---\n\nOther notes.",
+        )
+        .unwrap();
+
+        fs::write(
+            research_dir.join("2026-04-14-normal.md"),
+            "---\ntags: [pipeline-run:abc]\n---\n\nNormal research.",
+        )
+        .unwrap();
+
+        let addenda = find_step_addenda(dir.path(), "implement");
+        assert_eq!(addenda.len(), 1, "expected 1 addendum, got: {:?}", addenda);
+        assert_eq!(addenda[0], "research/2026-04-14-correction.md");
+    }
+
+    #[test]
+    fn find_step_addenda_returns_empty_when_none_match() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_dir = dir
+            .path()
+            .join(".wai")
+            .join("projects")
+            .join("test-project");
+        let research_dir = project_dir.join("research");
+        fs::create_dir_all(&research_dir).unwrap();
+
+        fs::write(
+            research_dir.join("2026-04-14-normal.md"),
+            "---\ntags: [pipeline-run:abc]\n---\n\nNormal research.",
+        )
+        .unwrap();
+
+        let addenda = find_step_addenda(dir.path(), "implement");
+        assert!(
+            addenda.is_empty(),
+            "expected no addenda, got: {:?}",
+            addenda
+        );
+    }
+
+    #[test]
+    fn find_step_addenda_scans_multiple_directories() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_dir = dir
+            .path()
+            .join(".wai")
+            .join("projects")
+            .join("test-project");
+        let research_dir = project_dir.join("research");
+        let plans_dir = project_dir.join("plans");
+        fs::create_dir_all(&research_dir).unwrap();
+        fs::create_dir_all(&plans_dir).unwrap();
+
+        fs::write(
+            research_dir.join("2026-04-14-fix.md"),
+            "---\ntags: [pipeline-addendum:design]\n---\n\nFix notes.",
+        )
+        .unwrap();
+
+        fs::write(
+            plans_dir.join("2026-04-14-revised.md"),
+            "---\ntags: [pipeline-addendum:design]\n---\n\nRevised plan.",
+        )
+        .unwrap();
+
+        let addenda = find_step_addenda(dir.path(), "design");
+        assert_eq!(addenda.len(), 2, "expected 2 addenda, got: {:?}", addenda);
+        assert!(addenda.contains(&"plans/2026-04-14-revised.md".to_string()));
+        assert!(addenda.contains(&"research/2026-04-14-fix.md".to_string()));
+    }
+
+    #[test]
+    fn find_step_addenda_handles_missing_projects_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        let addenda = find_step_addenda(dir.path(), "implement");
+        assert!(
+            addenda.is_empty(),
+            "expected no addenda for missing project dir"
+        );
     }
 }
