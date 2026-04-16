@@ -34,12 +34,13 @@ pub struct PipelineStep {
 
 /// Gate configuration for a pipeline step.
 ///
-/// Gates are evaluated in order: structural → procedural → oracle → approval.
+/// Gates are evaluated in order: structural → procedural → coverage → oracle → approval.
 /// The first failing tier blocks advancement.
 #[derive(Debug, Clone, serde::Deserialize, Default)]
 pub struct StepGate {
     pub structural: Option<StructuralGate>,
     pub procedural: Option<ProceduralGate>,
+    pub coverage: Option<CoverageGate>,
     #[serde(default)]
     pub oracles: Vec<OracleGate>,
     pub approval: Option<ApprovalGate>,
@@ -68,6 +69,17 @@ pub struct ProceduralGate {
     pub max_critical: Option<u32>,
     /// Maximum allowed high-severity findings (default: no limit).
     pub max_high: Option<u32>,
+}
+
+/// Coverage gate: require an input coverage manifest before advancing.
+///
+/// A coverage manifest is a wai artifact of type `review` tagged with
+/// `coverage-manifest:<step-id>`, listing each input artifact with a disposition.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct CoverageGate {
+    /// When true, require a coverage manifest artifact before advancing.
+    #[serde(default)]
+    pub require_input_manifest: bool,
 }
 
 /// Oracle gate: run a user-defined script to validate artifacts.
@@ -120,7 +132,7 @@ pub struct PipelineDefinition {
 ///
 /// The TOML format uses a `[pipeline]` section for metadata and top-level
 /// `[[steps]]` arrays. Steps may include a `[steps.gate]` sub-table with
-/// gate configuration (structural, procedural, oracle, approval).
+/// gate configuration (structural, procedural, coverage, oracle, approval).
 #[derive(serde::Deserialize)]
 struct PipelineDefinitionFile {
     pipeline: PipelineMetadata,
@@ -768,6 +780,9 @@ fn format_gate_summary(gate: &Option<StepGate>) -> String {
     if g.procedural.is_some() {
         parts.push("procedural");
     }
+    if g.coverage.is_some() {
+        parts.push("coverage");
+    }
     if !g.oracles.is_empty() {
         parts.push("oracle");
     }
@@ -987,6 +1002,13 @@ fn print_gate_status(
         if let Some(mh) = pg.max_high {
             println!("      {} max_high: {}", "•".dimmed(), mh);
         }
+    }
+
+    // Coverage
+    if let Some(ref cg) = gate.coverage
+        && cg.require_input_manifest
+    {
+        println!("    {} Coverage: require input manifest", "•".dimmed(),);
     }
 
     // Oracles
@@ -1345,7 +1367,16 @@ fn evaluate_gates(
         return Ok(failures);
     }
 
-    // Tier 3: Oracles
+    // Tier 3: Coverage
+    if let Some(ref cg) = gate.coverage
+        && cg.require_input_manifest
+    {
+        // Coverage gate evaluation is a placeholder — the gate struct is parsed
+        // but enforcement logic will be added in a follow-up ticket.
+        // For now, having the gate present is informational only.
+    }
+
+    // Tier 4: Oracles
     for oracle in &gate.oracles {
         let oracle_failures = run_oracle(oracle, &step_artifacts, project_root)?;
         failures.extend(oracle_failures);
@@ -1354,7 +1385,7 @@ fn evaluate_gates(
         return Ok(failures);
     }
 
-    // Tier 4: Approval
+    // Tier 5: Approval
     if let Some(ref ag) = gate.approval
         && ag.required
     {
@@ -1813,6 +1844,20 @@ pub fn validate_pipeline(def: &PipelineDefinition, project_root: &Path) -> Vec<V
 /// If the prompt contains no `{topic}` placeholder, the prompt is returned unchanged.
 pub fn render_prompt(prompt: &str, topic: &str) -> String {
     prompt.replace("{topic}", topic)
+}
+
+/// Compute SHA-256 hash of an artifact file, normalizing line endings to LF.
+///
+/// Returns the hash as a hex string prefixed with "sha256:".
+#[allow(dead_code)] // Used by pipeline lock/verify commands (wai-2lwo, wai-rdp5)
+pub fn artifact_hash(path: &Path) -> Result<String> {
+    use sha2::{Digest, Sha256};
+    let content = fs::read_to_string(path).into_diagnostic()?;
+    let normalized = content.replace("\r\n", "\n");
+    let mut hasher = Sha256::new();
+    hasher.update(normalized.as_bytes());
+    let hash = hasher.finalize();
+    Ok(format!("sha256:{:x}", hash))
 }
 
 // ─── Unit tests ───────────────────────────────────────────────────────────────
@@ -2456,6 +2501,9 @@ prompt = "Do {topic}."
                 max_critical: None,
                 max_high: None,
             }),
+            coverage: Some(CoverageGate {
+                require_input_manifest: true,
+            }),
             oracles: vec![OracleGate {
                 name: "check".to_string(),
                 command: None,
@@ -2470,8 +2518,68 @@ prompt = "Do {topic}."
         };
         assert_eq!(
             format_gate_summary(&Some(gate)),
-            "[structural + procedural + oracle + approval]"
+            "[structural + procedural + coverage + oracle + approval]"
         );
+    }
+
+    // ── coverage gate tests ───────────────────────────────────────────────
+
+    #[test]
+    fn coverage_gate_toml_backward_compat() {
+        // TOML without [steps.gate.coverage] should still parse correctly
+        let toml = r#"
+[pipeline]
+name = "no-coverage"
+
+[[steps]]
+id = "step1"
+prompt = "Do something."
+
+[steps.gate.structural]
+min_artifacts = 1
+"#;
+        let f = write_toml(toml);
+        let def = load_pipeline_toml(f.path()).expect("should parse without coverage gate");
+        let gate = def.steps[0].gate.as_ref().expect("should have gate");
+        assert!(
+            gate.coverage.is_none(),
+            "coverage should be None when omitted"
+        );
+        assert!(gate.structural.is_some());
+    }
+
+    #[test]
+    fn coverage_gate_toml_parses() {
+        let toml = r#"
+[pipeline]
+name = "with-coverage"
+
+[[steps]]
+id = "generate"
+prompt = "Generate {topic}."
+
+[steps.gate.coverage]
+require_input_manifest = true
+"#;
+        let f = write_toml(toml);
+        let def = load_pipeline_toml(f.path()).expect("should parse coverage gate");
+        let gate = def.steps[0].gate.as_ref().expect("should have gate");
+        let cg = gate
+            .coverage
+            .as_ref()
+            .expect("coverage gate should be present");
+        assert!(cg.require_input_manifest);
+    }
+
+    #[test]
+    fn format_gate_summary_coverage_only() {
+        let gate = StepGate {
+            coverage: Some(CoverageGate {
+                require_input_manifest: true,
+            }),
+            ..Default::default()
+        };
+        assert_eq!(format_gate_summary(&Some(gate)), "[coverage]");
     }
 
     // ── oracle resolution tests ───────────────────────────────────────────
@@ -2573,5 +2681,48 @@ prompt = "Do {topic}."
         let names = builtin_template_names();
         assert!(!names.is_empty());
         assert!(names.contains(&"scientific-research"));
+    }
+
+    // ── artifact_hash ─────────────────────────────────────────────────────
+
+    #[test]
+    fn artifact_hash_consistent() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("artifact.md");
+        fs::write(&path, "hello world\n").unwrap();
+        let h1 = artifact_hash(&path).unwrap();
+        let h2 = artifact_hash(&path).unwrap();
+        assert_eq!(h1, h2, "same file should produce identical hashes");
+        assert!(
+            h1.starts_with("sha256:"),
+            "hash should be prefixed with sha256:"
+        );
+    }
+
+    #[test]
+    fn artifact_hash_normalizes_crlf() {
+        let dir = tempfile::tempdir().unwrap();
+        let lf_path = dir.path().join("lf.md");
+        let crlf_path = dir.path().join("crlf.md");
+        fs::write(&lf_path, "line one\nline two\n").unwrap();
+        fs::write(&crlf_path, "line one\r\nline two\r\n").unwrap();
+        let lf_hash = artifact_hash(&lf_path).unwrap();
+        let crlf_hash = artifact_hash(&crlf_path).unwrap();
+        assert_eq!(
+            lf_hash, crlf_hash,
+            "CRLF and LF content should hash identically"
+        );
+    }
+
+    #[test]
+    fn artifact_hash_different_content() {
+        let dir = tempfile::tempdir().unwrap();
+        let a = dir.path().join("a.md");
+        let b = dir.path().join("b.md");
+        fs::write(&a, "content A\n").unwrap();
+        fs::write(&b, "content B\n").unwrap();
+        let ha = artifact_hash(&a).unwrap();
+        let hb = artifact_hash(&b).unwrap();
+        assert_ne!(ha, hb, "different content should produce different hashes");
     }
 }

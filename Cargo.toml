@@ -62,6 +62,9 @@ shell-words = "1"
 tar = "0.4"
 flate2 = "1"
 
+# Cryptographic hashing (SHA-256 for artifact integrity)
+sha2 = "0.10"
+
 [features]
 default = []
 async = ["tokio"]
