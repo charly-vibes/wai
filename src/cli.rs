@@ -976,6 +976,15 @@ pub enum PipelineCommands {
     /// EXAMPLES
     ///   wai pipeline lock
     Lock,
+
+    /// Verify integrity of locked pipeline artifacts
+    ///
+    /// Recomputes SHA-256 hashes for all locked artifacts and compares
+    /// against stored lock metadata. Exits non-zero on mismatch.
+    ///
+    /// EXAMPLES
+    ///   wai pipeline verify
+    Verify,
 }
 
 /// Returns the names of all top-level wai subcommands, derived from the [`Cli`] struct.

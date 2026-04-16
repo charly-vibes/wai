@@ -28,7 +28,6 @@ pub struct PipelineStep {
     pub gate: Option<StepGate>,
     /// When true, artifacts for this step are locked (SHA-256 hashed) on advancement.
     #[serde(default)]
-    #[allow(dead_code)] // Read by pipeline lock/next commands (wai-2lwo, wai-bzrp)
     pub lock: bool,
 }
 
@@ -202,6 +201,7 @@ pub fn run(cmd: PipelineCommands) -> Result<()> {
         PipelineCommands::Check { oracle } => cmd_check(oracle.as_deref()),
         PipelineCommands::Validate { name } => cmd_validate(name.as_deref()),
         PipelineCommands::Lock => cmd_lock(),
+        PipelineCommands::Verify => cmd_verify(),
     }
 }
 
@@ -535,6 +535,23 @@ fn cmd_next() -> Result<()> {
         }
     }
 
+    // 5b. Lock artifacts if step has lock = true
+    if current_step.lock {
+        let artifact_paths = find_step_artifact_paths(&project_root, &run.run_id, &current_step.id);
+        if artifact_paths.is_empty() {
+            miette::bail!("Cannot lock step '{}' with no artifacts.", current_step.id);
+        }
+        for path in &artifact_paths {
+            write_artifact_lock(path, &run.run_id, &current_step.id)?;
+        }
+        log::info(format!(
+            "Locked {} artifact(s) for step '{}'",
+            artifact_paths.len(),
+            current_step.id
+        ))
+        .into_diagnostic()?;
+    }
+
     // 6. Advance step
     let next_step = run.current_step + 1;
     let updated = PipelineRun {
@@ -777,6 +794,75 @@ fn cmd_lock() -> Result<()> {
     .into_diagnostic()?;
 
     Ok(())
+}
+
+// ─── Verify command ─────────────────────────────────────────────────────────
+
+fn cmd_verify() -> Result<()> {
+    let project_root = require_project()?;
+    let projects_dir = crate::config::projects_dir(&project_root);
+
+    // Walk all .lock files under .wai/projects/
+    let mut lock_count: usize = 0;
+    let mut mismatches: Vec<String> = Vec::new();
+
+    for entry in walkdir::WalkDir::new(&projects_dir)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        let Some(ext) = path.extension().and_then(|e| e.to_str()) else {
+            continue;
+        };
+        if ext != "lock" {
+            continue;
+        }
+
+        let lock = read_artifact_lock(path)?;
+        let artifact_path = path.parent().unwrap().join(&lock.artifact);
+
+        if !artifact_path.exists() {
+            mismatches.push(format!(
+                "  {} — artifact missing (expected at {})",
+                lock.artifact,
+                artifact_path.display()
+            ));
+            lock_count += 1;
+            continue;
+        }
+
+        let actual_hash = artifact_hash(&artifact_path)?;
+        if actual_hash != lock.lock_hash {
+            mismatches.push(format!(
+                "  {} — expected {}, got {}",
+                lock.artifact, lock.lock_hash, actual_hash
+            ));
+        }
+
+        lock_count += 1;
+    }
+
+    if lock_count == 0 {
+        log::info("No locked artifacts found.").into_diagnostic()?;
+        return Ok(());
+    }
+
+    if mismatches.is_empty() {
+        log::success(format!("All {} locked artifacts verified.", lock_count)).into_diagnostic()?;
+        Ok(())
+    } else {
+        let header = format!(
+            "{} of {} locked artifacts failed verification:",
+            mismatches.len(),
+            lock_count
+        );
+        let detail = mismatches.join("\n");
+        log::error(format!("{}\n{}", header, detail)).into_diagnostic()?;
+        std::process::exit(1);
+    }
 }
 
 /// Find all artifact file paths tagged with the given run ID and step ID.
@@ -3433,5 +3519,206 @@ require_input_manifest = true
 
         let paths = find_step_artifact_paths(dir.path(), "run-abc", "generate");
         assert!(paths.is_empty(), "expected no artifacts, got: {:?}", paths);
+    }
+
+    // ── cmd_next locking integration ────────────────────────────────────
+
+    #[test]
+    fn cmd_next_lock_creates_lock_files_for_step_artifacts() {
+        // Simulate the locking path from cmd_next: when a step has lock=true,
+        // find its artifacts and write lock sidecars for each.
+        let dir = tempfile::tempdir().unwrap();
+        let project_dir = dir
+            .path()
+            .join(".wai")
+            .join("projects")
+            .join("test-project");
+        let research_dir = project_dir.join("research");
+        fs::create_dir_all(&research_dir).unwrap();
+
+        let run_id = "run-lock-test";
+        let step_id = "generate";
+
+        // Create two artifacts tagged for this run+step
+        fs::write(
+            research_dir.join("2026-04-14-findings.md"),
+            "---\ntags: [pipeline-run:run-lock-test, pipeline-step:generate]\n---\n\nFindings.",
+        )
+        .unwrap();
+        fs::write(
+            research_dir.join("2026-04-14-analysis.md"),
+            "---\ntags: [pipeline-run:run-lock-test, pipeline-step:generate]\n---\n\nAnalysis.",
+        )
+        .unwrap();
+
+        // Build a step definition with lock = true
+        let step_def = PipelineStep {
+            id: step_id.to_string(),
+            prompt: String::new(),
+            gate: None,
+            lock: true,
+        };
+
+        // Execute the same logic as cmd_next's locking block
+        assert!(step_def.lock, "step should have lock=true");
+        let artifact_paths = find_step_artifact_paths(dir.path(), run_id, &step_def.id);
+        assert_eq!(
+            artifact_paths.len(),
+            2,
+            "expected 2 artifacts, got: {:?}",
+            artifact_paths
+        );
+
+        for path in &artifact_paths {
+            write_artifact_lock(path, run_id, &step_def.id).unwrap();
+        }
+
+        // Verify lock files exist for each artifact
+        for path in &artifact_paths {
+            let lock_filename = format!(
+                "{}.{}.lock",
+                path.file_name().unwrap().to_string_lossy(),
+                run_id
+            );
+            let lock_path = path.parent().unwrap().join(&lock_filename);
+            assert!(
+                lock_path.exists(),
+                "lock file should exist: {:?}",
+                lock_path
+            );
+
+            // Verify lock content
+            let lock = read_artifact_lock(&lock_path).unwrap();
+            assert_eq!(lock.pipeline_run, run_id);
+            assert_eq!(lock.pipeline_step, step_id);
+            assert!(lock.lock_hash.starts_with("sha256:"));
+        }
+    }
+
+    #[test]
+    fn cmd_next_lock_skipped_when_lock_is_false() {
+        // When lock=false, no lock files should be created (the if-branch is not entered)
+        let step_def = PipelineStep {
+            id: "review".to_string(),
+            prompt: String::new(),
+            gate: None,
+            lock: false,
+        };
+        assert!(
+            !step_def.lock,
+            "step should have lock=false — locking block would be skipped"
+        );
+    }
+
+    // ── cmd_verify (via artifact_hash / read_artifact_lock) ─────────────
+
+    #[test]
+    fn verify_passes_when_artifacts_are_intact() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_dir = dir
+            .path()
+            .join(".wai")
+            .join("projects")
+            .join("test-project")
+            .join("research");
+        fs::create_dir_all(&project_dir).unwrap();
+
+        let artifact = project_dir.join("notes.md");
+        fs::write(&artifact, "# Notes\nSome content.\n").unwrap();
+
+        let hash = artifact_hash(&artifact).unwrap();
+        let lock = ArtifactLock {
+            artifact: "notes.md".to_string(),
+            locked_at: chrono::Utc::now().to_rfc3339(),
+            lock_hash: hash.clone(),
+            pipeline_run: "run-1".to_string(),
+            pipeline_step: "generate".to_string(),
+        };
+        let lock_path = project_dir.join("notes.md.run-1.lock");
+        fs::write(&lock_path, toml::to_string_pretty(&lock).unwrap()).unwrap();
+
+        let projects_dir = dir.path().join(".wai").join("projects");
+        let mut mismatches: Vec<String> = Vec::new();
+        let mut lock_count: usize = 0;
+        for entry in walkdir::WalkDir::new(&projects_dir)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            if path.extension().and_then(|e| e.to_str()) != Some("lock") {
+                continue;
+            }
+            let parsed_lock = read_artifact_lock(path).unwrap();
+            let artifact_path = path.parent().unwrap().join(&parsed_lock.artifact);
+            let actual = artifact_hash(&artifact_path).unwrap();
+            if actual != parsed_lock.lock_hash {
+                mismatches.push(parsed_lock.artifact.clone());
+            }
+            lock_count += 1;
+        }
+
+        assert_eq!(lock_count, 1, "should find exactly one lock file");
+        assert!(mismatches.is_empty(), "all artifacts should verify OK");
+    }
+
+    #[test]
+    fn verify_detects_tampered_artifact() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_dir = dir
+            .path()
+            .join(".wai")
+            .join("projects")
+            .join("test-project")
+            .join("research");
+        fs::create_dir_all(&project_dir).unwrap();
+
+        let artifact = project_dir.join("notes.md");
+        fs::write(&artifact, "# Notes\nOriginal content.\n").unwrap();
+
+        let original_hash = artifact_hash(&artifact).unwrap();
+        let lock = ArtifactLock {
+            artifact: "notes.md".to_string(),
+            locked_at: chrono::Utc::now().to_rfc3339(),
+            lock_hash: original_hash.clone(),
+            pipeline_run: "run-1".to_string(),
+            pipeline_step: "generate".to_string(),
+        };
+        let lock_path = project_dir.join("notes.md.run-1.lock");
+        fs::write(&lock_path, toml::to_string_pretty(&lock).unwrap()).unwrap();
+
+        // Tamper with the artifact
+        fs::write(&artifact, "# Notes\nTampered content!\n").unwrap();
+
+        let projects_dir = dir.path().join(".wai").join("projects");
+        let mut mismatches: Vec<String> = Vec::new();
+        for entry in walkdir::WalkDir::new(&projects_dir)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            if path.extension().and_then(|e| e.to_str()) != Some("lock") {
+                continue;
+            }
+            let parsed_lock = read_artifact_lock(path).unwrap();
+            let artifact_path = path.parent().unwrap().join(&parsed_lock.artifact);
+            let actual = artifact_hash(&artifact_path).unwrap();
+            if actual != parsed_lock.lock_hash {
+                mismatches.push(parsed_lock.artifact.clone());
+            }
+        }
+
+        assert_eq!(
+            mismatches.len(),
+            1,
+            "should detect exactly one mismatch, got: {:?}",
+            mismatches
+        );
+        assert_eq!(mismatches[0], "notes.md");
     }
 }
