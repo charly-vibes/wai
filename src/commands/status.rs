@@ -194,11 +194,7 @@ pub fn run(verbose: u8) -> Result<()> {
                 if change.total > 0 && change.done == change.total {
                     continue; // hide completed changes; use --verbose to show all
                 }
-                let pct = if change.total > 0 {
-                    change.done * 100 / change.total
-                } else {
-                    0
-                };
+                let pct = (change.done * 100).checked_div(change.total).unwrap_or(0);
                 println!(
                     "    {} {}: {}/{} ({}%)",
                     "•".dimmed(),

@@ -116,11 +116,7 @@ pub fn run(project: Option<String>) -> Result<()> {
 
     if let Some(ref spec) = spec_status {
         for change in &spec.changes {
-            let pct = if change.total > 0 {
-                change.done * 100 / change.total
-            } else {
-                0
-            };
+            let pct = (change.done * 100).checked_div(change.total).unwrap_or(0);
             println!(
                 "{} Spec:    {}: {}/{} ({}%)",
                 "•".dimmed(),

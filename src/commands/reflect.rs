@@ -298,7 +298,7 @@ pub fn read_handoffs(project_root: &Path, budget: usize) -> Vec<HandoffEntry> {
     }
 
     // Sort newest-first.
-    entries.sort_by(|a, b| b.0.cmp(&a.0));
+    entries.sort_by_key(|e| std::cmp::Reverse(e.0));
 
     // Fill up to budget.
     let mut result = Vec::new();
@@ -378,7 +378,7 @@ pub fn read_secondary_artifacts(project_root: &Path, budget: usize) -> Vec<Secon
         entries.push((mtime, rel_path, kind, content));
     }
 
-    entries.sort_by(|a, b| b.0.cmp(&a.0));
+    entries.sort_by_key(|e| std::cmp::Reverse(e.0));
 
     let mut result = Vec::new();
     let mut used = 0usize;
@@ -448,7 +448,7 @@ pub fn read_previous_reflections(project_root: &Path, budget: usize) -> Vec<Refl
         entries.push((mtime, rel_path, content));
     }
 
-    entries.sort_by(|a, b| b.0.cmp(&a.0));
+    entries.sort_by_key(|e| std::cmp::Reverse(e.0));
 
     let mut result = Vec::new();
     let mut used = 0usize;
@@ -861,10 +861,8 @@ pub fn extract_top_level_bullets(content: &str) -> Vec<String> {
         .filter_map(|line| {
             let stripped = if let Some(rest) = line.strip_prefix("- ") {
                 rest
-            } else if let Some(rest) = line.strip_prefix("* ") {
-                rest
             } else {
-                return None;
+                line.strip_prefix("* ")?
             };
             let text = stripped.trim().to_string();
             if text.is_empty() {

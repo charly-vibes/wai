@@ -577,7 +577,7 @@ pub fn truncate_context(
         })
         .collect();
     // Higher score first; ties keep recency order (stable sort)
-    scored.sort_by(|a, b| b.0.cmp(&a.0));
+    scored.sort_by_key(|e| std::cmp::Reverse(e.0));
 
     let mut selected = Vec::new();
     let mut chars_used = 0;
