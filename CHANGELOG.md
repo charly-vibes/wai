@@ -5,6 +5,42 @@ All notable changes to wai will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Calendar Versioning](https://calver.org/) (YYYY.M.MICRO).
 
+## [2026.4.4] - 2026-04-17
+
+### Added
+
+#### Artifact Locking & Integrity Verification
+- **SHA-256 artifact hashing** — tamper-evident hashing for pipeline artifacts with LF-normalized content (`sha2` crate)
+- **`wai pipeline lock`** — lock current step's artifacts with SHA-256 hashes stored in `.lock` sidecar TOML files
+- **`wai pipeline verify`** — recompute hashes and report integrity mismatches (exits non-zero on failure)
+- **Auto-lock on advancement** — `wai pipeline next` automatically locks artifacts when step has `lock = true`
+- **`--corrects=<path>` flag** — create addenda referencing locked artifacts via `wai add`; auto-tags with `pipeline-addendum:<step-id>`
+- **Unlock warning** — warns when `--corrects` targets an unlocked artifact
+- **Doctor lock checks** — `wai doctor` walks `.lock` sidecars and verifies SHA-256 integrity
+
+#### Coverage Gate
+- **CoverageGate tier** — new gate tier requiring input coverage manifests at pipeline step boundaries
+- **Coverage gate blocking** — `wai pipeline next` blocks when coverage manifest is missing
+- **Lock-without-gate warning** — `wai pipeline validate` warns when step locks artifacts without a gate
+- **Addenda display** — `wai pipeline current` shows addenda for the active step
+
+#### Other
+- **Context threshold warning** — managed block warns the user when context nears 40% instead of silently closing
+
+### Fixed
+- **`--project` flag position** — `wai phase next --project foo` now accepted (marked as global arg)
+- **Embedded dolt mode** — switched from server mode to prevent zombie `dolt sql-server` processes causing lock errors
+- **Stale quick reference** — updated `pipeline run`→`pipeline start` and `pipeline advance`→`pipeline next`
+- **Broken doc links** — corrected anchor refs and dead relative links across docs
+- **Clippy lints** — resolved `unnecessary_sort_by`, `question_mark`, `manual_checked_ops` from Rust 1.95
+- **Test assertion** — narrowed `doctor_warns_wai_project_empty` to avoid false matches on CI
+
+### Changed
+- **Documentation overhaul** — new concept pages (sessions, reasoning, toolchain synergy, glossary, architecture, adopt-wai guide), rewritten introduction with problem/solution framing
+- **Comprehensive docs audit** — documented review artifacts, resource commands, safe mode, all 16 doctor checks, and 5 missing pipeline subcommands
+
+---
+
 ## [2026.4.2] - 2026-04-07
 
 ### Fixed
