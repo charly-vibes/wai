@@ -350,6 +350,6 @@ File an issue at https://github.com/charly-vibes/wai/issues with `plugin-debug.t
 
 ## See Also
 
-- [Commands Reference](../commands.md#plugin-management) - Plugin management commands
+- [Commands Reference](../commands.md#plugins) - Plugin management commands
 - [Troubleshooting](../troubleshooting.md#plugin-issues) - Plugin-specific troubleshooting
 - [JSON Output](../advanced/json-output.md#plugin-list) - Plugin JSON schema

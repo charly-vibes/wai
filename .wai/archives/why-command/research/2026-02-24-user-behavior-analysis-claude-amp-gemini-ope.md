@@ -105,19 +105,19 @@ Before proposing new features, mapping pain points to current capabilities:
 
 `bd prime` orients for beads. `wai status` shows project/phase. Nothing combines both with a handoff summary and openspec progress into a single "what's the situation?" answer.
 
-Relates to: [openspec onboarding spec](../openspec/specs/onboarding/spec.md) — covers first-run but not per-session orientation.
+Relates to: openspec onboarding spec — covers first-run but not per-session orientation.
 
 ### B. Session close has no trigger (HIGH)
 
 `wai handoff create` exists but is never triggered automatically. The manual checklist in CLAUDE.md isn't followed consistently — 6 handoffs across months of multi-project work confirms this.
 
-Relates to: [handoff-system spec](../openspec/specs/handoff-system/spec.md) — explicitly marks "automatic handoff generation" as a non-goal. That non-goal may need revisiting for hook-based triggering.
+Relates to: handoff-system spec — explicitly marks "automatic handoff generation" as a non-goal. That non-goal may need revisiting for hook-based triggering.
 
 ### C. Agent config sync doesn't reach global tool dirs (HIGH)
 
 `wai sync` reads `.projections.yml` and writes to project-relative targets. It never touches `~/.config/amp/`, `~/.gemini/`, or global `~/AGENTS.md`. This is confirmed by source (`src/commands/sync.rs`).
 
-Relates to: [agent-config-sync spec](../openspec/specs/agent-config-sync/spec.md) — scope is currently per-project projections; global sync is out of scope.
+Relates to: agent-config-sync spec — scope is currently per-project projections; global sync is out of scope.
 
 ### D. Artifact capture requires an active command (MEDIUM)
 

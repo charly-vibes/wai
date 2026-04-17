@@ -323,4 +323,4 @@ Ensures no modifications occur during automated queries.
 
 - [Commands Reference](../commands.md#global-flags) - Global flags documentation
 - [Troubleshooting](../troubleshooting.md#json-output-issues) - JSON troubleshooting
-- [Quick Start](../quick-start.md#json-output) - Getting started with JSON
+- [Quick Start](../quick-start.md) - Getting started with JSON

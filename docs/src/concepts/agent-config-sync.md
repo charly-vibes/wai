@@ -312,4 +312,4 @@ wai sync
 
 - [Commands Reference](../commands.md#agent-configuration) - Config management commands
 - [Troubleshooting](../troubleshooting.md#sync-issues) - Sync troubleshooting guide
-- [Quick Start](../quick-start.md#agent-configuration) - Getting started with config sync
+- [Quick Start](../quick-start.md) - Getting started with config sync

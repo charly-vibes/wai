@@ -6,7 +6,7 @@ Define the LLM-powered reasoning oracle that helps developers understand *why* c
 
 The term **"oracle"** refers to the system's ability to proactively surface relevant context and synthesize reasoning chains from multiple sources, like consulting a knowledgeable advisor who can connect disparate information and explain the evolution of decisions.
 
-This capability builds on the existing `wai search` command (see [timeline-search](../timeline-search/spec.md)) by adding an LLM synthesis layer that transforms keyword matches into reasoned explanations.
+This capability builds on the existing `wai search` command (see timeline-search spec) by adding an LLM synthesis layer that transforms keyword matches into reasoned explanations.
 
 ## Problem Statement
 

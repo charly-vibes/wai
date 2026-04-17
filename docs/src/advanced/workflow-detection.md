@@ -228,5 +228,5 @@ wai status -q
 ## See Also
 
 - [Project Phases](../concepts/phases.md) - Understanding workflow stages
-- [Commands Reference](../commands.md#viewing--navigating) - Status command details
+- [Commands Reference](../commands.md#searching--timeline) - Status command details
 - [JSON Output](./json-output.md#status) - Programmatic access to suggestions

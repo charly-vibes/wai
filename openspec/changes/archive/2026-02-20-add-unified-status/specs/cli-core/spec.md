@@ -30,4 +30,4 @@ The CLI SHALL provide `wai status` to show project overview, OpenSpec implementa
 
 #### Scenario: Contextual suggestions
 
-See [context-suggestions](../context-suggestions/spec.md) for the complete suggestion logic.
+See context-suggestions spec for the complete suggestion logic.
