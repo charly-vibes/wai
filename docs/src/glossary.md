@@ -4,8 +4,14 @@ Domain-specific terms used throughout the wai documentation.
 
 ---
 
+**Addendum**
+A correction artifact that references a locked artifact via `--corrects=<path>`. Preserves the original's integrity while recording what changed and why. See [Pipelines — Artifact Locking](./concepts/pipelines.md#artifact-locking).
+
 **Artifact**
 A dated Markdown file capturing reasoning at a specific point in time. Types include research, design, plan, handoff, and review. Stored in project subdirectories under `.wai/projects/`. See [Project Phases](./concepts/phases.md).
+
+**Artifact lock**
+A SHA-256 hash sidecar (`.lock` file) written alongside a pipeline artifact to freeze its content. Created automatically when a step with `lock = true` advances, or manually via `wai pipeline lock`. Verified by `wai pipeline verify` and `wai doctor`. See [Pipelines — Artifact Locking](./concepts/pipelines.md#artifact-locking).
 
 **Frontmatter**
 YAML metadata at the top of an artifact file (between `---` markers). Contains fields like title, date, tags, and project name. Used by `wai search` for filtering and by `wai why` for context gathering.

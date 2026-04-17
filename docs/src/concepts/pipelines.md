@@ -243,6 +243,55 @@ If critical issues are found, route back to step 6 for the specific subtask that
 └──────────────┘   └─────────────┘
 ```
 
+## Artifact Locking
+
+Steps can declare `lock = true` to freeze their artifacts with SHA-256 hashes when you advance past them. This prevents accidental modification of validated work — once a step's artifacts are locked, any change will be caught by `wai pipeline verify` or `wai doctor`.
+
+### How it works
+
+When a step with `lock = true` completes (via `wai pipeline next`), wai computes a SHA-256 hash of each artifact tagged with that step and writes a `.lock` sidecar file alongside it. The sidecar records the hash, run ID, step ID, and timestamp.
+
+You can also lock manually at any time:
+
+```bash
+wai pipeline lock      # Lock current step's artifacts now
+```
+
+### Verifying integrity
+
+```bash
+wai pipeline verify    # Check all locked artifacts across the workspace
+```
+
+Verify reports:
+- **Missing artifacts** — a `.lock` file exists but the artifact was deleted
+- **Hash mismatches** — an artifact was modified after locking
+
+`wai doctor` also checks artifact lock integrity as part of its health checks.
+
+### Correcting locked artifacts
+
+Locked artifacts should not be edited directly. Instead, create an **addendum** — a new artifact that references the original:
+
+```bash
+wai add research --corrects=<path-to-locked-artifact> "correction details"
+```
+
+This preserves the audit trail: the original artifact stays intact and the addendum records what changed and why.
+
+### Configuring lock in pipeline TOML
+
+Add `lock = true` to any step definition:
+
+```toml
+[[steps]]
+id = "synthesize"
+lock = true
+prompt = """
+{topic}: Assemble findings into a coherent output.
+"""
+```
+
 ## Command reference
 
 | Command | Description |
@@ -256,6 +305,8 @@ If critical issues are found, route back to step 6 for the specific subtask that
 | `wai pipeline check` | Dry-run gate evaluation |
 | `wai pipeline approve` | Human approval for current step |
 | `wai pipeline validate <name>` | Validate pipeline TOML |
+| `wai pipeline lock` | Lock current step's artifacts (SHA-256) |
+| `wai pipeline verify` | Verify integrity of all locked artifacts |
 
 ## See Also
 

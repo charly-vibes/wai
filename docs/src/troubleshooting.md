@@ -250,6 +250,50 @@ wai doctor --json | jq .
 # https://github.com/charly-vibes/wai/issues
 ```
 
+## Artifact Integrity Issues
+
+### Locked artifact verification fails
+
+**Problem:** `wai pipeline verify` or `wai doctor` reports hash mismatches.
+
+**Solution:**
+A mismatch means a locked artifact was modified after locking. This can happen if you edited it directly instead of creating an addendum.
+
+```bash
+# See which artifacts failed
+wai pipeline verify
+
+# If the edit was intentional, create an addendum instead:
+# 1. Restore the original (git checkout the file)
+git checkout -- .wai/projects/my-project/research/2026-04-15-findings.md
+
+# 2. Record corrections as an addendum
+wai add research --corrects=.wai/projects/my-project/research/2026-04-15-findings.md "corrected details"
+
+# 3. Verify again
+wai pipeline verify
+```
+
+If you need to re-lock after a legitimate change, delete the `.lock` sidecar and run `wai pipeline lock` again.
+
+### "artifact missing" in verify output
+
+**Problem:** A `.lock` file references an artifact that no longer exists.
+
+**Solution:**
+The artifact was deleted after locking. Either restore it from git history or remove the orphaned `.lock` file:
+
+```bash
+# Find orphaned lock files
+wai pipeline verify
+
+# Restore from git
+git checkout -- <path-to-artifact>
+
+# Or remove the orphaned lock
+rm <path-to-artifact>.lock
+```
+
 ## Phase Management Issues
 
 ### Can't advance to next phase

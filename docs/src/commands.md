@@ -145,6 +145,8 @@ Advanced reasoning, session management, and automated pipelines.
 | `wai pipeline current` | Show the current step of the active run |
 | `wai pipeline status <name>` | Show run status (use `--run <id>` for details) |
 | `wai pipeline suggest` | Get a skill suggestion for a topic |
+| `wai pipeline lock` | Lock current step's artifacts (SHA-256 hash sidecars) |
+| `wai pipeline verify` | Verify integrity of all locked artifacts |
 
 ### Plugins
 
