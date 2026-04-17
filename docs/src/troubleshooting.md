@@ -214,6 +214,8 @@ ls .wai/projects/my-project/research/
 
 ## Doctor Command Issues
 
+Doctor runs 16 checks covering directory structure, configuration, plugins, agent configs, pipelines, artifact locks, and more. See the full list in [Commands — Doctor Checks](./commands.md#doctor-checks).
+
 ### Doctor reports issues but --fix doesn't work
 
 **Problem:** `wai doctor --fix` doesn't repair all issues.

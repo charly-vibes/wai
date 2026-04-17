@@ -17,7 +17,11 @@ Available for all commands:
 | `--json` | Output machine-readable JSON |
 | `--no-input` | Disable interactive prompts |
 | `--yes` | Auto-confirm actions with defaults |
-| `--safe` | Run in read-only safe mode |
+| `--safe` | Run in read-only safe mode (blocks write operations) |
+
+### Safe mode
+
+`--safe` prevents all write operations. Commands that modify state — `add`, `sync`, `move`, `pipeline start/next/init/approve/lock`, `phase next/back/set`, and `import` — will exit with an error. Read-only commands like `status`, `search`, `doctor`, `pipeline verify`, and `pipeline current` work normally.
 
 ---
 
@@ -30,7 +34,7 @@ Commands for managing the wai workspace and checking repo hygiene.
 | `wai init [--name <name>]` | Initialize wai in current directory |
 | `wai tutorial` | Run interactive quickstart tutorial |
 | `wai ls [--root <dir>] [--depth <n>] [--timeout <sec>]` | List all wai workspaces under a root directory |
-| `wai doctor [--fix]` | Diagnose and repair **wai workspace** health |
+| `wai doctor [--fix]` | Diagnose and repair **wai workspace** health (see [checks](#doctor-checks)) |
 | `wai way [--fix <CHECK>]` | Check and scaffold **repository best practices** |
 | `wai import <path>` | Import existing tool configs (.claude/, .cursorrules) |
 
@@ -62,10 +66,12 @@ Manage PARA items (Projects, Areas, Resources, Archives) and their associated ar
 | Command | Description |
 |---------|-------------|
 | `wai add research <content>` | Add research notes (also `plan`, `design`) |
+| `wai add review <content>` | Add a review artifact for an existing artifact |
 | `wai add <type> --file <path>` | Import artifact from file |
 | `wai add <type> --tags <tags>` | Add tagged artifact (frontmatter-based) |
 | `wai add <type> --bead <id>` | Link artifact to a beads issue ID |
 | `wai add <type> --project <name>` | Add to specific project (instead of current) |
+| `wai add <type> --corrects <path>` | Create an addendum correcting a locked artifact |
 
 #### Choosing an Artifact Type
 
@@ -77,6 +83,10 @@ Wai encourages capturing the right kind of documentation at each stage:
   - *Example:* "Proposed microservices architecture with EventBridge for communication."
 - **Plan** (`wai add plan`) — Use for breaking down implementation into specific, actionable steps.
   - *Example:* "Step 1: Scaffold auth service. Step 2: Implement JWT middleware."
+- **Review** (`wai add review`) — Use for recording validation results against an existing artifact.
+  - *Example:* `wai add review --reviews 2026-04-15-findings.md --verdict pass --severity "critical:0,high:1"`
+  - Requires `--reviews <filename>` to specify the target artifact.
+  - Optional: `--verdict` (pass/fail/needs-work), `--severity` (level:count pairs), `--produced_by` (skill name).
 
 ### Searching & Timeline
 
@@ -108,7 +118,11 @@ Manage how AI agents interact with your project through skills, rules, and conte
 | `wai config add <type> <file>` | Add agent config (skill/rule/context) |
 | `wai config edit <path>` | **Safe:** Edit config file in $EDITOR |
 | `wai resource list skills` | List all available skills |
-| `wai resource add skill <name>` | Scaffold a new skill (also `install`, `export`) |
+| `wai resource add skill <name>` | Scaffold a new skill (with optional `--template`) |
+| `wai resource install <skill> [--global\|--from-repo <path>]` | Install a skill globally or from another repo |
+| `wai resource export <skills...> --output <file>` | Export skills to a tar.gz archive |
+| `wai resource import skills [--from <dir>]` | Import skills from a directory |
+| `wai resource import archive <file> [--yes]` | Import skills from a tar.gz archive |
 
 > **⚠️ WARNING:** `wai sync` is **destructive** to your target files. It will overwrite manual changes in `.cursorrules`, `.claude/config.json`, etc., with the sources from your `.wai/` directory.
 
@@ -139,12 +153,18 @@ Advanced reasoning, session management, and automated pipelines.
 
 | Command | Description |
 |---------|-------------|
+| `wai pipeline list` | List all available pipelines |
+| `wai pipeline show <name>` | View steps and gates for a pipeline |
 | `wai pipeline init <name>` | Scaffold a new TOML pipeline definition |
-| `wai pipeline start <name>` | Start a run; writes run ID to `.wai/.pipeline-run` |
+| `wai pipeline start <name> --topic="..."` | Start a run with topic substitution |
 | `wai pipeline next` | Advance to the next step in the active run |
-| `wai pipeline current` | Show the current step of the active run |
+| `wai pipeline current` | Reprint current step prompt (session recovery) |
 | `wai pipeline status <name>` | Show run status (use `--run <id>` for details) |
-| `wai pipeline suggest` | Get a skill suggestion for a topic |
+| `wai pipeline suggest [description]` | Rank pipelines by keyword match |
+| `wai pipeline gates [name] [--step=<id>]` | Show gate requirements and live status |
+| `wai pipeline check [--oracle=<name>]` | Dry-run gate evaluation without advancing |
+| `wai pipeline approve` | Record human approval for current step |
+| `wai pipeline validate [name]` | Validate pipeline TOML definitions |
 | `wai pipeline lock` | Lock current step's artifacts (SHA-256 hash sidecars) |
 | `wai pipeline verify` | Verify integrity of all locked artifacts |
 
@@ -155,6 +175,31 @@ Advanced reasoning, session management, and automated pipelines.
 | `wai plugin list` | List all plugins (built-in and custom) |
 | `wai plugin enable <name>` | Enable a plugin |
 | `wai <plugin> <command>` | Pass-through to plugin commands (e.g. `wai beads list`) |
+
+---
+
+## Doctor Checks
+
+`wai doctor` runs the following checks. Use `--fix` to auto-repair where possible.
+
+| Check | What it verifies |
+|-------|-----------------|
+| Directory structure | Required `.wai/` subdirectories exist |
+| Configuration | `.wai/config.toml` is parseable and valid |
+| Version | Config version is compatible with installed wai |
+| Plugin tools | External tools (git, beads, openspec) are installed and reachable |
+| Agent config sync | Projections are in sync between source and target files |
+| Project state | Phase state files are valid and consistent |
+| Custom plugins | TOML plugin definitions parse correctly |
+| README badge | Repository README includes a wai badge |
+| Claude Code session hook | Claude Code hooks are configured for wai |
+| Skills in repo | Skill files are valid and importable |
+| Agent tool coverage | Agent instructions reference available skills |
+| Agent instructions | CLAUDE.md / AGENTS.md files are present and well-formed |
+| Managed block staleness | Auto-generated sections are up to date |
+| Pipeline definitions | Pipeline TOML files parse correctly with valid gates |
+| WAI_PROJECT env var | Environment variable matches active project |
+| Artifact locks | Locked artifacts match their SHA-256 hashes |
 
 ---
 

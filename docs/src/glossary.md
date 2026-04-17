@@ -43,6 +43,9 @@ A condition that must be satisfied before advancing to the next pipeline step. G
 **Pipeline run**
 An active execution of a pipeline, scoped to a topic. Created with `wai pipeline start` and advanced with `wai pipeline next`. State is tracked so you can resume across sessions.
 
+**Review artifact**
+An artifact that records validation results against another artifact. Created with `wai add review --reviews <target>`. Includes optional verdict (pass/fail/needs-work), severity counts, and the producing skill name. Used by pipeline procedural gates to enforce review requirements. See [Commands — Adding Artifacts](./commands.md#adding-artifacts).
+
 **Plugin**
 An integration module that connects wai with external tools (git, beads, openspec). Plugins are auto-detected based on workspace markers (e.g., `.git/`, `.beads/`). See [Plugin System](./concepts/plugins.md).
 
@@ -54,6 +57,9 @@ A plugin extension point triggered during wai operations. Hooks like `on_status`
 
 **Passthrough**
 A plugin command that delegates directly to the underlying tool. For example, `wai beads list` passes through to the beads CLI. See [Plugin System — Commands](./concepts/plugins.md#plugin-commands).
+
+**Safe mode**
+A read-only execution mode activated by the `--safe` global flag. Blocks all write operations (add, sync, move, pipeline start/next/init/approve/lock, phase changes, import). Read-only commands work normally. See [Commands — Safe mode](./commands.md#safe-mode).
 
 **Reflection**
 A synthesized summary of project patterns, conventions, and architectural notes produced by `wai reflect`. Stored as versioned Markdown in `.wai/resources/reflections/` and injected into instruction files. See [Reasoning](./concepts/reasoning.md#wai-reflect--project-synthesis).
