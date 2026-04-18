@@ -76,6 +76,7 @@ pub fn run(topic: Option<String>, fix: Option<String>) -> Result<()> {
         check_vale(&repo_root),
         check_shell_linting(&repo_root),
         check_documentation(&repo_root),
+        check_docs_status_page(&repo_root),
         check_ai_instructions(&repo_root),
         check_llm_txt(&repo_root),
         check_agent_skills(&repo_root),
@@ -1836,6 +1837,132 @@ fn check_documentation(repo_root: &Path) -> CheckResult {
             success_criteria,
             suggestion: Some(format!("Consider adding: {}", suggestions.join(", "))),
         }
+    }
+}
+
+fn check_docs_status_page(repo_root: &Path) -> CheckResult {
+    let name = "Implementation status page";
+    let intent = Some(
+        "An overview page showing what is implemented and how features relate to their specs."
+            .to_string(),
+    );
+    let success_criteria = Some(
+        "A status.md page exists in docs, is referenced in the table of contents, and the file is present on disk."
+            .to_string(),
+    );
+
+    let docs_dir = repo_root.join("docs");
+
+    // No docs directory at all — not applicable
+    if !docs_dir.is_dir() {
+        return CheckResult {
+            name: name.to_string(),
+            status: Status::Pass,
+            message: "No docs directory — skipped".to_string(),
+            intent,
+            success_criteria,
+            suggestion: None,
+        };
+    }
+
+    // mdBook pattern: docs/src/SUMMARY.md must link to a file named status*.md
+    let summary_path = docs_dir.join("src").join("SUMMARY.md");
+    if summary_path.exists() {
+        let summary = std::fs::read_to_string(&summary_path).unwrap_or_default();
+        // Match only markdown links whose target filename starts with "status"
+        // e.g. [Implementation Status](./status.md) — not arbitrary prose
+        let linked_status_file = summary.lines().find_map(|line| {
+            let lower = line.to_lowercase();
+            if !lower.contains("](") {
+                return None;
+            }
+            let after_bracket = lower.split("](").nth(1)?;
+            let target = after_bracket.split(')').next()?;
+            let filename = std::path::Path::new(target)
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("");
+            if filename.starts_with("status") {
+                // Return the actual (non-lowercased) path for existence check
+                let actual_target = line.split("](").nth(1)?.split(')').next()?;
+                Some(
+                    docs_dir.join("src").join(
+                        actual_target
+                            .trim_start_matches("./")
+                            .trim_start_matches('/'),
+                    ),
+                )
+            } else {
+                None
+            }
+        });
+
+        return match linked_status_file {
+            Some(path) if path.exists() => CheckResult {
+                name: name.to_string(),
+                status: Status::Pass,
+                message: "Status page linked in docs/src/SUMMARY.md and file exists".to_string(),
+                intent,
+                success_criteria,
+                suggestion: None,
+            },
+            Some(path) => CheckResult {
+                name: name.to_string(),
+                status: Status::Info,
+                message: format!(
+                    "SUMMARY.md links to {} but file is missing",
+                    path.file_name().unwrap_or_default().to_string_lossy()
+                ),
+                intent,
+                success_criteria,
+                suggestion: Some(
+                    "Create the status.md file that SUMMARY.md references".to_string(),
+                ),
+            },
+            None => CheckResult {
+                name: name.to_string(),
+                status: Status::Info,
+                message: "No status page linked in docs".to_string(),
+                intent,
+                success_criteria,
+                suggestion: Some(
+                    "Add docs/src/status.md and link it from docs/src/SUMMARY.md — \
+                     an overview of what's implemented and how it relates to specs helps \
+                     users and contributors understand scope at a glance"
+                        .to_string(),
+                ),
+            },
+        };
+    }
+
+    // Generic fallback for non-mdBook layouts: check for status.md under docs/
+    let candidates = [
+        docs_dir.join("status.md"),
+        docs_dir.join("STATUS.md"),
+        docs_dir.join("src").join("status.md"),
+    ];
+    if candidates.iter().any(|p| p.exists()) {
+        return CheckResult {
+            name: name.to_string(),
+            status: Status::Pass,
+            message: "Status page found in docs/".to_string(),
+            intent,
+            success_criteria,
+            suggestion: None,
+        };
+    }
+
+    CheckResult {
+        name: name.to_string(),
+        status: Status::Info,
+        message: "No status page in docs".to_string(),
+        intent,
+        success_criteria,
+        suggestion: Some(
+            "Add a status.md to docs/ — an implementation overview helps users understand \
+             what's built and how it relates to specs"
+                .to_string(),
+        ),
     }
 }
 

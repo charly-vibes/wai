@@ -31,6 +31,7 @@
 
 # Reference
 
+- [Implementation Status](./status.md)
 - [FAQ Reference](./faq-reference.md)
 - [Glossary](./glossary.md)
 
