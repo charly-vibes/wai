@@ -4885,6 +4885,32 @@ fn prime_all_headings_handoff_shows_no_summary_yet() {
 }
 
 #[test]
+fn prime_handoff_code_fence_content_not_used_as_snippet() {
+    // Regression: find_first_paragraph used to leak code-fence content (e.g. git
+    // status lines) as the handoff snippet when all real sections were empty.
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproject");
+    write_handoff(
+        tmp.path(),
+        "myproject",
+        "2026-02-23-session-end.md",
+        "---\ndate: 2026-02-23\nproject: myproject\nphase: implement\n---\n\n\
+         ## What Was Done\n\n<!-- placeholder -->\n\n\
+         ## Context\n\n### git_status\n\n```\nM  src/main.rs\n```\n",
+    );
+
+    wai_cmd(tmp.path())
+        .args(["prime", "--project", "myproject", "--no-input"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("no summary yet"))
+        .stdout(predicate::str::is_match("(?s).*").unwrap())
+        // Must NOT show the raw git-status line as the snippet
+        .stdout(predicate::str::contains("M  src/main.rs").not());
+}
+
+#[test]
 fn prime_outside_workspace_fails() {
     let tmp = TempDir::new().unwrap();
     // No wai init — no .wai/ directory

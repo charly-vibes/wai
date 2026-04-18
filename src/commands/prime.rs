@@ -4,7 +4,7 @@ use owo_colors::OwoColorize;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
-use crate::config::{HANDOFFS_DIR, STATE_FILE, projects_dir};
+use crate::config::{HANDOFFS_DIR, PLANS_DIR, STATE_FILE, projects_dir};
 use crate::context::current_context;
 use crate::json::{BeadsSummary, OpenspecEntry, PrimePayload};
 use crate::openspec;
@@ -32,6 +32,7 @@ pub fn run(project: Option<String>) -> Result<()> {
                 resume: false,
                 handoff_summary: None,
                 next_steps: Vec::new(),
+                plans: Vec::new(),
                 beads: None,
                 openspec: Vec::new(),
             };
@@ -103,6 +104,15 @@ pub fn run(project: Option<String>) -> Result<()> {
                 println!("{} Handoff: {} — '{}'", "•".dimmed(), date, snippet);
             }
             // If snippet is empty, it means missing/invalid frontmatter → skip the line
+        }
+    }
+
+    // Plans — shown when available so the AI has orient context even with an empty handoff
+    let plans = read_recent_plans(&project_root, &project_name, 3);
+    if !plans.is_empty() {
+        println!("{} Plans:", "◆".cyan());
+        for plan in &plans {
+            println!("  {} {}", "•".dimmed(), plan);
         }
     }
 
@@ -226,12 +236,15 @@ fn render_json(
         next_steps
     };
 
+    let plans = read_recent_plans(project_root, project_name, 3);
+
     let payload = PrimePayload {
         project: Some(project_name.to_string()),
         phase: Some(phase.to_string()),
         resume,
         handoff_summary,
         next_steps,
+        plans,
         beads,
         openspec,
     };
@@ -413,11 +426,20 @@ pub fn read_handoff_summary(path: &Path) -> (NaiveDate, String) {
 }
 
 /// Extract the first paragraph line from markdown body content.
-/// Skips headings (# ...) and blank lines. Returns "no summary yet" if none found.
+/// Skips headings (# ...), blank lines, HTML comments, and code fence blocks.
+/// Returns "no summary yet" if none found.
 fn find_first_paragraph(body: &str) -> String {
+    let mut in_code_block = false;
     for line in body.lines() {
         let trimmed = line.trim();
-        if trimmed.is_empty() || trimmed.starts_with('#') || trimmed.starts_with("```") {
+        if trimmed.starts_with("```") {
+            in_code_block = !in_code_block;
+            continue;
+        }
+        if in_code_block {
+            continue;
+        }
+        if trimmed.is_empty() || trimmed.starts_with('#') {
             continue;
         }
         // Skip HTML comments
@@ -432,6 +454,30 @@ fn find_first_paragraph(body: &str) -> String {
         }
     }
     "no summary yet".to_string()
+}
+
+/// Read the most recent `limit` plan files for a project, returning their trimmed text content.
+/// Files are sorted descending by filename so newest plans come first.
+fn read_recent_plans(project_root: &Path, project: &str, limit: usize) -> Vec<String> {
+    let plans_dir = projects_dir(project_root).join(project).join(PLANS_DIR);
+    let Ok(rd) = std::fs::read_dir(&plans_dir) else {
+        return Vec::new();
+    };
+    let mut files: Vec<_> = rd
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("md"))
+        .map(|e| e.path())
+        .collect();
+    files.sort_by(|a, b| b.cmp(a)); // descending: newest first
+    files
+        .into_iter()
+        .take(limit)
+        .filter_map(|p| {
+            let text = std::fs::read_to_string(&p).ok()?;
+            let line = text.trim().lines().next()?.trim().to_string();
+            if line.is_empty() { None } else { Some(line) }
+        })
+        .collect()
 }
 
 /// Invoke `bd ready --json` and return the first issue's `id`, or `None` on any error.

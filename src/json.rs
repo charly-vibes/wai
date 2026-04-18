@@ -204,6 +204,8 @@ pub struct PrimePayload {
     pub resume: bool,
     pub handoff_summary: Option<String>,
     pub next_steps: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub plans: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub beads: Option<BeadsSummary>,
     pub openspec: Vec<OpenspecEntry>,
