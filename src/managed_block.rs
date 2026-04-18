@@ -118,6 +118,11 @@ pub fn wai_block_content(
     block.push_str("\n## Starting a Session\n\n");
     let mut step = 1;
     block.push_str(&format!(
+        "{}. Run `wai sync` to ensure all agent tools and skills are correctly projected.\n",
+        step
+    ));
+    step += 1;
+    block.push_str(&format!(
         "{}. Run `wai status` to see active projects, current phase, and suggestions.\n",
         step
     ));

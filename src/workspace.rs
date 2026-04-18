@@ -208,7 +208,16 @@ pub fn ensure_workspace_current(project_root: &Path) -> Result<Vec<WorkspaceActi
     let projections_path = agent_config.join(".projections.yml");
     if !projections_path.exists() {
         let projections_content = "# Agent config projections — defines how configs are synced to tool-specific locations\n\
-            # Strategies: symlink, inline, reference\n\
+            # Strategies: symlink, inline, reference, copy\n\
+            #\n\
+            # Example for general agents (like Pi): syncs skills to .agents/\n\
+            # projections:\n\
+            #   - target: .agents\n\
+            #\n\
+            # Example for Claude Code (built-in projection): translates skills to commands\n\
+            # projections:\n\
+            #   - target: claude-code\n\
+            \n\
             projections: []\n";
         std::fs::write(&projections_path, projections_content).into_diagnostic()?;
         actions.push(WorkspaceAction::new(

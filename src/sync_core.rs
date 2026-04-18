@@ -445,6 +445,31 @@ pub(crate) fn execute_claude_code(project_root: &Path, config_dir: &Path) -> Res
     Ok(())
 }
 
+/// Execute an .agents projection: symlink all skills to the .agents/ directory.
+///
+/// This is a built-in projection for general agents (like Pi) that look for
+/// instructions in the `.agents/` directory. It symlinks all entries from
+/// `config_dir/skills/` into `project_root/.agents/`.
+pub(crate) fn execute_agents_projection(project_root: &Path, config_dir: &Path) -> Result<()> {
+    let skills_dir = config_dir.join("skills");
+    if !skills_dir.exists() {
+        log::info("No skills directory found; nothing to sync").into_diagnostic()?;
+        return Ok(());
+    }
+
+    let target = project_root.join(".agents");
+    ensure_parent_dirs(&target)?;
+
+    // Use execute_symlink logic but hardcoded for skills -> .agents
+    let proj = Projection {
+        target: ".agents".to_string(),
+        strategy: "symlink".to_string(),
+        sources: vec!["skills".to_string()],
+    };
+
+    execute_symlink(project_root, config_dir, &proj)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

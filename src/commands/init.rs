@@ -63,6 +63,10 @@ pub fn run(name: Option<String>) -> Result<()> {
                     detected_plugins: detected.iter().map(|s| s.to_string()).collect(),
                     suggestions: vec![
                         crate::json::Suggestion {
+                            label: "Sync agent configs".to_string(),
+                            command: "wai sync".to_string(),
+                        },
+                        crate::json::Suggestion {
                             label: "Check project status".to_string(),
                             command: "wai status".to_string(),
                         },
@@ -188,6 +192,10 @@ pub fn run(name: Option<String>) -> Result<()> {
         if context.json {
             let mut suggestions = vec![
                 crate::json::Suggestion {
+                    label: "Sync agent configs".to_string(),
+                    command: "wai sync".to_string(),
+                },
+                crate::json::Suggestion {
                     label: "Create your first project".to_string(),
                     command: "wai new project \"my-app\"".to_string(),
                 },
@@ -237,6 +245,9 @@ pub fn run(name: Option<String>) -> Result<()> {
             }
 
             println!("●  Next steps:");
+            println!(
+                "  → wai sync                     Sync agent configs to tool-specific locations"
+            );
             println!("  → wai new project \"my-app\"    Create your first project");
             println!("  → wai status                   Check project status");
             println!("  → wai doctor                   Check workspace health");

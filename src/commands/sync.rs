@@ -204,6 +204,10 @@ pub fn run(status_only: bool, dry_run: bool, from_main: bool) -> Result<()> {
             sync_core::execute_claude_code(&project_root, &config_dir)?;
             continue;
         }
+        if proj.target == ".agents" {
+            sync_core::execute_agents_projection(&project_root, &config_dir)?;
+            continue;
+        }
         match proj.strategy.as_str() {
             "symlink" => sync_core::execute_symlink(&project_root, &config_dir, proj)?,
             "inline" => sync_core::execute_inline(&project_root, &config_dir, proj)?,
