@@ -5,6 +5,23 @@ All notable changes to wai will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Calendar Versioning](https://calver.org/) (YYYY.M.MICRO).
 
+## [2026.4.5] - 2026-04-19
+
+### Added
+
+- **Prime plan context** — `wai prime` now shows recent plans even when the latest handoff is empty, so resume context still includes intended next work
+- **Initialization workflow improvements** — `wai init` better repairs and refreshes existing workspaces during re-init
+- **Built-in `.agents` projection** — initialization now ships built-in agent configuration projection support out of the box
+- **Implementation status page check** — `wai way` now checks for a docs status page to improve implementation-status discoverability
+- **Agent projection sync check** — `wai way` now reports whether projected agent config appears out of sync and points to the relevant fix path
+
+### Changed
+
+- **Local artifact ignores** — `.gitignore` now excludes local agent/tool artifacts such as `.claude/worktrees/` and `.codex`
+- **Repo maintenance cleanup** — archived completed wai project artifacts and finished associated ticket housekeeping
+
+---
+
 ## [2026.4.4] - 2026-04-17
 
 ### Added
