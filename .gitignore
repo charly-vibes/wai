@@ -35,3 +35,8 @@ docs/book/
 
 # Beads / Dolt files (added by bd init)
 .beads-credential-key
+
+# Local agent/tool artifacts
+.claude/worktrees/
+.codex
+rust_out
