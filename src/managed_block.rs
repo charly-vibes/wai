@@ -484,6 +484,27 @@ pub fn read_reflect_block(path: &Path) -> Option<String> {
 mod wai_block_tests {
     use super::*;
 
+    #[test]
+    fn wai_sync_step_present_in_session_start() {
+        let output = wai_block_content(&[], &[], &[]);
+        assert!(
+            output.contains("wai sync"),
+            "expected 'wai sync' in session start instructions"
+        );
+        let starting_pos = output
+            .find("## Starting a Session")
+            .expect("## Starting a Session not found");
+        let sync_pos = output.find("wai sync").expect("wai sync not found");
+        let status_pos = output[starting_pos..]
+            .find("wai status")
+            .expect("wai status not found in Starting a Session section")
+            + starting_pos;
+        assert!(
+            sync_pos < status_pos,
+            "wai sync should appear before wai status in Starting a Session"
+        );
+    }
+
     // Phase 1: session-close openspec checklist step
 
     #[test]

@@ -2865,6 +2865,67 @@ fn way_check_ai_instructions_missing() {
 }
 
 #[test]
+fn way_check_agent_config_sync_pass() {
+    let tmp = TempDir::new().unwrap();
+    let agent_config = tmp.path().join(".wai/resources/agent-config");
+    fs::create_dir_all(&agent_config).unwrap();
+    fs::write(
+        agent_config.join(".projections.yml"),
+        "projections:\n  - target: .agents",
+    )
+    .unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Agent context sync")
+                .and(predicate::str::contains(
+                    "Agent config projections configured",
+                ))
+                .and(predicate::str::contains("\"pass\"")),
+        );
+}
+
+#[test]
+fn way_check_agent_config_sync_info_missing() {
+    let tmp = TempDir::new().unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Agent context sync")
+                .and(predicate::str::contains(
+                    "No agent config projections found",
+                ))
+                .and(predicate::str::contains("\"info\"")),
+        );
+}
+
+#[test]
+fn way_check_agent_config_sync_info_empty() {
+    let tmp = TempDir::new().unwrap();
+    let agent_config = tmp.path().join(".wai/resources/agent-config");
+    fs::create_dir_all(&agent_config).unwrap();
+    fs::write(agent_config.join(".projections.yml"), "projections: []").unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Agent context sync")
+                .and(predicate::str::contains(
+                    "Projections file exists but no projections are configured",
+                ))
+                .and(predicate::str::contains("\"info\"")),
+        );
+}
+
+#[test]
 fn way_check_cicd_github_actions() {
     let tmp = TempDir::new().unwrap();
     fs::create_dir_all(tmp.path().join(".github/workflows")).unwrap();
@@ -6813,6 +6874,7 @@ fn project_use_valid_prints_export() {
     create_project(tmp.path(), "myproj");
 
     let out = wai_cmd(tmp.path())
+        .env("SHELL", "/bin/bash")
         .args(["project", "use", "myproj"])
         .assert()
         .success()

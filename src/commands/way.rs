@@ -80,6 +80,7 @@ pub fn run(topic: Option<String>, fix: Option<String>) -> Result<()> {
         check_ai_instructions(&repo_root),
         check_llm_txt(&repo_root),
         check_agent_skills(&repo_root),
+        check_agent_config_sync(&repo_root),
         check_gh_cli(),
         check_ci_cd(&repo_root),
         check_devcontainer(&repo_root),
@@ -891,7 +892,7 @@ their AI workflow before generating files.
 ### 1. AI Instruction File
 A persistent file that gives AI assistants project context and rules.
 - **CLAUDE.md** — read by Claude Code automatically. Project conventions,
-  architecture notes, "do this / don't do that" rules.
+  architecture notes, \"do this / don't do that\" rules.
 - **AGENTS.md** — similar, used by some other AI tools.
 - **What to include**: coding style, test conventions, architecture overview,
   known gotchas, forbidden patterns, preferred libraries.
@@ -900,7 +901,16 @@ A persistent file that gives AI assistants project context and rules.
   keep making that instructions could prevent? What context is hardest
   for the AI to figure out on its own?
 
-### 2. LLM Context File (llm.txt)
+### 2. Agent Config Sync (wai sync)
+Ensure that AI instructions and skills are available to the tools that
+need them.
+- **projections** — define how `.wai/resources/agent-config/` content
+  is synced to `.agents/`, `.claude/commands/`, etc.
+- **wai sync** — the command that applies these projections.
+- **→ Ask:** Have they configured `.projections.yml`? Do they want to
+  sync skills to a standard location like `.agents/`?
+
+### 3. LLM Context File (llm.txt)
 Machine-readable project summary for LLMs. Lives at `llm.txt` in the root.
 - Purpose: gives any LLM a quick orientation — what the project does,
   key files, entry points, architecture.
@@ -2275,6 +2285,57 @@ fn check_agent_skills(repo_root: &Path) -> CheckResult {
                 missing.join(", ")
             )),
         }
+    }
+}
+
+fn check_agent_config_sync(repo_root: &Path) -> CheckResult {
+    let name = "Agent context sync";
+    let intent = Some(
+        "Project agent-specific configurations (skills, rules) to tool-specific locations."
+            .to_string(),
+    );
+    let success_criteria = Some(
+        "Agent configurations are automatically synced to tool-specific directories (e.g. .agents/, .claude/commands/)."
+            .to_string(),
+    );
+
+    let agent_config = agent_config_dir(repo_root);
+    let projections_path = agent_config.join(".projections.yml");
+
+    if !projections_path.exists() {
+        return CheckResult {
+            name: name.to_string(),
+            status: Status::Info,
+            message: "No agent config projections found".to_string(),
+            intent,
+            success_criteria,
+            suggestion: Some("Run `wai init` to set up .projections.yml".to_string()),
+        };
+    }
+
+    // Check if any projections are defined
+    let content = std::fs::read_to_string(&projections_path).unwrap_or_default();
+    if content.contains("projections: []") || !content.contains("target:") {
+        return CheckResult {
+            name: name.to_string(),
+            status: Status::Info,
+            message: "Projections file exists but no projections are configured".to_string(),
+            intent,
+            success_criteria,
+            suggestion: Some(
+                "Edit .wai/resources/agent-config/.projections.yml to add targets like .agents or claude-code"
+                    .to_string(),
+            ),
+        };
+    }
+
+    CheckResult {
+        name: name.to_string(),
+        status: Status::Pass,
+        message: "Agent config projections configured".to_string(),
+        intent,
+        success_criteria,
+        suggestion: Some("Run `wai sync` to apply projections".to_string()),
     }
 }
 
