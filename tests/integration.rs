@@ -69,6 +69,46 @@ fn write_artifact(
     fs::write(path, content).unwrap();
 }
 
+fn install_fake_bd(
+    dir: &std::path::Path,
+    query: &str,
+    output_lines: &[&str],
+) -> std::path::PathBuf {
+    let bin_dir = dir.join("fake-bin");
+    fs::create_dir_all(&bin_dir).unwrap();
+    let script_path = bin_dir.join("bd");
+
+    let escaped_lines = output_lines
+        .iter()
+        .map(|line| format!("printf '%s\\n' '{}'", line.replace('\'', "'\"'\"'")))
+        .collect::<Vec<_>>()
+        .join("\n    ");
+
+    let script = format!(
+        "#!/bin/sh
+if [ \"$1\" = \"memories\" ] && [ \"$2\" = \"{query}\" ]; then
+    {escaped_lines}
+    exit 0
+fi
+if [ \"$1\" = \"memories\" ]; then
+    exit 0
+fi
+exit 1
+"
+    );
+
+    fs::write(&script_path, script).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&script_path).unwrap().permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&script_path, perms).unwrap();
+    }
+
+    bin_dir
+}
+
 // ─── wai init ────────────────────────────────────────────────────────────────
 
 #[test]
@@ -853,6 +893,98 @@ fn search_invalid_regex_fails() {
         .assert()
         .failure()
         .stderr(predicate::str::contains("Invalid regex"));
+}
+
+#[test]
+fn search_include_memories_appends_memories_section() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+    write_artifact(
+        tmp.path(),
+        "my-app",
+        "research",
+        "2026-01-15-notes.md",
+        "shared-term in artifact\n",
+    );
+    fs::create_dir_all(tmp.path().join(".beads")).unwrap();
+    let fake_bin = install_fake_bd(
+        tmp.path(),
+        "shared-term",
+        &["memory-key: remembered detail from bd memories"],
+    );
+    let path = format!(
+        "{}:{}",
+        fake_bin.display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+
+    wai_cmd(tmp.path())
+        .args(["search", "shared-term", "--include-memories"])
+        .env("PATH", path)
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Search results")
+                .and(predicate::str::contains("Memories"))
+                .and(predicate::str::contains("[mem]"))
+                .and(predicate::str::contains("memory-key")),
+        );
+}
+
+#[test]
+fn search_include_memories_shows_memory_only_results() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+    fs::create_dir_all(tmp.path().join(".beads")).unwrap();
+    let fake_bin = install_fake_bd(
+        tmp.path(),
+        "memory-only",
+        &["memory-only-key: remembered detail with no artifact hit"],
+    );
+    let path = format!(
+        "{}:{}",
+        fake_bin.display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+
+    wai_cmd(tmp.path())
+        .args(["search", "memory-only", "--include-memories"])
+        .env("PATH", path)
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("No artifact results found")
+                .and(predicate::str::contains("Memories"))
+                .and(predicate::str::contains("memory-only-key")),
+        );
+}
+
+#[test]
+fn search_include_memories_verbose_shows_full_value() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+    fs::create_dir_all(tmp.path().join(".beads")).unwrap();
+    let long_value = "This memory value is intentionally long so search should truncate it by default but show the full value when verbose is enabled.";
+    let fake_bin = install_fake_bd(
+        tmp.path(),
+        "verbose-memory",
+        &[&format!("verbose-key: {long_value}")],
+    );
+    let path = format!(
+        "{}:{}",
+        fake_bin.display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+
+    wai_cmd(tmp.path())
+        .args(["-v", "search", "verbose-memory", "--include-memories"])
+        .env("PATH", path)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(long_value));
 }
 
 // ─── add plan/design with --tags ─────────────────────────────────────────────

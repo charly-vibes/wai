@@ -8,6 +8,13 @@ use crate::json::{SearchPayload, SearchResult};
 use crate::output::print_json;
 use crate::plugin::fetch_memories_for_query;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct MemoryMatch {
+    key: String,
+    value: String,
+    raw: String,
+}
+
 use super::require_project;
 
 const DEFAULT_LIMIT: usize = 20;
@@ -157,6 +164,14 @@ pub fn run(args: SearchArgs) -> Result<()> {
         results.retain(|(path, ..)| *path == best_path);
     }
 
+    let memory_matches = if include_memories && !context.json {
+        fetch_memories_for_query(&project_root, &query)
+            .map(|raw| parse_memory_matches(&raw))
+            .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+
     if context.json {
         let payload = SearchPayload {
             query: query.clone(),
@@ -175,116 +190,115 @@ pub fn run(args: SearchArgs) -> Result<()> {
         return print_json(&payload);
     }
 
-    if results.is_empty() {
+    if results.is_empty() && memory_matches.is_empty() {
         println!();
         println!("  {} No results found for '{}'", "○".dimmed(), query);
         println!();
         return Ok(());
     }
 
-    let total = results.len();
-    let truncated = total > display_limit;
-    let display_results = &results[..total.min(display_limit)];
+    if results.is_empty() {
+        println!();
+        println!(
+            "  {} No artifact results found for '{}'",
+            "○".dimmed(),
+            query
+        );
+        println!();
+    }
 
-    println!();
-    println!(
-        "  {} Search results for '{}' ({} matches)",
-        "◆".cyan(),
-        query.bold(),
-        total,
-    );
-    println!();
+    if !results.is_empty() {
+        let total = results.len();
+        let truncated = total > display_limit;
+        let display_results = &results[..total.min(display_limit)];
 
-    // Compute the width needed to pad line numbers for alignment.
-    // When context is shown, also account for surrounding line numbers.
-    let max_line_num = display_results
-        .iter()
-        .map(|(_, line_num, ..)| line_num + context_size)
-        .max()
-        .unwrap_or(1);
-    let line_num_width = max_line_num.to_string().len();
+        println!();
+        println!(
+            "  {} Search results for '{}' ({} matches)",
+            "◆".cyan(),
+            query.bold(),
+            total,
+        );
+        println!();
 
-    let mut current_file = String::new();
-    // last_shown_end tracks the last line number (1-based) printed for the current file,
-    // so we can insert "--" separators between non-adjacent context blocks.
-    let mut last_shown_end: Option<usize> = None;
+        // Compute the width needed to pad line numbers for alignment.
+        // When context is shown, also account for surrounding line numbers.
+        let max_line_num = display_results
+            .iter()
+            .map(|(_, line_num, ..)| line_num + context_size)
+            .max()
+            .unwrap_or(1);
+        let line_num_width = max_line_num.to_string().len();
 
-    for (path, line_num, line, start, end, context_lines) in display_results {
-        if *path != current_file {
-            current_file = path.clone();
-            last_shown_end = None;
-            println!("  {}", path.cyan());
+        let mut current_file = String::new();
+        // last_shown_end tracks the last line number (1-based) printed for the current file,
+        // so we can insert "--" separators between non-adjacent context blocks.
+        let mut last_shown_end: Option<usize> = None;
+
+        for (path, line_num, line, start, end, context_lines) in display_results {
+            if *path != current_file {
+                current_file = path.clone();
+                last_shown_end = None;
+                println!("  {}", path.cyan());
+            }
+
+            if context_size > 0 {
+                // extract_context_lines uses `line_num` (0-based) as the center, so
+                // the number of pre-context lines actually collected is
+                // min(context_size, line_num_0based) = min(context_size, line_num - 1).
+                let pre_count = context_size.min(line_num.saturating_sub(1));
+                let first_line_num = line_num.saturating_sub(pre_count); // 1-based number of first context line
+
+                // Insert separator when this block is not adjacent to the previous one.
+                if let Some(prev_end) = last_shown_end
+                    && first_line_num > prev_end + 1
+                {
+                    println!("    {}", "--".dimmed());
+                }
+
+                // Print pre-context lines (dim).
+                for (i, ctx_line) in context_lines.iter().enumerate() {
+                    let abs_line_num = first_line_num + i;
+                    if abs_line_num == *line_num {
+                        // This is the match line — print highlighted.
+                        let padded_num =
+                            format!("{:>width$}", abs_line_num, width = line_num_width);
+                        println!(
+                            "    {}:  {}",
+                            padded_num.dimmed(),
+                            highlight_match(ctx_line, *start, *end),
+                        );
+                    } else {
+                        // Context line — print dim.
+                        let padded_num =
+                            format!("{:>width$}", abs_line_num, width = line_num_width);
+                        println!("    {}:  {}", padded_num.dimmed(), ctx_line.dimmed(),);
+                    }
+                }
+
+                let last_line_num = first_line_num + context_lines.len().saturating_sub(1);
+                last_shown_end = Some(last_line_num);
+            } else {
+                let padded_num = format!("{:>width$}", line_num, width = line_num_width);
+                println!(
+                    "    {}:  {}",
+                    padded_num.dimmed(),
+                    highlight_match(line, *start, *end),
+                );
+            }
         }
 
-        if context_size > 0 {
-            // extract_context_lines uses `line_num` (0-based) as the center, so
-            // the number of pre-context lines actually collected is
-            // min(context_size, line_num_0based) = min(context_size, line_num - 1).
-            let pre_count = context_size.min(line_num.saturating_sub(1));
-            let first_line_num = line_num.saturating_sub(pre_count); // 1-based number of first context line
+        println!();
 
-            // Insert separator when this block is not adjacent to the previous one.
-            if let Some(prev_end) = last_shown_end
-                && first_line_num > prev_end + 1
-            {
-                println!("    {}", "--".dimmed());
-            }
-
-            // Print pre-context lines (dim).
-            for (i, ctx_line) in context_lines.iter().enumerate() {
-                let abs_line_num = first_line_num + i;
-                if abs_line_num == *line_num {
-                    // This is the match line — print highlighted.
-                    let padded_num = format!("{:>width$}", abs_line_num, width = line_num_width);
-                    println!(
-                        "    {}:  {}",
-                        padded_num.dimmed(),
-                        highlight_match(ctx_line, *start, *end),
-                    );
-                } else {
-                    // Context line — print dim.
-                    let padded_num = format!("{:>width$}", abs_line_num, width = line_num_width);
-                    println!("    {}:  {}", padded_num.dimmed(), ctx_line.dimmed(),);
-                }
-            }
-
-            let last_line_num = first_line_num + context_lines.len().saturating_sub(1);
-            last_shown_end = Some(last_line_num);
-        } else {
-            let padded_num = format!("{:>width$}", line_num, width = line_num_width);
-            println!(
-                "    {}:  {}",
-                padded_num.dimmed(),
-                highlight_match(line, *start, *end),
+        if truncated {
+            eprintln!(
+                "Showing first {} of {} results. Use -n to see more.",
+                display_limit, total
             );
         }
     }
 
-    println!();
-
-    if truncated {
-        eprintln!(
-            "Showing first {} of {} results. Use -n to see more.",
-            display_limit, total
-        );
-    }
-
-    // bd memories section — shown when --include-memories is passed
-    if include_memories
-        && !context.json
-        && let Some(mem_raw) = fetch_memories_for_query(&project_root, &query)
-    {
-        let mem_lines: Vec<&str> = mem_raw.lines().filter(|l| !l.trim().is_empty()).collect();
-        if !mem_lines.is_empty() {
-            println!();
-            println!("  {} Memories", "◆".cyan());
-            println!();
-            for line in &mem_lines {
-                println!("  {}  {}", "[mem]".dimmed(), line);
-            }
-            println!();
-        }
-    }
+    render_memory_matches(&memory_matches, context.verbose);
 
     Ok(())
 }
@@ -338,6 +352,80 @@ fn date_prefix(path: &str) -> &str {
     } else {
         ""
     }
+}
+
+fn render_memory_matches(matches: &[MemoryMatch], verbose: u8) {
+    if matches.is_empty() {
+        return;
+    }
+
+    println!();
+    println!("  {} Memories", "◆".cyan());
+    println!();
+    for memory in matches {
+        println!(
+            "  {}  {}",
+            "[mem]".dimmed(),
+            format_memory_match(memory, verbose)
+        );
+    }
+    println!();
+}
+
+fn format_memory_match(memory: &MemoryMatch, verbose: u8) -> String {
+    if memory.value.is_empty() {
+        return memory.raw.clone();
+    }
+
+    let value = if verbose > 0 {
+        memory.value.clone()
+    } else {
+        truncate_with_ellipsis(&memory.value, 80)
+    };
+
+    format!("{}: {}", memory.key, value)
+}
+
+fn parse_memory_matches(raw: &str) -> Vec<MemoryMatch> {
+    raw.lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(parse_memory_match)
+        .collect()
+}
+
+fn parse_memory_match(line: &str) -> MemoryMatch {
+    for separator in [": ", "\t", " = ", "="] {
+        if let Some((key, value)) = line.split_once(separator) {
+            let key = key.trim().to_string();
+            let value = value.trim().to_string();
+            if !key.is_empty() && !value.is_empty() {
+                return MemoryMatch {
+                    key,
+                    value,
+                    raw: line.to_string(),
+                };
+            }
+        }
+    }
+
+    MemoryMatch {
+        key: line.to_string(),
+        value: String::new(),
+        raw: line.to_string(),
+    }
+}
+
+fn truncate_with_ellipsis(text: &str, max_chars: usize) -> String {
+    let char_count = text.chars().count();
+    if char_count <= max_chars {
+        return text.to_string();
+    }
+    if max_chars == 0 {
+        return String::new();
+    }
+    let take = max_chars.saturating_sub(1);
+    format!("{}…", text.chars().take(take).collect::<String>())
 }
 
 fn extract_context_lines(content: &str, line_num: usize, context: usize) -> Vec<String> {
