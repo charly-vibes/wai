@@ -1789,7 +1789,7 @@ fn check_agent_instructions(project_root: &Path) -> Vec<CheckResult> {
 
 /// Check managed block staleness by comparing generated vs actual content.
 fn check_managed_block_staleness(project_root: &Path) -> Vec<CheckResult> {
-    use crate::managed_block::{read_managed_block, wai_block_content};
+    use crate::managed_block::{read_managed_block, wai_block_content, wai_detailed_content};
     use crate::workspace::{detect_installed_pipelines, detect_installed_skill_names};
 
     let mut results = Vec::new();
@@ -1804,6 +1804,7 @@ fn check_managed_block_staleness(project_root: &Path) -> Vec<CheckResult> {
     let skill_name_refs: Vec<&str> = skill_names.iter().map(|s| s.as_str()).collect();
     let installed_pipelines = detect_installed_pipelines(project_root);
 
+    // Check root CLAUDE.md / AGENTS.md against slim block
     let expected = wai_block_content(&plugin_names, &skill_name_refs, &installed_pipelines);
 
     for filename in &["CLAUDE.md", "AGENTS.md"] {
@@ -1822,6 +1823,32 @@ fn check_managed_block_staleness(project_root: &Path) -> Vec<CheckResult> {
                 fix_fn: None,
             });
         }
+    }
+
+    // Check .wai/AGENTS.md against detailed content
+    let detailed_path = project_root.join(".wai").join("AGENTS.md");
+    if detailed_path.exists() {
+        let expected_detailed =
+            wai_detailed_content(&plugin_names, &skill_name_refs, &installed_pipelines);
+        if let Ok(actual_detailed) = std::fs::read_to_string(&detailed_path)
+            && actual_detailed != expected_detailed
+        {
+            results.push(CheckResult {
+                name: "Managed block staleness: .wai/AGENTS.md".to_string(),
+                status: Status::Warn,
+                message: ".wai/AGENTS.md outdated — run 'wai init --update' to refresh".to_string(),
+                fix: Some("Run: wai init".to_string()),
+                fix_fn: None,
+            });
+        }
+    } else {
+        results.push(CheckResult {
+            name: "Managed block staleness: .wai/AGENTS.md".to_string(),
+            status: Status::Warn,
+            message: ".wai/AGENTS.md missing — run 'wai init' to create it".to_string(),
+            fix: Some("Run: wai init".to_string()),
+            fix_fn: None,
+        });
     }
 
     results

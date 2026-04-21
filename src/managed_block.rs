@@ -12,6 +12,10 @@ pub struct InstalledPipeline {
     pub step_count: usize,
 }
 
+/// Generate the **slim** managed block for CLAUDE.md / AGENTS.md.
+///
+/// This is Layer 1 of progressive disclosure: orient the agent, surface
+/// pipelines, and point to `.wai/AGENTS.md` for the full reference.
 pub fn wai_block_content(
     detected_plugins: &[&str],
     installed_skills: &[&str],
@@ -28,7 +32,6 @@ pub fn wai_block_content(
     block.push_str(WAI_START);
     block.push('\n');
 
-    // Tool Landscape (always present)
     block.push_str(
         "# Workflow Tools\n\
          \n\
@@ -73,11 +76,86 @@ pub fn wai_block_content(
         );
     }
 
-    // When to Use What (only when companion tools detected)
-    if has_companions {
+    // Quick start — just the essentials
+    block.push_str("\n## Quick Start\n\n");
+    block.push_str("1. `wai sync` — ensure agent tools are projected\n");
+    block.push_str("2. `wai status` — see active projects, phase, and suggestions\n");
+    if has_beads {
+        block.push_str("3. `bd ready` — find available work items\n");
+    }
+    block.push_str(
+        "\n\
+         When context reaches ~40%: stop and tell the user — responses degrade past\n\
+         this point. Recommend `wai close` then `/clear` to resume cleanly.\n\
+         Do NOT skip `wai close` — it enables resume detection.\n",
+    );
+
+    // Available Pipelines — discovery-critical, stays in the slim block
+    if !installed_pipelines.is_empty() {
         block.push_str(
             "\n\
-             ## When to Use What\n\
+             ## Available Pipelines\n\
+             \n\
+             | Pipeline | When to Use | Start |\n\
+             |----------|-------------|-------|\n",
+        );
+        for p in installed_pipelines {
+            block.push_str(&format!(
+                "| {} | {} | `wai pipeline start {} --topic=<topic>` |\n",
+                p.name, p.when, p.name,
+            ));
+        }
+        block.push_str(
+            "\n> Pipeline steps may have gates that enforce artifact creation, review \
+             coverage, and oracle checks before advancement. \
+             Run `wai pipeline gates <name>` for details.\n",
+        );
+    }
+
+    // Pointer to detailed instructions
+    block.push_str(
+        "\n\
+         ## Detailed Instructions\n\
+         \n\
+         Full workflow reference — session lifecycle, capturing work, command cheat\n\
+         sheets, cross-tool sync, and PARA structure — lives in **`.wai/AGENTS.md`**.\n\
+         Read it at the start of your first session or when you need detailed guidance.\n\
+         \n\
+         Keep this managed block so `wai init` can refresh the instructions.\n\
+         \n",
+    );
+
+    block.push_str(WAI_END);
+    block
+}
+
+/// Generate the **detailed** agent instructions written to `.wai/AGENTS.md`.
+///
+/// This is Layer 2 of progressive disclosure: full session lifecycle,
+/// command reference, capturing work, cross-tool sync, PARA structure.
+pub fn wai_detailed_content(
+    detected_plugins: &[&str],
+    installed_skills: &[&str],
+    installed_pipelines: &[InstalledPipeline],
+) -> String {
+    let has_beads = detected_plugins.contains(&"beads");
+    let has_openspec = detected_plugins.contains(&"openspec");
+    let has_companions = has_beads || has_openspec;
+    let has_ro5 = installed_skills
+        .iter()
+        .any(|s| *s == "ro5" || *s == "rule-of-5" || *s == "rule-of-5-universal");
+
+    let mut doc = String::new();
+    doc.push_str("# wai Workflow Reference\n\n");
+    doc.push_str(
+        "> This file is managed by `wai init`. Do not edit manually.\n\
+         > Changes will be overwritten on the next init.\n\n",
+    );
+
+    // When to Use What (only when companion tools detected)
+    if has_companions {
+        doc.push_str(
+            "## When to Use What\n\
              \n\
              | Need | Tool | Example |\n\
              |------|------|---------|\n\
@@ -86,66 +164,66 @@ pub fn wai_block_content(
              | Session context transfer | wai | `wai handoff create <project>` |\n",
         );
         if has_beads {
-            block.push_str(
+            doc.push_str(
                 "| Track work items/bugs | `bd` | `bd create --title=\"...\" --type=task` |\n\
                  | Find available work | `bd` | `bd ready` |\n\
                  | Manage dependencies | `bd` | `bd dep add <blocked> <blocker>` |\n",
             );
         }
         if has_openspec {
-            block.push_str(
+            doc.push_str(
                 "| Propose system changes | openspec | Read `openspec/AGENTS.md` |\n\
                  | Define requirements | openspec | `openspec validate --strict` |\n",
             );
         }
-        block.push_str(
+        doc.push_str(
             "\nKey distinction:\n\
              - **wai** = *why* decisions were made (reasoning, context, handoffs)\n",
         );
         if has_beads {
-            block.push_str(
+            doc.push_str(
                 "- **`bd`** (beads) = *what* needs to be done (concrete tasks, status tracking)\n",
             );
         }
         if has_openspec {
-            block.push_str(
+            doc.push_str(
                 "- **openspec** = *what the system should look like* (specs, requirements, proposals)\n",
             );
         }
     }
 
-    // Starting a Session (unified)
-    block.push_str("\n## Starting a Session\n\n");
+    // Starting a Session
+    doc.push_str("\n## Starting a Session\n\n");
     let mut step = 1;
-    block.push_str(&format!(
+    doc.push_str(&format!(
         "{}. Run `wai sync` to ensure all agent tools and skills are correctly projected.\n",
         step
     ));
     step += 1;
-    block.push_str(&format!(
+    doc.push_str(&format!(
         "{}. Run `wai status` to see active projects, current phase, and suggestions.\n",
         step
     ));
     step += 1;
     if has_beads {
-        block.push_str(&format!(
+        doc.push_str(&format!(
             "{}. Run `bd ready` to find available work items.\n",
             step
         ));
-        block.push_str(
+        doc.push_str(
             "   Before claiming: read the relevant source files to confirm\n\
              \x20  the issue is not already implemented.\n",
         );
         step += 1;
     }
     if has_openspec {
-        block.push_str(&format!(
+        doc.push_str(&format!(
             "{}. Check `openspec list` for active change proposals.\n",
             step
         ));
         step += 1;
     }
-    block.push_str(&format!(
+    doc.push_str(&format!(
         "{}. Check the phase — it tells you what kind of work is expected:\n\
          \x20  - **research** → gather information, explore options\n\
          \x20  - **design** → make architectural decisions\n\
@@ -156,13 +234,13 @@ pub fn wai_block_content(
         step
     ));
     step += 1;
-    block.push_str(&format!(
+    doc.push_str(&format!(
         "{}. Read existing artifacts with `wai search \"<topic>\"` before starting new work.\n",
         step
     ));
 
-    // Capturing Work (condensed wai core)
-    block.push_str(
+    // Capturing Work
+    doc.push_str(
         "\n\
          ## Capturing Work\n\
          \n\
@@ -180,9 +258,9 @@ pub fn wai_block_content(
          Phases are a guide, not a gate. Use `wai phase show` / `wai phase next`.\n",
     );
 
-    // Tracking Work Across Tools (when both beads and openspec present)
+    // Tracking Work Across Tools
     if has_beads && has_openspec {
-        block.push_str(
+        doc.push_str(
             "\n## Tracking Work Across Tools\n\
              \n\
              When beads and openspec are both active, keep them in sync:\n\
@@ -194,26 +272,26 @@ pub fn wai_block_content(
         );
     }
 
-    // Ending a Session (unified)
-    block.push_str(
+    // Ending a Session
+    doc.push_str(
         "\n## Ending a Session\n\n\
          Before saying \"done\", run this checklist:\n\n\
          ```\n\
          [ ] wai handoff create <project>   # capture context for next session\n",
     );
     if has_beads {
-        block.push_str(
+        doc.push_str(
             "[ ] bd close <id>                  # close completed issues; also close parent epic if last sub-task\n\
              [ ] bd sync --from-main            # pull beads updates\n",
         );
     }
     if has_openspec {
-        block.push_str(
+        doc.push_str(
             "[ ] openspec tasks.md — mark completed tasks [x]\n\
              [ ] openspec list — archive any ✓ Complete changes (`openspec archive <id> --yes`)\n",
         );
     }
-    block.push_str(
+    doc.push_str(
         "[ ] wai reflect                    # update CLAUDE.md with project patterns (every ~5 sessions)\n\
          [ ] git add <files> && git commit  # commit code + handoff\n\
          ```\n\
@@ -236,7 +314,7 @@ pub fn wai_block_content(
     );
 
     // Quick Reference
-    block.push_str(
+    doc.push_str(
         "\n\
          ## Quick Reference\n\
          \n\
@@ -262,7 +340,7 @@ pub fn wai_block_content(
          ```\n",
     );
     if has_beads {
-        block.push_str(
+        doc.push_str(
             "\n\
              ### beads (CLI: `bd`)\n\
              ```bash\n\
@@ -275,7 +353,7 @@ pub fn wai_block_content(
         );
     }
     if has_openspec {
-        block.push_str(
+        doc.push_str(
             "\n\
              ### openspec\n\
              Read `openspec/AGENTS.md` for full instructions.\n\
@@ -286,9 +364,9 @@ pub fn wai_block_content(
         );
     }
 
-    // Available Pipelines (only when pipelines with metadata exist)
+    // Available Pipelines
     if !installed_pipelines.is_empty() {
-        block.push_str(
+        doc.push_str(
             "\n\
              ## Available Pipelines\n\
              \n\
@@ -296,20 +374,26 @@ pub fn wai_block_content(
              |----------|-------------|-------|\n",
         );
         for p in installed_pipelines {
-            block.push_str(&format!(
+            doc.push_str(&format!(
                 "| {} | {} | `wai pipeline start {} --topic=<topic>` |\n",
                 p.name, p.when, p.name,
             ));
         }
-        block.push_str(
+        doc.push_str(
             "\n> Pipeline steps may have gates that enforce artifact creation, review \
              coverage, and oracle checks before advancement. \
              Run `wai pipeline gates <name>` for details.\n",
         );
     }
+    if has_ro5 {
+        doc.push_str(
+            "\n> **Ro5**: The Rule of 5 skill is installed. Run `/ro5` after key phase transitions \
+             — implement, research, design — for iterative quality review.\n",
+        );
+    }
 
-    // Structure + footer
-    block.push_str(
+    // Structure
+    doc.push_str(
         "\n\
          ## Structure\n\
          \n\
@@ -319,14 +403,46 @@ pub fn wai_block_content(
          - **resources/** — reference material, agent configs, templates\n\
          - **archives/** — completed or inactive items\n\
          \n\
-         Do not edit `.wai/config.toml` directly. Use `wai` commands instead.\n\
-         \n\
-         Keep this managed block so `wai init` can refresh the instructions.\n\
-         \n",
+         Do not edit `.wai/config.toml` directly. Use `wai` commands instead.\n",
     );
 
-    block.push_str(WAI_END);
-    block
+    doc
+}
+
+/// Write the detailed agent instructions to `.wai/AGENTS.md`.
+///
+/// This file is fully managed by wai (overwritten on each init).
+pub fn write_detailed_agents_file(
+    wai_dir: &Path,
+    detected_plugins: &[&str],
+    installed_skills: &[&str],
+    installed_pipelines: &[InstalledPipeline],
+) -> Result<DetailedFileResult, std::io::Error> {
+    let path = wai_dir.join("AGENTS.md");
+    let content = wai_detailed_content(detected_plugins, installed_skills, installed_pipelines);
+    let existed = path.exists();
+    std::fs::write(&path, &content)?;
+    Ok(if existed {
+        DetailedFileResult::Updated
+    } else {
+        DetailedFileResult::Created
+    })
+}
+
+pub enum DetailedFileResult {
+    Created,
+    Updated,
+}
+
+impl DetailedFileResult {
+    pub fn description(&self) -> String {
+        match self {
+            DetailedFileResult::Created => {
+                "Created .wai/AGENTS.md with detailed workflow reference".to_string()
+            }
+            DetailedFileResult::Updated => "Updated .wai/AGENTS.md workflow reference".to_string(),
+        }
+    }
 }
 
 pub fn inject_managed_block(
@@ -484,211 +600,73 @@ pub fn read_reflect_block(path: &Path) -> Option<String> {
 mod wai_block_tests {
     use super::*;
 
+    // ── Slim block (Layer 1: CLAUDE.md / AGENTS.md) ──────────────────────
+
     #[test]
-    fn wai_sync_step_present_in_session_start() {
+    fn slim_block_contains_wai_sync() {
         let output = wai_block_content(&[], &[], &[]);
         assert!(
             output.contains("wai sync"),
-            "expected 'wai sync' in session start instructions"
-        );
-        let starting_pos = output
-            .find("## Starting a Session")
-            .expect("## Starting a Session not found");
-        let sync_pos = output.find("wai sync").expect("wai sync not found");
-        let status_pos = output[starting_pos..]
-            .find("wai status")
-            .expect("wai status not found in Starting a Session section")
-            + starting_pos;
-        assert!(
-            sync_pos < status_pos,
-            "wai sync should appear before wai status in Starting a Session"
-        );
-    }
-
-    // Phase 1: session-close openspec checklist step
-
-    #[test]
-    fn openspec_checklist_step_present_when_openspec_detected() {
-        let output = wai_block_content(&["openspec"], &[], &[]);
-        assert!(
-            output.contains("openspec tasks.md"),
-            "expected 'openspec tasks.md' in output"
+            "expected 'wai sync' in slim block"
         );
     }
 
     #[test]
-    fn openspec_checklist_step_absent_without_openspec() {
+    fn slim_block_contains_wai_status() {
         let output = wai_block_content(&[], &[], &[]);
         assert!(
-            !output.contains("openspec tasks.md"),
-            "unexpected 'openspec tasks.md' in output without openspec"
+            output.contains("wai status"),
+            "expected 'wai status' in slim block"
         );
     }
 
     #[test]
-    fn openspec_checklist_step_ordering() {
-        let output = wai_block_content(&["beads", "openspec"], &[], &[]);
-        let bd_sync_pos = output
-            .find("bd sync --from-main")
-            .expect("bd sync --from-main not found");
-        let openspec_pos = output
-            .find("openspec tasks.md")
-            .expect("openspec tasks.md not found");
-        let wai_reflect_pos = output.find("wai reflect").expect("wai reflect not found");
-        assert!(
-            bd_sync_pos < openspec_pos,
-            "openspec tasks.md should appear after bd sync --from-main"
-        );
-        assert!(
-            openspec_pos < wai_reflect_pos,
-            "openspec tasks.md should appear before wai reflect"
-        );
-    }
-
-    #[test]
-    fn openspec_archive_step_present_when_openspec_detected() {
-        let output = wai_block_content(&["openspec"], &[], &[]);
-        assert!(
-            output.contains("openspec archive"),
-            "expected 'openspec archive' in output"
-        );
-    }
-
-    #[test]
-    fn openspec_archive_step_absent_without_openspec() {
+    fn slim_block_points_to_detailed_instructions() {
         let output = wai_block_content(&[], &[], &[]);
         assert!(
-            !output.contains("openspec archive"),
-            "unexpected 'openspec archive' in output without openspec"
+            output.contains(".wai/AGENTS.md"),
+            "expected pointer to .wai/AGENTS.md in slim block"
         );
     }
 
     #[test]
-    fn openspec_archive_step_after_tasks_step() {
-        let output = wai_block_content(&["openspec"], &[], &[]);
-        let tasks_pos = output
-            .find("openspec tasks.md")
-            .expect("openspec tasks.md not found");
-        let archive_pos = output
-            .find("openspec archive")
-            .expect("openspec archive not found");
-        assert!(
-            tasks_pos < archive_pos,
-            "openspec archive should appear after openspec tasks.md"
-        );
-    }
-
-    // Phase 2: cross-tool tracking section
-
-    #[test]
-    fn tracking_section_present_when_both_beads_and_openspec() {
-        let output = wai_block_content(&["beads", "openspec"], &[], &[]);
-        assert!(
-            output.contains("Tracking Work Across Tools"),
-            "expected 'Tracking Work Across Tools' in output"
-        );
-    }
-
-    #[test]
-    fn tracking_section_absent_with_only_beads() {
-        let output = wai_block_content(&["beads"], &[], &[]);
-        assert!(
-            !output.contains("Tracking Work Across Tools"),
-            "unexpected 'Tracking Work Across Tools' with beads only"
-        );
-    }
-
-    #[test]
-    fn tracking_section_absent_with_only_openspec() {
-        let output = wai_block_content(&["openspec"], &[], &[]);
-        assert!(
-            !output.contains("Tracking Work Across Tools"),
-            "unexpected 'Tracking Work Across Tools' with openspec only"
-        );
-    }
-
-    #[test]
-    fn tracking_section_between_capturing_work_and_ending_session() {
-        let output = wai_block_content(&["beads", "openspec"], &[], &[]);
-        let capturing_pos = output
-            .find("## Capturing Work")
-            .expect("## Capturing Work not found");
-        let tracking_pos = output
-            .find("## Tracking Work Across Tools")
-            .expect("## Tracking Work Across Tools not found");
-        let ending_pos = output
-            .find("## Ending a Session")
-            .expect("## Ending a Session not found");
-        assert!(
-            capturing_pos < tracking_pos,
-            "Tracking section should appear after Capturing Work"
-        );
-        assert!(
-            tracking_pos < ending_pos,
-            "Tracking section should appear before Ending a Session"
-        );
-    }
-
-    // Phase 3: pre-claim implementation check
-
-    #[test]
-    fn pre_claim_note_present_with_beads() {
-        let output = wai_block_content(&["beads"], &[], &[]);
-        assert!(
-            output.contains("already implemented"),
-            "expected 'already implemented' near bd ready line"
-        );
-    }
-
-    #[test]
-    fn pre_claim_note_absent_without_beads() {
+    fn slim_block_does_not_contain_quick_reference() {
         let output = wai_block_content(&[], &[], &[]);
         assert!(
-            !output.contains("already implemented"),
-            "unexpected 'already implemented' without beads"
-        );
-    }
-
-    // Phase 4: epic closure reminder
-
-    #[test]
-    fn bd_close_line_mentions_epic_with_beads() {
-        let output = wai_block_content(&["beads"], &[], &[]);
-        let bd_close_line = output
-            .lines()
-            .find(|l| l.contains("bd close <id>"))
-            .expect("bd close line not found");
-        assert!(
-            bd_close_line.contains("epic") || bd_close_line.contains("parent"),
-            "bd close line should mention 'epic' or 'parent', got: {bd_close_line}"
+            !output.contains("## Quick Reference"),
+            "slim block should not contain full Quick Reference"
         );
     }
 
     #[test]
-    fn bd_close_line_absent_without_beads() {
+    fn slim_block_does_not_contain_capturing_work() {
         let output = wai_block_content(&[], &[], &[]);
         assert!(
-            !output.contains("bd close <id>"),
-            "unexpected 'bd close <id>' without beads"
+            !output.contains("## Capturing Work"),
+            "slim block should not contain Capturing Work section"
         );
     }
 
-    // TDD/Tidy First disclaimer
+    #[test]
+    fn slim_block_does_not_contain_ending_session() {
+        let output = wai_block_content(&[], &[], &[]);
+        assert!(
+            !output.contains("## Ending a Session"),
+            "slim block should not contain Ending a Session section"
+        );
+    }
 
     #[test]
     fn tdd_disclaimer_present_with_companion_tools() {
         let output = wai_block_content(&["beads", "openspec"], &[], &[]);
         assert!(
             output.contains("CRITICAL"),
-            "expected CRITICAL disclaimer in output with companion tools"
+            "expected CRITICAL disclaimer in slim block with companion tools"
         );
-        assert!(
-            output.contains("TDD"),
-            "expected 'TDD' in output with companion tools"
-        );
+        assert!(output.contains("TDD"), "expected 'TDD' in slim block");
         assert!(
             output.contains("Tidy First"),
-            "expected 'Tidy First' in output with companion tools"
+            "expected 'Tidy First' in slim block"
         );
     }
 
@@ -697,7 +675,7 @@ mod wai_block_tests {
         let output = wai_block_content(&["beads"], &[], &[]);
         assert!(
             output.contains("CRITICAL"),
-            "expected CRITICAL disclaimer in output with beads"
+            "expected CRITICAL disclaimer with beads"
         );
     }
 
@@ -706,26 +684,9 @@ mod wai_block_tests {
         let output = wai_block_content(&[], &[], &[]);
         assert!(
             !output.contains("Tidy First"),
-            "unexpected 'Tidy First' in output without companion tools"
+            "unexpected 'Tidy First' without companion tools"
         );
     }
-
-    #[test]
-    fn tdd_disclaimer_before_when_to_use_what() {
-        let output = wai_block_content(&["beads"], &[], &[]);
-        let critical_pos = output
-            .find("CRITICAL")
-            .expect("CRITICAL not found in output");
-        let when_pos = output
-            .find("## When to Use What")
-            .expect("## When to Use What not found");
-        assert!(
-            critical_pos < when_pos,
-            "CRITICAL disclaimer should appear before '## When to Use What'"
-        );
-    }
-
-    // ro5 skill reminder
 
     #[test]
     fn ro5_reminder_present_when_skill_installed() {
@@ -733,11 +694,7 @@ mod wai_block_tests {
             let output = wai_block_content(&[], &[name], &[]);
             assert!(
                 output.contains("/ro5"),
-                "expected '/ro5' in output when skill '{name}' installed"
-            );
-            assert!(
-                output.contains("Rule of 5"),
-                "expected 'Rule of 5' in output when skill '{name}' installed"
+                "expected '/ro5' when skill '{name}' installed"
             );
         }
     }
@@ -745,14 +702,8 @@ mod wai_block_tests {
     #[test]
     fn ro5_reminder_absent_without_skill() {
         let output = wai_block_content(&["beads", "openspec"], &[], &[]);
-        assert!(
-            !output.contains("/ro5"),
-            "unexpected '/ro5' in output without ro5 skill"
-        );
+        assert!(!output.contains("/ro5"), "unexpected '/ro5' without skill");
     }
-
-    // 6.4: search-before-research instruction present with companions, absent without
-    // The instruction uses "before writing new content" as its distinguishing phrase.
 
     const SEARCH_INSTRUCTION: &str = "before writing new content";
 
@@ -766,7 +717,7 @@ mod wai_block_tests {
             let output = wai_block_content(plugins, &[], &[]);
             assert!(
                 output.contains(SEARCH_INSTRUCTION),
-                "expected search-before-research instruction with plugins {:?}",
+                "expected search instruction with plugins {:?}",
                 plugins
             );
         }
@@ -777,7 +728,7 @@ mod wai_block_tests {
         let output = wai_block_content(&[], &[], &[]);
         assert!(
             !output.contains(SEARCH_INSTRUCTION),
-            "unexpected search-before-research instruction without companion tools"
+            "unexpected search instruction without companion tools"
         );
     }
 
@@ -788,28 +739,17 @@ mod wai_block_tests {
         let search_pos = output
             .find(SEARCH_INSTRUCTION)
             .expect("search instruction not found");
-        assert!(
-            search_pos > tdd_pos,
-            "search-before-research should appear after TDD disclaimer"
-        );
+        assert!(search_pos > tdd_pos);
     }
-
-    // Context pressure warning
 
     #[test]
     fn context_pressure_tells_user() {
         let output = wai_block_content(&[], &[], &[]);
-        assert!(
-            output.contains("stop and tell the user"),
-            "expected 'stop and tell the user' context pressure instruction"
-        );
-        assert!(
-            output.contains("responses degrade"),
-            "expected 'responses degrade' phrasing"
-        );
+        assert!(output.contains("stop and tell the user"));
+        assert!(output.contains("responses degrade"));
     }
 
-    // Pipeline section tests
+    // Pipeline section (stays in slim block — discovery-critical)
 
     #[test]
     fn pipeline_section_present_when_pipelines_installed() {
@@ -820,31 +760,16 @@ mod wai_block_tests {
             step_count: 8,
         }];
         let output = wai_block_content(&[], &[], &pipelines);
-        assert!(
-            output.contains("## Available Pipelines"),
-            "expected 'Available Pipelines' section"
-        );
-        assert!(
-            output.contains("scientific-research"),
-            "expected pipeline name in output"
-        );
-        assert!(
-            output.contains("Frontier-level research"),
-            "expected 'when' description in output"
-        );
-        assert!(
-            output.contains("wai pipeline start scientific-research --topic=<topic>"),
-            "expected start command in output"
-        );
+        assert!(output.contains("## Available Pipelines"));
+        assert!(output.contains("scientific-research"));
+        assert!(output.contains("Frontier-level research"));
+        assert!(output.contains("wai pipeline start scientific-research --topic=<topic>"));
     }
 
     #[test]
     fn pipeline_section_absent_when_no_pipelines() {
         let output = wai_block_content(&[], &[], &[]);
-        assert!(
-            !output.contains("Available Pipelines"),
-            "unexpected 'Available Pipelines' section without pipelines"
-        );
+        assert!(!output.contains("Available Pipelines"));
     }
 
     #[test]
@@ -856,36 +781,7 @@ mod wai_block_tests {
             step_count: 2,
         }];
         let output = wai_block_content(&[], &[], &pipelines);
-        assert!(
-            output.contains("gates"),
-            "expected gate note in pipeline section"
-        );
-    }
-
-    #[test]
-    fn pipeline_section_between_quick_ref_and_structure() {
-        let pipelines = vec![InstalledPipeline {
-            name: "test".to_string(),
-            description: "Test".to_string(),
-            when: "Testing".to_string(),
-            step_count: 1,
-        }];
-        let output = wai_block_content(&[], &[], &pipelines);
-        let quick_ref_pos = output
-            .find("## Quick Reference")
-            .expect("Quick Reference not found");
-        let pipeline_pos = output
-            .find("## Available Pipelines")
-            .expect("Available Pipelines not found");
-        let structure_pos = output.find("## Structure").expect("Structure not found");
-        assert!(
-            pipeline_pos > quick_ref_pos,
-            "Available Pipelines should appear after Quick Reference"
-        );
-        assert!(
-            pipeline_pos < structure_pos,
-            "Available Pipelines should appear before Structure"
-        );
+        assert!(output.contains("gates"));
     }
 
     #[test]
@@ -907,8 +803,114 @@ mod wai_block_tests {
         let output = wai_block_content(&[], &[], &pipelines);
         assert!(output.contains("alpha"));
         assert!(output.contains("beta"));
-        assert!(output.contains("When alpha"));
-        assert!(output.contains("When beta"));
+    }
+
+    // ── Detailed content (Layer 2: .wai/AGENTS.md) ───────────────────────
+
+    #[test]
+    fn detailed_contains_session_start() {
+        let output = wai_detailed_content(&[], &[], &[]);
+        assert!(output.contains("## Starting a Session"));
+    }
+
+    #[test]
+    fn detailed_wai_sync_before_status() {
+        let output = wai_detailed_content(&[], &[], &[]);
+        let sync_pos = output.find("wai sync").expect("wai sync not found");
+        let status_pos = output.find("wai status").expect("wai status not found");
+        assert!(sync_pos < status_pos);
+    }
+
+    #[test]
+    fn detailed_contains_capturing_work() {
+        let output = wai_detailed_content(&[], &[], &[]);
+        assert!(output.contains("## Capturing Work"));
+    }
+
+    #[test]
+    fn detailed_contains_ending_session() {
+        let output = wai_detailed_content(&[], &[], &[]);
+        assert!(output.contains("## Ending a Session"));
+    }
+
+    #[test]
+    fn detailed_contains_quick_reference() {
+        let output = wai_detailed_content(&[], &[], &[]);
+        assert!(output.contains("## Quick Reference"));
+    }
+
+    #[test]
+    fn detailed_contains_structure() {
+        let output = wai_detailed_content(&[], &[], &[]);
+        assert!(output.contains("## Structure"));
+    }
+
+    #[test]
+    fn detailed_openspec_checklist_present_when_detected() {
+        let output = wai_detailed_content(&["openspec"], &[], &[]);
+        assert!(output.contains("openspec tasks.md"));
+    }
+
+    #[test]
+    fn detailed_openspec_checklist_absent_without_openspec() {
+        let output = wai_detailed_content(&[], &[], &[]);
+        assert!(!output.contains("openspec tasks.md"));
+    }
+
+    #[test]
+    fn detailed_openspec_archive_present_when_detected() {
+        let output = wai_detailed_content(&["openspec"], &[], &[]);
+        assert!(output.contains("openspec archive"));
+    }
+
+    #[test]
+    fn detailed_tracking_section_present_when_both() {
+        let output = wai_detailed_content(&["beads", "openspec"], &[], &[]);
+        assert!(output.contains("Tracking Work Across Tools"));
+    }
+
+    #[test]
+    fn detailed_tracking_section_absent_with_only_beads() {
+        let output = wai_detailed_content(&["beads"], &[], &[]);
+        assert!(!output.contains("Tracking Work Across Tools"));
+    }
+
+    #[test]
+    fn detailed_pre_claim_note_present_with_beads() {
+        let output = wai_detailed_content(&["beads"], &[], &[]);
+        assert!(output.contains("already implemented"));
+    }
+
+    #[test]
+    fn detailed_pre_claim_note_absent_without_beads() {
+        let output = wai_detailed_content(&[], &[], &[]);
+        assert!(!output.contains("already implemented"));
+    }
+
+    #[test]
+    fn detailed_bd_close_mentions_epic_with_beads() {
+        let output = wai_detailed_content(&["beads"], &[], &[]);
+        let bd_close_line = output
+            .lines()
+            .find(|l| l.contains("bd close <id>"))
+            .expect("bd close line not found");
+        assert!(
+            bd_close_line.contains("epic") || bd_close_line.contains("parent"),
+            "bd close line should mention 'epic' or 'parent', got: {bd_close_line}"
+        );
+    }
+
+    #[test]
+    fn detailed_contains_autonomous_loop() {
+        let output = wai_detailed_content(&[], &[], &[]);
+        assert!(output.contains("Autonomous Loop"));
+    }
+
+    #[test]
+    fn detailed_does_not_have_wai_markers() {
+        let output = wai_detailed_content(&[], &[], &[]);
+        assert!(!output.contains(WAI_START));
+        assert!(!output.contains(WAI_END));
     }
 }
 

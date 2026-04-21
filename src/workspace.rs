@@ -6,7 +6,7 @@ use crate::config::{
     PROJECTS_DIR, ProjectConfig, REFLECTIONS_DIR, RESOURCES_DIR, RULES_DIR, SKILLS_DIR,
     TEMPLATES_DIR, agent_config_dir,
 };
-use crate::managed_block::{InstalledPipeline, inject_managed_block};
+use crate::managed_block::{InstalledPipeline, inject_managed_block, write_detailed_agents_file};
 use crate::plugin;
 
 /// Actions taken during workspace repair/initialization
@@ -274,7 +274,7 @@ pub fn ensure_workspace_current(project_root: &Path) -> Result<Vec<WorkspaceActi
     // Collect installed pipelines with metadata for managed block
     let installed_pipelines = detect_installed_pipelines(project_root);
 
-    // Inject/update managed blocks in agent instruction files
+    // Inject/update slim managed blocks in root agent instruction files
     let agent_files = ["AGENTS.md", "CLAUDE.md"];
     for filename in &agent_files {
         let path = project_root.join(filename);
@@ -291,6 +291,13 @@ pub fn ensure_workspace_current(project_root: &Path) -> Result<Vec<WorkspaceActi
                 }
             }
         }
+    }
+
+    // Write detailed workflow reference to .wai/AGENTS.md
+    let wai_dir = project_root.join(CONFIG_DIR);
+    match write_detailed_agents_file(&wai_dir, &detected, &skill_name_refs, &installed_pipelines) {
+        Ok(result) => actions.push(WorkspaceAction::new(result.description())),
+        Err(e) => eprintln!("Warning: Failed to write .wai/AGENTS.md: {}", e),
     }
 
     Ok(actions)

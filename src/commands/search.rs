@@ -91,6 +91,9 @@ pub fn run(args: SearchArgs) -> Result<()> {
     // results: (file_path, line_num, line, start, end, context_lines)
     let mut results: Vec<(String, usize, String, usize, usize, Vec<String>)> = Vec::new();
 
+    // Managed files that should not appear in artifact search results.
+    let agents_md = search_root.join("AGENTS.md");
+
     for entry in WalkDir::new(&search_root)
         .into_iter()
         .filter_map(|e| e.ok())
@@ -102,6 +105,8 @@ pub fn run(args: SearchArgs) -> Result<()> {
                 .map(|ext| ext == "md" || ext == "yml" || ext == "yaml" || ext == "toml")
                 .unwrap_or(false)
         })
+        // Skip managed files (e.g. .wai/AGENTS.md) — not user artifacts
+        .filter(|e| e.path() != agents_md)
     {
         // Apply type filter
         if let Some(ref type_f) = type_filter {
