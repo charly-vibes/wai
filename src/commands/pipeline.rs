@@ -1457,6 +1457,7 @@ fn cmd_validate(name: Option<&str>) -> Result<()> {
 fn get_builtin_template(name: &str) -> Option<&'static str> {
     match name {
         "scientific-research" => Some(include_str!("../templates/scientific-research.toml")),
+        "tdd-ro5" => Some(include_str!("../templates/tdd-ro5.toml")),
         _ => None,
     }
 }
@@ -1464,7 +1465,7 @@ fn get_builtin_template(name: &str) -> Option<&'static str> {
 /// Returns names of all available built-in templates.
 #[cfg(test)]
 fn builtin_template_names() -> &'static [&'static str] {
-    &["scientific-research"]
+    &["scientific-research", "tdd-ro5"]
 }
 
 /// List all pipeline names found in the pipelines directory.
@@ -3220,6 +3221,44 @@ require_input_manifest = true
     }
 
     #[test]
+    fn builtin_template_tdd_ro5_exists() {
+        let template = get_builtin_template("tdd-ro5");
+        assert!(template.is_some(), "expected tdd-ro5 template");
+        let content = template.unwrap();
+        assert!(content.contains("[pipeline]"));
+        assert!(content.contains("tdd-ro5"));
+        assert!(content.contains("[pipeline.metadata]"));
+    }
+
+    #[test]
+    fn builtin_template_tdd_ro5_has_seven_steps() {
+        let content = get_builtin_template("tdd-ro5").unwrap();
+        let f = write_toml(content);
+        let def = load_pipeline_toml(f.path()).expect("should parse tdd-ro5 template");
+        assert_eq!(def.steps.len(), 7);
+        let ids: Vec<&str> = def.steps.iter().map(|s| s.id.as_str()).collect();
+        assert_eq!(
+            ids,
+            ["plan", "red", "green", "refactor", "review", "fix", "ship"]
+        );
+    }
+
+    #[test]
+    fn builtin_template_tdd_ro5_has_gates() {
+        let content = get_builtin_template("tdd-ro5").unwrap();
+        let f = write_toml(content);
+        let def = load_pipeline_toml(f.path()).expect("should parse tdd-ro5 template");
+        // plan step has structural gate
+        assert!(def.steps[0].gate.is_some());
+        // review step has procedural gate
+        let review_gate = def.steps[4].gate.as_ref().unwrap();
+        assert!(review_gate.procedural.is_some());
+        // green step has oracle gate
+        let green_gate = def.steps[2].gate.as_ref().unwrap();
+        assert!(!green_gate.oracles.is_empty());
+    }
+
+    #[test]
     fn builtin_template_unknown_returns_none() {
         assert!(get_builtin_template("nonexistent").is_none());
     }
@@ -3229,6 +3268,7 @@ require_input_manifest = true
         let names = builtin_template_names();
         assert!(!names.is_empty());
         assert!(names.contains(&"scientific-research"));
+        assert!(names.contains(&"tdd-ro5"));
     }
 
     // ── artifact_hash ─────────────────────────────────────────────────────
