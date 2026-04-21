@@ -77,6 +77,7 @@ pub fn run(topic: Option<String>, fix: Option<String>) -> Result<()> {
         check_shell_linting(&repo_root),
         check_documentation(&repo_root),
         check_docs_status_page(&repo_root),
+        check_docs_openspec_inclusion(&repo_root),
         check_ai_instructions(&repo_root),
         check_llm_txt(&repo_root),
         check_agent_skills(&repo_root),
@@ -1974,6 +1975,113 @@ fn check_docs_status_page(repo_root: &Path) -> CheckResult {
                 .to_string(),
         ),
     }
+}
+
+fn check_docs_openspec_inclusion(repo_root: &Path) -> CheckResult {
+    let name = "Specs in deployed docs";
+    let intent = Some(
+        "Include openspec specifications in deployed documentation so users can discover \
+         the design rationale behind features."
+            .to_string(),
+    );
+    let success_criteria = Some(
+        "When both openspec/ and a docs CI workflow exist, the workflow copies or references \
+         openspec/ into the built output so specs ship with the deployed site."
+            .to_string(),
+    );
+
+    let openspec_dir = repo_root.join("openspec");
+    let docs_dir = repo_root.join("docs");
+
+    // Only relevant when both openspec and docs are present
+    if !openspec_dir.is_dir() || !docs_dir.is_dir() {
+        return CheckResult {
+            name: name.to_string(),
+            status: Status::Pass,
+            message: "Not applicable (openspec or docs missing)".to_string(),
+            intent,
+            success_criteria,
+            suggestion: None,
+        };
+    }
+
+    // Check docs CI workflow for openspec inclusion.
+    // Doc tools (mdBook, MkDocs, etc.) only package their own src directory,
+    // so openspec/ content won't appear in the deployed site unless the CI
+    // workflow explicitly copies or symlinks it into the build tree.
+    let workflow_includes_openspec = docs_workflow_includes_openspec(repo_root);
+
+    if workflow_includes_openspec {
+        return CheckResult {
+            name: name.to_string(),
+            status: Status::Pass,
+            message: "Docs workflow includes openspec in build".to_string(),
+            intent,
+            success_criteria,
+            suggestion: None,
+        };
+    }
+
+    // Check if openspec content is already inside the docs source tree
+    // (e.g. symlinked or copied manually)
+    let specs_in_docs = docs_dir.join("src").join("specs").is_dir()
+        || docs_dir.join("src").join("openspec").is_dir()
+        || docs_dir.join("specs").is_dir();
+
+    if specs_in_docs {
+        return CheckResult {
+            name: name.to_string(),
+            status: Status::Pass,
+            message: "Specs already in docs source tree".to_string(),
+            intent,
+            success_criteria,
+            suggestion: None,
+        };
+    }
+
+    CheckResult {
+        name: name.to_string(),
+        status: Status::Info,
+        message: "openspec not included in deployed docs".to_string(),
+        intent,
+        success_criteria,
+        suggestion: Some(
+            "Your docs workflow doesn't include openspec/ in the build. \
+             Specs explain the design rationale behind features and help users \
+             understand architectural decisions. Add a step to your docs CI \
+             workflow that copies openspec/specs/ into the docs source tree \
+             before building (e.g. `cp -r openspec/specs docs/src/specs`), \
+             then link them from your table of contents."
+                .to_string(),
+        ),
+    }
+}
+
+/// Check whether any docs-related CI workflow references openspec.
+///
+/// Scans `.github/workflows/` for files whose name contains "doc" or "page"
+/// and checks whether the workflow body mentions "openspec".
+fn docs_workflow_includes_openspec(repo_root: &Path) -> bool {
+    let workflows_dir = repo_root.join(".github").join("workflows");
+    let Ok(entries) = std::fs::read_dir(&workflows_dir) else {
+        return false;
+    };
+    for entry in entries.filter_map(|e| e.ok()) {
+        let path = entry.path();
+        let name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+        if (name.contains("doc") || name.contains("page"))
+            && (name.ends_with(".yml") || name.ends_with(".yaml"))
+            && let Ok(content) = std::fs::read_to_string(&path)
+            && content.to_lowercase().contains("openspec")
+        {
+            return true;
+        }
+    }
+    false
 }
 
 fn check_ai_instructions(repo_root: &Path) -> CheckResult {
