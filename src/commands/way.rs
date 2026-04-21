@@ -1507,13 +1507,18 @@ fn hook_exists_nonempty(repo_root: &Path) -> bool {
     read_hook(repo_root, "pre-commit").is_some_and(|c| !c.trim().is_empty())
 }
 
-/// Return the `core.hooksPath` git config value if set, else `None`.
+/// Return the repo-local `core.hooksPath` git config value, else `None`.
+///
+/// Only checks `--local` scope. Global/system `core.hooksPath` is a machine-level
+/// setting outside the repo's control and not something a repo best-practices
+/// check should flag.
 fn git_core_hooks_path(repo_root: &Path) -> Option<String> {
     let output = std::process::Command::new("git")
         .args([
             "-C",
             &repo_root.to_string_lossy(),
             "config",
+            "--local",
             "core.hooksPath",
         ])
         .output()
@@ -1575,7 +1580,7 @@ fn check_git_hooks(repo_root: &Path) -> CheckResult {
                 intent,
                 success_criteria,
                 suggestion: Some(
-                    "Unset it first: git config --unset core.hooksPath && git config --global --unset core.hooksPath".to_string(),
+                    "Unset it first: git config --local --unset core.hooksPath".to_string(),
                 ),
             };
         }
