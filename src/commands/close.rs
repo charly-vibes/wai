@@ -69,19 +69,17 @@ pub fn run(project: Option<String>, remember: bool) -> Result<()> {
 
         let in_worktree = detect_main_worktree_root(&project_root).is_some();
 
-        let next_steps = if beads_detected && in_worktree {
-            format!(
-                "wai sync --from-main && bd sync --from-main && {}",
-                git_add_part
-            )
-        } else if beads_detected {
-            format!("bd sync --from-main && {}", git_add_part)
-        } else if in_worktree {
+        let next_steps = if in_worktree {
             format!("wai sync --from-main && {}", git_add_part)
         } else {
             git_add_part
         };
         println!("→ Next: {}", next_steps);
+        if beads_detected {
+            println!(
+                "→ Beads: if you need tracker-specific follow-up, run `bd` and use the commands your installed version offers"
+            );
+        }
 
         // 5.1–5.3: Reflect nudge — show if 5+ handoffs since last reflect.
         if !context.json {

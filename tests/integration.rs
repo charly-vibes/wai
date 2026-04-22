@@ -4784,14 +4784,18 @@ fn close_single_project_creates_handoff() {
         stdout.contains("Handoff created:"),
         "expected 'Handoff created:' in stdout, got: {stdout}"
     );
-    // Output should contain next-steps with bd sync (beads detected)
-    assert!(
-        stdout.contains("bd sync --from-main"),
-        "expected 'bd sync --from-main' in stdout, got: {stdout}"
-    );
+    // Output should contain next-steps plus a generic beads hint.
     assert!(
         stdout.contains("→ Next:"),
         "expected '→ Next:' in stdout, got: {stdout}"
+    );
+    assert!(
+        stdout.contains("→ Beads:"),
+        "expected '→ Beads:' in stdout, got: {stdout}"
+    );
+    assert!(
+        !stdout.contains("bd sync --from-main"),
+        "did not expect stale 'bd sync --from-main' in stdout, got: {stdout}"
     );
 }
 

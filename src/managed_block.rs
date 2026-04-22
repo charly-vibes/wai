@@ -281,8 +281,7 @@ pub fn wai_detailed_content(
     );
     if has_beads {
         doc.push_str(
-            "[ ] bd close <id>                  # close completed issues; also close parent epic if last sub-task\n\
-             [ ] bd sync --from-main            # pull beads updates\n",
+            "[ ] bd close <id>                  # close completed issues; also close parent epic if last sub-task\n",
         );
     }
     if has_openspec {
@@ -294,9 +293,15 @@ pub fn wai_detailed_content(
     doc.push_str(
         "[ ] wai reflect                    # update CLAUDE.md with project patterns (every ~5 sessions)\n\
          [ ] git add <files> && git commit  # commit code + handoff\n\
-         ```\n\
-         \n\
-         ### Autonomous Loop\n\
+         ```\n",
+    );
+    if has_beads {
+        doc.push_str(
+            "\nIf beads needs any extra follow-up beyond `bd close`, run `bd` and use the\ncommands your installed version offers. Do not assume a hard-coded sync\nsubcommand.\n",
+        );
+    }
+    doc.push_str(
+        "\n### Autonomous Loop\n\
          \n\
          One task per session. The resume loop:\n\
          \n\
@@ -898,6 +903,18 @@ mod wai_block_tests {
             bd_close_line.contains("epic") || bd_close_line.contains("parent"),
             "bd close line should mention 'epic' or 'parent', got: {bd_close_line}"
         );
+    }
+
+    #[test]
+    fn detailed_beads_note_present_with_beads() {
+        let output = wai_detailed_content(&["beads"], &[], &[]);
+        assert!(output.contains("Do not assume a hard-coded sync"));
+    }
+
+    #[test]
+    fn detailed_beads_note_absent_without_beads() {
+        let output = wai_detailed_content(&[], &[], &[]);
+        assert!(!output.contains("Do not assume a hard-coded sync"));
     }
 
     #[test]
