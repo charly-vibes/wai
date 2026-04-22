@@ -93,10 +93,60 @@ fn check_unmanaged_dir(target: &Path) -> Result<()> {
     }
 }
 
+/// Check whether a file→file symlink projection is already up-to-date.
+#[cfg(unix)]
+fn symlink_file_up_to_date(target: &Path, source: &Path) -> bool {
+    target.is_symlink()
+        && std::fs::read_link(target)
+            .map(|dest| dest == source)
+            .unwrap_or(false)
+}
+
+/// Check whether a dir→dir symlink projection is already up-to-date.
+///
+/// Returns `true` when `target` is a real directory whose entries are exactly the
+/// symlinks that would be created from `source`, each pointing at the right path.
+#[cfg(unix)]
+fn symlink_dir_up_to_date(target: &Path, source: &Path) -> bool {
+    use std::collections::HashSet;
+
+    if !target.is_dir() || target.is_symlink() {
+        return false;
+    }
+
+    // Collect expected entry names from source.
+    let expected: HashSet<std::ffi::OsString> = match std::fs::read_dir(source) {
+        Ok(rd) => rd.filter_map(|e| e.ok()).map(|e| e.file_name()).collect(),
+        Err(_) => return false,
+    };
+
+    // Collect actual entry names in target.
+    let actual: HashSet<std::ffi::OsString> = match std::fs::read_dir(target) {
+        Ok(rd) => rd.filter_map(|e| e.ok()).map(|e| e.file_name()).collect(),
+        Err(_) => return false,
+    };
+
+    if expected != actual {
+        return false;
+    }
+
+    // Each entry must be a symlink pointing to the correct source path.
+    expected.iter().all(|name| {
+        let link = target.join(name);
+        let expected_dest = source.join(name);
+        link.is_symlink()
+            && std::fs::read_link(&link)
+                .map(|dest| dest == expected_dest)
+                .unwrap_or(false)
+    })
+}
+
 /// Execute a symlink projection.
 ///
 /// - File source → file symlink at target pointing to source.
 /// - Directory source → create target directory and symlink each entry inside it.
+///
+/// Idempotent: skips work when the target already matches the desired state.
 pub(crate) fn execute_symlink(
     project_root: &Path,
     config_dir: &Path,
@@ -105,6 +155,27 @@ pub(crate) fn execute_symlink(
     let target = project_root.join(&proj.target);
 
     ensure_parent_dirs(&target)?;
+
+    // Check if the projection is already up-to-date.
+    #[cfg(unix)]
+    {
+        let up_to_date = proj.sources.iter().all(|source| {
+            let source_path = config_dir.join(source);
+            if !source_path.exists() {
+                return !target.exists(); // stale target → not up-to-date
+            }
+            if source_path.is_file() {
+                symlink_file_up_to_date(&target, &source_path)
+            } else if source_path.is_dir() {
+                symlink_dir_up_to_date(&target, &source_path)
+            } else {
+                true
+            }
+        });
+        if up_to_date {
+            return Ok(());
+        }
+    }
 
     // Remove any existing target before recreating.
     if target.symlink_metadata().is_ok() {
@@ -569,6 +640,115 @@ mod tests {
         execute_symlink(&root, &config, &proj).unwrap();
         assert!(root.join("f.md").is_symlink());
         assert_eq!(fs::read_to_string(root.join("f.md")).unwrap(), "new");
+    }
+
+    // ── idempotency tests ──────────────────────────────────────────────────────
+
+    #[test]
+    #[cfg(unix)]
+    fn symlink_file_is_idempotent() {
+        let tmp = TempDir::new().unwrap();
+        let (root, config) = make_config_dir(&tmp);
+
+        fs::write(config.join("notes.md"), "hello").unwrap();
+
+        let proj = Projection {
+            target: "out/notes.md".into(),
+            strategy: "symlink".into(),
+            sources: vec!["notes.md".into()],
+        };
+
+        execute_symlink(&root, &config, &proj).unwrap();
+        let target = root.join("out/notes.md");
+        let meta_before = target.symlink_metadata().unwrap();
+        let mtime_before = meta_before.modified().unwrap();
+
+        // Small delay to ensure mtime would differ if recreated.
+        std::thread::sleep(std::time::Duration::from_millis(50));
+
+        // Second call should be a no-op.
+        execute_symlink(&root, &config, &proj).unwrap();
+        let meta_after = target.symlink_metadata().unwrap();
+        let mtime_after = meta_after.modified().unwrap();
+
+        assert_eq!(
+            mtime_before, mtime_after,
+            "symlink should not be recreated when already correct"
+        );
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn symlink_dir_is_idempotent() {
+        let tmp = TempDir::new().unwrap();
+        let (root, config) = make_config_dir(&tmp);
+
+        let src_dir = config.join("skills");
+        fs::create_dir_all(&src_dir).unwrap();
+        fs::write(src_dir.join("a.md"), "skill-a").unwrap();
+        fs::write(src_dir.join("b.md"), "skill-b").unwrap();
+
+        let proj = Projection {
+            target: "out/skills".into(),
+            strategy: "symlink".into(),
+            sources: vec!["skills".into()],
+        };
+
+        execute_symlink(&root, &config, &proj).unwrap();
+        let link_a = root.join("out/skills/a.md");
+        let mtime_before = link_a.symlink_metadata().unwrap().modified().unwrap();
+
+        std::thread::sleep(std::time::Duration::from_millis(50));
+
+        // Second call should be a no-op.
+        execute_symlink(&root, &config, &proj).unwrap();
+        let mtime_after = link_a.symlink_metadata().unwrap().modified().unwrap();
+
+        assert_eq!(
+            mtime_before, mtime_after,
+            "dir symlinks should not be recreated when already correct"
+        );
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn symlink_dir_updates_when_source_changes() {
+        let tmp = TempDir::new().unwrap();
+        let (root, config) = make_config_dir(&tmp);
+
+        let src_dir = config.join("skills");
+        fs::create_dir_all(&src_dir).unwrap();
+        fs::write(src_dir.join("a.md"), "skill-a").unwrap();
+
+        let proj = Projection {
+            target: "out/skills".into(),
+            strategy: "symlink".into(),
+            sources: vec!["skills".into()],
+        };
+
+        execute_symlink(&root, &config, &proj).unwrap();
+        assert!(!root.join("out/skills/b.md").exists());
+
+        // Add a new file to source.
+        fs::write(src_dir.join("b.md"), "skill-b").unwrap();
+
+        // Allow removal of the managed dir in non-interactive test context.
+        crate::context::set_context(crate::context::CliContext {
+            no_input: false,
+            json: false,
+            yes: true,
+            safe: false,
+            verbose: 0,
+            quiet: false,
+        });
+
+        // Should detect the mismatch and recreate.
+        execute_symlink(&root, &config, &proj).unwrap();
+        assert!(root.join("out/skills/b.md").exists());
+        assert_eq!(
+            fs::read_to_string(root.join("out/skills/b.md")).unwrap(),
+            "skill-b"
+        );
     }
 
     // ── safety check tests ────────────────────────────────────────────────────
