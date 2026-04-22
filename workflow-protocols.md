@@ -49,4 +49,4 @@ Before claiming an issue (expand Stage 1 Step 2):
 
 - Close tickets before committing (so commit message can reference closure)
 - One commit per logical unit — don't bundle mypy fixes with feature code
-- Run `bd sync --from-main` after every commit session (even if it fails for missing remote — it's a no-op then)
+- If beads needs follow-up after a commit session, run `bd` and use the commands your installed version offers
