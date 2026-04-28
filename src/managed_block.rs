@@ -822,6 +822,26 @@ mod wai_block_tests {
         assert!(!output.contains("## Ubiquitous Language"));
     }
 
+    #[test]
+    fn detailed_block_includes_ubiquitous_language_note_when_index_exists() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let note_root = dir.path().join(".wai/resources/ubiquitous-language");
+        std::fs::create_dir_all(&note_root).unwrap();
+        std::fs::write(note_root.join("README.md"), "# Index\n").unwrap();
+
+        let output = wai_detailed_content(dir.path(), &[], &[], &[]);
+        assert!(output.contains("## Ubiquitous Language"));
+        assert!(output.contains("read it first as the"));
+        assert!(output.contains("Avoid loading every terminology file"));
+    }
+
+    #[test]
+    fn detailed_block_omits_ubiquitous_language_note_without_index() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let output = wai_detailed_content(dir.path(), &[], &[], &[]);
+        assert!(!output.contains("## Ubiquitous Language"));
+    }
+
     // Pipeline section (stays in slim block — discovery-critical)
 
     #[test]

@@ -118,7 +118,7 @@ Manage how AI agents interact with your project through skills, rules, and conte
 | `wai config add <type> <file>` | Add agent config (skill/rule/context) |
 | `wai config edit <path>` | **Safe:** Edit config file in $EDITOR |
 | `wai resource list skills` | List all available skills |
-| `wai resource add skill <name>` | Scaffold a new skill (with optional `--template`) |
+| `wai add skill <name> [--template <tpl>]` | Scaffold a new skill (templates: gather, create, tdd, rule-of-5, ubiquitous-language) |
 | `wai resource install <skill> [--global\|--from-repo <path>]` | Install a skill globally or from another repo |
 | `wai resource export <skills...> --output <file>` | Export skills to a tar.gz archive |
 | `wai resource import skills [--from <dir>]` | Import skills from a directory |

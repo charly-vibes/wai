@@ -102,6 +102,30 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 "WAI_PIPELINE_RUN tag is merged with any --tags value",
             ],
         }),
+        "add skill" => Some(HelpContent {
+            about: "Add a new agent skill to the repository",
+            examples: &[
+                ("wai add skill my-skill", "Create a blank skill"),
+                (
+                    "wai add skill issue/gather --template gather",
+                    "Create from built-in gather template",
+                ),
+                (
+                    "wai add skill ubiquitous-language --template ubiquitous-language",
+                    "Scaffold ubiquitous-language skill",
+                ),
+            ],
+            options: &[],
+            advanced_options: &[
+                "--template <TPL>    Built-in templates: gather, create, tdd, rule-of-5, ubiquitous-language",
+            ],
+            env_vars: &[("NO_COLOR", "Disable colored output")],
+            internals: &[
+                "Skill stored in .wai/resources/agent-config/skills/<name>/SKILL.md",
+                "Hierarchical skill names use one '/' separator (e.g. issue/gather)",
+                "'wai resource add skill' is deprecated — prefer 'wai add skill'",
+            ],
+        }),
         "phase" => Some(HelpContent {
             about: "Show or change the current project phase",
             examples: &[
@@ -689,13 +713,89 @@ pub fn try_render_help(args: &[String]) -> Option<String> {
         }
     }
 
-    let subcommand = args
+    // Collect up to two positional (non-flag) tokens so we can try compound
+    // keys like "add skill" before falling back to the single-token key.
+    let mut positional = args
         .iter()
         .skip(1)
-        .find(|a| !a.starts_with('-') && *a != "help");
+        .filter(|a| !a.starts_with('-') && *a != "help");
+    let first = positional.next();
+    let second = positional.next();
 
-    match subcommand {
-        Some(cmd) => render_command_help(cmd.as_str(), verbose),
-        None => Some(render_main_help(verbose)),
+    match (first, second) {
+        (Some(verb), Some(noun)) => {
+            let compound = format!("{verb} {noun}");
+            render_command_help(&compound, verbose)
+                .or_else(|| render_command_help(verb.as_str(), verbose))
+        }
+        (Some(cmd), None) => render_command_help(cmd.as_str(), verbose),
+        _ => Some(render_main_help(verbose)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn args(v: &[&str]) -> Vec<String> {
+        v.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn no_help_flag_returns_none() {
+        assert!(try_render_help(&args(&["wai", "add", "skill"])).is_none());
+    }
+
+    #[test]
+    fn main_help_when_no_subcommand() {
+        let out = try_render_help(&args(&["wai", "--help"])).unwrap();
+        assert!(out.contains("wai"), "main help should mention wai");
+    }
+
+    #[test]
+    fn single_subcommand_routes_correctly() {
+        let out = try_render_help(&args(&["wai", "status", "--help"])).unwrap();
+        assert!(out.contains("project status"), "status help about line");
+    }
+
+    #[test]
+    fn compound_add_skill_routes_to_skill_help() {
+        let out = try_render_help(&args(&["wai", "add", "skill", "--help", "-v"])).unwrap();
+        assert!(
+            out.contains("ubiquitous-language"),
+            "add skill -v help should list ubiquitous-language template"
+        );
+    }
+
+    #[test]
+    fn compound_unknown_noun_falls_back_to_verb_help() {
+        // "add unknown-noun" has no compound key, should fall back to "add" help
+        let out = try_render_help(&args(&["wai", "add", "unknown-noun", "--help"])).unwrap();
+        assert!(
+            out.contains("Add artifacts"),
+            "should fall back to 'add' help"
+        );
+    }
+
+    #[test]
+    fn resource_subcommand_routes_to_resource_help() {
+        let out = try_render_help(&args(&["wai", "resource", "--help"])).unwrap();
+        assert!(out.contains("Manage resources"));
+    }
+
+    #[test]
+    fn compound_with_no_entry_for_either_returns_none() {
+        // "totally unknown-verb" has no entry at all
+        assert!(try_render_help(&args(&["wai", "totally", "unknown-verb", "--help"])).is_none());
+    }
+
+    #[test]
+    fn pipeline_start_falls_back_to_pipeline_help() {
+        // "pipeline start" has no compound key yet; should fall back to "pipeline"
+        let out = try_render_help(&args(&["wai", "pipeline", "start", "--help"])).unwrap();
+        assert!(
+            out.contains("Manage pipelines"),
+            "should fall back to pipeline help"
+        );
     }
 }

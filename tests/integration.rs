@@ -4423,6 +4423,17 @@ fn resource_help_lists_ubiquitous_language_template() {
 }
 
 #[test]
+fn add_skill_help_lists_ubiquitous_language_template() {
+    let tmp = TempDir::new().unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["add", "skill", "--help", "-v"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("ubiquitous-language"));
+}
+
+#[test]
 fn resource_add_skill_deprecated_still_works_and_warns() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
