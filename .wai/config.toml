@@ -2,9 +2,9 @@ plugins = []
 
 [project]
 name = "wai"
-version = "2026.4.7"
+version = "2026.4.8"
 description = ""
-tool_commit = "bf66bc0"
+tool_commit = "f8c9198"
 
 [llm]
 privacy_notice_shown = true
