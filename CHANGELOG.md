@@ -5,6 +5,22 @@ All notable changes to wai will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Calendar Versioning](https://calver.org/) (YYYY.M.MICRO).
 
+## [2026.4.8] - 2026-04-28
+
+### Added
+
+- **Ubiquitous language guidance** — `wai way` now checks for a `.wai/resources/ubiquitous-language/` directory and reports PASS/INFO with setup suggestions; managed block injection teaches agents to use progressive disclosure when loading terminology files
+- **`ubiquitous-language` skill template** — `wai add skill <name> --template ubiquitous-language` scaffolds a maintenance workflow for keeping bounded-context terminology up to date
+- **Concept page** — new documentation page explaining the ubiquitous language directory layout, progressive disclosure rationale, `wai way` detection states, and managed block injection
+
+### Fixed
+
+- **Compound subcommand help routing** — `wai add skill --help` now renders skill-specific help instead of falling back to the generic `add` help; `try_render_help` collects two positional tokens before resolving help content
+- **Symlink projection idempotency** — `execute_symlink` no longer deletes and recreates correct symlinks on every `wai sync` call; up-to-date checks compare destinations against expected sources and skip unnecessary work
+- **Beads sync guidance** — managed block and `wai close` no longer hardcode deprecated sync guidance; content is now generated dynamically from the current beads configuration
+
+---
+
 ## [2026.4.5] - 2026-04-19
 
 ### Added

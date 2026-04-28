@@ -18,6 +18,7 @@
 - [Plugin System](./concepts/plugins.md)
 - [Pipelines](./concepts/pipelines.md)
 - [Agent Config Sync](./concepts/agent-config-sync.md)
+- [Ubiquitous Language](./concepts/ubiquitous-language.md)
 - [Toolchain Synergy](./concepts/toolchain.md)
 
 # How-To Guides
