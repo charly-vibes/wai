@@ -80,6 +80,7 @@ pub fn run(topic: Option<String>, fix: Option<String>) -> Result<()> {
         check_docs_openspec_inclusion(&repo_root),
         check_ai_instructions(&repo_root),
         check_llm_txt(&repo_root),
+        check_ubiquitous_language(&repo_root),
         check_agent_skills(&repo_root),
         check_agent_config_sync(&repo_root),
         check_gh_cli(),
@@ -2296,6 +2297,94 @@ fn check_llm_txt(repo_root: &Path) -> CheckResult {
                     .to_string(),
             ),
         }
+    }
+}
+
+fn check_ubiquitous_language(repo_root: &Path) -> CheckResult {
+    let name = "Ubiquitous language context";
+    let intent = Some(
+        "Provide a canonical, machine-readable source of domain terminology so humans and agents use the same language."
+            .to_string(),
+    );
+    let success_criteria = Some(
+        "A progressively disclosed ubiquitous-language resource tree exists with a lightweight index and bounded-context term files."
+            .to_string(),
+    );
+
+    let root = repo_root.join(".wai/resources/ubiquitous-language");
+    let readme = root.join("README.md");
+    let shared = root.join("shared.md");
+    let contexts_dir = root.join("contexts");
+    let context_file_count = std::fs::read_dir(&contexts_dir)
+        .ok()
+        .map(|entries| {
+            entries
+                .filter_map(|e| e.ok())
+                .filter(|e| e.path().extension().and_then(|ext| ext.to_str()) == Some("md"))
+                .count()
+        })
+        .unwrap_or(0);
+
+    if readme.exists() && context_file_count > 0 {
+        return CheckResult {
+            name: name.to_string(),
+            status: Status::Pass,
+            message: format!(
+                "Ubiquitous-language tree fully configured with {} bounded-context file(s)",
+                context_file_count
+            ),
+            intent,
+            success_criteria,
+            suggestion: None,
+        };
+    }
+
+    let base_suggestion = "Create .wai/resources/ubiquitous-language/ with README.md as the root index and bounded-context files under contexts/".to_string();
+
+    if readme.exists() && shared.exists() {
+        return CheckResult {
+            name: name.to_string(),
+            status: Status::Info,
+            message: "Root index and shared terms exist — valid starting point, but bounded-context files are still missing".to_string(),
+            intent,
+            success_criteria,
+            suggestion: Some(
+                "Add bounded-context files under .wai/resources/ubiquitous-language/contexts/ to complete the progressive-disclosure layout".to_string(),
+            ),
+        };
+    }
+
+    if readme.exists() {
+        return CheckResult {
+            name: name.to_string(),
+            status: Status::Info,
+            message: "Root index exists, but bounded-context files are still missing".to_string(),
+            intent,
+            success_criteria,
+            suggestion: Some(
+                "Add bounded-context files under .wai/resources/ubiquitous-language/contexts/ to complete the progressive-disclosure layout".to_string(),
+            ),
+        };
+    }
+
+    if root.exists() && context_file_count > 0 {
+        return CheckResult {
+            name: name.to_string(),
+            status: Status::Info,
+            message: "README.md is required as the root index before bounded-context files can be loaded safely".to_string(),
+            intent,
+            success_criteria,
+            suggestion: Some(base_suggestion),
+        };
+    }
+
+    CheckResult {
+        name: name.to_string(),
+        status: Status::Info,
+        message: "No ubiquitous-language resource tree detected".to_string(),
+        intent,
+        success_criteria,
+        suggestion: Some(base_suggestion),
     }
 }
 

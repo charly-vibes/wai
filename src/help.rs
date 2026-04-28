@@ -482,7 +482,7 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
             ],
             options: &[],
             advanced_options: &[
-                "add skill --template <TPL>       Built-in templates: gather, create, tdd, rule-of-5",
+                "add skill --template <TPL>       Built-in templates: gather, create, tdd, rule-of-5, ubiquitous-language",
                 "install   --global               Install to ~/.wai/resources/skills/",
                 "install   --from-repo <PATH>     Copy skill from another repository",
                 "export    --output <FILE>        Output tar.gz archive path",

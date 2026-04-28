@@ -1805,7 +1805,12 @@ fn check_managed_block_staleness(project_root: &Path) -> Vec<CheckResult> {
     let installed_pipelines = detect_installed_pipelines(project_root);
 
     // Check root CLAUDE.md / AGENTS.md against slim block
-    let expected = wai_block_content(&plugin_names, &skill_name_refs, &installed_pipelines);
+    let expected = wai_block_content(
+        project_root,
+        &plugin_names,
+        &skill_name_refs,
+        &installed_pipelines,
+    );
 
     for filename in &["CLAUDE.md", "AGENTS.md"] {
         let path = project_root.join(filename);
@@ -1828,8 +1833,12 @@ fn check_managed_block_staleness(project_root: &Path) -> Vec<CheckResult> {
     // Check .wai/AGENTS.md against detailed content
     let detailed_path = project_root.join(".wai").join("AGENTS.md");
     if detailed_path.exists() {
-        let expected_detailed =
-            wai_detailed_content(&plugin_names, &skill_name_refs, &installed_pipelines);
+        let expected_detailed = wai_detailed_content(
+            project_root,
+            &plugin_names,
+            &skill_name_refs,
+            &installed_pipelines,
+        );
         if let Ok(actual_detailed) = std::fs::read_to_string(&detailed_path)
             && actual_detailed != expected_detailed
         {

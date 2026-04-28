@@ -558,7 +558,7 @@ pub enum AddCommands {
     /// Only one '/' separator is allowed; each segment must be lowercase
     /// letters, digits, and hyphens (no leading/trailing hyphens).
     ///
-    /// Built-in templates: gather, create, tdd, rule-of-5
+    /// Built-in templates: gather, create, tdd, rule-of-5, ubiquitous-language
     Skill {
         /// Skill name (e.g. "my-skill" or "issue/gather")
         name: String,
@@ -570,6 +570,7 @@ pub enum AddCommands {
         ///   create    — creation stub: retrieve plan, bd create items, wire dependencies
         ///   tdd       — TDD stub: RED/GREEN/REFACTOR loop with cargo test and commits
         ///   rule-of-5 — review stub: 5 passes with convergence check and APPROVED/NEEDS_CHANGES/NEEDS_HUMAN verdict
+        ///   ubiquitous-language — terminology curation stub: read the root index first, then update only relevant context files
         #[arg(long, value_name = "TEMPLATE")]
         template: Option<String>,
     },
@@ -716,7 +717,7 @@ pub enum ResourceAddCommands {
     /// Only one '/' separator is allowed; each segment must be lowercase
     /// letters, digits, and hyphens (no leading/trailing hyphens).
     ///
-    /// Built-in templates: gather, create, tdd, rule-of-5
+    /// Built-in templates: gather, create, tdd, rule-of-5, ubiquitous-language
     Skill {
         /// Skill name (e.g. "my-skill" or "issue/gather")
         name: String,
@@ -728,6 +729,7 @@ pub enum ResourceAddCommands {
         ///   create    — creation stub: retrieve plan, bd create items, wire dependencies
         ///   tdd       — TDD stub: RED/GREEN/REFACTOR loop with cargo test and commits
         ///   rule-of-5 — review stub: 5 passes with convergence check and APPROVED/NEEDS_CHANGES/NEEDS_HUMAN verdict
+        ///   ubiquitous-language — terminology curation stub: read the root index first, then update only relevant context files
         #[arg(long, value_name = "TEMPLATE")]
         template: Option<String>,
     },

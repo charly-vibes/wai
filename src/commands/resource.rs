@@ -300,7 +300,13 @@ pub fn add_skill(name: &str, template_name: Option<&str>) -> Result<()> {
     Ok(())
 }
 
-const VALID_TEMPLATES: &[&str] = &["gather", "create", "tdd", "rule-of-5"];
+const VALID_TEMPLATES: &[&str] = &[
+    "gather",
+    "create",
+    "tdd",
+    "rule-of-5",
+    "ubiquitous-language",
+];
 
 fn skill_template_body(name: &str) -> Result<String> {
     match name {
@@ -389,6 +395,24 @@ After all passes, output one of:
 - **APPROVED** — ready to merge/deploy
 - **NEEDS_CHANGES** — list specific required changes
 - **NEEDS_HUMAN** — ambiguous or high-risk; escalate to a human reviewer
+"#
+        .to_string()),
+
+        "ubiquitous-language" => Ok(r#"## Instructions
+
+Use this skill to curate ubiquitous language for $ARGUMENTS in the $PROJECT project.
+Repository root: $REPO_ROOT
+
+1. Read `.wai/resources/ubiquitous-language/README.md` first to understand the index and file layout.
+2. Search existing artifacts and code for the relevant domain terms:
+   ```
+   wai search "$ARGUMENTS"
+   ```
+3. Update only the bounded-context files that match the task under
+   `.wai/resources/ubiquitous-language/contexts/`.
+4. If a term truly spans contexts, update `shared.md` and link back from the relevant context files.
+5. Preserve progressive disclosure: do not collapse all terminology into one giant glossary file.
+6. Summarize what changed, open questions, and any terms that still need human confirmation.
 "#
         .to_string()),
 

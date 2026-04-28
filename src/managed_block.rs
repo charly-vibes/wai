@@ -3,6 +3,17 @@ use std::path::Path;
 const WAI_START: &str = "<!-- WAI:START -->";
 const WAI_END: &str = "<!-- WAI:END -->";
 
+fn ubiquitous_language_note(repo_root: &Path) -> Option<&'static str> {
+    let index = repo_root.join(".wai/resources/ubiquitous-language/README.md");
+    index.exists().then_some(
+        "## Ubiquitous Language\n\
+         \n\
+         If `.wai/resources/ubiquitous-language/README.md` exists, read it first as the\n\
+         navigation index, then open only the bounded-context files relevant to the task.\n\
+         Avoid loading every terminology file unless the work truly spans multiple contexts.\n",
+    )
+}
+
 /// Info about an installed pipeline with metadata, for managed block generation.
 #[derive(Debug, Clone)]
 pub struct InstalledPipeline {
@@ -17,6 +28,7 @@ pub struct InstalledPipeline {
 /// This is Layer 1 of progressive disclosure: orient the agent, surface
 /// pipelines, and point to `.wai/AGENTS.md` for the full reference.
 pub fn wai_block_content(
+    repo_root: &Path,
     detected_plugins: &[&str],
     installed_skills: &[&str],
     installed_pipelines: &[InstalledPipeline],
@@ -112,6 +124,11 @@ pub fn wai_block_content(
         );
     }
 
+    if let Some(note) = ubiquitous_language_note(repo_root) {
+        block.push('\n');
+        block.push_str(note);
+    }
+
     // Pointer to detailed instructions
     block.push_str(
         "\n\
@@ -134,6 +151,7 @@ pub fn wai_block_content(
 /// This is Layer 2 of progressive disclosure: full session lifecycle,
 /// command reference, capturing work, cross-tool sync, PARA structure.
 pub fn wai_detailed_content(
+    repo_root: &Path,
     detected_plugins: &[&str],
     installed_skills: &[&str],
     installed_pipelines: &[InstalledPipeline],
@@ -397,6 +415,11 @@ pub fn wai_detailed_content(
         );
     }
 
+    if let Some(note) = ubiquitous_language_note(repo_root) {
+        doc.push('\n');
+        doc.push_str(note);
+    }
+
     // Structure
     doc.push_str(
         "\n\
@@ -424,7 +447,13 @@ pub fn write_detailed_agents_file(
     installed_pipelines: &[InstalledPipeline],
 ) -> Result<DetailedFileResult, std::io::Error> {
     let path = wai_dir.join("AGENTS.md");
-    let content = wai_detailed_content(detected_plugins, installed_skills, installed_pipelines);
+    let repo_root = wai_dir.parent().unwrap_or(wai_dir);
+    let content = wai_detailed_content(
+        repo_root,
+        detected_plugins,
+        installed_skills,
+        installed_pipelines,
+    );
     let existed = path.exists();
     std::fs::write(&path, &content)?;
     Ok(if existed {
@@ -456,7 +485,13 @@ pub fn inject_managed_block(
     installed_skills: &[&str],
     installed_pipelines: &[InstalledPipeline],
 ) -> Result<InjectResult, std::io::Error> {
-    let wai_block = wai_block_content(detected_plugins, installed_skills, installed_pipelines);
+    let repo_root = path.parent().unwrap_or(Path::new("."));
+    let wai_block = wai_block_content(
+        repo_root,
+        detected_plugins,
+        installed_skills,
+        installed_pipelines,
+    );
     let ref_block = format!(
         "{}\n{}{}\n",
         REFLECT_REF_START,
@@ -609,7 +644,7 @@ mod wai_block_tests {
 
     #[test]
     fn slim_block_contains_wai_sync() {
-        let output = wai_block_content(&[], &[], &[]);
+        let output = wai_block_content(Path::new("."), &[], &[], &[]);
         assert!(
             output.contains("wai sync"),
             "expected 'wai sync' in slim block"
@@ -618,7 +653,7 @@ mod wai_block_tests {
 
     #[test]
     fn slim_block_contains_wai_status() {
-        let output = wai_block_content(&[], &[], &[]);
+        let output = wai_block_content(Path::new("."), &[], &[], &[]);
         assert!(
             output.contains("wai status"),
             "expected 'wai status' in slim block"
@@ -627,7 +662,7 @@ mod wai_block_tests {
 
     #[test]
     fn slim_block_points_to_detailed_instructions() {
-        let output = wai_block_content(&[], &[], &[]);
+        let output = wai_block_content(Path::new("."), &[], &[], &[]);
         assert!(
             output.contains(".wai/AGENTS.md"),
             "expected pointer to .wai/AGENTS.md in slim block"
@@ -636,7 +671,7 @@ mod wai_block_tests {
 
     #[test]
     fn slim_block_does_not_contain_quick_reference() {
-        let output = wai_block_content(&[], &[], &[]);
+        let output = wai_block_content(Path::new("."), &[], &[], &[]);
         assert!(
             !output.contains("## Quick Reference"),
             "slim block should not contain full Quick Reference"
@@ -645,7 +680,7 @@ mod wai_block_tests {
 
     #[test]
     fn slim_block_does_not_contain_capturing_work() {
-        let output = wai_block_content(&[], &[], &[]);
+        let output = wai_block_content(Path::new("."), &[], &[], &[]);
         assert!(
             !output.contains("## Capturing Work"),
             "slim block should not contain Capturing Work section"
@@ -654,7 +689,7 @@ mod wai_block_tests {
 
     #[test]
     fn slim_block_does_not_contain_ending_session() {
-        let output = wai_block_content(&[], &[], &[]);
+        let output = wai_block_content(Path::new("."), &[], &[], &[]);
         assert!(
             !output.contains("## Ending a Session"),
             "slim block should not contain Ending a Session section"
@@ -663,7 +698,7 @@ mod wai_block_tests {
 
     #[test]
     fn tdd_disclaimer_present_with_companion_tools() {
-        let output = wai_block_content(&["beads", "openspec"], &[], &[]);
+        let output = wai_block_content(Path::new("."), &["beads", "openspec"], &[], &[]);
         assert!(
             output.contains("CRITICAL"),
             "expected CRITICAL disclaimer in slim block with companion tools"
@@ -677,7 +712,7 @@ mod wai_block_tests {
 
     #[test]
     fn tdd_disclaimer_present_with_beads_only() {
-        let output = wai_block_content(&["beads"], &[], &[]);
+        let output = wai_block_content(Path::new("."), &["beads"], &[], &[]);
         assert!(
             output.contains("CRITICAL"),
             "expected CRITICAL disclaimer with beads"
@@ -686,7 +721,7 @@ mod wai_block_tests {
 
     #[test]
     fn tdd_disclaimer_absent_without_companion_tools() {
-        let output = wai_block_content(&[], &[], &[]);
+        let output = wai_block_content(Path::new("."), &[], &[], &[]);
         assert!(
             !output.contains("Tidy First"),
             "unexpected 'Tidy First' without companion tools"
@@ -696,7 +731,7 @@ mod wai_block_tests {
     #[test]
     fn ro5_reminder_present_when_skill_installed() {
         for name in &["ro5", "rule-of-5", "rule-of-5-universal"] {
-            let output = wai_block_content(&[], &[name], &[]);
+            let output = wai_block_content(Path::new("."), &[], &[name], &[]);
             assert!(
                 output.contains("/ro5"),
                 "expected '/ro5' when skill '{name}' installed"
@@ -706,7 +741,7 @@ mod wai_block_tests {
 
     #[test]
     fn ro5_reminder_absent_without_skill() {
-        let output = wai_block_content(&["beads", "openspec"], &[], &[]);
+        let output = wai_block_content(Path::new("."), &["beads", "openspec"], &[], &[]);
         assert!(!output.contains("/ro5"), "unexpected '/ro5' without skill");
     }
 
@@ -719,7 +754,7 @@ mod wai_block_tests {
             &["openspec"][..],
             &["beads", "openspec"][..],
         ] {
-            let output = wai_block_content(plugins, &[], &[]);
+            let output = wai_block_content(Path::new("."), plugins, &[], &[]);
             assert!(
                 output.contains(SEARCH_INSTRUCTION),
                 "expected search instruction with plugins {:?}",
@@ -730,7 +765,7 @@ mod wai_block_tests {
 
     #[test]
     fn search_before_research_absent_without_companions() {
-        let output = wai_block_content(&[], &[], &[]);
+        let output = wai_block_content(Path::new("."), &[], &[], &[]);
         assert!(
             !output.contains(SEARCH_INSTRUCTION),
             "unexpected search instruction without companion tools"
@@ -739,7 +774,7 @@ mod wai_block_tests {
 
     #[test]
     fn search_before_research_after_tdd_disclaimer() {
-        let output = wai_block_content(&["beads"], &[], &[]);
+        let output = wai_block_content(Path::new("."), &["beads"], &[], &[]);
         let tdd_pos = output.find("CRITICAL").expect("CRITICAL not found");
         let search_pos = output
             .find(SEARCH_INSTRUCTION)
@@ -749,9 +784,42 @@ mod wai_block_tests {
 
     #[test]
     fn context_pressure_tells_user() {
-        let output = wai_block_content(&[], &[], &[]);
+        let output = wai_block_content(Path::new("."), &[], &[], &[]);
         assert!(output.contains("stop and tell the user"));
         assert!(output.contains("responses degrade"));
+    }
+
+    #[test]
+    fn slim_block_includes_ubiquitous_language_note_when_index_exists() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let note_root = dir.path().join(".wai/resources/ubiquitous-language");
+        std::fs::create_dir_all(&note_root).unwrap();
+        std::fs::write(note_root.join("README.md"), "# Index\n").unwrap();
+
+        let output = wai_block_content(dir.path(), &[], &[], &[]);
+        assert!(output.contains("## Ubiquitous Language"));
+        assert!(output.contains("read it first as the"));
+        assert!(output.contains("Avoid loading every terminology file"));
+    }
+
+    #[test]
+    fn slim_block_omits_ubiquitous_language_note_without_index() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let output = wai_block_content(dir.path(), &[], &[], &[]);
+        assert!(!output.contains("## Ubiquitous Language"));
+    }
+
+    #[test]
+    fn slim_block_omits_ubiquitous_language_note_for_partial_tree_without_index() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let contexts = dir
+            .path()
+            .join(".wai/resources/ubiquitous-language/contexts");
+        std::fs::create_dir_all(&contexts).unwrap();
+        std::fs::write(contexts.join("billing.md"), "# Billing\n").unwrap();
+
+        let output = wai_block_content(dir.path(), &[], &[], &[]);
+        assert!(!output.contains("## Ubiquitous Language"));
     }
 
     // Pipeline section (stays in slim block — discovery-critical)
@@ -764,7 +832,7 @@ mod wai_block_tests {
             when: "Frontier-level research requiring systematic validation".to_string(),
             step_count: 8,
         }];
-        let output = wai_block_content(&[], &[], &pipelines);
+        let output = wai_block_content(Path::new("."), &[], &[], &pipelines);
         assert!(output.contains("## Available Pipelines"));
         assert!(output.contains("scientific-research"));
         assert!(output.contains("Frontier-level research"));
@@ -773,7 +841,7 @@ mod wai_block_tests {
 
     #[test]
     fn pipeline_section_absent_when_no_pipelines() {
-        let output = wai_block_content(&[], &[], &[]);
+        let output = wai_block_content(Path::new("."), &[], &[], &[]);
         assert!(!output.contains("Available Pipelines"));
     }
 
@@ -785,7 +853,7 @@ mod wai_block_tests {
             when: "Testing".to_string(),
             step_count: 2,
         }];
-        let output = wai_block_content(&[], &[], &pipelines);
+        let output = wai_block_content(Path::new("."), &[], &[], &pipelines);
         assert!(output.contains("gates"));
     }
 
@@ -805,7 +873,7 @@ mod wai_block_tests {
                 step_count: 5,
             },
         ];
-        let output = wai_block_content(&[], &[], &pipelines);
+        let output = wai_block_content(Path::new("."), &[], &[], &pipelines);
         assert!(output.contains("alpha"));
         assert!(output.contains("beta"));
     }
@@ -814,13 +882,13 @@ mod wai_block_tests {
 
     #[test]
     fn detailed_contains_session_start() {
-        let output = wai_detailed_content(&[], &[], &[]);
+        let output = wai_detailed_content(Path::new("."), &[], &[], &[]);
         assert!(output.contains("## Starting a Session"));
     }
 
     #[test]
     fn detailed_wai_sync_before_status() {
-        let output = wai_detailed_content(&[], &[], &[]);
+        let output = wai_detailed_content(Path::new("."), &[], &[], &[]);
         let sync_pos = output.find("wai sync").expect("wai sync not found");
         let status_pos = output.find("wai status").expect("wai status not found");
         assert!(sync_pos < status_pos);
@@ -828,73 +896,73 @@ mod wai_block_tests {
 
     #[test]
     fn detailed_contains_capturing_work() {
-        let output = wai_detailed_content(&[], &[], &[]);
+        let output = wai_detailed_content(Path::new("."), &[], &[], &[]);
         assert!(output.contains("## Capturing Work"));
     }
 
     #[test]
     fn detailed_contains_ending_session() {
-        let output = wai_detailed_content(&[], &[], &[]);
+        let output = wai_detailed_content(Path::new("."), &[], &[], &[]);
         assert!(output.contains("## Ending a Session"));
     }
 
     #[test]
     fn detailed_contains_quick_reference() {
-        let output = wai_detailed_content(&[], &[], &[]);
+        let output = wai_detailed_content(Path::new("."), &[], &[], &[]);
         assert!(output.contains("## Quick Reference"));
     }
 
     #[test]
     fn detailed_contains_structure() {
-        let output = wai_detailed_content(&[], &[], &[]);
+        let output = wai_detailed_content(Path::new("."), &[], &[], &[]);
         assert!(output.contains("## Structure"));
     }
 
     #[test]
     fn detailed_openspec_checklist_present_when_detected() {
-        let output = wai_detailed_content(&["openspec"], &[], &[]);
+        let output = wai_detailed_content(Path::new("."), &["openspec"], &[], &[]);
         assert!(output.contains("openspec tasks.md"));
     }
 
     #[test]
     fn detailed_openspec_checklist_absent_without_openspec() {
-        let output = wai_detailed_content(&[], &[], &[]);
+        let output = wai_detailed_content(Path::new("."), &[], &[], &[]);
         assert!(!output.contains("openspec tasks.md"));
     }
 
     #[test]
     fn detailed_openspec_archive_present_when_detected() {
-        let output = wai_detailed_content(&["openspec"], &[], &[]);
+        let output = wai_detailed_content(Path::new("."), &["openspec"], &[], &[]);
         assert!(output.contains("openspec archive"));
     }
 
     #[test]
     fn detailed_tracking_section_present_when_both() {
-        let output = wai_detailed_content(&["beads", "openspec"], &[], &[]);
+        let output = wai_detailed_content(Path::new("."), &["beads", "openspec"], &[], &[]);
         assert!(output.contains("Tracking Work Across Tools"));
     }
 
     #[test]
     fn detailed_tracking_section_absent_with_only_beads() {
-        let output = wai_detailed_content(&["beads"], &[], &[]);
+        let output = wai_detailed_content(Path::new("."), &["beads"], &[], &[]);
         assert!(!output.contains("Tracking Work Across Tools"));
     }
 
     #[test]
     fn detailed_pre_claim_note_present_with_beads() {
-        let output = wai_detailed_content(&["beads"], &[], &[]);
+        let output = wai_detailed_content(Path::new("."), &["beads"], &[], &[]);
         assert!(output.contains("already implemented"));
     }
 
     #[test]
     fn detailed_pre_claim_note_absent_without_beads() {
-        let output = wai_detailed_content(&[], &[], &[]);
+        let output = wai_detailed_content(Path::new("."), &[], &[], &[]);
         assert!(!output.contains("already implemented"));
     }
 
     #[test]
     fn detailed_bd_close_mentions_epic_with_beads() {
-        let output = wai_detailed_content(&["beads"], &[], &[]);
+        let output = wai_detailed_content(Path::new("."), &["beads"], &[], &[]);
         let bd_close_line = output
             .lines()
             .find(|l| l.contains("bd close <id>"))
@@ -907,25 +975,25 @@ mod wai_block_tests {
 
     #[test]
     fn detailed_beads_note_present_with_beads() {
-        let output = wai_detailed_content(&["beads"], &[], &[]);
+        let output = wai_detailed_content(Path::new("."), &["beads"], &[], &[]);
         assert!(output.contains("Do not assume a hard-coded sync"));
     }
 
     #[test]
     fn detailed_beads_note_absent_without_beads() {
-        let output = wai_detailed_content(&[], &[], &[]);
+        let output = wai_detailed_content(Path::new("."), &[], &[], &[]);
         assert!(!output.contains("Do not assume a hard-coded sync"));
     }
 
     #[test]
     fn detailed_contains_autonomous_loop() {
-        let output = wai_detailed_content(&[], &[], &[]);
+        let output = wai_detailed_content(Path::new("."), &[], &[], &[]);
         assert!(output.contains("Autonomous Loop"));
     }
 
     #[test]
     fn detailed_does_not_have_wai_markers() {
-        let output = wai_detailed_content(&[], &[], &[]);
+        let output = wai_detailed_content(Path::new("."), &[], &[], &[]);
         assert!(!output.contains(WAI_START));
         assert!(!output.contains(WAI_END));
     }

@@ -3276,6 +3276,114 @@ fn way_check_agent_skills_missing_suggests_fix_command() {
 }
 
 #[test]
+fn way_check_ubiquitous_language_fully_configured_tree_passes() {
+    let tmp = TempDir::new().unwrap();
+    fs::create_dir_all(
+        tmp.path()
+            .join(".wai/resources/ubiquitous-language/contexts"),
+    )
+    .unwrap();
+    fs::write(
+        tmp.path()
+            .join(".wai/resources/ubiquitous-language/README.md"),
+        "# Ubiquitous language\n",
+    )
+    .unwrap();
+    fs::write(
+        tmp.path()
+            .join(".wai/resources/ubiquitous-language/contexts/billing.md"),
+        "# Billing\n",
+    )
+    .unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Ubiquitous language context")
+                .and(predicate::str::contains("\"pass\""))
+                .and(predicate::str::contains("fully configured")),
+        );
+}
+
+#[test]
+fn way_check_ubiquitous_language_skeleton_tree_reports_info() {
+    let tmp = TempDir::new().unwrap();
+    fs::create_dir_all(tmp.path().join(".wai/resources/ubiquitous-language")).unwrap();
+    fs::write(
+        tmp.path()
+            .join(".wai/resources/ubiquitous-language/README.md"),
+        "# Ubiquitous language\n",
+    )
+    .unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Ubiquitous language context")
+                .and(predicate::str::contains("\"info\""))
+                .and(predicate::str::contains("bounded-context files")),
+        );
+}
+
+#[test]
+fn way_check_ubiquitous_language_shared_only_tree_reports_info() {
+    let tmp = TempDir::new().unwrap();
+    fs::create_dir_all(tmp.path().join(".wai/resources/ubiquitous-language")).unwrap();
+    fs::write(
+        tmp.path()
+            .join(".wai/resources/ubiquitous-language/README.md"),
+        "# Ubiquitous language\n",
+    )
+    .unwrap();
+    fs::write(
+        tmp.path()
+            .join(".wai/resources/ubiquitous-language/shared.md"),
+        "# Shared\n",
+    )
+    .unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Ubiquitous language context")
+                .and(predicate::str::contains("\"info\""))
+                .and(predicate::str::contains("valid starting point")),
+        );
+}
+
+#[test]
+fn way_check_ubiquitous_language_malformed_tree_without_index_reports_info() {
+    let tmp = TempDir::new().unwrap();
+    fs::create_dir_all(
+        tmp.path()
+            .join(".wai/resources/ubiquitous-language/contexts"),
+    )
+    .unwrap();
+    fs::write(
+        tmp.path()
+            .join(".wai/resources/ubiquitous-language/contexts/billing.md"),
+        "# Billing\n",
+    )
+    .unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Ubiquitous language context")
+                .and(predicate::str::contains("\"info\""))
+                .and(predicate::str::contains("README.md is required")),
+        );
+}
+
+#[test]
 fn way_fix_skills_prints_description_before_acting() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
@@ -4201,8 +4309,35 @@ fn resource_add_skill_template_unknown_fails_with_valid_names() {
         .stderr(
             predicate::str::contains("gather")
                 .and(predicate::str::contains("tdd"))
-                .and(predicate::str::contains("rule-of-5")),
+                .and(predicate::str::contains("rule-of-5"))
+                .and(predicate::str::contains("ubiquitous-language")),
         );
+}
+
+#[test]
+fn resource_add_skill_template_ubiquitous_language_preserves_progressive_disclosure() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args([
+            "resource",
+            "add",
+            "skill",
+            "term-curator",
+            "--template",
+            "ubiquitous-language",
+        ])
+        .assert()
+        .success();
+
+    let skill_md = tmp
+        .path()
+        .join(".wai/resources/agent-config/skills/term-curator/SKILL.md");
+    let content = fs::read_to_string(&skill_md).unwrap();
+    assert!(content.contains(".wai/resources/ubiquitous-language/README.md"));
+    assert!(content.contains("contexts/"));
+    assert!(content.contains("giant glossary file"));
 }
 
 #[test]
@@ -4274,6 +4409,17 @@ fn add_skill_with_template_creates_templated_file() {
         content.contains("wai search"),
         "gather template should contain wai search"
     );
+}
+
+#[test]
+fn resource_help_lists_ubiquitous_language_template() {
+    let tmp = TempDir::new().unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["resource", "--help", "-v"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("ubiquitous-language"));
 }
 
 #[test]
