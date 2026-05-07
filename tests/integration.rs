@@ -5995,6 +5995,36 @@ fn pipeline_add_merges_user_tags_and_pipeline_run_tag() {
 // ─── wai pipeline init ────────────────────────────────────────────────────────
 
 #[test]
+fn pipeline_help_lists_builtin_templates() {
+    let tmp = TempDir::new().unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "--help", "-v"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Built-in templates")
+                .and(predicate::str::contains("scientific-research"))
+                .and(predicate::str::contains("tdd-ro5")),
+        );
+}
+
+#[test]
+fn pipeline_init_help_lists_builtin_templates() {
+    let tmp = TempDir::new().unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "init", "--help", "-v"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Built-in templates")
+                .and(predicate::str::contains("scientific-research"))
+                .and(predicate::str::contains("tdd-ro5")),
+        );
+}
+
+#[test]
 fn pipeline_init_creates_toml_file() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());

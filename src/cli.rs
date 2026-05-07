@@ -397,6 +397,7 @@ pub enum Commands {
             state and auto-tagging artifacts with the run ID.\n\n\
             EXAMPLES\n\
               wai pipeline init my-workflow\n\
+              wai pipeline init tdd-ro5        # built-in template\n\
               wai pipeline start my-workflow --topic=auth-refactor\n\
               wai pipeline next\n\
               wai pipeline current\n\
@@ -843,11 +844,13 @@ pub enum PipelineCommands {
     /// Scaffold a new TOML pipeline definition
     ///
     /// Creates `.wai/resources/pipelines/<name>.toml` with a minimal two-step
-    /// template. Edit the prompts, then start a run with:
+    /// template, or a built-in template. See `wai pipeline --help -v` for the
+    /// current built-in template list. Edit the prompts, then start a run with:
     ///   wai pipeline start <name> --topic=<your-topic>
     ///
-    /// EXAMPLE
+    /// EXAMPLES
     ///   wai pipeline init my-workflow
+    ///   wai pipeline init tdd-ro5
     Init {
         /// Name for the new pipeline (creates <name>.toml)
         name: String,

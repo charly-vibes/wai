@@ -1455,6 +1455,10 @@ fn cmd_validate(name: Option<&str>) -> Result<()> {
 
 /// Returns a built-in template if one exists for the given name.
 fn get_builtin_template(name: &str) -> Option<&'static str> {
+    if !crate::config::BUILTIN_PIPELINE_TEMPLATES.contains(&name) {
+        return None;
+    }
+
     match name {
         "scientific-research" => Some(include_str!("../templates/scientific-research.toml")),
         "tdd-ro5" => Some(include_str!("../templates/tdd-ro5.toml")),
@@ -1465,7 +1469,7 @@ fn get_builtin_template(name: &str) -> Option<&'static str> {
 /// Returns names of all available built-in templates.
 #[cfg(test)]
 fn builtin_template_names() -> &'static [&'static str] {
-    &["scientific-research", "tdd-ro5"]
+    crate::config::BUILTIN_PIPELINE_TEMPLATES
 }
 
 /// List all pipeline names found in the pipelines directory.
@@ -3269,6 +3273,16 @@ require_input_manifest = true
         assert!(!names.is_empty());
         assert!(names.contains(&"scientific-research"));
         assert!(names.contains(&"tdd-ro5"));
+    }
+
+    #[test]
+    fn all_builtin_template_names_resolve_to_templates() {
+        for name in builtin_template_names() {
+            assert!(
+                get_builtin_template(name).is_some(),
+                "built-in template name '{name}' should resolve"
+            );
+        }
     }
 
     // ── artifact_hash ─────────────────────────────────────────────────────

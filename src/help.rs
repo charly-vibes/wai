@@ -1,3 +1,5 @@
+use crate::config::BUILTIN_PIPELINE_TEMPLATES_HELP;
+
 pub struct HelpContent {
     pub about: &'static str,
     pub examples: &'static [(&'static str, &'static str)],
@@ -313,40 +315,46 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
             ],
         }),
         "pipeline" => Some(HelpContent {
-            about: "Manage pipelines (ordered multi-skill workflows)",
+            about: "Manage pipelines (ordered multi-step workflows)",
             examples: &[
                 (
-                    "wai pipeline create review --stages=\"gather:research,run:plan\"",
-                    "Define a 2-stage pipeline",
+                    "wai pipeline init my-workflow",
+                    "Scaffold a generic pipeline",
                 ),
                 (
-                    "wai pipeline run review --topic=my-feature",
+                    "wai pipeline init tdd-ro5",
+                    "Scaffold from a built-in template",
+                ),
+                (
+                    "wai pipeline start my-workflow --topic=auth-refactor",
                     "Start a pipeline run",
                 ),
+                ("wai pipeline next", "Advance to the next step"),
                 (
-                    "wai pipeline advance review-2026-02-25-my-feature",
-                    "Advance to next stage",
+                    "wai pipeline suggest \"auth login\"",
+                    "Discover matching pipelines",
                 ),
-                ("wai pipeline status review", "Show per-stage run status"),
                 ("wai pipeline list", "List all pipelines"),
             ],
             options: &[],
             advanced_options: &[
-                "create --stages <STAGES>    Comma-separated skill:artifact pairs",
-                "run    --topic <SLUG>       Topic slug used in the run ID",
-                "status --run <RUN-ID>       Filter status to a single run",
+                "init <NAME>                 Scaffold a pipeline TOML definition",
+                BUILTIN_PIPELINE_TEMPLATES_HELP,
+                "start <NAME> --topic <SLUG> Start a run with {topic} substitution",
+                "status <NAME> --run <ID>    Filter status to a single run",
+                "gates [NAME] --step <ID>    Inspect configured gates",
             ],
             env_vars: &[
                 ("NO_COLOR", "Disable colored output"),
                 (
                     "WAI_PIPELINE_RUN",
-                    "Set by `wai pipeline run`; causes `wai add` to auto-tag artifacts",
+                    "Optional override for the active run; `wai add` auto-tags artifacts",
                 ),
             ],
             internals: &[
-                "Pipeline definitions stored in .wai/resources/pipelines/<name>.yml",
+                "Pipeline definitions stored in .wai/resources/pipelines/<name>.toml",
                 "Run state stored in .wai/resources/pipelines/<name>/runs/<id>.yml",
-                "Artifact lookup uses pipeline-run:<id> frontmatter tag",
+                "Artifact lookup uses pipeline-run:<id> and pipeline-step:<id> tags",
             ],
         }),
         "close" => Some(HelpContent {
