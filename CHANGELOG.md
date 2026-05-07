@@ -5,6 +5,20 @@ All notable changes to wai will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Calendar Versioning](https://calver.org/) (YYYY.M.MICRO).
 
+## [2026.5.0] - 2026-05-07
+
+### Added
+
+- **Pipeline template discoverability** — `wai pipeline --help -v` now lists built-in pipeline templates (`scientific-research`, `tdd-ro5`) and shows current pipeline commands such as `init`, `start`, `next`, `suggest`, and `gates`
+- **Pipeline init help coverage** — `wai pipeline init --help -v` now surfaces the same built-in template list through compound help routing
+
+### Changed
+
+- **Pipeline help modernization** — refreshed stale examples and internals from legacy `create`/`run`/`advance` and `.yml` wording to current `init`/`start`/`next` and `.toml` pipeline definitions
+- **Built-in template registry** — centralized built-in pipeline template names so help text and template resolution stay aligned
+
+---
+
 ## [2026.4.8] - 2026-04-28
 
 ### Added
