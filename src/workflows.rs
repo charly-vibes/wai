@@ -190,6 +190,45 @@ pub fn detect_patterns(ctx: &ProjectContext) -> Vec<WorkflowDetection> {
         });
     }
 
+    // In Design phase but no designs yet
+    if ctx.phase == Phase::Design && ctx.design_count == 0 && ctx.research_count > 0 {
+        detections.push(WorkflowDetection {
+            pattern: WorkflowPattern::NewProject, // Reuse or add new pattern
+            message: "In Design phase — start by adding a design artifact".to_string(),
+            suggestions: vec![
+                Suggestion {
+                    label: "Add design".to_string(),
+                    command: "wai add design \"...\"".to_string(),
+                },
+                Suggestion {
+                    label: "Review research".to_string(),
+                    command: "wai search --type research".to_string(),
+                },
+            ],
+        });
+    }
+
+    // In Plan phase but no plans yet
+    if ctx.phase == Phase::Plan
+        && ctx.plan_count == 0
+        && (ctx.research_count > 0 || ctx.design_count > 0)
+    {
+        detections.push(WorkflowDetection {
+            pattern: WorkflowPattern::NewProject,
+            message: "In Plan phase — start by adding a plan artifact".to_string(),
+            suggestions: vec![
+                Suggestion {
+                    label: "Add plan".to_string(),
+                    command: "wai add plan \"...\"".to_string(),
+                },
+                Suggestion {
+                    label: "Review designs".to_string(),
+                    command: "wai search --type design".to_string(),
+                },
+            ],
+        });
+    }
+
     // Ready to implement: in plan or design phase with at least one design
     if matches!(ctx.phase, Phase::Plan | Phase::Design) && ctx.design_count > 0 {
         detections.push(WorkflowDetection {

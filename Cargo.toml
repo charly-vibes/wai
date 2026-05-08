@@ -64,6 +64,7 @@ flate2 = "1"
 
 # Cryptographic hashing (SHA-256 for artifact integrity)
 sha2 = "0.10"
+pathdiff = "0.2.3"
 
 [features]
 default = []

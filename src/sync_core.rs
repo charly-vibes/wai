@@ -96,10 +96,13 @@ fn check_unmanaged_dir(target: &Path) -> Result<()> {
 /// Check whether a file→file symlink projection is already up-to-date.
 #[cfg(unix)]
 fn symlink_file_up_to_date(target: &Path, source: &Path) -> bool {
-    target.is_symlink()
-        && std::fs::read_link(target)
-            .map(|dest| dest == source)
-            .unwrap_or(false)
+    if !target.is_symlink() {
+        return false;
+    }
+    let rel_source = make_relative(target, source);
+    std::fs::read_link(target)
+        .map(|dest| dest == rel_source)
+        .unwrap_or(false)
 }
 
 /// Check whether a dir→dir symlink projection is already up-to-date.
@@ -134,9 +137,11 @@ fn symlink_dir_up_to_date(target: &Path, source: &Path) -> bool {
     expected.iter().all(|name| {
         let link = target.join(name);
         let expected_dest = source.join(name);
+        let rel_dest = make_relative(&link, &expected_dest);
+
         link.is_symlink()
             && std::fs::read_link(&link)
-                .map(|dest| dest == expected_dest)
+                .map(|dest| dest == rel_dest)
                 .unwrap_or(false)
     })
 }
@@ -147,6 +152,7 @@ fn symlink_dir_up_to_date(target: &Path, source: &Path) -> bool {
 /// - Directory source → create target directory and symlink each entry inside it.
 ///
 /// Idempotent: skips work when the target already matches the desired state.
+/// Uses relative symlinks for better portability.
 pub(crate) fn execute_symlink(
     project_root: &Path,
     config_dir: &Path,
@@ -178,8 +184,8 @@ pub(crate) fn execute_symlink(
     }
 
     // Remove any existing target before recreating.
-    if target.symlink_metadata().is_ok() {
-        if target.is_dir() && !target.is_symlink() {
+    if let Ok(meta) = target.symlink_metadata() {
+        if meta.is_dir() && !meta.file_type().is_symlink() {
             check_unmanaged_dir(&target)?;
             std::fs::remove_dir_all(&target).into_diagnostic()?;
         } else {
@@ -196,7 +202,10 @@ pub(crate) fn execute_symlink(
         if source_path.is_file() {
             // file→file: create a single symlink at target pointing to source.
             #[cfg(unix)]
-            std::os::unix::fs::symlink(&source_path, &target).into_diagnostic()?;
+            {
+                let rel_source = make_relative(&target, &source_path);
+                std::os::unix::fs::symlink(rel_source, &target).into_diagnostic()?;
+            }
             #[cfg(not(unix))]
             std::fs::copy(&source_path, &target).into_diagnostic()?;
         } else if source_path.is_dir() {
@@ -204,20 +213,40 @@ pub(crate) fn execute_symlink(
             std::fs::create_dir_all(&target).into_diagnostic()?;
             for entry in std::fs::read_dir(&source_path).into_diagnostic()? {
                 let entry = entry.into_diagnostic()?;
+                let entry_path = entry.path();
                 let link_path = target.join(entry.file_name());
-                if link_path.symlink_metadata().is_ok() {
-                    std::fs::remove_file(&link_path).into_diagnostic()?;
+
+                if let Ok(meta) = link_path.symlink_metadata() {
+                    if meta.is_dir() && !meta.file_type().is_symlink() {
+                        check_unmanaged_dir(&link_path)?;
+                        std::fs::remove_dir_all(&link_path).into_diagnostic()?;
+                    } else {
+                        std::fs::remove_file(&link_path).into_diagnostic()?;
+                    }
                 }
+
                 #[cfg(unix)]
-                std::os::unix::fs::symlink(entry.path(), &link_path).into_diagnostic()?;
+                {
+                    let rel_source = make_relative(&link_path, &entry_path);
+                    std::os::unix::fs::symlink(rel_source, &link_path).into_diagnostic()?;
+                }
                 #[cfg(not(unix))]
-                std::fs::copy(entry.path(), &link_path).into_diagnostic()?;
+                std::fs::copy(entry_path, &link_path).into_diagnostic()?;
             }
         }
     }
 
     log::info(format!("Symlinked → {}", proj.target)).into_diagnostic()?;
     Ok(())
+}
+
+/// Calculate a relative path from `from` (the symlink location) to `to` (the target file).
+fn make_relative(from: &Path, to: &Path) -> std::path::PathBuf {
+    if let Some(parent) = from.parent() {
+        pathdiff::diff_paths(to, parent).unwrap_or_else(|| to.to_path_buf())
+    } else {
+        to.to_path_buf()
+    }
 }
 
 /// Execute an inline projection: concatenate source files into a single target file.

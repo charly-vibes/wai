@@ -19,17 +19,17 @@ Wai addresses each of these pain points directly:
 
 | Pain point | How wai solves it |
 |---|---|
-| Context resets every session | `wai close` captures session state; `wai prime` restores it — agents resume where they left off. |
+| Context resets every session | `wai close` captures session state; `wai prime` restores it. Agents resume where they left off. |
 | Decisions outlive their rationale | `wai add research`, `wai add design`, and `wai add plan` preserve the *why* alongside the *what*. |
 | Handoffs lose signal | `wai handoff create` generates a high-context summary that carries reasoning across sessions and agents. |
 | Config drift | The sync engine keeps agent configs aligned from a single source of truth. |
 
 ## At a Glance
 
-`wai` bridges the gap between your thoughts and your codebase:
+`wai` connects your thoughts and your codebase:
 
 - **🧠 Capture** — Record research, designs, and decisions as you work.
-- **🗺️ Context** — Advance projects through phases (Research → Design → Plan → Implement → Review → Archive).
+- **🗺️ Context** — Advance projects through phases: Research → Design → Plan → Implement → Review → Archive.
 - **🔄 Sync** — Keep AI instructions automatically aligned from one source of truth.
 - **📦 Handoff** — Generate high-context session summaries for yourself or other agents.
 
@@ -59,7 +59,7 @@ Wai addresses each of these pain points directly:
 - **PARA Method Storage**: Logical organization into Projects, Areas, Resources, and Archives.
 - **Phase Tracking**: Structured workflow from initial research to final archive.
 - **Sync Engine**: Single source of truth for agent configurations across multiple tools.
-- **Plugin System**: Seamless integration with `git`, `beads`, `openspec`, and more.
+- **Plugin System**: Integration with `git`, `beads`, `openspec`, and more.
 - **Reasoning Oracle**: Ask natural language "why" questions about your codebase with `wai why`.
 
 ## Where to Go Next

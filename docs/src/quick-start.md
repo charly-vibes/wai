@@ -20,7 +20,7 @@ Navigate to your project directory and initialize:
 wai init
 ```
 
-This creates a `.wai/` directory — the single source of truth for all reasoning and workflow state in this repository. Everything wai tracks lives here: artifacts, configs, plugin definitions, and project metadata. It's designed to be committed alongside your code.
+This creates a `.wai/` directory as the single source of truth for all reasoning and workflow state. Everything wai tracks lives here: artifacts, configs, plugin definitions, and project metadata. Commit this directory alongside your code.
 
 ## 3. Create a Project
 
@@ -30,7 +30,7 @@ In `wai`, a "Project" is an active work item with a specific goal. Create your f
 wai new project my-feature
 ```
 
-Projects use phases instead of jumping straight to code. This forces the research and design reasoning to exist *before* implementation, so when you or an agent revisits the project later, the *why* is already captured — not lost in a chat thread.
+Projects use phases instead of jumping straight to code. This ensures research and design reasoning exist *before* implementation. When you or an agent revisits the project later, the *why* is already captured.
 
 ## 4. Capture Research
 
@@ -40,7 +40,7 @@ Projects start in the **Research** phase. Record your initial thoughts or findin
 wai add research "Evaluated options A and B. Choosing A for performance."
 ```
 
-This creates a dated Markdown artifact in `.wai/projects/my-feature/research/`. The artifact persists across sessions — unlike chat history, it won't disappear when an agent's context resets.
+This creates a dated Markdown artifact in `.wai/projects/my-feature/research/`. The artifact persists across sessions and won't disappear when an agent's context resets.
 
 ## 5. Advance Through Phases
 

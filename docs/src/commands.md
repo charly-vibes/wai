@@ -2,9 +2,23 @@
 
 Complete CLI reference for wai.
 
-Wai provides a comprehensive set of commands for managing projects, artifacts, phases, and agent configurations.
+## Table of Contents
 
-> **Tip:** Run `wai --help` for a quick overview, or `wai <command> --help` for detailed help on any command.
+- [Global Flags](#global-flags)
+- [Workspace & Initialization](#workspace--initialization)
+- [PARA Lifecycle (Projects & Artifacts)](#para-lifecycle-projects--artifacts)
+  - [Items & Phases](#items--phases)
+  - [Adding Artifacts](#adding-artifacts)
+  - [Searching & Timeline](#searching--timeline)
+- [Agent Configuration](#agent-configuration)
+- [AI-Driven Workflows](#ai-driven-workflows)
+  - [Reasoning & Reflection](#reasoning--reflection)
+  - [Session Management](#session-management)
+  - [Pipelines](#pipelines)
+- [Plugin System](#plugin-system)
+- [Doctor & Health Checks](#doctor-checks)
+
+---
 
 ## Global Flags
 
