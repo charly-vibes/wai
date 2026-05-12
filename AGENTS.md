@@ -53,6 +53,25 @@ Do NOT skip `wai close` — it enables resume detection.
 
 > Pipeline steps may have gates that enforce artifact creation, review coverage, and oracle checks before advancement. Run `wai pipeline gates <name>` for details.
 
+## Ubiquitous Language
+
+If `.wai/resources/ubiquitous-language/README.md` exists, read it first as the
+navigation index, then open only the bounded-context files relevant to the task.
+Avoid loading every terminology file unless the work truly spans multiple contexts.
+
+## Autonomous Work Policy
+
+Proceed without routine confirmation when the next step is clear.
+Do not ask to continue, fix, or commit — just do it.
+
+**Stop and ask** only when:
+- Conflicting requirements or ambiguous intent
+- Destructive actions (data loss, force-push, drop table)
+- Credentials, secrets, or external services not yet authorized
+- Unresolved test failures after two attempts
+- Push, deploy, or release — always get explicit authorization
+- Context approaching 40% — recommend `wai close` then `/clear`
+
 ## Detailed Instructions
 
 Full workflow reference — session lifecycle, capturing work, command cheat
@@ -73,6 +92,7 @@ context before starting research or creating tickets.
 > **Before research or ticket creation**: always run `wai search "<topic>"` to
 > check for known patterns. Do not rediscover what is already documented.
 <!-- WAI:REFLECT:REF:END -->
+
 
 
 

@@ -129,6 +129,23 @@ pub fn wai_block_content(
         block.push_str(note);
     }
 
+    // Autonomous Work Policy — always present in slim block
+    block.push_str(
+        "\n\
+         ## Autonomous Work Policy\n\
+         \n\
+         Proceed without routine confirmation when the next step is clear.\n\
+         Do not ask to continue, fix, or commit — just do it.\n\
+         \n\
+         **Stop and ask** only when:\n\
+         - Conflicting requirements or ambiguous intent\n\
+         - Destructive actions (data loss, force-push, drop table)\n\
+         - Credentials, secrets, or external services not yet authorized\n\
+         - Unresolved test failures after two attempts\n\
+         - Push, deploy, or release — always get explicit authorization\n\
+         - Context approaching 40% — recommend `wai close` then `/clear`\n",
+    );
+
     // Pointer to detailed instructions
     block.push_str(
         "\n\
@@ -334,6 +351,24 @@ pub fn wai_detailed_content(
          When context reaches ~40%: stop and tell the user — responses degrade past\n\
          this point. Recommend `wai close` then `/clear` to resume cleanly.\n\
          Do NOT skip `wai close` — it enables resume detection.\n",
+    );
+
+    // Quality Gate — ledger required before final commit/response
+    doc.push_str(
+        "\n\
+         ## Quality Gate\n\
+         \n\
+         Before your final commit or response, produce a quality ledger:\n\
+         \n\
+         ```\n\
+         Changed  — files/modules touched and why\n\
+         Verified — commands run to confirm correctness (test, build, lint)\n\
+         Review   — what was reviewed, by whom/what (self, ro5, pair)\n\
+         Risks    — known risks, edge cases, or deferred concerns\n\
+         Next     — follow-up work, if any\n\
+         ```\n\
+         \n\
+         The ledger lives in the commit message or session handoff, not in code.\n",
     );
 
     // Quick Reference
@@ -898,6 +933,59 @@ mod wai_block_tests {
         assert!(output.contains("beta"));
     }
 
+    // ── Autonomous Work Policy (slim block) ────────────────────────────
+
+    #[test]
+    fn slim_block_contains_autonomous_work_policy_section() {
+        let output = wai_block_content(Path::new("."), &[], &[], &[]);
+        assert!(
+            output.contains("## Autonomous Work Policy"),
+            "expected Autonomous Work Policy section in slim block"
+        );
+    }
+
+    #[test]
+    fn slim_block_policy_says_no_routine_confirmations() {
+        let output = wai_block_content(Path::new("."), &[], &[], &[]);
+        assert!(
+            output.contains("routine confirmation"),
+            "policy should mention not asking routine confirmations"
+        );
+    }
+
+    #[test]
+    fn slim_block_policy_lists_stop_conditions() {
+        let output = wai_block_content(Path::new("."), &[], &[], &[]);
+        for condition in [
+            "Conflicting requirements",
+            "Destructive action",
+            "Credentials",
+            "Unresolved test failure",
+            "push",
+            "context",
+        ] {
+            assert!(
+                output.contains(condition),
+                "stop conditions should mention '{condition}'"
+            );
+        }
+    }
+
+    #[test]
+    fn slim_block_policy_before_detailed_instructions() {
+        let output = wai_block_content(Path::new("."), &[], &[], &[]);
+        let policy_pos = output
+            .find("Autonomous Work Policy")
+            .expect("Autonomous Work Policy not found");
+        let detailed_pos = output
+            .find("Detailed Instructions")
+            .expect("Detailed Instructions not found");
+        assert!(
+            policy_pos < detailed_pos,
+            "Autonomous Work Policy should appear before Detailed Instructions"
+        );
+    }
+
     // ── Detailed content (Layer 2: .wai/AGENTS.md) ───────────────────────
 
     #[test]
@@ -1009,6 +1097,41 @@ mod wai_block_tests {
     fn detailed_contains_autonomous_loop() {
         let output = wai_detailed_content(Path::new("."), &[], &[], &[]);
         assert!(output.contains("Autonomous Loop"));
+    }
+
+    // ── Quality Gate (detailed content) ─────────────────────────────────
+
+    #[test]
+    fn detailed_contains_quality_gate_section() {
+        let output = wai_detailed_content(Path::new("."), &[], &[], &[]);
+        assert!(
+            output.contains("## Quality Gate"),
+            "expected Quality Gate section in detailed content"
+        );
+    }
+
+    #[test]
+    fn detailed_quality_gate_requires_ledger_fields() {
+        let output = wai_detailed_content(Path::new("."), &[], &[], &[]);
+        for field in ["Changed", "Verified", "Review", "Risks", "Next"] {
+            assert!(
+                output.contains(field),
+                "quality ledger should require '{field}'"
+            );
+        }
+    }
+
+    #[test]
+    fn detailed_quality_gate_after_ending_session() {
+        let output = wai_detailed_content(Path::new("."), &[], &[], &[]);
+        let ending_pos = output
+            .find("Ending a Session")
+            .expect("Ending a Session not found");
+        let gate_pos = output.find("Quality Gate").expect("Quality Gate not found");
+        assert!(
+            gate_pos > ending_pos,
+            "Quality Gate should appear after Ending a Session"
+        );
     }
 
     #[test]
