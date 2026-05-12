@@ -6595,6 +6595,97 @@ fn pipeline_current_errors_when_no_active_run() {
 }
 
 #[test]
+fn pipeline_current_json_reports_active_run() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml(tmp.path(), "my-pipe");
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "start", "my-pipe", "--topic=my-topic"])
+        .assert()
+        .success();
+
+    let output = wai_cmd(tmp.path())
+        .args(["pipeline", "current", "--json"])
+        .env_remove("WAI_PIPELINE_RUN")
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let payload: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(payload["active"], true);
+    assert_eq!(payload["pipeline"], "my-pipe");
+    assert_eq!(payload["topic"], "my-topic");
+    assert_eq!(payload["step"]["index"], 1);
+    assert_eq!(payload["step"]["id"], "step-one");
+    assert!(
+        payload["step"]["prompt"]
+            .as_str()
+            .unwrap()
+            .contains("my-topic")
+    );
+    assert_eq!(payload["next_command"], "wai pipeline next");
+    assert!(payload["run_id"].as_str().unwrap().contains("my-pipe"));
+    assert!(payload.get("gate_summary").is_some());
+}
+
+#[test]
+fn pipeline_current_json_reports_no_active_run() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    let output = wai_cmd(tmp.path())
+        .args(["pipeline", "current", "--json"])
+        .env_remove("WAI_PIPELINE_RUN")
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let payload: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(payload["active"], false);
+    assert!(
+        payload["message"]
+            .as_str()
+            .unwrap()
+            .contains("No active pipeline run")
+    );
+    assert_eq!(
+        payload["next_command"],
+        "wai pipeline start <name> --topic=<topic>"
+    );
+}
+
+#[test]
+fn pipeline_status_json_reports_active_run() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml(tmp.path(), "my-pipe");
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "start", "my-pipe", "--topic=my-topic"])
+        .assert()
+        .success();
+
+    let output = wai_cmd(tmp.path())
+        .args(["--json", "pipeline", "status"])
+        .env_remove("WAI_PIPELINE_RUN")
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let payload: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(payload["active"], true);
+    assert_eq!(payload["pipeline"], "my-pipe");
+    assert_eq!(payload["step"]["id"], "step-one");
+}
+
+#[test]
 fn pipeline_current_on_complete_run_prints_done() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());

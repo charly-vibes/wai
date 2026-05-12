@@ -324,7 +324,9 @@ prompt = """
 | `wai pipeline show <name>` | View steps and gates for a pipeline |
 | `wai pipeline start <name> --topic="..."` | Start a new run |
 | `wai pipeline next` | Advance to the next step |
-| `wai pipeline status <name>` | Show per-stage run status |
+| `wai pipeline current` | Reprint the active step |
+| `wai pipeline current --json` | Emit machine-readable active run context |
+| `wai pipeline status` | Alias for machine-readable active run context |
 | `wai pipeline gates <name>` | Show gate requirements |
 | `wai pipeline check` | Dry-run gate evaluation |
 | `wai pipeline approve` | Human approval for current step |

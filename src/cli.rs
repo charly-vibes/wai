@@ -825,18 +825,12 @@ pub enum PipelineCommands {
         topic: Option<String>,
     },
 
-    /// Show status of a pipeline's runs
+    /// Show status for the active pipeline run
     ///
-    /// Lists all runs with per-stage completion status and artifact paths.
-    /// Use --run to filter to a single run.
-    Status {
-        /// Pipeline name
-        name: String,
-
-        /// Show detail for a single run
-        #[arg(long)]
-        run: Option<String>,
-    },
+    /// Resolves the active run from `WAI_PIPELINE_RUN` or the `.last-run`
+    /// pointer file and prints the current step. With `--json`, emits
+    /// machine-readable active-run context for agent integrations.
+    Status,
 
     /// List all pipelines
     List,
@@ -887,7 +881,11 @@ pub enum PipelineCommands {
     /// ENVIRONMENT
     ///   WAI_PIPELINE_RUN  When set, identifies the active run. Falls back to
     ///                     `.wai/resources/pipelines/.last-run` when not set.
-    Current,
+    Current {
+        /// Output machine-readable JSON for the active run
+        #[arg(long)]
+        json: bool,
+    },
 
     /// List and rank available TOML pipelines, optionally by keyword match
     ///

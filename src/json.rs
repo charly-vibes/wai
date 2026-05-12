@@ -211,6 +211,33 @@ pub struct PrimePayload {
     pub openspec: Vec<OpenspecEntry>,
 }
 
+#[derive(Debug, Serialize)]
+pub struct PipelineCurrentPayload {
+    pub active: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pipeline: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub run_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub topic: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub step: Option<PipelineCurrentStep>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gate_summary: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next_command: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct PipelineCurrentStep {
+    pub index: usize,
+    pub total: usize,
+    pub id: String,
+    pub prompt: String,
+}
+
 #[allow(dead_code)]
 pub fn sanitize_path(path: &std::path::Path, project_root: &std::path::Path) -> String {
     if let Ok(relative) = path.strip_prefix(project_root) {

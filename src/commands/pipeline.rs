@@ -8,7 +8,9 @@ use std::path::Path;
 
 use crate::cli::PipelineCommands;
 use crate::config::pipelines_dir;
-use crate::context::require_safe_mode;
+use crate::context::{current_context, require_safe_mode};
+use crate::json::{PipelineCurrentPayload, PipelineCurrentStep};
+use crate::output::print_json;
 
 use super::require_project;
 
@@ -188,12 +190,12 @@ pub struct PipelineRun {
 
 pub fn run(cmd: PipelineCommands) -> Result<()> {
     match cmd {
-        PipelineCommands::Status { name, run } => cmd_status(&name, run.as_deref()),
+        PipelineCommands::Status => cmd_status(),
         PipelineCommands::List => cmd_list(),
         PipelineCommands::Init { name } => cmd_init(&name),
         PipelineCommands::Start { name, topic } => cmd_start(&name, topic.as_deref()),
         PipelineCommands::Next => cmd_next(),
-        PipelineCommands::Current => cmd_current(),
+        PipelineCommands::Current { json } => cmd_current(json),
         PipelineCommands::Suggest { description } => cmd_suggest(description.as_deref()),
         PipelineCommands::Approve => cmd_approve(),
         PipelineCommands::Show { name } => cmd_show(&name),
@@ -207,10 +209,8 @@ pub fn run(cmd: PipelineCommands) -> Result<()> {
 
 // ─── status ──────────────────────────────────────────────────────────────────
 
-fn cmd_status(_name: &str, _run_filter: Option<&str>) -> Result<()> {
-    miette::bail!(
-        "'wai pipeline status' is deprecated. Use 'wai pipeline current' to see the active step."
-    )
+fn cmd_status() -> Result<()> {
+    cmd_current(current_context().json)
 }
 
 // ─── list ────────────────────────────────────────────────────────────────────
@@ -578,42 +578,43 @@ fn cmd_next() -> Result<()> {
 
 // ─── current ──────────────────────────────────────────────────────────────────
 
-fn cmd_current() -> Result<()> {
+fn cmd_current(json: bool) -> Result<()> {
+    let json = json || current_context().json;
     let project_root = require_project()?;
 
-    // 1. Resolve run ID (env var → .last-run)
-    let run_id = resolve_active_run_id(&project_root)?;
-
-    // 2. Load run state
-    let runs_dir = crate::config::wai_dir(&project_root).join("pipeline-runs");
-    let run_path = runs_dir.join(format!("{}.yml", run_id));
-    if !run_path.exists() {
+    let Some(status) = pipeline_current_status(&project_root)? else {
+        if json {
+            return print_json(&PipelineCurrentPayload {
+                active: false,
+                message: Some(
+                    "No active pipeline run. Start one with: wai pipeline start <name> --topic=<topic>"
+                        .to_string(),
+                ),
+                pipeline: None,
+                run_id: None,
+                topic: None,
+                step: None,
+                gate_summary: None,
+                next_command: Some("wai pipeline start <name> --topic=<topic>".to_string()),
+            });
+        }
         miette::bail!(
-            "No run state found for '{}'. The .last-run pointer may be stale.\nStart a new run with: wai pipeline start <name> --topic=<topic>",
-            run_id
+            "No active pipeline run. Start one with: wai pipeline start <name> --topic=<topic>"
         );
+    };
+
+    if json {
+        return print_json(&status);
     }
-    let run: PipelineRun =
-        serde_yml::from_str(&fs::read_to_string(&run_path).into_diagnostic()?)
-            .map_err(|e| miette::miette!("Failed to parse run state for '{}': {}", run_id, e))?;
 
-    // 3. Load pipeline definition
-    let def_path =
-        crate::config::pipelines_dir(&project_root).join(format!("{}.toml", run.pipeline));
-    let definition = load_pipeline_toml(&def_path)?;
+    if let Some(ref step) = status.step {
+        println!(
+            "── step {}/{}: {} ──────────────────────────────",
+            step.index, step.total, step.id
+        );
+        println!("{}", step.prompt);
 
-    // 4. Print current step (or completion block if the run is done)
-    if run.current_step >= definition.steps.len() {
-        println!("──────────────────────────────────────────────");
-        println!("Pipeline '{}' is already complete!", definition.name);
-        println!();
-        println!("Next: wai close");
-    } else {
-        print_step(&definition, run.current_step, &run.topic);
-
-        // 5. Show addenda for the current step (if any)
-        let step_id = &definition.steps[run.current_step].id;
-        let addenda = find_step_addenda(&project_root, step_id);
+        let addenda = find_step_addenda(&project_root, &step.id);
         if !addenda.is_empty() {
             println!();
             println!("{} Addenda ({})", "◆".cyan(), addenda.len());
@@ -621,6 +622,19 @@ fn cmd_current() -> Result<()> {
                 println!("  {} {}", "•".dimmed(), path);
             }
         }
+    } else {
+        println!("──────────────────────────────────────────────");
+        println!(
+            "Pipeline '{}' is already complete!",
+            status.pipeline.unwrap()
+        );
+        println!();
+        println!(
+            "Next: {}",
+            status
+                .next_command
+                .unwrap_or_else(|| "wai close".to_string())
+        );
     }
 
     Ok(())
@@ -1954,6 +1968,64 @@ fn find_artifact_path(projects_dir: &Path, filename: &str) -> Option<String> {
         }
     }
     None
+}
+
+fn pipeline_current_status(project_root: &Path) -> Result<Option<PipelineCurrentPayload>> {
+    let run_id = match resolve_active_run_id(project_root) {
+        Ok(run_id) => run_id,
+        Err(_) => return Ok(None),
+    };
+
+    let runs_dir = crate::config::wai_dir(project_root).join("pipeline-runs");
+    let run_path = runs_dir.join(format!("{}.yml", run_id));
+    if !run_path.exists() {
+        return Ok(None);
+    }
+
+    let run: PipelineRun =
+        serde_yml::from_str(&fs::read_to_string(&run_path).into_diagnostic()?)
+            .map_err(|e| miette::miette!("Failed to parse run state for '{}': {}", run_id, e))?;
+
+    let def_path =
+        crate::config::pipelines_dir(project_root).join(format!("{}.toml", run.pipeline));
+    let definition = load_pipeline_toml(&def_path)?;
+
+    let (step, gate_summary, next_command, message) = if run.current_step >= definition.steps.len()
+    {
+        (
+            None,
+            None,
+            Some("wai close".to_string()),
+            Some(format!(
+                "Pipeline '{}' is already complete!",
+                definition.name
+            )),
+        )
+    } else {
+        let current_step = &definition.steps[run.current_step];
+        (
+            Some(PipelineCurrentStep {
+                index: run.current_step + 1,
+                total: definition.steps.len(),
+                id: current_step.id.clone(),
+                prompt: render_prompt(&current_step.prompt, &run.topic),
+            }),
+            Some(format_gate_summary(&current_step.gate)),
+            Some("wai pipeline next".to_string()),
+            None,
+        )
+    };
+
+    Ok(Some(PipelineCurrentPayload {
+        active: true,
+        message,
+        pipeline: Some(definition.name),
+        run_id: Some(run.run_id),
+        topic: Some(run.topic),
+        step,
+        gate_summary,
+        next_command,
+    }))
 }
 
 /// Resolve the active run ID: check `WAI_PIPELINE_RUN` env var first, then
