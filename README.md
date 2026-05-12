@@ -116,7 +116,26 @@ This repository also exposes Pi workflow guardrails as a local Pi package:
 pi install /path/to/wai
 ```
 
-The package loads `extensions/wai-autonomy`, which detects wai workspaces and adds autonomous workflow/context guardrails for Pi sessions. It can block unverified `git commit` attempts and unauthorized `git push` commands; record an explicit waiver with `wai add research "VERIFICATION NOT RUN: <reason>"` when verification is impossible.
+For project-local installation, run the command from the repo you want to guard and add `-l`:
+
+```bash
+pi install -l /path/to/wai
+```
+
+The package loads `extensions/wai-autonomy`, which detects wai workspaces and adds autonomous workflow/context guardrails for Pi sessions. It:
+
+- injects wai autonomous-work policy into each Pi turn
+- warns as context approaches the wai handoff threshold
+- customizes compaction summaries for wai session continuity
+- blocks unverified `git commit` attempts after edits unless you record `wai add research "VERIFICATION NOT RUN: <reason>"`
+- blocks `git push` unless the current user prompt explicitly authorizes push/release/deploy
+
+You can smoke-test the package from this repo with:
+
+```bash
+npm run test:pi-extension
+pi -e ./extensions/wai-autonomy/index.ts
+```
 
 ## Contributing
 

@@ -34,8 +34,23 @@ export function isCommitCommand(command: string): boolean {
   return /\bgit\s+commit\b/.test(command);
 }
 
+export function promptExplicitlyAllowsPush(prompt: string): boolean {
+  return /\b(push|release|deploy)\b/i.test(prompt);
+}
+
 export function recordsVerificationWaiver(command: string): boolean {
   return /\bwai\s+add\s+(research|plan|design)\b[\s\S]*VERIFICATION NOT RUN:/i.test(command);
+}
+
+export function contextInstructionForUsage(percent: number | null | undefined): string {
+  if (percent == null) return "";
+  if (percent >= 40) {
+    return "\n- Context usage is >=40%. Do not continue implementation. Create/update wai handoff and stop.\n";
+  }
+  if (percent >= 35) {
+    return "\n- Context usage is >=35%. Prefer finishing the current atomic step, then run wai close.\n";
+  }
+  return "";
 }
 
 export function isReadOnlyOrWorkflowCommand(command: string): boolean {
@@ -80,16 +95,11 @@ export default function (pi: ExtensionAPI) {
     const waiRoot = findWaiRoot(ctx.cwd);
     if (!waiRoot) return;
 
-    explicitPushAllowed = /\b(push|release|deploy)\b/i.test(event.prompt);
+    explicitPushAllowed = promptExplicitlyAllowsPush(event.prompt);
 
     const usage = ctx.getContextUsage();
     const activePipeline = hasActivePipeline(waiRoot);
-    const contextInstruction =
-      usage?.percent != null && usage.percent >= 40
-        ? "\n- Context usage is >=40%. Do not continue implementation. Create/update wai handoff and stop.\n"
-        : usage?.percent != null && usage.percent >= 35
-          ? "\n- Context usage is >=35%. Prefer finishing the current atomic step, then run wai close.\n"
-          : "";
+    const contextInstruction = contextInstructionForUsage(usage?.percent);
 
     return {
       systemPrompt: event.systemPrompt + autonomousPolicy(waiRoot, activePipeline, contextInstruction),
