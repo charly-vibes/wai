@@ -243,6 +243,30 @@ If critical issues are found, route back to step 6 for the specific subtask that
 └──────────────┘   └─────────────┘
 ```
 
+## Built-in: TDD + Rule of 5 Pipeline
+
+The `tdd-ro5` pipeline is designed for autonomous implementation work where an agent should keep moving without routine confirmations, but must prove correctness before shipping.
+
+Start it with:
+
+```bash
+wai pipeline start tdd-ro5 --topic="Your feature or bug fix"
+```
+
+The pipeline uses nine gated steps:
+
+1. **Orient** — run `wai prime`, `wai status`, available work discovery, and `wai search` before editing.
+2. **Plan** — record desired behavior, out of scope, test cases, and verification commands.
+3. **Red** — write failing tests and record expected failure evidence.
+4. **Green** — implement the minimum code and pass relevant tests.
+5. **Refactor** — tidy safely while tests remain green.
+6. **RO5U Review** — run Universal Rule of 5 review and record findings without fixing yet.
+7. **Fix Review** — address review findings and keep tests green.
+8. **Quality Ledger** — record Changed, Verified, Review, Risks, and Next.
+9. **Ship Close** — inspect the diff, update linked workflow tools, commit atomically, and run `wai close`.
+
+Review and fixing are intentionally separate steps: the review step observes and records evidence; the fix step applies bounded remediation. Push/release/deploy remains outside the default pipeline unless explicitly authorized by project policy or user instruction.
+
 ## Artifact Locking
 
 Steps can declare `lock = true` to freeze their artifacts with SHA-256 hashes when you advance past them. This prevents accidental modification of validated work — once a step's artifacts are locked, any change will be caught by `wai pipeline verify` or `wai doctor`.

@@ -108,6 +108,16 @@ cargo clippy                 # Lint
 cargo run -- --help -v       # View advanced help
 ```
 
+## Pi Extension Package
+
+This repository also exposes Pi workflow guardrails as a local Pi package:
+
+```bash
+pi install /path/to/wai
+```
+
+The package loads `extensions/wai-autonomy`, which detects wai workspaces and adds autonomous workflow/context guardrails for Pi sessions. It can block unverified `git commit` attempts and unauthorized `git push` commands; record an explicit waiver with `wai add research "VERIFICATION NOT RUN: <reason>"` when verification is impossible.
+
 ## Contributing
 
 See [Development](docs/src/development.md) for guidelines on contributing to wai.

@@ -3235,31 +3235,48 @@ require_input_manifest = true
     }
 
     #[test]
-    fn builtin_template_tdd_ro5_has_seven_steps() {
+    fn builtin_template_tdd_ro5_has_autonomous_ro5u_steps() {
         let content = get_builtin_template("tdd-ro5").unwrap();
         let f = write_toml(content);
         let def = load_pipeline_toml(f.path()).expect("should parse tdd-ro5 template");
-        assert_eq!(def.steps.len(), 7);
+        assert_eq!(def.steps.len(), 9);
         let ids: Vec<&str> = def.steps.iter().map(|s| s.id.as_str()).collect();
         assert_eq!(
             ids,
-            ["plan", "red", "green", "refactor", "review", "fix", "ship"]
+            [
+                "orient",
+                "plan",
+                "red",
+                "green",
+                "refactor",
+                "ro5u-review",
+                "fix-review",
+                "quality-ledger",
+                "ship-close"
+            ]
         );
     }
 
     #[test]
-    fn builtin_template_tdd_ro5_has_gates() {
+    fn builtin_template_tdd_ro5_has_autonomous_gates() {
         let content = get_builtin_template("tdd-ro5").unwrap();
         let f = write_toml(content);
         let def = load_pipeline_toml(f.path()).expect("should parse tdd-ro5 template");
-        // plan step has structural gate
+        // orient and plan steps require artifacts
         assert!(def.steps[0].gate.is_some());
-        // review step has procedural gate
-        let review_gate = def.steps[4].gate.as_ref().unwrap();
+        assert!(def.steps[1].gate.is_some());
+        // ro5u-review step has procedural review gate
+        let review_gate = def.steps[5].gate.as_ref().unwrap();
         assert!(review_gate.procedural.is_some());
-        // green step has oracle gate
-        let green_gate = def.steps[2].gate.as_ref().unwrap();
-        assert!(!green_gate.oracles.is_empty());
+        // green/refactor/fix-review/ship-close steps have oracle gates
+        for idx in [3, 4, 6, 8] {
+            let gate = def.steps[idx].gate.as_ref().unwrap();
+            assert!(
+                !gate.oracles.is_empty(),
+                "step {} should have oracle gate",
+                def.steps[idx].id
+            );
+        }
     }
 
     #[test]

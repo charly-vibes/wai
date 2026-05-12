@@ -6145,6 +6145,33 @@ fn pipeline_init_template_is_valid_toml() {
     );
 }
 
+#[test]
+fn pipeline_init_tdd_ro5_uses_autonomous_ro5u_template() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "init", "tdd-ro5"])
+        .assert()
+        .success();
+
+    let toml_path = tmp.path().join(".wai/resources/pipelines/tdd-ro5.toml");
+    let content = fs::read_to_string(&toml_path).unwrap();
+
+    for expected in [
+        "id = \"orient\"",
+        "id = \"ro5u-review\"",
+        "id = \"quality-ledger\"",
+        "id = \"ship-close\"",
+        "QUALITY LEDGER",
+    ] {
+        assert!(
+            content.contains(expected),
+            "Expected {expected} in TOML: {content}"
+        );
+    }
+}
+
 // ─── wai pipeline start ───────────────────────────────────────────────────────
 
 /// Helper: write a minimal two-step TOML pipeline for start tests.

@@ -1,38 +1,58 @@
-# TDD + Rule of 5 Review Pipeline
+# Autonomous TDD + Universal Rule of 5 Review Pipeline
 #
-# Test-driven development workflow with iterative quality review.
-# Each cycle: plan tests, write failing tests (red), make them pass (green),
-# refactor safely, then validate via Rule of 5 review with a fix-all pass.
+# Test-driven implementation workflow with explicit orientation, verification,
+# Universal Rule of 5 review, bounded fixes, quality ledger, and wai handoff.
 #
-# Designed for: feature implementation, bug fixes, and refactoring where
-# correctness must be proven by tests and quality assured by review.
+# Designed for: autonomous feature implementation, bug fixes, and refactoring
+# where correctness must be proven by tests and context must survive agent
+# session boundaries.
 #
 # Usage: wai pipeline start tdd-ro5 --topic="<what you're building>"
 
 [pipeline]
 name = "tdd-ro5"
-description = "Test-driven development with Rule of 5 review and fix-all pass"
+description = "Autonomous TDD implementation loop with Universal Rule of 5 review and wai handoff"
 
 [pipeline.metadata]
-when = "Feature development or bug fixes requiring test-driven discipline and quality review"
-skills = ["tdd", "rule-of-5-universal"]
+when = "Autonomous feature, bugfix, or refactor work where tests and review must gate progress"
+skills = ["tdd", "rule-of-5-universal", "commit"]
+
+[[steps]]
+id = "orient"
+prompt = """
+{topic}: Orient before changing anything.
+
+Run:
+- `wai prime`
+- `wai status`
+- `bd ready` if beads is present
+- `openspec list` if openspec is present
+- `wai search "<topic>"`
+
+Select exactly one task. If the task is ambiguous, stop and ask. Otherwise proceed autonomously.
+
+Record orientation: `wai add research "ORIENT: ..."`
+Advance: `wai pipeline next`
+"""
+
+[steps.gate.structural]
+min_artifacts = 1
+types = ["research"]
 
 [[steps]]
 id = "plan"
 prompt = """
-{topic}: Define what to build and how to test it.
+{topic}: Produce a minimal TDD plan.
 
-Before writing any code, establish:
-- What behavior is being added or changed
-- What the test strategy looks like (unit, integration, edge cases)
-- Input/output shapes for the public interface
-- Which existing tests might be affected
+Include:
+- desired behavior
+- out of scope
+- test cases to write
+- narrow test command
+- full verification command
+- files likely touched
 
-Deliverables:
-- A plan artifact describing the feature and its test strategy
-- List of test cases to write (name each, describe expected behavior)
-
-Do NOT write code or tests yet — only the plan.
+Do not edit code yet.
 
 Record plan: `wai add plan "..."`
 Advance: `wai pipeline next`
@@ -45,89 +65,86 @@ types = ["plan"]
 [[steps]]
 id = "red"
 prompt = """
-{topic}: Write failing tests.
+{topic}: Write failing tests first.
 
-Implement the test cases from your plan. Every test should FAIL because
-the production code doesn't exist yet. This proves the tests are actually
-checking something.
+Rules:
+- Only test files should change unless test scaffolding requires otherwise.
+- Run the narrow test command.
+- Confirm failure is for the expected missing behavior, not setup breakage.
 
-For each test:
-1. Write the test with clear assertions
-2. Run the test suite — confirm the new test fails
-3. Confirm existing tests still pass (no collateral damage)
-
-Do NOT write any production code. The only changes should be test files.
-
-Record what you wrote: `wai add plan "test cases implemented"`
+Record evidence: `wai add research "RED: command=... expected failure=..."`
 Advance: `wai pipeline next`
 """
 
 [steps.gate.structural]
 min_artifacts = 1
+types = ["research"]
 
 [[steps]]
 id = "green"
 prompt = """
-{topic}: Make the tests pass with minimal code.
-
-Write the simplest production code that makes ALL tests pass.
-Do not optimize, do not refactor, do not add anything beyond what
-the tests require.
+{topic}: Implement the minimum production change.
 
 Rules:
-- If a test passes without any code change, the test is wrong — fix it
-- If you need to change a test to make it pass, go back to red
-- Run the FULL test suite after every change
+- Make the red test pass with the smallest correct change.
+- Run the narrow test command.
+- Then run the relevant package/module test suite.
 
-Advance only when all tests are green.
+Record decision: `wai add design "GREEN: ..."`
 Advance: `wai pipeline next`
 """
 
 [[steps.gate.oracles]]
 name = "tests-pass"
-description = "All tests must pass before advancing"
+description = "Relevant tests must pass after green implementation"
 timeout = 300
 
 [[steps]]
 id = "refactor"
 prompt = """
-{topic}: Clean up while keeping tests green.
+{topic}: Refactor safely while tests stay green.
 
-Now improve the code without changing behavior:
-- Extract duplication
-- Improve naming
-- Simplify control flow
-- Apply domain patterns
+Allowed:
+- simplify names
+- remove duplication
+- clarify structure
+- improve boundaries
 
-After EVERY change, run the full test suite. If any test breaks,
-undo the change immediately.
+Forbidden:
+- behavior expansion
+- unrelated cleanup
+- large architectural rewrites
 
-Commit refactoring changes separately from the green step.
+Run tests after refactoring.
 
+Record refactor note: `wai add design "REFACTOR: ..."`
 Advance: `wai pipeline next`
 """
 
 [[steps.gate.oracles]]
 name = "tests-pass"
-description = "All tests must still pass after refactoring"
+description = "Tests must pass after refactor"
 timeout = 300
 
 [[steps]]
-id = "review"
+id = "ro5u-review"
 prompt = """
-{topic}: Run Rule of 5 review on all changes.
+{topic}: Review the diff using `rule-of-5-universal`.
 
-Execute /ro5 on the code written in this cycle. The five passes:
-1. **Accuracy** — correctness of logic, algorithms, edge cases
-2. **Completeness** — missing tests, unhandled paths, gaps in coverage
-3. **Clarity** — naming, structure, readability, comments where non-obvious
-4. **Actionability** — each finding has a concrete fix, ranked by severity
-5. **Integration** — consistency with the rest of the codebase
+Review only. Do not fix yet.
 
-Record the review findings as an artifact.
-Do NOT fix anything yet — only observe and document.
+Return findings grouped by:
+- Critical
+- High
+- Medium
+- Low
 
-Record review: `wai add review "..."`
+Each finding must include:
+- file/location
+- evidence
+- concrete fix
+
+Record review: `wai add review "RO5U: ..."`
 Advance: `wai pipeline next`
 """
 
@@ -136,21 +153,18 @@ require_review = true
 max_critical = 0
 
 [[steps]]
-id = "fix"
+id = "fix-review"
 prompt = """
-{topic}: Address ALL findings from the review.
+{topic}: Fix review findings.
 
-Go through every finding from the review step and fix it:
-- Critical and high findings: must be fixed
-- Medium findings: fix unless there's a documented reason to defer
-- Low findings: fix if quick, defer with a note otherwise
+Rules:
+- Critical/high must be fixed.
+- Medium fixed unless explicitly deferred with reason.
+- Low fixed if cheap, otherwise tracked.
+- Add tests for behavior-impacting fixes.
+- Run tests after fixes.
 
-For each fix:
-1. Make the change
-2. Run the test suite — confirm all tests still pass
-3. If a fix requires a new test, add it
-
-Record what you fixed: `wai add research "review findings addressed"`
+Record fixes: `wai add research "RO5U-FIXES: ..."`
 Advance: `wai pipeline next`
 """
 
@@ -159,25 +173,57 @@ min_artifacts = 1
 
 [[steps.gate.oracles]]
 name = "tests-pass"
-description = "All tests must pass after fixes"
+description = "Tests must pass after review fixes"
 timeout = 300
 
 [[steps]]
-id = "ship"
+id = "quality-ledger"
 prompt = """
-{topic}: Final verification and commit.
+{topic}: Produce final quality ledger.
 
-Verify the cycle is complete:
-- [ ] All tests pass
-- [ ] All review findings addressed (or deferred with reason)
-- [ ] Code is committed in atomic, well-described commits
-- [ ] No TODO/FIXME left without a tracking issue
+Record exactly:
 
-If everything checks out, the cycle is complete.
+Changed:
+- files and purpose
 
-Record final assessment: `wai add research "cycle complete"`
-Pipeline complete.
+Verified:
+- commands run and result
+
+Review:
+- RO5U status and remaining findings
+
+Risks:
+- known remaining risks or "none known"
+
+Next:
+- exact next action
+
+Record ledger: `wai add research "QUALITY LEDGER: ..."`
+Advance: `wai pipeline next`
 """
 
 [steps.gate.structural]
 min_artifacts = 1
+types = ["research"]
+
+[[steps]]
+id = "ship-close"
+prompt = """
+{topic}: Ship the completed task.
+
+Do:
+- inspect `git diff`
+- close/update beads issue if applicable
+- mark openspec task complete if applicable
+- commit atomically
+- run `wai close`
+
+Do not push unless project policy or user instruction explicitly says to push.
+
+Pipeline complete.
+"""
+
+[[steps.gate.oracles]]
+name = "tests-pass"
+description = "Final tests must pass before close"
+timeout = 300

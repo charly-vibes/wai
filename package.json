@@ -1,0 +1,13 @@
+{
+  "name": "wai-pi-autonomy",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pi extension package for wai autonomous workflow guardrails.",
+  "keywords": ["pi-package", "wai", "autonomy", "workflow"],
+  "pi": {
+    "extensions": ["./extensions/wai-autonomy/index.ts"]
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*"
+  }
+}
