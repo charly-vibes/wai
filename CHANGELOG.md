@@ -5,6 +5,20 @@ All notable changes to wai will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Calendar Versioning](https://calver.org/) (YYYY.M.MICRO).
 
+## [2026.5.1] - 2026-05-12
+
+### Added
+
+- **Autonomous `tdd-ro5` workflow** — the built-in implementation pipeline now guides agents through orient → plan → red → green → refactor → RO5U review → fix → quality ledger → ship/close with stronger gates and autonomy defaults
+- **Pi autonomy integration** — installable `wai-autonomy` extension package plus machine-readable pipeline status for Pi integration
+- **Decision freshness design** — added `docs/feedback-loop-design.md` describing a tracer-bullet feedback loop for detecting stale wai decision artifacts as code evolves
+
+### Changed
+
+- **Managed agent instructions** — generated `AGENTS.md` and `.wai/AGENTS.md` now include explicit autonomous work policy and quality-ledger expectations
+
+---
+
 ## [2026.5.0] - 2026-05-07
 
 ### Added
