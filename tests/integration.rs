@@ -1,7 +1,9 @@
 use assert_cmd::Command;
 use chrono::{Duration, Local, SecondsFormat, Utc};
+use flate2::{Compression, write::GzEncoder};
 use predicates::prelude::*;
 use std::fs;
+use tar::Header;
 use tempfile::TempDir;
 
 /// Strip ANSI escape sequences from a string.
@@ -3858,6 +3860,49 @@ fn why_no_llm_flag_falls_back_to_search() {
         .stdout(predicate::str::contains("TOML"));
 }
 
+#[test]
+fn why_no_llm_ignores_missing_llm_config_and_error_fallback() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproj");
+    write_artifact(
+        tmp.path(),
+        "myproj",
+        "research",
+        "2024-01-01-notes.md",
+        "TOML was chosen because it is human-readable and well-supported.",
+    );
+
+    let config_path = tmp.path().join(".wai").join("config.toml");
+    let existing = fs::read_to_string(&config_path).unwrap();
+    let updated = format!(
+        "{}\n[llm]\nllm = \"claude\"\nfallback = \"error\"\n",
+        existing.trim_end()
+    );
+    fs::write(&config_path, updated).unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["why", "--no-llm", "TOML"])
+        .env_remove("ANTHROPIC_API_KEY")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("TOML"))
+        .stderr(predicate::str::is_empty());
+}
+
+#[test]
+fn why_with_no_artifacts_prints_guidance_and_exits_cleanly() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproj");
+
+    wai_cmd(tmp.path())
+        .args(["why", "TOML"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No artifacts found in .wai/"));
+}
+
 /// 7.5 — When no LLM backend is configured or available, the command warns
 /// and automatically falls back to `wai search`.
 #[test]
@@ -4674,6 +4719,94 @@ fn resource_import_skills_copies_full_directory_tree() {
         target.join("templates/base.md").is_file(),
         "subdirectory contents should be copied"
     );
+}
+
+#[test]
+fn resource_export_then_import_archive_round_trips_skill() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["resource", "add", "skill", "round-trip-skill"])
+        .assert()
+        .success();
+
+    let skill_md = tmp
+        .path()
+        .join(".wai/resources/agent-config/skills/round-trip-skill/SKILL.md");
+    let content = "---\nname: round-trip-skill\ndescription: Round trip\n---\n\n# Round Trip\n";
+    fs::write(&skill_md, content).unwrap();
+
+    let archive = tmp.path().join("skills.tar.gz");
+    wai_cmd(tmp.path())
+        .args([
+            "resource",
+            "export",
+            "round-trip-skill",
+            "--output",
+            archive.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    fs::remove_dir_all(
+        tmp.path()
+            .join(".wai/resources/agent-config/skills/round-trip-skill"),
+    )
+    .unwrap();
+
+    wai_cmd(tmp.path())
+        .args([
+            "resource",
+            "import",
+            "archive",
+            archive.to_str().unwrap(),
+            "--yes",
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Imported 1 new skill"));
+
+    assert_eq!(fs::read_to_string(skill_md).unwrap(), content);
+}
+
+#[test]
+fn resource_import_archive_rejects_malformed_entry_path() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    let archive = tmp.path().join("bad-skills.tar.gz");
+    let out = fs::File::create(&archive).unwrap();
+    let gz = GzEncoder::new(out, Compression::default());
+    let mut builder = tar::Builder::new(gz);
+
+    let payload = b"bad skill";
+    let mut header = Header::new_gnu();
+    header.set_size(payload.len() as u64);
+    header.set_mode(0o644);
+    header.set_cksum();
+    builder
+        .append_data(&mut header, "evil.txt", &payload[..])
+        .unwrap();
+    builder.finish().unwrap();
+    let gz = builder.into_inner().unwrap();
+    gz.finish().unwrap();
+
+    wai_cmd(tmp.path())
+        .args([
+            "resource",
+            "import",
+            "archive",
+            archive.to_str().unwrap(),
+            "--yes",
+        ])
+        .assert()
+        .failure()
+        .stderr(
+            predicate::str::contains("Invalid archive entry").or(predicate::str::contains(
+                "entries must end with '/SKILL.md'",
+            )),
+        );
 }
 
 // ── Doctor projection consistency ────────────────────────────────────────────

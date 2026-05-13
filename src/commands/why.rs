@@ -1910,6 +1910,62 @@ mod tests {
         );
     }
 
+    #[test]
+    fn gather_git_file_context_returns_history_for_tracked_file() {
+        let tmp = TempDir::new().unwrap();
+        std::process::Command::new("git")
+            .args(["init"])
+            .current_dir(tmp.path())
+            .output()
+            .unwrap();
+
+        let src_dir = tmp.path().join("src");
+        fs::create_dir_all(&src_dir).unwrap();
+        let src_file = src_dir.join("main.rs");
+        fs::write(&src_file, "fn main() {}\n").unwrap();
+
+        std::process::Command::new("git")
+            .args(["add", "src/main.rs"])
+            .current_dir(tmp.path())
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args([
+                "-c",
+                "user.name=Test User",
+                "-c",
+                "user.email=test@example.com",
+                "commit",
+                "-m",
+                "add main",
+            ])
+            .current_dir(tmp.path())
+            .output()
+            .unwrap();
+
+        let history = gather_git_file_context("src/main.rs", tmp.path())
+            .expect("tracked file should produce git history");
+        assert!(history.contains("Git history for src/main.rs"));
+        assert!(history.contains("add main"));
+    }
+
+    #[test]
+    fn gather_git_file_context_returns_none_for_untracked_file() {
+        let tmp = TempDir::new().unwrap();
+        std::process::Command::new("git")
+            .args(["init"])
+            .current_dir(tmp.path())
+            .output()
+            .unwrap();
+
+        let src_dir = tmp.path().join("src");
+        fs::create_dir_all(&src_dir).unwrap();
+        let src_file = src_dir.join("main.rs");
+        fs::write(&src_file, "fn main() {}\n").unwrap();
+
+        assert!(gather_git_file_context("src/main.rs", tmp.path()).is_none());
+    }
+
     // ── full pipeline integration test (7.4) ──
 
     #[test]

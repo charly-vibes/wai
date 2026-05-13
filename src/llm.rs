@@ -540,6 +540,31 @@ pub fn estimate_cost(model: &str, input_chars: usize, output_chars: usize) -> Op
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    fn install_fake_claude_bin(dir: &std::path::Path) -> String {
+        let bin_dir = dir.join("fake-bin");
+        fs::create_dir_all(&bin_dir).unwrap();
+        let script_path = bin_dir.join("claude");
+        fs::write(
+            &script_path,
+            "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then\n  echo 'claude 0.0-test'\n  exit 0\nfi\nexit 1\n",
+        )
+        .unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(&script_path).unwrap().permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(&script_path, perms).unwrap();
+        }
+        format!(
+            "{}:{}",
+            bin_dir.display(),
+            std::env::var("PATH").unwrap_or_default()
+        )
+    }
 
     // ── AgentBackend ──
 
@@ -903,6 +928,80 @@ mod tests {
         assert!(backend.is_some());
         assert_eq!(backend.unwrap().name(), "Claude");
         unsafe { std::env::remove_var("ANTHROPIC_API_KEY") };
+    }
+
+    #[test]
+    #[serial]
+    fn explicit_claude_cli_uses_selected_provider_even_in_agent_session() {
+        let tmp = TempDir::new().unwrap();
+        let path = install_fake_claude_bin(tmp.path());
+        let old_path = std::env::var("PATH").ok();
+        unsafe {
+            std::env::set_var("PATH", path);
+            std::env::set_var("CLAUDECODE", "1");
+            std::env::remove_var("ANTHROPIC_API_KEY");
+        }
+        let cfg = LlmConfig {
+            llm: Some("claude-cli".to_string()),
+            ..Default::default()
+        };
+        let backend = detect_backend(&cfg).expect("explicit claude-cli should win");
+        assert_eq!(backend.name(), "Claude CLI");
+        unsafe {
+            std::env::remove_var("CLAUDECODE");
+            if let Some(path) = old_path {
+                std::env::set_var("PATH", path);
+            } else {
+                std::env::remove_var("PATH");
+            }
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn auto_detect_without_agent_or_api_key_uses_claude_cli_when_binary_exists() {
+        let tmp = TempDir::new().unwrap();
+        let path = install_fake_claude_bin(tmp.path());
+        let old_path = std::env::var("PATH").ok();
+        unsafe {
+            std::env::set_var("PATH", path);
+            std::env::remove_var("CLAUDECODE");
+            std::env::remove_var("WAI_AGENT");
+            std::env::remove_var("CURSOR_AGENT");
+            std::env::remove_var("ANTHROPIC_API_KEY");
+        }
+        let backend = detect_backend(&LlmConfig::default())
+            .expect("auto-detect should use claude-cli when available");
+        assert_eq!(backend.name(), "Claude CLI");
+        unsafe {
+            if let Some(path) = old_path {
+                std::env::set_var("PATH", path);
+            } else {
+                std::env::remove_var("PATH");
+            }
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn explicit_claude_cli_without_binary_returns_none() {
+        let old_path = std::env::var("PATH").ok();
+        unsafe {
+            std::env::set_var("PATH", "/nonexistent");
+            std::env::remove_var("CLAUDECODE");
+        }
+        let cfg = LlmConfig {
+            llm: Some("claude-cli".to_string()),
+            ..Default::default()
+        };
+        assert!(detect_backend(&cfg).is_none());
+        unsafe {
+            if let Some(path) = old_path {
+                std::env::set_var("PATH", path);
+            } else {
+                std::env::remove_var("PATH");
+            }
+        }
     }
 
     // ── ClaudeClient ──
