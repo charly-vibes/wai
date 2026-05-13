@@ -1,0 +1,263 @@
+# Autonomous TDD + Rule of 5 pipeline for working through the wai QA epic.
+#
+# Usage:
+#   wai pipeline start epic-autonomy-tdd-ro5 --topic="Work one ready child issue from epic wai-fvhv"
+#
+# This pipeline is tuned for autonomous backlog execution:
+# - pick exactly one ready child from epic wai-fvhv
+# - use TDD for implementation work
+# - use Rule of 5 review before closing
+# - record wai artifacts so context survives session boundaries
+
+[pipeline]
+name = "epic-autonomy-tdd-ro5"
+description = "Autonomous one-issue-at-a-time loop for working through QA epic wai-fvhv with TDD and Rule of 5 review"
+
+[pipeline.metadata]
+when = "Use when autonomously executing one ready child issue from epic wai-fvhv without routine confirmation"
+skills = ["tdd", "rule-of-5-universal", "commit"]
+
+[[steps]]
+id = "orient-and-claim"
+prompt = """
+{topic}: Orient and claim exactly one ready child issue under epic `wai-fvhv`.
+
+Run:
+- `wai prime`
+- `wai status`
+- `bd show wai-fvhv`
+- `bd ready --limit 0 | rg '^wai-fvhv\\.'`
+- `wai search "wai-fvhv <selected-topic>"`
+- `openspec list` if openspec is present
+
+Rules:
+- Select exactly one ready, unblocked child issue from epic `wai-fvhv`.
+- Prefer P1 issues first, then P2, then P3.
+- If the selected issue is a review/decision/docs ticket, do not write code.
+- If the selected issue is a code-quality refactor ticket, verify its blocker test tickets are already closed before claiming it.
+- Claim the issue: `bd update <id> --claim`
+
+Record orientation:
+- `wai add research "ORIENT: selected <id>; why chosen; blockers checked; relevant files/commands"`
+
+Advance: `wai pipeline next`
+"""
+
+[steps.gate.structural]
+min_artifacts = 1
+types = ["research"]
+
+[[steps]]
+id = "plan"
+prompt = """
+{topic}: Produce the smallest executable plan for the claimed issue.
+
+Include:
+- issue ID and title
+- desired outcome
+- out of scope
+- exact files likely touched
+- exact tests/review commands to run
+- whether this is code, docs, review, or decision work
+- red/green/refactor sequence if code changes are required
+- follow-up issue threshold for newly discovered work
+
+Rules:
+- One issue only.
+- Keep the plan small enough for one session.
+- If the issue turns out to be ambiguous or larger than expected, stop and create follow-up tickets instead of broadening scope.
+
+Record plan:
+- `wai add plan "ISSUE PLAN: <id> ..."`
+
+Advance: `wai pipeline next`
+"""
+
+[steps.gate.structural]
+min_artifacts = 1
+types = ["plan"]
+
+[[steps]]
+id = "red-or-analysis"
+prompt = """
+{topic}: Start execution using the correct mode for the issue type.
+
+If the claimed issue requires code changes:
+- Write failing tests first.
+- Only test files should change unless test scaffolding requires otherwise.
+- Run the narrow test command.
+- Confirm failure is for the expected missing behavior, not setup breakage.
+- Record: `wai add research "RED: <id>; command=...; expected failure=..."`
+
+If the claimed issue is review/docs/decision only:
+- Do the analysis work without code changes.
+- Record the review inputs, artifact destination, and validation method.
+- Record: `wai add research "ANALYSIS START: <id>; artifact=...; validation=..."`
+
+Advance: `wai pipeline next`
+"""
+
+[steps.gate.structural]
+min_artifacts = 1
+types = ["research"]
+
+[[steps]]
+id = "execute"
+prompt = """
+{topic}: Execute the smallest correct change for the claimed issue.
+
+If code changes are required:
+- Make the red test pass with the smallest correct change.
+- Run the narrow test command.
+- Then run the relevant package/module test suite.
+- Record: `wai add design "GREEN: <id>; behavior implemented; commands run"`
+
+If docs/review/decision work is required:
+- Produce the target artifact named by the issue.
+- Validate links, scope, and consistency with the issue acceptance criteria.
+- Record: `wai add design "EXECUTION: <id>; artifact produced; validation run"`
+
+Advance: `wai pipeline next`
+"""
+
+[[steps.gate.oracles]]
+name = "tests-pass"
+description = "Relevant tests must pass after execution when code changes are made"
+timeout = 300
+
+[[steps]]
+id = "refactor-or-tidy"
+prompt = """
+{topic}: Refactor or tidy only within the issue boundary.
+
+If code changes were made:
+- Refactor safely while tests stay green.
+- Allowed: simplify names, remove duplication, clarify structure, improve seams.
+- Forbidden: behavior expansion, unrelated cleanup, broad architecture changes.
+- Run tests after refactoring.
+- Record: `wai add design "REFACTOR: <id>; what changed structurally"`
+
+If no code changes were made:
+- Tighten wording, structure, or issue notes only as needed.
+- Do not broaden scope.
+- Record: `wai add design "TIDY: <id>; non-code cleanup only"`
+
+Advance: `wai pipeline next`
+"""
+
+[[steps.gate.oracles]]
+name = "tests-pass"
+description = "Tests must pass after refactor when code changes are made"
+timeout = 300
+
+[[steps]]
+id = "ro5-review"
+prompt = """
+{topic}: Review the work using `rule-of-5-universal`.
+
+Review only. Do not fix yet.
+
+Return findings grouped by:
+- Critical
+- High
+- Medium
+- Low
+
+Each finding must include:
+- file/location
+- evidence
+- concrete fix
+
+Record review:
+- `wai add review "RO5U: <id> ..."`
+
+Advance: `wai pipeline next`
+"""
+
+[steps.gate.procedural]
+require_review = true
+max_critical = 0
+
+[[steps]]
+id = "fix-review-findings"
+prompt = """
+{topic}: Fix review findings within the issue boundary.
+
+Rules:
+- Critical/high must be fixed.
+- Medium fixed unless explicitly deferred with reason in the issue notes.
+- Low fixed if cheap, otherwise tracked.
+- Add tests for behavior-impacting fixes.
+- Run tests after fixes when code changed.
+- If the review exposes out-of-scope work, create a follow-up child issue under epic `wai-fvhv` instead of expanding this task.
+
+Record fixes:
+- `wai add research "RO5U-FIXES: <id>; fixed=...; deferred=..."`
+
+Advance: `wai pipeline next`
+"""
+
+[steps.gate.structural]
+min_artifacts = 1
+
+[[steps.gate.oracles]]
+name = "tests-pass"
+description = "Tests must pass after review fixes when code changed"
+timeout = 300
+
+[[steps]]
+id = "quality-ledger"
+prompt = """
+{topic}: Produce the final quality ledger for the claimed issue.
+
+Record exactly:
+
+Changed:
+- files and purpose
+
+Verified:
+- commands run and result
+
+Review:
+- RO5U status and remaining findings
+
+Risks:
+- known remaining risks or \"none known\"
+
+Next:
+- exact next action
+
+Also update the bead with a concise summary in notes if helpful.
+
+Record ledger:
+- `wai add research "QUALITY LEDGER: <id> ..."`
+
+Advance: `wai pipeline next`
+"""
+
+[steps.gate.structural]
+min_artifacts = 1
+types = ["research"]
+
+[[steps]]
+id = "close-and-handoff"
+prompt = """
+{topic}: Close the claimed issue cleanly and prepare the next autonomous session.
+
+Do:
+- inspect `git diff`
+- update the bead notes if they do not already capture the outcome
+- `bd close <id>` if the issue is complete, otherwise leave it open with clear notes
+- close or create follow-up child issues under epic `wai-fvhv` for anything deferred
+- run the full verification command for the issue
+- run `wai close`
+
+Do not push unless the user explicitly authorizes push/release/deploy.
+
+Pipeline complete.
+"""
+
+[[steps.gate.oracles]]
+name = "tests-pass"
+description = "Final tests must pass before close when code changed"
+timeout = 300
