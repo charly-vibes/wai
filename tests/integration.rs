@@ -7532,6 +7532,309 @@ fn pipeline_check_no_gates_reports_pass() {
     );
 }
 
+// ─── wai pipeline authoring and integrity ────────────────────────────────────
+
+fn write_pipeline_toml_with_metadata(dir: &std::path::Path, name: &str) {
+    let pipelines_dir = dir.join(".wai/resources/pipelines");
+    fs::create_dir_all(&pipelines_dir).unwrap();
+    let content = format!(
+        r#"[pipeline]
+name = "{name}"
+description = "Pipeline with metadata"
+
+[pipeline.metadata]
+when = "Use for metadata-rich testing"
+skills = ["tdd", "rule-of-5-universal"]
+
+[[steps]]
+id = "research"
+prompt = "{{topic}}: research."
+
+[steps.gate]
+[steps.gate.structural]
+min_artifacts = 1
+types = ["research"]
+
+[[steps]]
+id = "review"
+prompt = "{{topic}}: review."
+"#,
+        name = name
+    );
+    fs::write(pipelines_dir.join(format!("{}.toml", name)), content).unwrap();
+}
+
+#[test]
+fn pipeline_list_shows_defined_pipelines() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml(tmp.path(), "beta");
+    write_pipeline_toml(tmp.path(), "alpha");
+
+    let output = wai_cmd(tmp.path())
+        .args(["pipeline", "list"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let stdout = String::from_utf8(output).unwrap();
+    let stripped = strip_ansi(&stdout);
+
+    assert!(
+        stripped.contains("Pipelines"),
+        "Should show pipelines header, got:\n{stripped}"
+    );
+    assert!(
+        stripped.contains("alpha") && stripped.contains("beta"),
+        "Should list both pipelines, got:\n{stripped}"
+    );
+
+    let alpha_pos = stripped.find("alpha").unwrap();
+    let beta_pos = stripped.find("beta").unwrap();
+    assert!(
+        alpha_pos < beta_pos,
+        "Pipelines should be listed alphabetically, got:\n{stripped}"
+    );
+}
+
+#[test]
+fn pipeline_show_displays_metadata_and_steps() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml_with_metadata(tmp.path(), "meta-pipe");
+
+    let output = wai_cmd(tmp.path())
+        .args(["pipeline", "show", "meta-pipe"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let stdout = String::from_utf8(output).unwrap();
+    let stripped = strip_ansi(&stdout);
+
+    for expected in [
+        "meta-pipe",
+        "Pipeline with metadata",
+        "Use for metadata-rich testing",
+        "tdd, rule-of-5-universal",
+        "Steps (2)",
+        "research",
+        "review",
+        "structural",
+        "Oracles:",
+    ] {
+        assert!(
+            stripped.contains(expected),
+            "Expected '{expected}' in pipeline show output, got:\n{stripped}"
+        );
+    }
+}
+
+#[test]
+fn pipeline_validate_succeeds_for_valid_definition() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml_with_metadata(tmp.path(), "valid-pipe");
+
+    let output = wai_cmd(tmp.path())
+        .args(["pipeline", "validate", "valid-pipe"])
+        .assert()
+        .success()
+        .get_output()
+        .clone();
+
+    let combined = format!(
+        "{}{}",
+        strip_ansi(&String::from_utf8(output.stdout).unwrap()),
+        strip_ansi(&String::from_utf8(output.stderr).unwrap())
+    );
+    assert!(
+        combined.contains("valid-pipe") && combined.contains("steps"),
+        "Validate should report success for valid pipeline, got:\n{combined}"
+    );
+}
+
+#[test]
+fn pipeline_validate_fails_for_invalid_toml() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    let pipelines_dir = tmp.path().join(".wai/resources/pipelines");
+    fs::create_dir_all(&pipelines_dir).unwrap();
+    fs::write(
+        pipelines_dir.join("broken.toml"),
+        "[pipeline]\nname = \"broken\"\n[[steps]]\nid = ",
+    )
+    .unwrap();
+
+    let output = wai_cmd(tmp.path())
+        .args(["pipeline", "validate", "broken"])
+        .assert()
+        .failure()
+        .get_output()
+        .clone();
+
+    let combined = format!(
+        "{}{}",
+        strip_ansi(&String::from_utf8(output.stdout).unwrap()),
+        strip_ansi(&String::from_utf8(output.stderr).unwrap())
+    );
+    assert!(
+        combined.contains("broken") && (combined.contains("parse") || combined.contains("TOML")),
+        "Validate should report invalid TOML, got:\n{combined}"
+    );
+}
+
+#[test]
+fn pipeline_lock_creates_lock_files_for_step_artifacts() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-proj");
+    write_pipeline_toml(tmp.path(), "basic");
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "start", "basic", "--topic=lock-test"])
+        .assert()
+        .success();
+
+    let run_id = fs::read_to_string(tmp.path().join(".wai/resources/pipelines/.last-run"))
+        .unwrap()
+        .trim()
+        .to_string();
+
+    write_artifact_with_tags(
+        tmp.path(),
+        "my-proj",
+        "research",
+        "2026-01-01-locked.md",
+        &[
+            &format!("pipeline-run:{}", run_id),
+            "pipeline-step:step-one",
+        ],
+    );
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "lock"])
+        .assert()
+        .success();
+
+    let lock_path = tmp
+        .path()
+        .join(".wai/projects/my-proj/research/2026-01-01-locked.md")
+        .with_file_name(format!("2026-01-01-locked.md.{}.lock", run_id));
+    assert!(lock_path.exists(), "Expected lock file at {:?}", lock_path);
+}
+
+#[test]
+fn pipeline_verify_passes_after_locking_artifacts() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-proj");
+    write_pipeline_toml(tmp.path(), "basic");
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "start", "basic", "--topic=verify-pass"])
+        .assert()
+        .success();
+
+    let run_id = fs::read_to_string(tmp.path().join(".wai/resources/pipelines/.last-run"))
+        .unwrap()
+        .trim()
+        .to_string();
+
+    write_artifact_with_tags(
+        tmp.path(),
+        "my-proj",
+        "research",
+        "2026-01-01-verify.md",
+        &[
+            &format!("pipeline-run:{}", run_id),
+            "pipeline-step:step-one",
+        ],
+    );
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "lock"])
+        .assert()
+        .success();
+
+    let output = wai_cmd(tmp.path())
+        .args(["pipeline", "verify"])
+        .assert()
+        .success()
+        .get_output()
+        .clone();
+
+    let combined = format!(
+        "{}{}",
+        strip_ansi(&String::from_utf8(output.stdout).unwrap()),
+        strip_ansi(&String::from_utf8(output.stderr).unwrap())
+    );
+    assert!(
+        combined.contains("verified") || combined.contains("All 1 locked artifacts verified"),
+        "Verify should pass for intact artifacts, got:\n{combined}"
+    );
+}
+
+#[test]
+fn pipeline_verify_fails_when_locked_artifact_is_tampered() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-proj");
+    write_pipeline_toml(tmp.path(), "basic");
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "start", "basic", "--topic=verify-fail"])
+        .assert()
+        .success();
+
+    let run_id = fs::read_to_string(tmp.path().join(".wai/resources/pipelines/.last-run"))
+        .unwrap()
+        .trim()
+        .to_string();
+
+    let artifact_path = tmp
+        .path()
+        .join(".wai/projects/my-proj/research/2026-01-01-tampered.md");
+    write_artifact_with_tags(
+        tmp.path(),
+        "my-proj",
+        "research",
+        "2026-01-01-tampered.md",
+        &[
+            &format!("pipeline-run:{}", run_id),
+            "pipeline-step:step-one",
+        ],
+    );
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "lock"])
+        .assert()
+        .success();
+
+    fs::write(&artifact_path, "tampered content\n").unwrap();
+
+    let output = wai_cmd(tmp.path())
+        .args(["pipeline", "verify"])
+        .assert()
+        .failure()
+        .get_output()
+        .clone();
+
+    let combined = format!(
+        "{}{}",
+        strip_ansi(&String::from_utf8(output.stdout).unwrap()),
+        strip_ansi(&String::from_utf8(output.stderr).unwrap())
+    );
+    assert!(
+        combined.contains("failed verification") || combined.contains("expected sha256:"),
+        "Verify should report hash mismatch, got:\n{combined}"
+    );
+}
+
 // ─── wai pipeline suggest ─────────────────────────────────────────────────────
 
 /// Helper: write a pipeline TOML with a specific name and description.

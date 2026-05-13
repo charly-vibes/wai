@@ -38,18 +38,17 @@ phase: research
  M .beads/backup/backup_state.json
  M .beads/interactions.jsonl
 M  .beads/issues.jsonl
+ M .wai/pipeline-runs/epic-autonomy-tdd-ro5-2026-05-13-work-one-ready-child-issue-from-epic-wai-fvhv.yml
  M .wai/resources/pipelines/.last-run
  M tests/integration.rs
-?? .wai/pipeline-runs/epic-autonomy-tdd-ro5-2026-05-13-pipeline-gates-and-approvals-tests-wai-fvhv-108.yml
-?? .wai/projects/qa-round-execution/designs/2026-05-13-green-wai-fvhv-108-all-12-tests-pass-against-exi.md
-?? .wai/projects/qa-round-execution/designs/2026-05-13-tidy-wai-fvhv-108-no-refactoring-needed-write.md
-?? .wai/projects/qa-round-execution/plans/2026-05-13-issue-plan-wai-fvhv-108-pipeline-gates-and-appr.md
-?? .wai/projects/qa-round-execution/research/2026-05-13-orient-selected-wai-fvhv-108-pipeline-gates-appr.md
-?? .wai/projects/qa-round-execution/research/2026-05-13-quality-ledger-wai-fvhv-108-changed-tests-int.md
-?? .wai/projects/qa-round-execution/research/2026-05-13-red-wai-fvhv-108-12-tests-written-all-passing-a.md
-?? .wai/projects/qa-round-execution/research/2026-05-13-ro5u-fixes-wai-fvhv-108-fixed-m1-fragile-structu.md
-?? .wai/projects/qa-round-execution/reviews/2026-05-13-ro5u-wai-fvhv-108-0-critical-0-high-2-medium.md
-?? .wai/projects/qa-round-execution/reviews/2026-05-13-self-review-fixed-both-medium-findings-from-ro5.md
+?? .wai/projects/qa-round-execution/designs/2026-05-13-green-wai-fvhv-109-added-focused-integration-cov.md
+?? .wai/projects/qa-round-execution/designs/2026-05-13-tidy-wai-fvhv-109-no-refactoring-needed-beyond-k.md
+?? .wai/projects/qa-round-execution/plans/2026-05-13-issue-plan-wai-fvhv-109-tests-add-focused-cove.md
+?? .wai/projects/qa-round-execution/research/2026-05-13-orient-selected-wai-fvhv-109-why-chosen-p1-ready.md
+?? .wai/projects/qa-round-execution/research/2026-05-13-quality-ledger-wai-fvhv-109-changed-tests-int.md
+?? .wai/projects/qa-round-execution/research/2026-05-13-red-wai-fvhv-109-command-cargo-test-test-integ.md
+?? .wai/projects/qa-round-execution/research/2026-05-13-ro5u-fixes-wai-fvhv-109-fixed-none-required-beca.md
+?? .wai/projects/qa-round-execution/reviews/2026-05-13-ro5u-wai-fvhv-109-critical-none-high-none.md
 ```
 
 ### open_issues
@@ -59,7 +58,6 @@ M  .beads/issues.jsonl
 ├── ○ wai-fvhv.101 ● P1 Scope: Restructure documentation IA around beginner, contributor, and integrator audiences
 ├── ○ wai-fvhv.102 ● P1 Scope: Add an ADR or product map for command taxonomy
 ├── ○ wai-fvhv.103 ● P1 Scope: Define release criteria that require docs/tests/spec sync before surface-area growth
-├── ○ wai-fvhv.109 ● P1 Tests: add focused coverage for `wai pipeline` authoring and integrity commands
 ├── ○ wai-fvhv.111 ● P1 Tests: add focused coverage for `wai plugin` management and passthrough behavior
 ├── ○ wai-fvhv.114 ● P1 Tests: add focused coverage for `wai resource` skill lifecycle
 ├── ○ wai-fvhv.115 ● P1 Tests: add focused coverage for `wai resource` import/export flows
@@ -91,6 +89,7 @@ M  .beads/issues.jsonl
 ├── ○ wai-fvhv.96 ● P1 Scope: Define JSON output stability policy for automation users
 ├── ○ wai-fvhv.97 ● P1 Scope: Clarify what `--safe` guarantees across every command family
 ├── ○ wai-fvhv.34 ● P2 Tests: add focused coverage for `wai new`
+├── ○ wai-fvhv.35 ● P2 Tests: add focused coverage for `wai phase`
 ├── ○ wai-fvhv.38 ● P2 Tests: add focused coverage for `wai prime`
 ├── ○ wai-fvhv.41 ● P2 Tests: add focused coverage for `wai search`
 ├── ○ wai-fvhv.42 ● P2 Tests: add focused coverage for `wai show`
