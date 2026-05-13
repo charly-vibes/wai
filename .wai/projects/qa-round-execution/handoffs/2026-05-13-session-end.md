@@ -8,29 +8,42 @@ phase: research
 
 ## What Was Done
 
-<!-- Summary of completed work -->
+- Closed `wai-fvhv.119` with focused `wai why` provider-selection and no-LLM tests.
+- Closed `wai-fvhv.118` with focused `wai why` history/fallback and no-artifact tests.
+- Closed `wai-fvhv.115` with focused `wai resource` export/import archive tests.
 
 ## Key Decisions
 
-<!-- Decisions made and rationale -->
+- Added targeted tests next to existing `why`/`resource` coverage instead of refactoring command code, because the tickets asked for localized regression coverage.
+- Used fake `claude` binaries and temporary git repos to make provider and history tests deterministic.
 
 ## Gotchas & Surprises
 
-<!-- What behaved unexpectedly? Non-obvious requirements? Hidden dependencies? -->
+- `wai resource import archive` reports success text on stderr via the logging helper, not stdout.
+- `tar` rejects `..` archive paths before `wai` sees them, so malformed-archive coverage should use a structurally valid tar entry with an invalid `wai` skill path like `evil.txt`.
 
 ## What Took Longer Than Expected
 
-<!-- Steps that needed multiple attempts. Commands that failed before the right one. -->
+- Initial archive-malformation test used `../evil/SKILL.md`, but the tar library rejected it before command execution.
+- A first cargo test invocation passed multiple test names incorrectly; reran with one filter per command.
 
 ## Open Questions
 
-<!-- Unresolved questions -->
+- Whether to continue with `wai-fvhv.114` next or switch to the remaining `wai plugin` coverage ticket.
 
 ## Next Steps
 
-<!-- Prioritized list of what to do next -->
+1. Pick up `wai-fvhv.114` for `wai resource` skill-lifecycle coverage or explicitly re-prioritize.
+2. Commit and push the new coverage plus tracker/handoff updates.
 
 ## Context
+
+### verification
+
+- `cargo test why_ -- --nocapture`
+- `cargo test resource_ -- --nocapture`
+- targeted new tests for `claude_cli`, `gather_git_file_context`, and archive import/export flows
+
 
 ### git_status
 
@@ -39,16 +52,9 @@ phase: research
  M .beads/interactions.jsonl
 M  .beads/issues.jsonl
  M .wai/pipeline-runs/epic-autonomy-tdd-ro5-2026-05-13-work-one-ready-child-issue-from-epic-wai-fvhv.yml
- M .wai/resources/pipelines/.last-run
+ M src/commands/why.rs
+ M src/llm.rs
  M tests/integration.rs
-?? .wai/projects/qa-round-execution/designs/2026-05-13-green-wai-fvhv-109-added-focused-integration-cov.md
-?? .wai/projects/qa-round-execution/designs/2026-05-13-tidy-wai-fvhv-109-no-refactoring-needed-beyond-k.md
-?? .wai/projects/qa-round-execution/plans/2026-05-13-issue-plan-wai-fvhv-109-tests-add-focused-cove.md
-?? .wai/projects/qa-round-execution/research/2026-05-13-orient-selected-wai-fvhv-109-why-chosen-p1-ready.md
-?? .wai/projects/qa-round-execution/research/2026-05-13-quality-ledger-wai-fvhv-109-changed-tests-int.md
-?? .wai/projects/qa-round-execution/research/2026-05-13-red-wai-fvhv-109-command-cargo-test-test-integ.md
-?? .wai/projects/qa-round-execution/research/2026-05-13-ro5u-fixes-wai-fvhv-109-fixed-none-required-beca.md
-?? .wai/projects/qa-round-execution/reviews/2026-05-13-ro5u-wai-fvhv-109-critical-none-high-none.md
 ```
 
 ### open_issues
@@ -59,10 +65,6 @@ M  .beads/issues.jsonl
 ├── ○ wai-fvhv.102 ● P1 Scope: Add an ADR or product map for command taxonomy
 ├── ○ wai-fvhv.103 ● P1 Scope: Define release criteria that require docs/tests/spec sync before surface-area growth
 ├── ○ wai-fvhv.111 ● P1 Tests: add focused coverage for `wai plugin` management and passthrough behavior
-├── ○ wai-fvhv.114 ● P1 Tests: add focused coverage for `wai resource` skill lifecycle
-├── ○ wai-fvhv.115 ● P1 Tests: add focused coverage for `wai resource` import/export flows
-├── ○ wai-fvhv.118 ● P1 Tests: add focused coverage for `wai why` history lookup and fallback behavior
-├── ○ wai-fvhv.119 ● P1 Tests: add focused coverage for `wai why` provider selection and no-LLM paths
 ├── ○ wai-fvhv.25 ● P1 Tests: add focused coverage for `wai add`
 ├── ○ wai-fvhv.28 ● P1 Tests: add focused coverage for `wai doctor`
 ├── ○ wai-fvhv.39 ● P1 Tests: add focused coverage for `wai reflect`
@@ -88,6 +90,10 @@ M  .beads/issues.jsonl
 ├── ○ wai-fvhv.94 ● P1 Scope: Clarify tutorial target audience and success criteria
 ├── ○ wai-fvhv.96 ● P1 Scope: Define JSON output stability policy for automation users
 ├── ○ wai-fvhv.97 ● P1 Scope: Clarify what `--safe` guarantees across every command family
+├── ○ wai-fvhv.30 ● P2 Tests: add focused coverage for `wai import`
+├── ○ wai-fvhv.31 ● P2 Tests: add focused coverage for `wai init`
+├── ○ wai-fvhv.32 ● P2 Tests: add focused coverage for `wai ls`
+├── ○ wai-fvhv.33 ● P2 Tests: add focused coverage for `wai move`
 ├── ○ wai-fvhv.34 ● P2 Tests: add focused coverage for `wai new`
 ├── ○ wai-fvhv.35 ● P2 Tests: add focused coverage for `wai phase`
 ├── ○ wai-fvhv.38 ● P2 Tests: add focused coverage for `wai prime`
