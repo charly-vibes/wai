@@ -6731,6 +6731,279 @@ fn pipeline_current_on_complete_run_prints_done() {
     );
 }
 
+// ─── wai pipeline run lifecycle (focused coverage) ───────────────────────────
+
+#[test]
+fn pipeline_next_resolves_run_via_env_var() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml(tmp.path(), "my-pipe");
+
+    // Start a run and capture the run ID
+    wai_cmd(tmp.path())
+        .args(["pipeline", "start", "my-pipe", "--topic=env-test"])
+        .assert()
+        .success();
+
+    let last_run_path = tmp.path().join(".wai/resources/pipelines/.last-run");
+    let run_id = fs::read_to_string(&last_run_path)
+        .unwrap()
+        .trim()
+        .to_string();
+
+    // Delete .last-run to force env var resolution
+    fs::remove_file(&last_run_path).unwrap();
+
+    // Advance using WAI_PIPELINE_RUN env var
+    let output = wai_cmd(tmp.path())
+        .env("WAI_PIPELINE_RUN", &run_id)
+        .args(["pipeline", "next"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let stripped = strip_ansi(&String::from_utf8(output).unwrap());
+    assert!(
+        stripped.contains("step 2/2"),
+        "Should advance to step 2/2 via env var, got:\n{stripped}"
+    );
+}
+
+#[test]
+fn pipeline_current_resolves_run_via_env_var() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml(tmp.path(), "my-pipe");
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "start", "my-pipe", "--topic=env-test"])
+        .assert()
+        .success();
+
+    let last_run_path = tmp.path().join(".wai/resources/pipelines/.last-run");
+    let run_id = fs::read_to_string(&last_run_path)
+        .unwrap()
+        .trim()
+        .to_string();
+
+    // Delete .last-run to force env var resolution
+    fs::remove_file(&last_run_path).unwrap();
+
+    let output = wai_cmd(tmp.path())
+        .env("WAI_PIPELINE_RUN", &run_id)
+        .args(["pipeline", "current"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let stripped = strip_ansi(&String::from_utf8(output).unwrap());
+    assert!(
+        stripped.contains("step 1/2"),
+        "Should show step 1/2 via env var, got:\n{stripped}"
+    );
+}
+
+#[test]
+fn pipeline_next_errors_when_last_run_points_to_missing_file() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    // Write a .last-run that points to a non-existent run file
+    let pipelines_dir = tmp.path().join(".wai/resources/pipelines");
+    fs::create_dir_all(&pipelines_dir).unwrap();
+    fs::write(
+        pipelines_dir.join(".last-run"),
+        "ghost-run-2026-01-01-does-not-exist",
+    )
+    .unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "next"])
+        .env_remove("WAI_PIPELINE_RUN")
+        .assert()
+        .failure()
+        .stderr(
+            predicate::str::contains("stale")
+                .or(predicate::str::contains("not found"))
+                .or(predicate::str::contains("deleted"))
+                .or(predicate::str::contains("No such file")),
+        );
+}
+
+#[test]
+fn pipeline_current_treats_stale_last_run_as_no_active_run() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    // Point .last-run to a non-existent run file
+    let pipelines_dir = tmp.path().join(".wai/resources/pipelines");
+    fs::create_dir_all(&pipelines_dir).unwrap();
+    fs::write(
+        pipelines_dir.join(".last-run"),
+        "ghost-run-2026-01-01-does-not-exist",
+    )
+    .unwrap();
+
+    // current uses a gentle resolution path — stale .last-run is treated as "no active run"
+    wai_cmd(tmp.path())
+        .args(["pipeline", "current"])
+        .env_remove("WAI_PIPELINE_RUN")
+        .assert()
+        .failure()
+        .stderr(
+            predicate::str::contains("No active pipeline run")
+                .or(predicate::str::contains("pipeline start")),
+        );
+}
+
+#[test]
+fn pipeline_run_yaml_has_all_required_fields_after_start() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml(tmp.path(), "my-pipe");
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "start", "my-pipe", "--topic=yaml-check"])
+        .assert()
+        .success();
+
+    let last_run_path = tmp.path().join(".wai/resources/pipelines/.last-run");
+    let run_id = fs::read_to_string(&last_run_path)
+        .unwrap()
+        .trim()
+        .to_string();
+    let run_file = tmp
+        .path()
+        .join(".wai/pipeline-runs")
+        .join(format!("{}.yml", run_id));
+    let content = fs::read_to_string(&run_file).unwrap();
+
+    assert!(
+        content.contains("run_id:"),
+        "YAML must contain run_id field"
+    );
+    assert!(
+        content.contains("pipeline: my-pipe"),
+        "YAML must contain pipeline name"
+    );
+    assert!(content.contains("yaml-check"), "YAML must contain topic");
+    assert!(
+        content.contains("created_at:"),
+        "YAML must contain created_at timestamp"
+    );
+    assert!(
+        content.contains("current_step: 0"),
+        "YAML must start at step 0"
+    );
+    assert!(
+        content.contains("approvals:"),
+        "YAML must contain approvals map"
+    );
+}
+
+#[test]
+fn pipeline_run_yaml_updates_correctly_through_lifecycle() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml(tmp.path(), "my-pipe");
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "start", "my-pipe", "--topic=lifecycle"])
+        .assert()
+        .success();
+
+    let last_run_path = tmp.path().join(".wai/resources/pipelines/.last-run");
+    let run_id = fs::read_to_string(&last_run_path)
+        .unwrap()
+        .trim()
+        .to_string();
+    let run_file = tmp
+        .path()
+        .join(".wai/pipeline-runs")
+        .join(format!("{}.yml", run_id));
+
+    // After start: step 0
+    let content = fs::read_to_string(&run_file).unwrap();
+    assert!(content.contains("current_step: 0"), "Step 0 after start");
+
+    // After first next: step 1
+    wai_cmd(tmp.path())
+        .args(["pipeline", "next"])
+        .assert()
+        .success();
+    let content = fs::read_to_string(&run_file).unwrap();
+    assert!(
+        content.contains("current_step: 1"),
+        "Step 1 after first next"
+    );
+
+    // After second next: step 2 (complete for a 2-step pipeline)
+    wai_cmd(tmp.path())
+        .args(["pipeline", "next"])
+        .assert()
+        .success();
+    let content = fs::read_to_string(&run_file).unwrap();
+    assert!(
+        content.contains("current_step: 2"),
+        "Step 2 (complete) after second next"
+    );
+}
+
+#[test]
+fn pipeline_start_overwrites_last_run_when_starting_new_run() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml(tmp.path(), "my-pipe");
+
+    // Start first run
+    wai_cmd(tmp.path())
+        .args(["pipeline", "start", "my-pipe", "--topic=first-run"])
+        .assert()
+        .success();
+
+    let last_run_path = tmp.path().join(".wai/resources/pipelines/.last-run");
+    let first_id = fs::read_to_string(&last_run_path)
+        .unwrap()
+        .trim()
+        .to_string();
+
+    // Start second run
+    wai_cmd(tmp.path())
+        .args(["pipeline", "start", "my-pipe", "--topic=second-run"])
+        .assert()
+        .success();
+
+    let second_id = fs::read_to_string(&last_run_path)
+        .unwrap()
+        .trim()
+        .to_string();
+
+    assert_ne!(first_id, second_id, "Second run should have a different ID");
+    assert!(
+        second_id.contains("second-run"),
+        ".last-run should point to the second run, got: {second_id}"
+    );
+
+    // Both run files should exist
+    let first_file = tmp
+        .path()
+        .join(".wai/pipeline-runs")
+        .join(format!("{}.yml", first_id));
+    let second_file = tmp
+        .path()
+        .join(".wai/pipeline-runs")
+        .join(format!("{}.yml", second_id));
+    assert!(
+        first_file.exists(),
+        "First run state file should still exist"
+    );
+    assert!(second_file.exists(), "Second run state file should exist");
+}
+
 // ─── wai pipeline suggest ─────────────────────────────────────────────────────
 
 /// Helper: write a pipeline TOML with a specific name and description.
