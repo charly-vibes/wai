@@ -108,6 +108,8 @@ fn reflect_dry_run_does_not_create_resource_file() {
     let tmp = TempDir::new().unwrap();
     reflect_workspace(tmp.path());
 
+    let claude_before = fs::read_to_string(tmp.path().join("CLAUDE.md")).unwrap();
+
     wai_cmd(tmp.path())
         .args(["reflect", "--project", "test-proj", "--dry-run"])
         .env("WAI_REFLECT_MOCK_RESPONSE", MOCK_REFLECT_CONTENT)
@@ -119,6 +121,12 @@ fn reflect_dry_run_does_not_create_resource_file() {
     assert!(
         !refl_dir.exists() || fs::read_dir(&refl_dir).unwrap().count() == 0,
         "dry-run must not create a reflection resource file"
+    );
+
+    let claude_after = fs::read_to_string(tmp.path().join("CLAUDE.md")).unwrap();
+    assert_eq!(
+        claude_before, claude_after,
+        "dry-run must not modify CLAUDE.md"
     );
 }
 
@@ -142,7 +150,7 @@ fn reflect_missing_output_target_fails_after_removing_claude_md() {
     reflect_workspace(tmp.path());
 
     // Remove both CLAUDE.md and AGENTS.md so detect_output_targets errors.
-    fs::remove_file(tmp.path().join("CLAUDE.md")).ok();
+    fs::remove_file(tmp.path().join("CLAUDE.md")).unwrap();
     let _ = fs::remove_file(tmp.path().join("AGENTS.md"));
 
     wai_cmd(tmp.path())
