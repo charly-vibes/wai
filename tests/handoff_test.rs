@@ -92,5 +92,6 @@ fn handoff_create_for_missing_project_fails() {
     wai_cmd(tmp.path())
         .args(["handoff", "create", "nonexistent"])
         .assert()
-        .failure();
+        .failure()
+        .stderr(predicate::str::contains("not found"));
 }
