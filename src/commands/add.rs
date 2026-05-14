@@ -1,6 +1,7 @@
 use chrono::Utc;
 use cliclack::log;
 use miette::{IntoDiagnostic, Result};
+use std::path::Path;
 
 use super::resource;
 use crate::cli::AddCommands;
@@ -29,36 +30,17 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             require_safe_mode("add research")?;
             let resolved = resolve_project(&project_root, project.as_deref())?;
             let target_project = resolved.name;
-            let project_dir = projects_dir(&project_root).join(&target_project);
-            let dir = project_dir.join(RESEARCH_DIR);
+            let dir = projects_dir(&project_root)
+                .join(&target_project)
+                .join(RESEARCH_DIR);
 
             let body = get_content(content.as_deref(), file.as_deref())?;
-            let slug = slug::slugify(body.chars().take(50).collect::<String>());
-            let date = Utc::now().format("%Y-%m-%d");
-            let base_filename = format!("{}-{}.md", date, slug);
+            let filename = make_unique_filename(&dir, &body);
 
-            // Deduplicate: if the file already exists, append a counter
-            let mut filename = base_filename.clone();
-            let mut counter = 2;
-            while dir.join(&filename).exists() {
-                filename = format!("{}-{}-{}.md", date, slug, counter);
-                counter += 1;
-            }
+            let mut all_tags = build_tags(tags.as_deref(), &project_root);
+            process_corrects(corrects.as_deref(), &mut all_tags)?;
 
             let mut file_content = String::new();
-
-            // Build combined tags: user-supplied + pipeline-run auto-tag
-            let mut all_tags = build_tags(tags.as_deref(), &project_root);
-            // When correcting another artifact, auto-add pipeline-addendum tag
-            if let Some(ref corrects_path) = corrects
-                && let Some(step_id) = resolve_pipeline_step_from_artifact(corrects_path)
-            {
-                warn_if_unlocked(corrects_path, &step_id)?;
-                let addendum_tag = format!("pipeline-addendum:{}", step_id);
-                if !all_tags.contains(&addendum_tag) {
-                    all_tags.push(addendum_tag);
-                }
-            }
             if !all_tags.is_empty() || bead.is_some() || corrects.is_some() {
                 file_content.push_str("---\n");
                 if !all_tags.is_empty() {
@@ -72,7 +54,6 @@ pub fn run(cmd: AddCommands) -> Result<()> {
                 }
                 file_content.push_str("---\n\n");
             }
-
             file_content.push_str(&body);
             file_content.push('\n');
 
@@ -84,7 +65,6 @@ pub fn run(cmd: AddCommands) -> Result<()> {
                     .into_diagnostic()?;
             }
 
-            // Post-command suggestions after adding research
             if !ctx.quiet
                 && let Some(wf_ctx) = workflows::scan_project(&project_root, &target_project)
             {
@@ -139,34 +119,17 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             require_safe_mode("add plan")?;
             let resolved = resolve_project(&project_root, project.as_deref())?;
             let target_project = resolved.name;
-            let project_dir = projects_dir(&project_root).join(&target_project);
-            let dir = project_dir.join(PLANS_DIR);
+            let dir = projects_dir(&project_root)
+                .join(&target_project)
+                .join(PLANS_DIR);
 
             let body = get_content(content.as_deref(), file.as_deref())?;
-            let slug = slug::slugify(body.chars().take(50).collect::<String>());
-            let date = Utc::now().format("%Y-%m-%d");
-            let base_filename = format!("{}-{}.md", date, slug);
-
-            // Deduplicate: if the file already exists, append a counter
-            let mut filename = base_filename.clone();
-            let mut counter = 2;
-            while dir.join(&filename).exists() {
-                filename = format!("{}-{}-{}.md", date, slug, counter);
-                counter += 1;
-            }
-
-            let mut file_content = String::new();
+            let filename = make_unique_filename(&dir, &body);
 
             let mut all_tags = build_tags(tags.as_deref(), &project_root);
-            if let Some(ref corrects_path) = corrects
-                && let Some(step_id) = resolve_pipeline_step_from_artifact(corrects_path)
-            {
-                warn_if_unlocked(corrects_path, &step_id)?;
-                let addendum_tag = format!("pipeline-addendum:{}", step_id);
-                if !all_tags.contains(&addendum_tag) {
-                    all_tags.push(addendum_tag);
-                }
-            }
+            process_corrects(corrects.as_deref(), &mut all_tags)?;
+
+            let mut file_content = String::new();
             if !all_tags.is_empty() || corrects.is_some() {
                 file_content.push_str("---\n");
                 if !all_tags.is_empty() {
@@ -177,7 +140,6 @@ pub fn run(cmd: AddCommands) -> Result<()> {
                 }
                 file_content.push_str("---\n\n");
             }
-
             file_content.push_str(&body);
             file_content.push('\n');
 
@@ -198,34 +160,17 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             require_safe_mode("add design")?;
             let resolved = resolve_project(&project_root, project.as_deref())?;
             let target_project = resolved.name;
-            let project_dir = projects_dir(&project_root).join(&target_project);
-            let dir = project_dir.join(DESIGNS_DIR);
+            let dir = projects_dir(&project_root)
+                .join(&target_project)
+                .join(DESIGNS_DIR);
 
             let body = get_content(content.as_deref(), file.as_deref())?;
-            let slug = slug::slugify(body.chars().take(50).collect::<String>());
-            let date = Utc::now().format("%Y-%m-%d");
-            let base_filename = format!("{}-{}.md", date, slug);
-
-            // Deduplicate: if the file already exists, append a counter
-            let mut filename = base_filename.clone();
-            let mut counter = 2;
-            while dir.join(&filename).exists() {
-                filename = format!("{}-{}-{}.md", date, slug, counter);
-                counter += 1;
-            }
-
-            let mut file_content = String::new();
+            let filename = make_unique_filename(&dir, &body);
 
             let mut all_tags = build_tags(tags.as_deref(), &project_root);
-            if let Some(ref corrects_path) = corrects
-                && let Some(step_id) = resolve_pipeline_step_from_artifact(corrects_path)
-            {
-                warn_if_unlocked(corrects_path, &step_id)?;
-                let addendum_tag = format!("pipeline-addendum:{}", step_id);
-                if !all_tags.contains(&addendum_tag) {
-                    all_tags.push(addendum_tag);
-                }
-            }
+            process_corrects(corrects.as_deref(), &mut all_tags)?;
+
+            let mut file_content = String::new();
             if !all_tags.is_empty() || corrects.is_some() {
                 file_content.push_str("---\n");
                 if !all_tags.is_empty() {
@@ -236,7 +181,6 @@ pub fn run(cmd: AddCommands) -> Result<()> {
                 }
                 file_content.push_str("---\n\n");
             }
-
             file_content.push_str(&body);
             file_content.push('\n');
 
@@ -284,28 +228,12 @@ pub fn run(cmd: AddCommands) -> Result<()> {
 
             let dir = project_dir.join(REVIEWS_DIR);
             let body = get_content(content.as_deref(), file.as_deref())?;
-            let slug = slug::slugify(body.chars().take(50).collect::<String>());
-            let date = Utc::now().format("%Y-%m-%d");
-            let base_filename = format!("{}-{}.md", date, slug);
+            let filename = make_unique_filename(&dir, &body);
 
-            let mut filename = base_filename.clone();
-            let mut counter = 2;
-            while dir.join(&filename).exists() {
-                filename = format!("{}-{}-{}.md", date, slug, counter);
-                counter += 1;
-            }
+            let mut all_tags = build_tags(tags.as_deref(), &project_root);
+            process_corrects(corrects.as_deref(), &mut all_tags)?;
 
             let mut file_content = String::new();
-            let mut all_tags = build_tags(tags.as_deref(), &project_root);
-            if let Some(ref corrects_path) = corrects
-                && let Some(step_id) = resolve_pipeline_step_from_artifact(corrects_path)
-            {
-                warn_if_unlocked(corrects_path, &step_id)?;
-                let addendum_tag = format!("pipeline-addendum:{}", step_id);
-                if !all_tags.contains(&addendum_tag) {
-                    all_tags.push(addendum_tag);
-                }
-            }
 
             // Reviews always have frontmatter (at minimum the reviews field)
             file_content.push_str("---\n");
@@ -425,6 +353,32 @@ fn validate_review_target(project_dir: &std::path::Path, target: &str) -> Result
         target,
         project_name
     ))
+}
+
+fn make_unique_filename(dir: &Path, body: &str) -> String {
+    let slug = slug::slugify(body.chars().take(50).collect::<String>());
+    let date = Utc::now().format("%Y-%m-%d");
+    let base = format!("{}-{}.md", date, slug);
+    let mut filename = base.clone();
+    let mut counter = 2;
+    while dir.join(&filename).exists() {
+        filename = format!("{}-{}-{}.md", date, slug, counter);
+        counter += 1;
+    }
+    filename
+}
+
+fn process_corrects(corrects: Option<&str>, tags: &mut Vec<String>) -> Result<()> {
+    if let Some(path) = corrects
+        && let Some(step_id) = resolve_pipeline_step_from_artifact(path)
+    {
+        warn_if_unlocked(path, &step_id)?;
+        let addendum_tag = format!("pipeline-addendum:{}", step_id);
+        if !tags.contains(&addendum_tag) {
+            tags.push(addendum_tag);
+        }
+    }
+    Ok(())
 }
 
 fn get_content(content: Option<&str>, file: Option<&str>) -> Result<String> {
