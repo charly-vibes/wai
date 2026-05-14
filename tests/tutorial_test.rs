@@ -1,3 +1,72 @@
+use assert_cmd::Command;
+use predicates::prelude::*;
+use std::{fs, io::Write};
+use tempfile::TempDir;
+
+#[allow(deprecated)]
+fn wai_cmd(dir: &std::path::Path) -> Command {
+    let mut cmd = Command::cargo_bin("wai").unwrap();
+    cmd.current_dir(dir);
+    cmd.env("NO_COLOR", "1");
+    cmd
+}
+
+// ── tutorial startup and completion ──────────────────────────────────────────
+
+#[test]
+fn tutorial_first_run_shows_welcome_message() {
+    let tmp_config = TempDir::new().unwrap();
+    let tmp_project = TempDir::new().unwrap();
+
+    wai_cmd(tmp_project.path())
+        .env("XDG_CONFIG_HOME", tmp_config.path())
+        .args(["tutorial"])
+        .assert()
+        .success();
+}
+
+// ── persistence of tutorial-seen state ───────────────────────────────────────
+
+#[test]
+fn tutorial_marks_seen_after_completion() {
+    let tmp_config = TempDir::new().unwrap();
+    let tmp_project = TempDir::new().unwrap();
+
+    wai_cmd(tmp_project.path())
+        .env("XDG_CONFIG_HOME", tmp_config.path())
+        .args(["tutorial"])
+        .assert()
+        .success();
+
+    let config_content =
+        fs::read_to_string(tmp_config.path().join("wai/config.toml")).unwrap_or_default();
+    assert!(
+        config_content.contains("seen_tutorial = true"),
+        "seen_tutorial should be persisted after tutorial run"
+    );
+}
+
+// ── repeat-run path ───────────────────────────────────────────────────────────
+
+#[test]
+fn tutorial_repeat_run_shows_replay_message() {
+    let tmp_config = TempDir::new().unwrap();
+    let tmp_project = TempDir::new().unwrap();
+
+    let wai_config_dir = tmp_config.path().join("wai");
+    fs::create_dir_all(&wai_config_dir).unwrap();
+    let mut config_file = fs::File::create(wai_config_dir.join("config.toml")).unwrap();
+    writeln!(config_file, "seen_tutorial = true").unwrap();
+
+    wai_cmd(tmp_project.path())
+        .env("XDG_CONFIG_HOME", tmp_config.path())
+        .args(["tutorial"])
+        .assert()
+        .success();
+}
+
+// ── unit tests for UserConfig ─────────────────────────────────────────────────
+
 #[cfg(test)]
 mod tests {
     use wai::config::UserConfig;
