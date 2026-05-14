@@ -111,6 +111,36 @@ exit 1
     bin_dir
 }
 
+fn install_fake_bd_passthrough(dir: &std::path::Path) -> std::path::PathBuf {
+    let bin_dir = dir.join("fake-bin");
+    fs::create_dir_all(&bin_dir).unwrap();
+    let script_path = bin_dir.join("bd");
+    let script = "#!/bin/sh
+if [ \"$1\" = \"ready\" ]; then
+    echo 'fake ready issue'
+    exit 0
+fi
+if [ \"$1\" = \"list\" ]; then
+    echo 'fake issue list'
+    exit 0
+fi
+if [ \"$1\" = \"show\" ]; then
+    echo \"show $2\"
+    exit 0
+fi
+exit 1
+";
+    fs::write(&script_path, script).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&script_path).unwrap().permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&script_path, perms).unwrap();
+    }
+    bin_dir
+}
+
 // ─── wai init ────────────────────────────────────────────────────────────────
 
 #[test]
@@ -1528,6 +1558,39 @@ fn plugin_enable_json_outputs_state() {
             predicate::str::contains("\"plugin\"")
                 .and(predicate::str::contains("\"enabled\": true")),
         );
+}
+
+#[test]
+fn plugin_passthrough_ready_executes_beads_command() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    fs::create_dir_all(tmp.path().join(".beads")).unwrap();
+    let fake_bin = install_fake_bd_passthrough(tmp.path());
+    let path = format!(
+        "{}:{}",
+        fake_bin.display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+
+    wai_cmd(tmp.path())
+        .args(["beads", "ready"])
+        .env("PATH", path)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("fake ready issue"));
+}
+
+#[test]
+fn plugin_passthrough_unknown_command_fails_for_detected_plugin() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    fs::create_dir_all(tmp.path().join(".beads")).unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["beads", "unknown-cmd"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("has no command 'unknown-cmd'"));
 }
 
 // ─── wai status ─────────────────────────────────────────────────────────────
@@ -4583,6 +4646,99 @@ fn resource_list_skills_json_has_skills_key() {
         .assert()
         .success()
         .stdout(predicate::str::contains("\"skills\""));
+}
+
+// ── wai resource install ─────────────────────────────────────────────────────
+
+#[test]
+fn resource_install_global_copies_skill_to_home_library() {
+    let tmp = TempDir::new().unwrap();
+    let fake_home = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["resource", "add", "skill", "global-skill"])
+        .assert()
+        .success();
+
+    let skill_md = tmp
+        .path()
+        .join(".wai/resources/agent-config/skills/global-skill/SKILL.md");
+    fs::write(
+        &skill_md,
+        "---\nname: global-skill\ndescription: Install me globally\n---\n\n# Global Skill\n",
+    )
+    .unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["resource", "install", "global-skill", "--global"])
+        .env("HOME", fake_home.path())
+        .assert()
+        .success()
+        .stderr(predicate::str::contains(
+            "Installed 'global-skill' globally",
+        ));
+
+    assert!(
+        fake_home
+            .path()
+            .join(".wai/resources/skills/global-skill/SKILL.md")
+            .is_file()
+    );
+}
+
+#[test]
+fn resource_install_from_repo_copies_skill_into_current_project() {
+    let dst = TempDir::new().unwrap();
+    let src = TempDir::new().unwrap();
+    init_workspace(dst.path());
+    init_workspace(src.path());
+
+    wai_cmd(src.path())
+        .args(["resource", "add", "skill", "repo-skill"])
+        .assert()
+        .success();
+
+    let src_skill = src
+        .path()
+        .join(".wai/resources/agent-config/skills/repo-skill/SKILL.md");
+    fs::write(
+        &src_skill,
+        "---\nname: repo-skill\ndescription: Install from repo\n---\n\n# Repo Skill\n",
+    )
+    .unwrap();
+
+    wai_cmd(dst.path())
+        .args([
+            "resource",
+            "install",
+            "repo-skill",
+            "--from-repo",
+            src.path().to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Installed 'repo-skill' from"));
+
+    assert!(
+        dst.path()
+            .join(".wai/resources/agent-config/skills/repo-skill/SKILL.md")
+            .is_file()
+    );
+}
+
+#[test]
+fn resource_install_global_fails_when_skill_missing() {
+    let tmp = TempDir::new().unwrap();
+    let fake_home = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["resource", "install", "missing-skill", "--global"])
+        .env("HOME", fake_home.path())
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("not found in current project"));
 }
 
 // ── wai resource import skills ───────────────────────────────────────────────
