@@ -36,20 +36,8 @@ phase: research
 
 ```
  M .beads/backup/backup_state.json
- M .beads/interactions.jsonl
 M  .beads/issues.jsonl
  M .wai/pipeline-runs/epic-autonomy-tdd-ro5-2026-05-13-work-one-ready-child-issue-from-epic-wai-fvhv.yml
-?? .wai/projects/qa-round-execution/designs/2026-05-14-green-wai-fvhv-28-tests-doctor-test-rs-created-w-2.md
-?? .wai/projects/qa-round-execution/designs/2026-05-14-green-wai-fvhv-28-tests-doctor-test-rs-created-w.md
-?? .wai/projects/qa-round-execution/designs/2026-05-14-tidy-wai-fvhv-28-tests-doctor-test-rs-is-clean-a.md
-?? .wai/projects/qa-round-execution/plans/2026-05-14-issue-plan-wai-fvhv-28-tests-add-focused-cover.md
-?? .wai/projects/qa-round-execution/research/2026-05-14-orient-selected-wai-fvhv-28-p1-tests-wai-docto.md
-?? .wai/projects/qa-round-execution/research/2026-05-14-quality-ledger-wai-fvhv-28-tests-add-focused-c.md
-?? .wai/projects/qa-round-execution/research/2026-05-14-red-wai-fvhv-28-command-cargo-test-test-doctor.md
-?? .wai/projects/qa-round-execution/research/2026-05-14-ro5u-fixes-wai-fvhv-28-fixed-low-1-tightened-co.md
-?? .wai/projects/qa-round-execution/research/2026-05-14-ro5u-wai-fvhv-28-verdict-ship-critical-0-high.md
-?? .wai/projects/qa-round-execution/reviews/2026-05-14-ro5u-wai-fvhv-28-verdict-ship-critical-0-high.md
-?? tests/doctor_test.rs
 ```
 
 ### open_issues
