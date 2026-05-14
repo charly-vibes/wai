@@ -94,5 +94,5 @@ fn close_unknown_project_fails_with_diagnostic() {
         .args(["close", "--project", "nonexistent"])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("nonexistent"));
+        .stderr(predicate::str::contains("not found"));
 }
