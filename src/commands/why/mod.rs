@@ -626,9 +626,7 @@ pub fn run(query: String, no_llm: bool, json: bool, verbose: u8) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::context::{
-        Artifact, ArtifactKind, GatheredContext, ProjectMeta, gather_context, truncate_context,
-    };
+    use super::context::{Artifact, ArtifactKind, GatheredContext, ProjectMeta, gather_context};
     use super::parsing::{ArtifactRef, ParsedResponse, Relevance, parse_response};
     use super::*;
     use serial_test::serial;
