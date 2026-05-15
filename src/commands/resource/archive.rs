@@ -11,8 +11,8 @@ use std::path::Path;
 use crate::config::{SKILLS_DIR, agent_config_dir, global_skills_dir};
 use crate::context::current_context;
 
-use super::require_project;
 use super::validation::validate_skill_name;
+use crate::commands::require_project;
 
 /// Validate an archive entry path.
 ///

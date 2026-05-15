@@ -8,8 +8,8 @@ use crate::config::{SKILLS_DIR, agent_config_dir, global_skills_dir};
 use crate::context::{current_context, require_safe_mode};
 
 use super::metadata::{SkillEntry, SkillListPayload, SkillSource, parse_skill_frontmatter};
-use super::require_project;
 use super::validation::validate_skill_name;
+use crate::commands::require_project;
 
 pub(super) fn add_skill(name: &str, template_name: Option<&str>) -> Result<()> {
     let project_root = require_project()?;

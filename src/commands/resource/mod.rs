@@ -4,7 +4,6 @@ mod skills;
 mod validation;
 
 use miette::Result;
-use std::path::PathBuf;
 
 use crate::cli::{
     ResourceAddCommands, ResourceExportArgs, ResourceImportCommands, ResourceInstallArgs,
@@ -13,12 +12,6 @@ use crate::cli::{
 
 // Re-export public items consumed by other modules
 pub use metadata::parse_skill_frontmatter;
-
-/// Forward `require_project` from the parent commands module so submodules
-/// can call `super::require_project()`.
-pub(super) fn require_project() -> Result<PathBuf> {
-    super::require_project()
-}
 
 /// Called directly by `commands/add.rs` for `wai add skill`.
 pub fn add_skill(name: &str, template_name: Option<&str>) -> Result<()> {
