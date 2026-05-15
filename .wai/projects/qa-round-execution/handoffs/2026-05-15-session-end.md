@@ -1,5 +1,5 @@
 ---
-date: 2026-05-14
+date: 2026-05-15
 project: qa-round-execution
 phase: research
 ---
@@ -35,8 +35,9 @@ phase: research
 ### git_status
 
 ```
+ M .beads/backup/backup_state.json
  M .beads/interactions.jsonl
-M  .beads/issues.jsonl
+ M .wai/projects/qa-round-execution/handoffs/2026-05-14-session-end.md
 ```
 
 ### open_issues
@@ -67,30 +68,30 @@ M  .beads/issues.jsonl
 ├── ○ wai-fvhv.94 ● P1 Scope: Clarify tutorial target audience and success criteria
 ├── ○ wai-fvhv.96 ● P1 Scope: Define JSON output stability policy for automation users
 ├── ○ wai-fvhv.97 ● P1 Scope: Clarify what `--safe` guarantees across every command family
-├── ○ wai-fvhv.26 ● P2 Tests: add focused coverage for `wai close`
-├── ○ wai-fvhv.27 ● P2 Tests: add focused coverage for `wai config`
-├── ○ wai-fvhv.29 ● P2 Tests: add focused coverage for `wai handoff`
-├── ○ wai-fvhv.31 ● P2 Tests: add focused coverage for `wai init`
-├── ○ wai-fvhv.32 ● P2 Tests: add focused coverage for `wai ls`
-├── ○ wai-fvhv.33 ● P2 Tests: add focused coverage for `wai move`
-├── ○ wai-fvhv.34 ● P2 Tests: add focused coverage for `wai new`
-├── ○ wai-fvhv.35 ● P2 Tests: add focused coverage for `wai phase`
-├── ○ wai-fvhv.38 ● P2 Tests: add focused coverage for `wai prime`
-├── ○ wai-fvhv.41 ● P2 Tests: add focused coverage for `wai search`
-├── ○ wai-fvhv.42 ● P2 Tests: add focused coverage for `wai show`
-├── ○ wai-fvhv.43 ● P2 Tests: add focused coverage for `wai status`
-├── ○ wai-fvhv.44 ● P2 Tests: add focused coverage for `wai sync`
-├── ○ wai-fvhv.45 ● P2 Tests: add focused coverage for `wai timeline`
-├── ○ wai-fvhv.46 ● P2 Tests: add focused coverage for `wai tutorial`
-├── ○ wai-fvhv.49 ● P2 Code quality: modularize src/commands/pipeline.rs
-├── ○ wai-fvhv.50 ● P2 Code quality: modularize src/commands/way.rs
-├── ○ wai-fvhv.51 ● P2 Code quality: modularize src/commands/doctor.rs
-├── ○ wai-fvhv.52 ● P2 Code quality: modularize src/commands/why.rs
-├── ○ wai-fvhv.53 ● P2 Code quality: modularize src/commands/reflect.rs
-├── ○ wai-fvhv.54 ● P2 Code quality: modularize src/commands/resource.rs
-├── ○ wai-fvhv.59 ● P2 Code quality: modularize src/commands/add.rs
+├── ○ wai-fvhv.100 ● P3 Scope: Audit examples and docs for Pi-specific scope drift
+├── ○ wai-fvhv.104 ● P3 Docs: strengthen guidance for `wai pipeline` run lifecycle
+├── ○ wai-fvhv.105 ● P3 Docs: strengthen guidance for `wai pipeline` gates and approvals
+├── ○ wai-fvhv.106 ● P3 Docs: strengthen guidance for `wai pipeline` authoring and integrity commands
+├── ○ wai-fvhv.110 ● P3 Docs: strengthen guidance for `wai plugin` management and passthrough behavior
+├── ○ wai-fvhv.112 ● P3 Docs: strengthen guidance for `wai resource` skill lifecycle
+├── ○ wai-fvhv.113 ● P3 Docs: strengthen guidance for `wai resource` import/export flows
 ├── ○ wai-fvhv.116 ● P3 Docs: strengthen guidance for `wai why` history lookup and fallback behavior
-└── ○ wai-fvhv.117 ● P3 Docs: strengthen guidance for `wai why` provider configuration
+├── ○ wai-fvhv.117 ● P3 Docs: strengthen guidance for `wai why` provider configuration
+├── ○ wai-fvhv.63 ● P3 Code quality: modularize src/suggestions.rs
+├── ○ wai-fvhv.67 ● P3 Usability review: Review `add` command discoverability across artifact types
+├── ○ wai-fvhv.68 ● P3 Usability review: Review `resource` namespace cognitive load
+├── ○ wai-fvhv.71 ● P3 Usability review: Improve error-message guidance for outside-workspace usage
+├── ○ wai-fvhv.75 ● P3 Usability review: Audit `ls` workspace discovery ergonomics
+├── ○ wai-fvhv.76 ● P3 Usability review: Review plugin passthrough UX
+├── ○ wai-fvhv.78 ● P3 Usability review: Improve handoff discoverability
+├── ○ wai-fvhv.80 ● P3 Usability review: Clarify move/category semantics
+├── ○ wai-fvhv.82 ● P3 Usability review: Audit verbosity ladder consistency
+├── ○ wai-fvhv.85 ● P3 Scope: Define product boundary between session continuity features and general project management
+├── ○ wai-fvhv.87 ● P3 Scope: Decide whether the Pi extension package is a core product concern or separate integration
+├── ○ wai-fvhv.90 ● P3 Scope: Create a feature map tying commands to primary user journeys
+├── ○ wai-fvhv.95 ● P3 Scope: Write a deprecation policy for commands, flags, and output formats
+├── ○ wai-fvhv.98 ● P3 Scope: Define boundaries for global config vs workspace-local config
+└── ○ wai-fvhv.99 ● P3 Scope: Clarify the contract between `.wai/` artifacts and external tools like beads/openspec
 ○ wai-qz1j ● P2 Implement decision artifact freshness feedback loop tracer bullet
 
 --------------------------------------------------------------------------------
