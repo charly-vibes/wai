@@ -413,9 +413,23 @@ pub enum Commands {
     #[command(subcommand)]
     Pipeline(PipelineCommands),
 
+    /// Inspect and manage decision artifacts
+    #[command(subcommand)]
+    Artifacts(ArtifactsCommands),
+
     /// Pass-through to plugin commands (e.g., wai beads list)
     #[command(external_subcommand)]
     External(Vec<String>),
+}
+
+#[derive(Subcommand)]
+pub enum ArtifactsCommands {
+    /// Report stale and untracked decision artifacts
+    Stale {
+        /// Output machine-readable JSON
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -469,6 +483,10 @@ pub enum AddCommands {
         /// Path to an artifact this corrects (creates an addendum)
         #[arg(long)]
         corrects: Option<String>,
+
+        /// Comma-separated repo-relative paths this artifact tracks for freshness
+        #[arg(long)]
+        tracks: Option<String>,
     },
 
     /// Add a plan document
@@ -491,6 +509,10 @@ pub enum AddCommands {
         /// Path to an artifact this corrects (creates an addendum)
         #[arg(long)]
         corrects: Option<String>,
+
+        /// Comma-separated repo-relative paths this artifact tracks for freshness
+        #[arg(long)]
+        tracks: Option<String>,
     },
 
     /// Add a design document
@@ -513,6 +535,10 @@ pub enum AddCommands {
         /// Path to an artifact this corrects (creates an addendum)
         #[arg(long)]
         corrects: Option<String>,
+
+        /// Comma-separated repo-relative paths this artifact tracks for freshness
+        #[arg(long)]
+        tracks: Option<String>,
     },
 
     /// Add a review artifact for an existing artifact

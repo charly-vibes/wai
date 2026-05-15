@@ -10,6 +10,7 @@ use crate::error::WaiError;
 use crate::suggestions::SuggestionEngine;
 
 mod add;
+mod artifacts;
 mod close;
 mod config_cmd;
 mod doctor;
@@ -89,6 +90,7 @@ pub fn run(cli: Cli) -> Result<()> {
             crate::cli::ResourceCommands::Export(args) => resource::run_export(args),
         },
         Some(Commands::Pipeline(cmd)) => pipeline::run(cmd),
+        Some(Commands::Artifacts(cmd)) => artifacts::run(cmd),
         Some(Commands::Close { project, remember }) => close::run(project, remember),
         Some(Commands::Prime { project }) => prime::run(project),
         Some(Commands::Project(cmd)) => project::run(cmd),

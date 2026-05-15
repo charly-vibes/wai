@@ -8,6 +8,7 @@ mod commands;
 mod config;
 mod context;
 mod error;
+pub mod freshness;
 mod guided_flows;
 mod help;
 mod json;

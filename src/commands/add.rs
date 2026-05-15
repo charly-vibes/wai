@@ -26,6 +26,7 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             tags,
             bead,
             corrects,
+            tracks,
         } => {
             require_safe_mode("add research")?;
             let resolved = resolve_project(&project_root, project.as_deref())?;
@@ -40,8 +41,14 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             let mut all_tags = build_tags(tags.as_deref(), &project_root);
             process_corrects(corrects.as_deref(), &mut all_tags)?;
 
+            let tracks_list = parse_tracks_arg(tracks.as_deref());
+
             let mut file_content = String::new();
-            if !all_tags.is_empty() || bead.is_some() || corrects.is_some() {
+            if !all_tags.is_empty()
+                || bead.is_some()
+                || corrects.is_some()
+                || !tracks_list.is_empty()
+            {
                 file_content.push_str("---\n");
                 if !all_tags.is_empty() {
                     file_content.push_str(&format!("tags: [{}]\n", all_tags.join(", ")));
@@ -52,13 +59,23 @@ pub fn run(cmd: AddCommands) -> Result<()> {
                 if let Some(ref corrects_path) = corrects {
                     file_content.push_str(&format!("corrects: {}\n", corrects_path));
                 }
+                if !tracks_list.is_empty() {
+                    file_content.push_str("tracks:\n");
+                    for t in &tracks_list {
+                        file_content.push_str(&format!("  - {}\n", t));
+                    }
+                }
                 file_content.push_str("---\n\n");
             }
             file_content.push_str(&body);
             file_content.push('\n');
 
             std::fs::create_dir_all(&dir).into_diagnostic()?;
-            std::fs::write(dir.join(&filename), &file_content).into_diagnostic()?;
+            let artifact_path = dir.join(&filename);
+            std::fs::write(&artifact_path, &file_content).into_diagnostic()?;
+            if !tracks_list.is_empty() {
+                crate::freshness::write_sidecar(&artifact_path, &project_root, &tracks_list);
+            }
             let ctx = current_context();
             if !ctx.quiet {
                 log::success(format!("Added research to '{}'", target_project))
@@ -115,6 +132,7 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             project,
             tags,
             corrects,
+            tracks,
         } => {
             require_safe_mode("add plan")?;
             let resolved = resolve_project(&project_root, project.as_deref())?;
@@ -129,8 +147,10 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             let mut all_tags = build_tags(tags.as_deref(), &project_root);
             process_corrects(corrects.as_deref(), &mut all_tags)?;
 
+            let tracks_list = parse_tracks_arg(tracks.as_deref());
+
             let mut file_content = String::new();
-            if !all_tags.is_empty() || corrects.is_some() {
+            if !all_tags.is_empty() || corrects.is_some() || !tracks_list.is_empty() {
                 file_content.push_str("---\n");
                 if !all_tags.is_empty() {
                     file_content.push_str(&format!("tags: [{}]\n", all_tags.join(", ")));
@@ -138,13 +158,23 @@ pub fn run(cmd: AddCommands) -> Result<()> {
                 if let Some(ref corrects_path) = corrects {
                     file_content.push_str(&format!("corrects: {}\n", corrects_path));
                 }
+                if !tracks_list.is_empty() {
+                    file_content.push_str("tracks:\n");
+                    for t in &tracks_list {
+                        file_content.push_str(&format!("  - {}\n", t));
+                    }
+                }
                 file_content.push_str("---\n\n");
             }
             file_content.push_str(&body);
             file_content.push('\n');
 
             std::fs::create_dir_all(&dir).into_diagnostic()?;
-            std::fs::write(dir.join(&filename), &file_content).into_diagnostic()?;
+            let artifact_path = dir.join(&filename);
+            std::fs::write(&artifact_path, &file_content).into_diagnostic()?;
+            if !tracks_list.is_empty() {
+                crate::freshness::write_sidecar(&artifact_path, &project_root, &tracks_list);
+            }
             if !current_context().quiet {
                 log::success(format!("Added plan to '{}'", target_project)).into_diagnostic()?;
             }
@@ -156,6 +186,7 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             project,
             tags,
             corrects,
+            tracks,
         } => {
             require_safe_mode("add design")?;
             let resolved = resolve_project(&project_root, project.as_deref())?;
@@ -170,8 +201,10 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             let mut all_tags = build_tags(tags.as_deref(), &project_root);
             process_corrects(corrects.as_deref(), &mut all_tags)?;
 
+            let tracks_list = parse_tracks_arg(tracks.as_deref());
+
             let mut file_content = String::new();
-            if !all_tags.is_empty() || corrects.is_some() {
+            if !all_tags.is_empty() || corrects.is_some() || !tracks_list.is_empty() {
                 file_content.push_str("---\n");
                 if !all_tags.is_empty() {
                     file_content.push_str(&format!("tags: [{}]\n", all_tags.join(", ")));
@@ -179,13 +212,23 @@ pub fn run(cmd: AddCommands) -> Result<()> {
                 if let Some(ref corrects_path) = corrects {
                     file_content.push_str(&format!("corrects: {}\n", corrects_path));
                 }
+                if !tracks_list.is_empty() {
+                    file_content.push_str("tracks:\n");
+                    for t in &tracks_list {
+                        file_content.push_str(&format!("  - {}\n", t));
+                    }
+                }
                 file_content.push_str("---\n\n");
             }
             file_content.push_str(&body);
             file_content.push('\n');
 
             std::fs::create_dir_all(&dir).into_diagnostic()?;
-            std::fs::write(dir.join(&filename), &file_content).into_diagnostic()?;
+            let artifact_path = dir.join(&filename);
+            std::fs::write(&artifact_path, &file_content).into_diagnostic()?;
+            if !tracks_list.is_empty() {
+                crate::freshness::write_sidecar(&artifact_path, &project_root, &tracks_list);
+            }
             if !current_context().quiet {
                 log::success(format!("Added design to '{}'", target_project)).into_diagnostic()?;
             }
@@ -379,6 +422,17 @@ fn process_corrects(corrects: Option<&str>, tags: &mut Vec<String>) -> Result<()
         }
     }
     Ok(())
+}
+
+fn parse_tracks_arg(tracks: Option<&str>) -> Vec<String> {
+    match tracks {
+        None => vec![],
+        Some(s) => s
+            .split(',')
+            .map(|p| p.trim().to_string())
+            .filter(|p| !p.is_empty())
+            .collect(),
+    }
 }
 
 fn get_content(content: Option<&str>, file: Option<&str>) -> Result<String> {
