@@ -10,10 +10,10 @@ use crate::managed_block::read_reflect_block;
 use crate::plugin::fetch_memories;
 
 /// Budget allocations for context tiers (conversation, handoffs, secondary, previous reflections).
-pub(super) const CONVERSATION_BUDGET: usize = 30_000;
-pub(super) const HANDOFF_BUDGET: usize = 40_000;
-pub(super) const SECONDARY_BUDGET: usize = 30_000;
-pub(super) const PREVIOUS_REFLECTIONS_BUDGET: usize = 20_000;
+const CONVERSATION_BUDGET: usize = 30_000;
+const HANDOFF_BUDGET: usize = 40_000;
+const SECONDARY_BUDGET: usize = 30_000;
+const PREVIOUS_REFLECTIONS_BUDGET: usize = 20_000;
 
 /// All context gathered before calling the LLM.
 #[derive(Debug)]

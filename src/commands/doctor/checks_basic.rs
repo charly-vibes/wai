@@ -4,8 +4,8 @@ use miette::IntoDiagnostic;
 
 use crate::config::{
     AGENT_CONFIG_DIR, ARCHIVES_DIR, AREAS_DIR, CONFIG_FILE, CONTEXT_DIR, PLUGINS_DIR, PROJECTS_DIR,
-    ProjectConfig, RESOURCES_DIR, RULES_DIR, SKILLS_DIR, STATE_FILE, agent_config_dir, plugins_dir,
-    projects_dir, wai_dir,
+    ProjectConfig, RESOURCES_DIR, RULES_DIR, SKILLS_DIR, STATE_FILE, plugins_dir, projects_dir,
+    wai_dir,
 };
 use crate::plugin;
 use crate::state::ProjectState;
@@ -513,10 +513,4 @@ pub(super) fn check_readme_badge(project_root: &Path) -> Vec<CheckResult> {
             fix_fn: None,
         }]
     }
-}
-
-// Re-export for use in checks_basic only — agent_config_dir is needed by checks_basic
-// but also referenced indirectly via checks_agents.
-pub(super) fn _agent_config_dir_reexport(project_root: &Path) -> std::path::PathBuf {
-    agent_config_dir(project_root)
 }

@@ -26,7 +26,6 @@ pub(super) struct CheckResult {
     name: String,
     status: Status,
     message: String,
-    #[allow(dead_code)]
     fix: Option<String>,
     #[allow(clippy::type_complexity)]
     fix_fn: Option<Box<dyn FnOnce(&Path) -> Result<()>>>,
