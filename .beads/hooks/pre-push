@@ -16,9 +16,6 @@ call_lefthook()
   elif lefthook -h >/dev/null 2>&1
   then
     lefthook "$@"
-  elif /var/home/linuxbrew/.linuxbrew/Cellar/lefthook/2.1.4/bin/lefthook -h >/dev/null 2>&1
-  then
-    /var/home/linuxbrew/.linuxbrew/Cellar/lefthook/2.1.4/bin/lefthook "$@"
   else
     dir="$(git rev-parse --show-toplevel)"
     osArch=$(uname | tr '[:upper:]' '[:lower:]')
@@ -35,6 +32,7 @@ call_lefthook()
     elif test -f "$dir/node_modules/lefthook/bin/index.js"
     then
       "$dir/node_modules/lefthook/bin/index.js" "$@"
+    
     elif go tool lefthook -h >/dev/null 2>&1
     then
       go tool lefthook "$@"
@@ -70,7 +68,7 @@ call_lefthook()
 
 call_lefthook run "pre-push" "$@"
 
-# --- BEGIN BEADS INTEGRATION v0.63.3 ---
+# --- BEGIN BEADS INTEGRATION v1.0.3 ---
 # This section is managed by beads. Do not remove these markers.
 if command -v bd >/dev/null 2>&1; then
   export BD_GIT_HOOK=1
@@ -92,4 +90,4 @@ if command -v bd >/dev/null 2>&1; then
   fi
   if [ $_bd_exit -ne 0 ]; then exit $_bd_exit; fi
 fi
-# --- END BEADS INTEGRATION v0.63.3 ---
+# --- END BEADS INTEGRATION v1.0.3 ---
