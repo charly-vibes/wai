@@ -80,17 +80,14 @@ wai import .cursorrules
 
 ### `wai way`
 
-Audits your repository against AI-friendliness best practices — checks for `CLAUDE.md`, `.editorconfig`, skill files, and similar scaffolding. Unlike `wai doctor`, which focuses on the `.wai/` workspace, `wai way` focuses on the repository as a whole.
+Audits your repository against AI-friendliness best practices: checks for `CLAUDE.md`, `.editorconfig`, skill files, and similar scaffolding. Unlike `wai doctor`, which focuses on the `.wai/` workspace, `wai way` focuses on the repository as a whole.
 
 ```bash
 # Check which best practices are missing
 wai way
 
-# Auto-scaffold all missing files
-wai way --fix all
-
-# Fix a specific check
-wai way --fix claude-md
+# Scaffold any missing skill files
+wai way --fix skills
 ```
 
 ### Choosing the Right Tool
@@ -101,8 +98,6 @@ wai way --fix claude-md
 ---
 
 ## Projects & Artifacts
-
-Manage PARA items (Projects, Areas, Resources, Archives) and their associated artifacts.
 
 ### Items & Phases
 
@@ -168,7 +163,7 @@ wai show user-auth
 
 #### `wai phase`
 
-Reads or changes the current project phase. Phases gate which artifact types are expected — for example, you should add research before advancing to design.
+Reads or changes the current project phase. Phases gate which artifact types are expected, for example, you should add research before advancing to design.
 
 ```bash
 # Check the current phase
@@ -204,8 +199,6 @@ Artifacts are the core of wai — they capture the *why* behind your decisions s
 
 #### Choosing an Artifact Type
 
-Wai encourages capturing the right kind of documentation at each stage:
-
 - **Research** (`wai add research`) — Use for gathering information, exploring problem spaces, and evaluating options.
   - *Example:* "Evaluated two DB engines; chose PostgreSQL for its JSONB support."
 - **Design** (`wai add design`) — Use for making architectural decisions and defining system structure.
@@ -237,7 +230,7 @@ wai add research --corrects .wai/projects/auth/research/2026-01-10.md \
   "Correction: the Redis pub/sub approach has 50ms latency at scale"
 ```
 
-> **Note on `--corrects`:** You can only correct a *locked* artifact (one with a SHA-256 sidecar from `wai pipeline lock`). The correction is stored as a linked addendum — the original is not modified.
+> **Note on `--corrects`:** You can only correct a *locked* artifact (one with a SHA-256 sidecar). To lock an artifact, run `wai pipeline lock` at the relevant pipeline step. The correction is stored as a linked addendum — the original is not modified.
 
 ---
 
@@ -290,7 +283,7 @@ wai timeline user-auth --from 2026-01-01 --to 2026-03-01
 
 ## Agent Configuration
 
-Manage how AI agents interact with your project through skills, rules, and context. See [Agent Config Sync](./concepts/agent-config-sync.md) for how projections work.
+See [Agent Config Sync](./concepts/agent-config-sync.md) for how projections work.
 
 | Command | Description |
 |---------|-------------|
@@ -307,20 +300,21 @@ Manage how AI agents interact with your project through skills, rules, and conte
 | `wai resource import skills [--from <dir>]` | Import skills from a directory |
 | `wai resource import archive <file> [--yes]` | Import skills from a tar.gz archive |
 
-> **⚠️ WARNING:** `wai sync` is **destructive** to your target files. It overwrites `.cursorrules`, `.claude/config.json`, and similar files with the sources from your `.wai/` directory. Always edit the `.wai/` source files — never edit the projected copies directly, as your changes will be lost on the next sync.
+> **⚠️ WARNING:** `wai sync` is **destructive** to your target files. Target locations are defined in `.wai/resources/agent-config/.projections.yml` — the built-in `claude-code` target writes to `.claude/commands/`. Always edit the `.wai/` source files; changes to the projected copies will be overwritten on the next sync.
 
 ### `wai sync`
 
-Projects your `.wai/` agent configs to tool-specific locations (e.g., `.claude/`, `.cursorrules`). Run after editing any config in `.wai/` to push changes out to the agent tools.
+Writes your `.wai/` agent configs out to their tool-specific target locations. Run after editing any config in `.wai/` to push changes out to the agent tools.
 
 ```bash
-# Project all configs to their targets
+# Write all configs to their targets
 wai sync
 
 # Preview what would change without writing
 wai sync --status
 
-# Sync from main branch when working in a worktree
+# Sync from main branch when working in a git worktree
+# (use when .wai/ lives on main but your branch doesn't have it)
 wai sync --from-main
 ```
 
@@ -381,7 +375,7 @@ wai resource import archive team-skills.tar.gz --yes
 
 ## AI-Driven Workflows
 
-Advanced reasoning, session management, and automated pipelines.
+These commands require an LLM backend. Run `wai why --no-llm` or configure a provider before using them in automated contexts. See [LLM Configuration](#backend-selection-and-fallback-behavior) under `wai why`.
 
 ### Reasoning & Reflection
 
@@ -411,7 +405,7 @@ wai why --no-llm "plugin architecture"
 
 **Backend selection and fallback behavior:**
 
-Wai auto-detects the available LLM backend in this order: Claude API (`ANTHROPIC_API_KEY`), Claude CLI binary, Ollama, Agent (Claude Code session). If no backend is available:
+Wai auto-detects the available LLM backend in this order: Agent (if inside a Claude Code session), Claude API (`ANTHROPIC_API_KEY`), Claude CLI binary, Ollama. If no backend is available:
 
 - By default, wai falls back to `wai search` on the same query (equivalent to `--no-llm`).
 - Set `fallback = "error"` in `[llm]` config to get an explicit error instead.
@@ -435,7 +429,7 @@ llm = "agent"
 
 #### `wai reflect`
 
-Synthesizes accumulated session context — handoffs, research, and conversation history — into a versioned reflection file in `.wai/resources/reflections/`. Run approximately every 5 sessions.
+Synthesizes accumulated session context (handoffs, research, conversation history) into a versioned reflection file in `.wai/resources/reflections/`. Run approximately every 5 sessions.
 
 ```bash
 # Synthesize and write a reflection file
@@ -445,7 +439,7 @@ wai reflect
 wai reflect --save-memories
 ```
 
-The reflection is automatically woven into managed blocks in `CLAUDE.md` / `AGENTS.md` so the next agent session starts with accumulated project wisdom. See [Reasoning](./concepts/reasoning.md) for the full synthesis cycle.
+The reflection is automatically woven into managed blocks in `CLAUDE.md` / `AGENTS.md` so the next agent session starts with the patterns, conventions, and gotchas extracted from your session history. See [Reasoning](./concepts/reasoning.md) for the full synthesis cycle.
 
 ---
 
