@@ -83,6 +83,7 @@ pub fn run(fix: bool) -> Result<()> {
     checks.extend(check_claude_session_hook());
     checks.extend(checks_basic::check_wai_project_env(&project_root));
     checks.extend(check_artifact_locks(&project_root));
+    checks.extend(check_dont_drift_signals(&project_root));
 
     let summary = Summary {
         pass: checks.iter().filter(|c| c.status == Status::Pass).count(),
@@ -1239,6 +1240,63 @@ fn check_artifact_locks(project_root: &Path) -> Vec<CheckResult> {
     }
 }
 
+/// Check for dont rejection signals via `ah signals`.
+///
+/// Enabled only when `WAI_DONT_SIGNALS=1` is set. Runs `ah signals` in the
+/// project root and surfaces any drift signals as warnings. Returns empty
+/// when the flag is absent or `ah` is not on PATH.
+fn check_dont_drift_signals(project_root: &Path) -> Vec<CheckResult> {
+    if std::env::var("WAI_DONT_SIGNALS").is_err() {
+        return vec![];
+    }
+    let output = std::process::Command::new("ah")
+        .arg("signals")
+        .current_dir(project_root)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .output();
+    let output = match output {
+        Ok(o) if o.status.success() => o,
+        _ => return vec![],
+    };
+    drift_signals_to_check_results(&output.stdout)
+}
+
+/// Parse the JSON output of `ah signals` and return check results.
+/// Extracted for unit testing without a subprocess dependency.
+fn drift_signals_to_check_results(json_bytes: &[u8]) -> Vec<CheckResult> {
+    let signals: Vec<serde_json::Value> = match serde_json::from_slice(json_bytes) {
+        Ok(v) => v,
+        Err(_) => return vec![],
+    };
+    if signals.is_empty() {
+        return vec![CheckResult {
+            name: "dont drift signals".to_string(),
+            status: Status::Pass,
+            message: "No dont rejection signals detected".to_string(),
+            fix: None,
+            fix_fn: None,
+        }];
+    }
+    let count = signals.len();
+    let rules: Vec<&str> = signals
+        .iter()
+        .filter_map(|s| s["rule_name"].as_str())
+        .collect::<std::collections::HashSet<_>>()
+        .into_iter()
+        .collect();
+    vec![CheckResult {
+        name: "dont drift signals".to_string(),
+        status: Status::Warn,
+        message: format!(
+            "{count} dont rejection signal(s) detected (rules: {}); run `ah signals` for details",
+            rules.join(", ")
+        ),
+        fix: Some("Run: dont doctor --json to inspect violations".to_string()),
+        fix_fn: None,
+    }]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1355,5 +1413,52 @@ mod tests {
         assert_eq!(results[0].status, Status::Warn);
         assert!(results[0].message.contains("Hash mismatch"));
         assert!(results[0].message.contains("bad.md"));
+    }
+
+    // --- dont drift signal tests ---
+
+    #[test]
+    fn drift_signals_empty_json_array_returns_pass() {
+        let results = drift_signals_to_check_results(b"[]");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].status, Status::Pass);
+        assert!(results[0].message.contains("No dont rejection signals"));
+    }
+
+    #[test]
+    fn drift_signals_with_one_signal_returns_warn() {
+        let json = serde_json::to_vec(&serde_json::json!([{
+            "schema_version": "1.0",
+            "signal_kind": "dont-rejection",
+            "source_tool": "dont",
+            "rule_name": "ungrounded",
+            "timestamp": "2026-06-10T12:00:00Z",
+            "violation_count": 2,
+            "violations": [],
+            "openspec_hint": "spec drift detected"
+        }]))
+        .unwrap();
+        let results = drift_signals_to_check_results(&json);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].status, Status::Warn);
+        assert!(results[0].message.contains("1 dont rejection signal"));
+        assert!(results[0].message.contains("ungrounded"));
+    }
+
+    #[test]
+    fn drift_signals_malformed_json_returns_empty() {
+        let results = drift_signals_to_check_results(b"not json");
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn check_dont_drift_signals_skips_when_env_absent() {
+        // Relies on WAI_DONT_SIGNALS not being set in the test environment.
+        if std::env::var("WAI_DONT_SIGNALS").is_ok() {
+            return;
+        }
+        let tmp = TempDir::new().unwrap();
+        let results = check_dont_drift_signals(tmp.path());
+        assert!(results.is_empty());
     }
 }
