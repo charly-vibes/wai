@@ -5,6 +5,14 @@ All notable changes to wai will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Calendar Versioning](https://calver.org/) (YYYY.M.MICRO).
 
+## [2026.5.2] - 2026-07-07
+
+### Added
+
+- **mise.toml detection** — `wai way` task-runner check now recognises `mise.toml` and `.mise.toml` as valid task runners, reporting PASS with a justfile migration suggestion
+
+---
+
 ## [2026.5.1] - 2026-05-12
 
 ### Added
