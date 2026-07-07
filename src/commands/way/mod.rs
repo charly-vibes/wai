@@ -1444,6 +1444,18 @@ fn check_task_runner(repo_root: &Path) -> CheckResult {
                     .to_string(),
             ),
         }
+    } else if repo_root.join("mise.toml").exists() || repo_root.join(".mise.toml").exists() {
+        CheckResult {
+            name: name.to_string(),
+            status: Status::Pass,
+            message: "mise.toml detected".to_string(),
+            intent,
+            success_criteria,
+            suggestion: Some(
+                "Consider migrating to justfile for better ergonomics — https://just.systems"
+                    .to_string(),
+            ),
+        }
     } else {
         CheckResult {
             name: name.to_string(),
@@ -2725,5 +2737,52 @@ fn check_gh_cli() -> CheckResult {
             success_criteria,
             suggestion: Some("Run 'gh auth login' to authenticate".to_string()),
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn task_runner_detects_mise_toml() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("mise.toml"), "[tools]\n").unwrap();
+
+        let result = check_task_runner(dir.path());
+        assert_eq!(result.status, Status::Pass);
+        assert!(
+            result.message.contains("mise.toml detected"),
+            "expected mise.toml detected, got: {}",
+            result.message
+        );
+    }
+
+    #[test]
+    fn task_runner_detects_dot_mise_toml() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join(".mise.toml"), "[tools]\n").unwrap();
+
+        let result = check_task_runner(dir.path());
+        assert_eq!(result.status, Status::Pass);
+        assert!(
+            result.message.contains("mise.toml detected"),
+            "expected mise.toml detected, got: {}",
+            result.message
+        );
+    }
+
+    #[test]
+    fn task_runner_no_runner_still_reports_info() {
+        let dir = tempfile::tempdir().unwrap();
+
+        let result = check_task_runner(dir.path());
+        assert_eq!(result.status, Status::Info);
+        assert!(
+            result.message.contains("No task runner detected"),
+            "expected No task runner detected, got: {}",
+            result.message
+        );
     }
 }
