@@ -2,6 +2,15 @@ use std::path::Path;
 
 use super::{CheckResult, Status};
 
+/// Read a hook file from an arbitrary path. Returns `None` if the file does not
+/// exist, is a directory, or cannot be read.
+pub(super) fn read_hook_from_path(path: &Path) -> Option<String> {
+    if !path.exists() || path.is_dir() {
+        return None;
+    }
+    std::fs::read_to_string(path).ok()
+}
+
 pub(super) fn read_hook(repo_root: &Path, hook_name: &str) -> Option<String> {
     let hook_path = repo_root.join(".git/hooks").join(hook_name);
     if !hook_path.exists() || hook_path.is_dir() {
@@ -132,7 +141,38 @@ pub(super) fn check_git_hooks(repo_root: &Path) -> CheckResult {
             suggestion: None,
         }
     } else if lefthook_config.exists() || lefthook_config_yaml.exists() {
-        if hook_contains(repo_root, "lefthook") {
+        // Check the delegated core.hooksPath first (e.g., when beads/bd sets hooksPath)
+        if let Some(hooks_path) = git_core_hooks_path(repo_root) {
+            let delegated_precommit = repo_root.join(&hooks_path).join("pre-commit");
+            let delegated_prepush = repo_root.join(&hooks_path).join("pre-push");
+
+            let lefthook_in_delegated = read_hook_from_path(&delegated_precommit)
+                .is_some_and(|c| c.contains("lefthook"))
+                || read_hook_from_path(&delegated_prepush).is_some_and(|c| c.contains("lefthook"));
+
+            if lefthook_in_delegated {
+                CheckResult {
+                    name: name.to_string(),
+                    status: Status::Pass,
+                    message: "lefthook detected and installed".to_string(),
+                    intent,
+                    success_criteria,
+                    suggestion: None,
+                }
+            } else {
+                CheckResult {
+                    name: name.to_string(),
+                    status: Status::Info,
+                    message: format!(
+                        "lefthook.yml found but core.hooksPath is set ('{}') — lefthook not found in delegated path",
+                        hooks_path,
+                    ),
+                    intent,
+                    success_criteria,
+                    suggestion: Some("Run: lefthook install".to_string()),
+                }
+            }
+        } else if hook_contains(repo_root, "lefthook") {
             CheckResult {
                 name: name.to_string(),
                 status: Status::Pass,
@@ -353,6 +393,93 @@ mod tests {
 
         let result = check_git_hooks(dir.path());
         assert_eq!(result.status, Status::Pass);
+    }
+
+    // -- lefthook via delegated core.hooksPath --
+
+    #[test]
+    fn lefthook_yml_with_delegated_hooks_path_detects_lefthook() {
+        let dir = setup_git_repo();
+        // Write lefthook.yml
+        fs::write(dir.path().join("lefthook.yml"), "pre-commit: [echo test]\n").unwrap();
+        // Set core.hooksPath to a custom directory
+        let custom_hooks = dir.path().join(".my-hooks");
+        fs::create_dir_all(&custom_hooks).unwrap();
+        std::process::Command::new("git")
+            .args(["config", "core.hooksPath", ".my-hooks"])
+            .current_dir(dir.path())
+            .output()
+            .unwrap();
+        // Write a lefthook shim in the delegated hooks directory
+        fs::write(
+            custom_hooks.join("pre-commit"),
+            "#!/usr/bin/env sh\nexec lefthook run pre-commit \"$@\"\n",
+        )
+        .unwrap();
+
+        let result = check_git_hooks(dir.path());
+        assert_eq!(
+            result.status,
+            Status::Pass,
+            "expected Pass for lefthook via delegated hooksPath, got: {:?} — {}",
+            result.status,
+            result.message
+        );
+        assert!(
+            result.message.contains("lefthook"),
+            "expected message to mention lefthook, got: {}",
+            result.message
+        );
+    }
+
+    #[test]
+    fn lefthook_yml_with_delegated_hooks_path_missing_lefthook_reports_conflict() {
+        let dir = setup_git_repo();
+        // Write lefthook.yml
+        fs::write(dir.path().join("lefthook.yml"), "pre-commit: [echo test]\n").unwrap();
+        // Set core.hooksPath to a custom directory but don't put lefthook there
+        let custom_hooks = dir.path().join(".other-hooks");
+        fs::create_dir_all(&custom_hooks).unwrap();
+        std::process::Command::new("git")
+            .args(["config", "core.hooksPath", ".other-hooks"])
+            .current_dir(dir.path())
+            .output()
+            .unwrap();
+        // Write a non-lefthook script in the delegated hooks directory
+        fs::write(
+            custom_hooks.join("pre-commit"),
+            "#!/usr/bin/env sh\necho \"some other hook\"\n",
+        )
+        .unwrap();
+
+        let result = check_git_hooks(dir.path());
+        assert_eq!(
+            result.status,
+            Status::Info,
+            "expected Info for unresolved hooksPath conflict, got: {:?} — {}",
+            result.status,
+            result.message
+        );
+        assert!(
+            result.message.contains("hooksPath"),
+            "expected message to mention hooksPath conflict, got: {}",
+            result.message
+        );
+    }
+
+    #[test]
+    fn lefthook_yml_without_any_hooks_still_suggests_install() {
+        let dir = setup_git_repo();
+        // Write lefthook.yml
+        fs::write(dir.path().join("lefthook.yml"), "pre-commit: [echo test]\n").unwrap();
+
+        let result = check_git_hooks(dir.path());
+        assert_eq!(result.status, Status::Info);
+        assert!(
+            result.message.contains("lefthook install"),
+            "expected lefthook install suggestion, got: {}",
+            result.message
+        );
     }
 
     // -- no hooks at all --
