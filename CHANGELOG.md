@@ -5,6 +5,15 @@ All notable changes to wai will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Calendar Versioning](https://calver.org/) (YYYY.M.MICRO).
 
+## [2026.5.3] - 2026-07-08
+
+### Fixed
+
+- **lefthook via delegated hooksPath** — `wai way` now detects lefthook installed through a delegated `core.hooksPath` (e.g., when beads/bd sets hooksPath) instead of falsely reporting "hooks not installed"
+- **status header** — `wai status` header now correctly shows `Workspace: <name>` when no projects exist and `Project: <project-name>` after creating a project, instead of always showing the workspace name
+
+---
+
 ## [2026.5.2] - 2026-07-07
 
 ### Added
