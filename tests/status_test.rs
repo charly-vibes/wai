@@ -27,6 +27,32 @@ fn create_project(dir: &std::path::Path, name: &str) {
 // ── project summary and suggestions ──────────────────────────────────────────
 
 #[test]
+fn status_shows_workspace_when_no_projects() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["status"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Workspace:"));
+}
+
+#[test]
+fn status_shows_project_name_in_header() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+
+    wai_cmd(tmp.path())
+        .args(["status"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Project:"))
+        .stderr(predicate::str::contains("test-ws").not());
+}
+
+#[test]
 fn status_shows_project_name_in_summary() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());

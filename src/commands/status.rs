@@ -102,7 +102,31 @@ pub fn run(verbose: u8) -> Result<()> {
         return render_json(&project_root, &config.project.name);
     }
 
-    intro(format!("Project: {}", config.project.name.bold())).into_diagnostic()?;
+    // Determine header label based on whether projects exist
+    let proj_dir = projects_dir(&project_root);
+    let header_label = if proj_dir.exists() {
+        let mut entries: Vec<_> = std::fs::read_dir(&proj_dir)
+            .into_diagnostic()?
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
+            .collect();
+        entries.sort_by_key(|e| e.file_name());
+
+        if let Some(first) = entries.first() {
+            let name = first.file_name().to_string_lossy().to_string();
+            if entries.len() == 1 {
+                format!("Project: {}", name.bold())
+            } else {
+                format!("Project: {} and {} others", name.bold(), entries.len() - 1)
+            }
+        } else {
+            format!("Workspace: {}", config.project.name.bold())
+        }
+    } else {
+        format!("Workspace: {}", config.project.name.bold())
+    };
+
+    intro(header_label).into_diagnostic()?;
 
     // List projects and their phases
     let proj_dir = projects_dir(&project_root);
