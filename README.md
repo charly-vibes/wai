@@ -19,6 +19,14 @@ Organizes artifacts using the PARA method (Projects, Areas, Resources, Archives)
 
 ## Installation
 
+### Cargo (crates.io)
+
+```bash
+cargo install wai-cli
+```
+
+Installs the `wai` binary.
+
 ### Homebrew (macOS & Linux)
 
 ```bash
@@ -42,8 +50,10 @@ Download the latest pre-compiled binary from the [GitHub Releases](https://githu
 Requires [Rust](https://www.rust-lang.org/tools/install) (stable toolchain):
 
 ```bash
-cargo install --path .
-```
+git clone https://github.com/charly-vibes/wai
+cd wai
+cargo build --release
+
 
 ## Quick Start
 
