@@ -5,6 +5,7 @@ edition = "2024"
 description = "Workflow manager for AI-driven development"
 license = "MIT"
 repository = "https://github.com/charly-vibes/wai"
+readme = "README.md"
 keywords = ["cli", "workflow", "ai", "development"]
 categories = ["command-line-utilities", "development-tools"]
 
