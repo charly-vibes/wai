@@ -1,5 +1,5 @@
 [package]
-name = "wai"
+name = "wai-cli"
 version = "2026.5.3"
 edition = "2024"
 description = "Workflow manager for AI-driven development"
