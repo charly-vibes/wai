@@ -5,6 +5,14 @@ All notable changes to wai will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Calendar Versioning](https://calver.org/) (YYYY.M.MICRO).
 
+## [2026.7.16] - 2026-07-15
+
+### Fixed
+
+- **reference projection no longer overwrites user files** — `execute_reference` (used by `wai sync` for the "reference" strategy) now checks if the target file contains user-authored content before overwriting. User-authored files (those not starting with the wai auto-generated header) are preserved. Only wai-managed reference stubs are refreshed.
+
+---
+
 ## [2026.5.3] - 2026-07-08
 
 ### Fixed
