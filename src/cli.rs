@@ -1,7 +1,7 @@
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use std::path::PathBuf;
 
-const VERSION: &str = concat!(
+pub const VERSION: &str = concat!(
     env!("CARGO_PKG_VERSION"),
     " (",
     env!("WAI_GIT_COMMIT"),
@@ -39,7 +39,7 @@ pub struct Cli {
     pub quiet: bool,
 
     /// Output machine-readable JSON
-    #[arg(long, global = true)]
+    #[arg(short = 'j', long, global = true)]
     pub json: bool,
 
     /// Disable interactive prompts
@@ -416,6 +416,12 @@ pub enum Commands {
     /// Inspect and manage decision artifacts
     #[command(subcommand)]
     Artifacts(ArtifactsCommands),
+
+    /// Generate shell completions
+    Completions {
+        /// Shell to generate completions for (bash, zsh, fish, powershell, elvish)
+        shell: clap_complete::Shell,
+    },
 
     /// Pass-through to plugin commands (e.g., wai beads list)
     #[command(external_subcommand)]

@@ -108,18 +108,6 @@ context before starting research or creating tickets.
 
 
 
-<!-- WAI:REFLECT:REF:START -->
-## Accumulated Project Patterns
-
-Project-specific conventions, gotchas, and architecture notes live in
-`.wai/resources/reflections/`. Run `wai search "<topic>"` to retrieve relevant
-context before starting research or creating tickets.
-
-> **Before research or ticket creation**: always run `wai search "<topic>"` to
-> check for known patterns. Do not rediscover what is already documented.
-<!-- WAI:REFLECT:REF:END -->
-
-
 
 <!-- OPENSPEC:START -->
 # OpenSpec Instructions

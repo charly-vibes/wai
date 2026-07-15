@@ -8,6 +8,7 @@ use crate::config::{UserConfig, find_project_root, projects_dir};
 use crate::context::current_context;
 use crate::error::WaiError;
 use crate::suggestions::SuggestionEngine;
+use clap::CommandFactory;
 
 mod add;
 mod artifacts;
@@ -123,7 +124,33 @@ pub fn run(cli: Cli) -> Result<()> {
             verbose: cli.verbose,
             save_memories,
         }),
-        Some(Commands::External(args)) => run_external(args),
+        Some(Commands::Completions { shell }) => {
+            let mut cmd = crate::cli::Cli::command();
+            let name = cmd.get_name().to_string();
+            clap_complete::generate(shell, &mut cmd, &name, &mut std::io::stdout());
+            Ok(())
+        }
+        Some(Commands::External(args)) => match run_external(args) {
+            Ok(_) => Ok(()),
+            Err(err) => {
+                let context = current_context();
+                if context.json {
+                    let payload = crate::error::ErrorPayload {
+                        code: err
+                            .code()
+                            .map(|c| format!("{}", c))
+                            .unwrap_or_else(|| "wai::error::unknown".to_string()),
+                        message: err.to_string(),
+                        help: None,
+                        details: None,
+                    };
+                    let _ = crate::output::print_json_line(&payload);
+                } else {
+                    eprintln!("{:?}", err);
+                }
+                std::process::exit(2);
+            }
+        },
         None => show_welcome(),
     }
 }

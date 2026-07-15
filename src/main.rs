@@ -43,6 +43,46 @@ fn main() -> Result<()> {
 
     let args: Vec<String> = std::env::args().collect();
 
+    // Handle --version --json before clap processes it (clap's built-in --version
+    // doesn't participate in the global --json flag)
+    let has_version = args.iter().any(|a| {
+        a == "--version"
+            || a == "-V"
+            || (a.starts_with("-") && !a.starts_with("--") && a.contains('V') && !a.contains('h'))
+    });
+    if has_version
+        && !args
+            .iter()
+            .any(|a| a == "--help" || a == "-h" || a == "-jh")
+    {
+        let has_json = args.iter().any(|a| {
+            a == "--json"
+                || a == "-j"
+                || (a.starts_with("-j") && !a.starts_with("--") && !a.contains('h'))
+        });
+        if has_json {
+            let envelope = serde_json::json!({
+                "ok": true,
+                "envelope_version": "0.2",
+                "cli_version": cli::VERSION,
+                "envelope_kind": "version",
+                "data": {
+                    "name": "wai",
+                    "version": cli::VERSION
+                },
+                "warnings": [],
+                "hints": [],
+                "meta": {
+                    "duration_ms": 0,
+                    "tx": serde_json::Value::Null,
+                    "request_id": serde_json::Value::Null
+                }
+            });
+            let _ = print_json_line(&envelope);
+            return Ok(());
+        }
+    }
+
     if let Some(output) = help::try_render_help(&args) {
         print!("{}", output);
         return Ok(());
@@ -63,7 +103,10 @@ fn main() -> Result<()> {
             let context = context::current_context();
             if context.json {
                 let payload = crate::error::ErrorPayload {
-                    code: "wai::error::unknown".to_string(),
+                    code: err
+                        .code()
+                        .map(|c| format!("{}", c))
+                        .unwrap_or_else(|| "wai::error::unknown".to_string()),
                     message: err.to_string(),
                     help: None,
                     details: None,
