@@ -51,3 +51,52 @@ fn way_partial_repo_emits_fix_suggestions() {
         .success()
         .stdout(predicate::str::contains("→").and(predicate::str::contains("https://")));
 }
+
+#[test]
+fn way_pretender_check_recommends_when_no_config() {
+    let tmp = TempDir::new().unwrap();
+    fs::write(tmp.path().join("README.md"), "# Test").unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("pretender")
+                .and(predicate::str::contains("No pretender.toml")),
+        );
+}
+
+#[test]
+fn way_pretender_check_passes_when_config_present() {
+    let tmp = TempDir::new().unwrap();
+    fs::write(tmp.path().join("README.md"), "# Test").unwrap();
+    fs::write(
+        tmp.path().join("pretender.toml"),
+        "[pretender]\nmode = \"tiered\"\n",
+    )
+    .unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("pretender")
+                .and(predicate::str::contains("pretender.toml detected")),
+        );
+}
+
+#[test]
+fn way_code_quality_topic_prints_guide() {
+    let tmp = TempDir::new().unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["way", "code-quality"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Code Quality Guide")
+                .and(predicate::str::contains("pretender")),
+        );
+}
