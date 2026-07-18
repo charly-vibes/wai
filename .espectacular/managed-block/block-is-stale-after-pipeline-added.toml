@@ -1,0 +1,6 @@
+id = "block-is-stale-after-pipeline-added"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.1.0"

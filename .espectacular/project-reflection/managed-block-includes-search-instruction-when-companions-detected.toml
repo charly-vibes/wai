@@ -1,0 +1,6 @@
+id = "managed-block-includes-search-instruction-when-companions-detected"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.1.0"

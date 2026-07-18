@@ -1,0 +1,6 @@
+id = "claude-cli-is-not-used-inside-claude-code-sessions-auto-detect"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.1.0"

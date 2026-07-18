@@ -1,0 +1,6 @@
+id = "no-handoffs-and-no-conversation-file"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.1.0"

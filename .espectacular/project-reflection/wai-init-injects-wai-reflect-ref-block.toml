@@ -1,0 +1,6 @@
+id = "wai-init-injects-wai-reflect-ref-block"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.1.0"

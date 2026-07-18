@@ -8,6 +8,11 @@
 #   - Tests MUST be fixed before merging
 
 pre-commit:
+# ah:managed:start
+  ah-check:
+    run: ah check
+# ah:managed:end
+
   parallel: true
   commands:
     format-check:
