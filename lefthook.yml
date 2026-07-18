@@ -20,7 +20,8 @@ pre-commit:
 pre-push:
   commands:
     test:
-      run: just pre-push
+      # Run only affected tests via testaruda (falls back to full cargo test)
+      run: testaruda-pre-push
       fail_text: |
         Tests failed. Push blocked.
 
