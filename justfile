@@ -32,6 +32,10 @@ install:
 test:
     cargo test
 
+# Validate spec-test correspondence (requires espectacular)
+validate:
+    ah check
+
 # Run tests with output
 test-verbose:
     cargo test -- --nocapture
