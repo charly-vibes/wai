@@ -390,6 +390,61 @@ pub enum Commands {
         save_memories: bool,
     },
 
+    /// File an issue against wai's upstream repo, with context attached.
+    ///
+    /// Gathers an environment context bundle, redacts secrets/paths, and files
+    /// a GitHub issue via `gh` (with a fallback ladder). Use --dry-run to
+    /// preview the title/body/labels and the exact `gh` line.
+    Feedback {
+        /// Kind of feedback to file.
+        #[arg(value_enum)]
+        kind: Option<FeedbackKind>,
+
+        /// Issue title.
+        ///
+        /// Required unless --from-last-error is used (which derives a title).
+        #[arg(short, long)]
+        title: Option<String>,
+
+        /// Issue body (markdown). Defaults to the error message with --from-last-error.
+        #[arg(long)]
+        body: Option<String>,
+
+        /// Build the report from the most recent error-scratch entry.
+        #[arg(long = "from-last-error")]
+        from_last_error: bool,
+
+        /// Print the title/body/labels + exact `gh` line and exit 0.
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Open a prefilled browser URL instead of using `gh`.
+        #[arg(long)]
+        web: bool,
+
+        /// Emit a JSON envelope.
+        #[arg(long)]
+        json: bool,
+
+        /// Skip interactive prompts (e.g. kind selection).
+        #[arg(short = 'y', long)]
+        yes: bool,
+
+        /// Omit the environment context bundle from the issue body.
+        #[arg(long)]
+        no_context: bool,
+
+        /// Reduce the git remote to host/path in the context bundle (default: on).
+        #[arg(
+            long,
+            action = clap::ArgAction::Set,
+            num_args = 0..=1,
+            default_missing_value = "true",
+            default_value = "true",
+        )]
+        redact_remote: bool,
+    },
+
     /// Manage pipelines (ordered multi-step workflows)
     #[command(
         about = "Manage pipelines (ordered multi-step workflows)",
@@ -436,6 +491,50 @@ pub enum ArtifactsCommands {
         #[arg(long)]
         json: bool,
     },
+}
+
+/// Kind of feedback an agent or human can file via `wai feedback`.
+///
+/// The verb is `feedback` (not `report`) — `report` is reserved in pretender
+/// and espectacular. Each kind maps to a label set applied to the filed issue.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub enum FeedbackKind {
+    /// A defect: something crashed, hung, or produced wrong output.
+    Bug,
+    /// A usability or workflow papercut (no defect, just friction).
+    Friction,
+    /// Missing, stale, or misleading documentation.
+    #[value(name = "docs-gap")]
+    DocsGap,
+    /// A gap in the AIX (agent-instructions) surface — managed blocks, AGENTS.md, etc.
+    #[value(name = "aix-gap")]
+    AixGap,
+    /// A feature idea or enhancement request.
+    Idea,
+}
+
+impl FeedbackKind {
+    /// The label set applied to the filed issue for this kind.
+    pub fn labels(self) -> &'static [&'static str] {
+        match self {
+            FeedbackKind::Bug => &["bug", "feedback"],
+            FeedbackKind::Friction => &["friction", "feedback"],
+            FeedbackKind::DocsGap => &["docs", "feedback"],
+            FeedbackKind::AixGap => &["aix", "feedback"],
+            FeedbackKind::Idea => &["idea", "feedback"],
+        }
+    }
+
+    /// A short human label for the kind, usable in derived issue titles.
+    pub fn as_word(self) -> &'static str {
+        match self {
+            FeedbackKind::Bug => "bug",
+            FeedbackKind::Friction => "friction",
+            FeedbackKind::DocsGap => "docs-gap",
+            FeedbackKind::AixGap => "aix-gap",
+            FeedbackKind::Idea => "idea",
+        }
+    }
 }
 
 #[derive(Subcommand)]

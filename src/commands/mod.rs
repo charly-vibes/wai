@@ -16,6 +16,7 @@ mod artifacts;
 mod close;
 mod config_cmd;
 mod doctor;
+mod feedback;
 mod handoff;
 mod import;
 mod init;
@@ -91,6 +92,29 @@ pub fn run(cli: Cli, guide: &Guide) -> Result<()> {
             crate::cli::ResourceCommands::Install(args) => resource::run_install(args),
             crate::cli::ResourceCommands::Export(args) => resource::run_export(args),
         },
+        Some(Commands::Feedback {
+            kind,
+            title,
+            body,
+            from_last_error,
+            dry_run,
+            web,
+            json,
+            yes,
+            no_context,
+            redact_remote,
+        }) => feedback::run(feedback::FeedbackArgs {
+            kind,
+            title,
+            body,
+            from_last_error,
+            dry_run,
+            web,
+            json,
+            yes,
+            no_context,
+            redact_remote,
+        }),
         Some(Commands::Pipeline(cmd)) => pipeline::run(cmd),
         Some(Commands::Artifacts(cmd)) => artifacts::run(cmd),
         Some(Commands::Close { project, remember }) => close::run(project, remember),
