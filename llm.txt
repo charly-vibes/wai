@@ -58,7 +58,17 @@ src/
 │   ├── search.rs       # wai search
 │   └── ...
 ├── plugin.rs           # Plugin detection and dispatch
+├── output.rs           # JSON output (wraps genesis::envelope for --json)
+├── managed_block.rs    # Content generation (injector from genesis::managed_block)
 └── config.rs           # Config loading and paths
+
+## Shared Infrastructure
+
+wai is a consumer of the **genesis** shared crate (https://github.com/charly-vibes/genesis):
+- `genesis::suggestions` — typo detection and `SuggestionEngine` (was local `src/suggestions.rs`)
+- `genesis::managed_block` — `BlockInjector` for `<!-- WAI:START -->/<!-- WAI:END -->` blocks
+- `genesis::envelope` — shared `Envelope` for all `--json` output
+
 ```
 
 ## Installation
