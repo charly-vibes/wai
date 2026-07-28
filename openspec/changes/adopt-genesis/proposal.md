@@ -11,7 +11,9 @@ them from `genesis`, so future improvements land once and propagate.
 
 ## What Changes
 
-- Add `genesis` git dependency (pinned by tag) to `Cargo.toml`.
+- Add the `genesis` crate to `Cargo.toml`. Originally specced as a git-tag
+  dep on `v0.1.0`; switched to crates.io once published — shipped as
+  `genesis-vibes = "0.2"` (crate name `genesis-vibes`, lib name `genesis`).
 - Replace `src/suggestions.rs` with a re-export of `genesis::suggestions`.
 - Replace `src/managed_block.rs` with a thin wrapper over
   `genesis::managed_block` (wai keeps its block *content* / plugin-aware
