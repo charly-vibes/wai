@@ -200,6 +200,29 @@ pub fn builtin_plugins() -> Vec<PluginDef> {
                 },
             )]),
         },
+        PluginDef {
+            name: "dont".to_string(),
+            description: "Integration with dont decision-logged conventions".to_string(),
+            intent: None,
+            success_criteria: None,
+            detector: Some(DetectorDef {
+                detector_type: "directory".to_string(),
+                path: ".dont".to_string(),
+            }),
+            commands: vec![PluginCommand {
+                name: "check".to_string(),
+                description: "Verify claims and terms are grounded".to_string(),
+                passthrough: "dont check".to_string(),
+                read_only: true,
+            }],
+            hooks: HashMap::from([(
+                "on_status".to_string(),
+                HookDef {
+                    command: "dont check".to_string(),
+                    inject_as: "dont_check".to_string(),
+                },
+            )]),
+        },
     ]
 }
 
