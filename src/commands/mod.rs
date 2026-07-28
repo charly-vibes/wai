@@ -7,8 +7,8 @@ use crate::cli::{Cli, Commands};
 use crate::config::{UserConfig, find_project_root, projects_dir};
 use crate::context::current_context;
 use crate::error::WaiError;
-use crate::suggestions::SuggestionEngine;
 use clap::CommandFactory;
+use genesis::suggestions::{CommandRegistry, SuggestionEngine};
 
 mod add;
 mod artifacts;
@@ -291,7 +291,8 @@ fn run_external(args: Vec<String>) -> Result<()> {
     let command_name = args.get(1).map(|s| s.as_str());
 
     let cmd_names = crate::cli::wai_subcommand_names();
-    let valid_commands: Vec<&str> = cmd_names.iter().map(|s| s.as_str()).collect();
+    let mut reg = CommandRegistry::new();
+    reg.register("wai", cmd_names.iter().map(|s| s.to_string()).collect());
     let patterns_owned = crate::cli::wai_subcommand_patterns();
     let valid_patterns: Vec<(&str, &str)> = patterns_owned
         .iter()
@@ -319,8 +320,7 @@ fn run_external(args: Vec<String>) -> Result<()> {
             .any(|p| p.def.name == *plugin_name && p.detected)
     });
 
-    if !is_known_plugin && let Some(suggestion) = engine.suggest_typo(plugin_name, &valid_commands)
-    {
+    if !is_known_plugin && let Some(suggestion) = engine.suggest_typo(plugin_name, &reg) {
         miette::bail!(
             "{}. {}",
             suggestion.message(),

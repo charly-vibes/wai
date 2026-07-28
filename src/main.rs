@@ -18,7 +18,6 @@ pub mod openspec;
 mod output;
 pub mod plugin;
 mod state;
-mod suggestions;
 mod sync_core;
 mod tutorial;
 #[allow(dead_code)]

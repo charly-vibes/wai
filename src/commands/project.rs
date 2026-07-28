@@ -4,7 +4,7 @@ use owo_colors::OwoColorize;
 use crate::cli::ProjectCommands;
 use crate::config::{STATE_FILE, projects_dir};
 use crate::state::ProjectState;
-use crate::suggestions::SuggestionEngine;
+use genesis::suggestions::SuggestionEngine;
 
 use super::{list_projects, require_project};
 

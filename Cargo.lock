@@ -555,6 +555,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "genesis"
+version = "0.1.0"
+source = "git+https://github.com/charly-vibes/genesis?tag=v0.1.0#613dc00041839e6a4dff1bbf2cb1f6b55e93ab5d"
+dependencies = [
+ "clap",
+ "miette",
+ "regex",
+ "serde",
+ "serde_json",
+ "strsim",
+ "thiserror",
+]
+
+[[package]]
 name = "getrandom"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2133,6 +2147,7 @@ dependencies = [
  "cliclack",
  "dirs",
  "flate2",
+ "genesis",
  "indicatif 0.17.11",
  "miette",
  "owo-colors",
