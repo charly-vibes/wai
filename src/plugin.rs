@@ -177,6 +177,29 @@ pub fn builtin_plugins() -> Vec<PluginDef> {
                 },
             )]),
         },
+        PluginDef {
+            name: "espectacular".to_string(),
+            description: "Integration with espectacular spec-test correspondence".to_string(),
+            intent: None,
+            success_criteria: None,
+            detector: Some(DetectorDef {
+                detector_type: "directory".to_string(),
+                path: ".espectacular".to_string(),
+            }),
+            commands: vec![PluginCommand {
+                name: "check".to_string(),
+                description: "Verify spec-test correspondence".to_string(),
+                passthrough: "ah check".to_string(),
+                read_only: true,
+            }],
+            hooks: HashMap::from([(
+                "on_status".to_string(),
+                HookDef {
+                    command: "sh -c 'ah doctor || true'".to_string(),
+                    inject_as: "espectacular_doctor".to_string(),
+                },
+            )]),
+        },
     ]
 }
 
