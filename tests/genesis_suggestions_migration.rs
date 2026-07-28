@@ -87,3 +87,19 @@ fn test_genesis_suggestions_command_registry() {
     assert_eq!(reg.all().len(), 1);
     assert_eq!(reg.all(), vec!["new"]);
 }
+
+/// Regression: `wai statos` (typo of `status`) still prints "Did you mean 'status'?"
+/// after migrating suggestions to genesis.
+#[test]
+fn test_wai_statos_regression() {
+    use assert_cmd::Command;
+
+    let mut cmd = Command::cargo_bin("wai").unwrap();
+    cmd.env("NO_COLOR", "1");
+    cmd.arg("statos");
+
+    cmd.assert()
+        .failure()
+        .stderr(predicates::str::contains("Did you mean"))
+        .stderr(predicates::str::contains("status"));
+}
