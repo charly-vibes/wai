@@ -223,6 +223,29 @@ pub fn builtin_plugins() -> Vec<PluginDef> {
                 },
             )]),
         },
+        PluginDef {
+            name: "pretender".to_string(),
+            description: "Integration with pretender structural code quality".to_string(),
+            intent: None,
+            success_criteria: None,
+            detector: Some(DetectorDef {
+                detector_type: "file".to_string(),
+                path: "pretender.toml".to_string(),
+            }),
+            commands: vec![PluginCommand {
+                name: "check".to_string(),
+                description: "Fast pass/fail scan against thresholds".to_string(),
+                passthrough: "pretender check".to_string(),
+                read_only: true,
+            }],
+            hooks: HashMap::from([(
+                "on_status".to_string(),
+                HookDef {
+                    command: "sh -c 'pretender doctor || true'".to_string(),
+                    inject_as: "pretender_doctor".to_string(),
+                },
+            )]),
+        },
     ]
 }
 
