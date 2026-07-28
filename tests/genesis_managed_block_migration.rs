@@ -104,3 +104,57 @@ fn test_genesis_block_injector_multiple_blocks() {
     assert!(content.contains("<!-- WAI:REFLECT:REF:START -->"));
     assert!(content.contains("<!-- WAI:REFLECT:REF:END -->"));
 }
+
+/// Regression: `wai sync` still injects/refreshes the WAI:START block
+/// after migrating managed_block injector mechanics to genesis.
+#[test]
+fn test_wai_sync_injects_managed_block() {
+    use assert_cmd::Command;
+
+    let dir = TempDir::new().unwrap();
+
+    // Init a workspace, which creates AGENTS.md with the managed block
+    let mut cmd = Command::cargo_bin("wai").unwrap();
+    cmd.current_dir(dir.path());
+    cmd.env("NO_COLOR", "1");
+    cmd.args(["init", "--name", "regression-test"]);
+    cmd.assert().success();
+
+    // Check that AGENTS.md has the WAI:START block
+    let agents_md = dir.path().join("AGENTS.md");
+    assert!(agents_md.exists(), "AGENTS.md should exist after init");
+    let content = std::fs::read_to_string(&agents_md).unwrap();
+    assert!(
+        content.contains("<!-- WAI:START -->"),
+        "AGENTS.md should contain WAI:START after init"
+    );
+    assert!(
+        content.contains("<!-- WAI:END -->"),
+        "AGENTS.md should contain WAI:END after init"
+    );
+
+    // Run sync to verify it refreshes the block
+    let mut cmd = Command::cargo_bin("wai").unwrap();
+    cmd.current_dir(dir.path());
+    cmd.env("NO_COLOR", "1");
+    cmd.args(["sync"]);
+    cmd.assert().success();
+
+    // Block is still there after sync
+    let content = std::fs::read_to_string(&agents_md).unwrap();
+    assert_eq!(
+        content.matches("<!-- WAI:START -->").count(),
+        1,
+        "should have exactly one WAI:START block"
+    );
+    assert_eq!(
+        content.matches("<!-- WAI:END -->").count(),
+        1,
+        "should have exactly one WAI:END block"
+    );
+    assert_eq!(
+        content.matches("<!-- WAI:REFLECT:REF:START -->").count(),
+        1,
+        "should have exactly one REFLECT:REF:START block"
+    );
+}
