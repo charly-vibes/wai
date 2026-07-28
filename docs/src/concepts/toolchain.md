@@ -1,20 +1,36 @@
 # Toolchain Synergy
 
-Wai is designed to work alongside two companion tools — **beads** (issue tracking) and **openspec** (specification management). Each tool owns a distinct concern:
+Wai is the suite orchestrator for the full [charly-vibes](https://github.com/charly-vibes) toolchain — eight tools that together cover the
+complete lifecycle from proposal to implementation to archival. Each tool owns
+a distinct concern and is detected automatically by its on-disk marker:
 
-| Tool | Owns | Question it answers |
-|------|------|---------------------|
-| **wai** | Reasoning and context | *Why* was this decision made? |
-| **bd** (beads) | Tasks and work items | *What* needs to be done? |
-| **openspec** | Specifications and proposals | *What should the system look like?* |
+| Tool | Owns | Detection Signal | Question it answers |
+|------|------|------------------|---------------------|
+| **wai** | Reasoning and context | `.wai/` | *Why* was this decision made? |
+| **bd** (beads) | Tasks and work items | `.beads/` | *What* needs to be done? |
+| **openspec** | Specifications and proposals | `openspec/` | *What should the system look like?* |
+| **pretender** | Structural code quality (AST linting) | `pretender.toml` | *Does the code match our rules?* |
+| **dont** | Decision-logged conventions | `.dont/` | *What have we agreed not to do?* |
+| **espectacular** | Spec-to-test correspondence | `.espectacular/` | *Does the test match the spec?* |
+| **testaruda** | Test harness & property testing | `testaruda.toml` | *Is the behavior correct?* |
+| **vampiro / crua / livin** | Spec-stage static analysis (planned) | TBD | *Does the design hold up under analysis?* |
+
+All tools live under the [charly-vibes](https://github.com/charly-vibes) GitHub organisation except:
+
+- **beads** — [gastownhall/beads](https://github.com/gastownhall/beads) (issue tracking with Dolt-backed sync).
+- **openspec** — [openspecio/openspec](https://github.com/openspecio/openspec) (specification management lifecycle).
 
 ## When to Use What
 
 | I need to... | Use |
 |---|---|
-| Record why I chose approach X over Y | `wai add research "..."` |
+| Record *why* I chose approach X over Y | `wai add research "..."` |
 | Track a bug or task | `bd create --title="..."` |
 | Propose a system change with requirements | `openspec create <id>` |
+| Lint code for structural quality | `pretender check .` |
+| Enforce a team convention with a decision log | `dont define` |
+| Verify spec-to-test correspondence | `ah check` (espectacular) |
+| Run property or harness tests | `testaruda check` |
 | Resume where I left off | `wai prime` |
 | Find available work | `bd ready` |
 | Validate a proposal is complete | `openspec validate --strict` |
@@ -24,15 +40,36 @@ Wai is designed to work alongside two companion tools — **beads** (issue track
 
 ## How They Integrate
 
-The three tools are connected through wai's [plugin system](./plugins.md):
+All tools connect through wai's [plugin system](./plugins.md), which
+auto-detects each tool by its on-disk marker:
 
-- **beads** is detected automatically when `.beads/` exists. Open issue counts appear in `wai status`, and `wai handoff create` includes issue context in handoff documents.
-- **openspec** is detected when `openspec/` exists. Active change proposals and their progress appear in `wai status`.
-- **Cross-references** tie them together: beads tickets reference openspec tasks (e.g., `add-why-command:7.1` in the description), and completing a beads ticket means checking the box in the openspec `tasks.md`.
+- **beads** — detected when `.beads/` exists. Open issue counts appear in
+  `wai status`, and `wai handoff create` includes issue context in handoff
+  documents.
+- **openspec** — detected when `openspec/` exists. Active change proposals
+  and their progress appear in `wai status`.
+- **pretender** — detected when `pretender.toml` exists. Wai can help
+  bootstrap its config via `wai way`.
+- **dont** — detected when `.dont/` exists. Dont managed blocks in `AGENTS.md`
+  are refreshed by `wai sync`.
+- **espectacular** — detected when `.espectacular/` exists. Espectacular
+  signals (spec-test gaps) are surfaced in `wai status`.
+- **testaruda** — detected when `testaruda.toml` exists. Test harness state
+  is reported in `wai status`.
+- **vampiro / crua / livin** — detection signals to be defined as the tools
+  ship. The trio's state will appear in `wai status` once detected.
+
+**Cross-references** tie them together: beads tickets reference openspec tasks
+(e.g., `add-why-command:7.1` in the description), and completing a beads ticket
+means checking the box in the openspec `tasks.md`. Wai's `wai doctor --suite`
+will eventually validate suite-wide consistency (see `wai-bdqw.8`).
+
+Detection is additive and optional — each tool works independently, but when
+multiple are present wai becomes the unified dashboard.
 
 ## Worked Example: Adding a Feature
 
-Here's how a ticket flows through all three tools:
+Here's how a ticket flows through the core trio (wai + beads + openspec):
 
 ```bash
 # 1. Propose the change in openspec
@@ -55,10 +92,39 @@ bd close wai-abc1
 # Check [x] for task 3.1 in openspec's tasks.md
 ```
 
+With the suite tools integrated, the workflow extends further:
+
+```bash
+# Enforce code quality conventions
+dont define "No unwrap() in library code"
+
+# Verify spec-to-test coverage before merging
+ah check       # espectacular — does the test match the spec?
+testaruda check  # property-based test coverage
+
+# Lint for structural quality
+pretender check .
+```
+
 ## What You Lose by Skipping One
 
-- **Without wai**: Tasks get done, but nobody remembers *why* decisions were made. Six months later, the code is a black box.
-- **Without beads**: Reasoning is captured, but there's no task decomposition, no dependency tracking, and no way to find available work.
-- **Without openspec**: Changes happen ad hoc — no requirements, no acceptance criteria, no validation that the system matches the spec.
+- **Without wai**: Tasks get done, but nobody remembers *why* decisions were
+  made. Six months later, the code is a black box.
+- **Without beads**: Reasoning is captured, but there's no task decomposition,
+  no dependency tracking, and no way to find available work.
+- **Without openspec**: Changes happen ad hoc — no requirements, no acceptance
+  criteria, no validation that the system matches the spec.
+- **Without pretender**: Code quality standards are enforced by human review
+  alone — slower, more inconsistent, and harder to enforce in CI.
+- **Without dont**: Conventions live in READMEs or Slack — unenforceable and
+  easy to forget.
+- **Without espectacular**: Specs and tests drift independently; no automated
+  signal that they disagree.
+- **Without testaruda**: Property-based and harness testing must be set up
+  manually, with no unified test dashboard.
+- **Without vampiro/crua/livin** (planned): Spec-stage analysis must be done
+  manually or deferred until implementation.
 
-Each tool is optional. Wai works fine alone. But together, they cover the full lifecycle from proposal to implementation to archival.
+Each tool is optional. Wai works fine alone. But together, the full suite
+covers the entire lifecycle — from proposal through implementation, quality
+assurance, and archival.
