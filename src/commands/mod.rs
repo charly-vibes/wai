@@ -8,7 +8,8 @@ use crate::config::{UserConfig, find_project_root, projects_dir};
 use crate::context::current_context;
 use crate::error::WaiError;
 use clap::CommandFactory;
-use genesis::suggestions::{CommandRegistry, SuggestionEngine};
+use genesis::guide::Guide;
+use genesis::suggestions::SuggestionEngine;
 
 mod add;
 mod artifacts;
@@ -36,7 +37,7 @@ mod timeline;
 mod way;
 mod why;
 
-pub fn run(cli: Cli) -> Result<()> {
+pub fn run(cli: Cli, guide: &Guide) -> Result<()> {
     match cli.command {
         Some(Commands::Init { name }) => init::run(name),
         Some(Commands::Status) => status::run(cli.verbose),
@@ -130,7 +131,7 @@ pub fn run(cli: Cli) -> Result<()> {
             clap_complete::generate(shell, &mut cmd, &name, &mut std::io::stdout());
             Ok(())
         }
-        Some(Commands::External(args)) => match run_external(args) {
+        Some(Commands::External(args)) => match run_external(args, guide) {
             Ok(_) => Ok(()),
             Err(err) => {
                 let context = current_context();
@@ -146,7 +147,16 @@ pub fn run(cli: Cli) -> Result<()> {
                     };
                     let _ = crate::output::print_envelope_ok(&payload);
                 } else {
-                    eprintln!("{:?}", err);
+                    // Self-healing error sink: print the message and persist it
+                    // to the error scratch (for a future `--from-last-error`
+                    // feedback flow). No generic footer — the bail messages
+                    // already carry specific guidance.
+                    let sink = guide.error_sink().with_suggest(false).with_feedback(None);
+                    let mut stderr = std::io::stderr();
+                    sink.handle(
+                        <miette::Report as AsRef<dyn std::error::Error>>::as_ref(&err),
+                        &mut stderr,
+                    );
                 }
                 std::process::exit(2);
             }
@@ -279,7 +289,7 @@ fn show_welcome() -> Result<()> {
     Ok(())
 }
 
-fn run_external(args: Vec<String>) -> Result<()> {
+fn run_external(args: Vec<String>, guide: &Guide) -> Result<()> {
     if args.is_empty() {
         return Err(WaiError::PluginNotFound {
             name: "".to_string(),
@@ -290,9 +300,8 @@ fn run_external(args: Vec<String>) -> Result<()> {
     let plugin_name = &args[0];
     let command_name = args.get(1).map(|s| s.as_str());
 
-    let cmd_names = crate::cli::wai_subcommand_names();
-    let mut reg = CommandRegistry::new();
-    reg.register("wai", cmd_names.iter().map(|s| s.to_string()).collect());
+    // Reuse the command registry assembled by the Guide scaffold at startup.
+    let reg = guide.registry();
     let patterns_owned = crate::cli::wai_subcommand_patterns();
     let valid_patterns: Vec<(&str, &str)> = patterns_owned
         .iter()
@@ -320,7 +329,7 @@ fn run_external(args: Vec<String>) -> Result<()> {
             .any(|p| p.def.name == *plugin_name && p.detected)
     });
 
-    if !is_known_plugin && let Some(suggestion) = engine.suggest_typo(plugin_name, &reg) {
+    if !is_known_plugin && let Some(suggestion) = engine.suggest_typo(plugin_name, reg) {
         miette::bail!(
             "{}. {}",
             suggestion.message(),

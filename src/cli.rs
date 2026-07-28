@@ -1050,6 +1050,20 @@ pub fn wai_subcommand_patterns() -> Vec<(String, String)> {
         .collect()
 }
 
+/// Build the [`genesis::guide::Guide`] scaffold for wai.
+///
+/// Assembles the tool name/version, one-line description, and the command
+/// registry (used for typo detection in `run_external`). Constructed once at
+/// startup and threaded through `commands::run`.
+pub fn build_guide() -> genesis::guide::Guide {
+    let names = wai_subcommand_names();
+    let names_ref: Vec<&str> = names.iter().map(|s| s.as_str()).collect();
+    genesis::guide::Guide::builder("wai", env!("CARGO_PKG_VERSION"))
+        .about("Workflow manager for AI-driven development")
+        .commands(&names_ref)
+        .build()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1077,6 +1091,24 @@ mod tests {
             !names.iter().any(|n| n == "external"),
             "external catch-all should not appear as a named command"
         );
+    }
+
+    #[test]
+    fn build_guide_assembles_wai_scaffold() {
+        let guide = build_guide();
+        assert_eq!(guide.name(), "wai");
+        assert_eq!(guide.version(), env!("CARGO_PKG_VERSION"));
+        // The guide's command registry is populated with the derived subcommand
+        // names and registered under the "wai" tool name (used for typo detection).
+        let registered = guide.registry().for_tool("wai");
+        let names = wai_subcommand_names();
+        assert!(!names.is_empty());
+        for cmd in &names {
+            assert!(
+                registered.contains(&cmd.as_str()),
+                "command '{cmd}' should be registered in the guide's registry"
+            );
+        }
     }
 
     #[test]

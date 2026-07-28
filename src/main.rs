@@ -89,7 +89,8 @@ fn main() -> Result<()> {
         verbose: cli.verbose,
         quiet: cli.quiet,
     });
-    match commands::run(cli) {
+    let guide = cli::build_guide();
+    match commands::run(cli, &guide) {
         Ok(_) => Ok(()),
         Err(err) => {
             let context = context::current_context();
