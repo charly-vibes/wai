@@ -551,3 +551,50 @@ pub(super) fn check_readme_badge(project_root: &Path) -> Vec<CheckResult> {
         }]
     }
 }
+
+/// Check that repos with a "tracked with wai" badge also have the WAI managed
+/// block in AGENTS.md. A badge without a managed block means the badge is
+/// aspirational — wai sync can't actually track the repo.
+pub(super) fn check_badge_managed_block_consistency(project_root: &Path) -> Vec<CheckResult> {
+    use crate::commands::why::content_has_wai_badge;
+    use crate::managed_block::has_managed_block;
+
+    let candidates = ["README.md", "README.rst", "README.txt", "README"];
+    let readme_path = candidates
+        .iter()
+        .map(|n| project_root.join(n))
+        .find(|p| p.exists());
+
+    let Some(path) = readme_path else {
+        return vec![];
+    };
+
+    let content = match std::fs::read_to_string(&path) {
+        Ok(c) => c,
+        Err(_) => return vec![],
+    };
+
+    if !content_has_wai_badge(&content) {
+        // No badge — no inconsistency to flag
+        return vec![];
+    }
+
+    let agents_path = project_root.join("AGENTS.md");
+    if agents_path.exists() && has_managed_block(&agents_path) {
+        vec![CheckResult {
+            name: "Badge-managed block consistency".to_string(),
+            status: Status::Pass,
+            message: "WAI managed block present in AGENTS.md — badge is accurate".to_string(),
+            fix: None,
+            fix_fn: None,
+        }]
+    } else {
+        vec![CheckResult {
+            name: "Badge-managed block consistency".to_string(),
+            status: Status::Warn,
+            message: "Repo has \"tracked with wai\" badge but no WAI managed block in AGENTS.md".to_string(),
+            fix: Some("Run wai sync in this repo or add <!-- WAI:START -->/<!-- WAI:END --> to AGENTS.md manually".to_string()),
+            fix_fn: None,
+        }]
+    }
+}

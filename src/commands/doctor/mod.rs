@@ -80,6 +80,9 @@ pub fn run(fix: bool) -> Result<()> {
     checks.extend(check_managed_block_staleness(&project_root));
     checks.extend(check_pipeline_definitions(&project_root));
     checks.extend(checks_basic::check_readme_badge(&project_root));
+    checks.extend(checks_basic::check_badge_managed_block_consistency(
+        &project_root,
+    ));
     checks.extend(check_claude_session_hook());
     checks.extend(checks_basic::check_wai_project_env(&project_root));
     checks.extend(check_artifact_locks(&project_root));
