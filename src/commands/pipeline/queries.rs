@@ -6,7 +6,7 @@ use std::path::Path;
 use crate::config::pipelines_dir;
 use crate::context::current_context;
 use crate::json::PipelineCurrentPayload;
-use crate::output::print_json;
+use crate::output::print_envelope_ok;
 
 use super::definition::{list_pipeline_names, load_pipeline_toml, validate_pipeline};
 use super::gates::{
@@ -82,7 +82,7 @@ pub(super) fn cmd_current(json: bool) -> Result<()> {
 
     let Some(status) = pipeline_current_status(&project_root)? else {
         if json {
-            return print_json(&PipelineCurrentPayload {
+            return print_envelope_ok(PipelineCurrentPayload {
                 active: false,
                 message: Some(
                     "No active pipeline run. Start one with: wai pipeline start <name> --topic=<topic>"
@@ -102,7 +102,7 @@ pub(super) fn cmd_current(json: bool) -> Result<()> {
     };
 
     if json {
-        return print_json(&status);
+        return print_envelope_ok(status);
     }
 
     if let Some(ref step) = status.step {

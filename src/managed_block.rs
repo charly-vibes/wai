@@ -34,6 +34,27 @@ pub fn wai_block_content(
     installed_skills: &[&str],
     installed_pipelines: &[InstalledPipeline],
 ) -> String {
+    let mut block = String::from(WAI_START);
+    block.push('\n');
+    block.push_str(&wai_block_inner(
+        repo_root,
+        detected_plugins,
+        installed_skills,
+        installed_pipelines,
+    ));
+    block.push_str(WAI_END);
+    block
+}
+
+/// Generate the inner content of the slim managed block (without WAI:START/WAI:END markers).
+///
+/// Used by the genesis BlockInjector which adds its own markers.
+pub fn wai_block_inner(
+    repo_root: &Path,
+    detected_plugins: &[&str],
+    installed_skills: &[&str],
+    installed_pipelines: &[InstalledPipeline],
+) -> String {
     let has_beads = detected_plugins.contains(&"beads");
     let has_openspec = detected_plugins.contains(&"openspec");
     let has_companions = has_beads || has_openspec;
@@ -42,8 +63,6 @@ pub fn wai_block_content(
         .any(|s| *s == "ro5" || *s == "rule-of-5" || *s == "rule-of-5-universal");
 
     let mut block = String::new();
-    block.push_str(WAI_START);
-    block.push('\n');
 
     block.push_str(
         "# Workflow Tools\n\
@@ -160,7 +179,6 @@ pub fn wai_block_content(
          \n",
     );
 
-    block.push_str(WAI_END);
     block
 }
 
@@ -522,18 +540,12 @@ pub fn inject_managed_block(
     installed_pipelines: &[InstalledPipeline],
 ) -> Result<InjectResult, std::io::Error> {
     let repo_root = path.parent().unwrap_or(Path::new("."));
-    let wai_content = wai_block_content(
+    let wai_content = wai_block_inner(
         repo_root,
         detected_plugins,
         installed_skills,
         installed_pipelines,
     );
-    // Strip the WAI:START/WAI:END markers since BlockInjector will add them
-    let inner = wai_content
-        .strip_prefix(WAI_START)
-        .unwrap_or(&wai_content)
-        .strip_suffix(WAI_END)
-        .unwrap_or(&wai_content);
     let ref_inner = format!("\n{}\n", wai_reflect_ref_content());
     // Full REF block with markers, used for direct file append
     let ref_full = format!(
@@ -552,7 +564,7 @@ pub fn inject_managed_block(
     ));
     let injector = BlockInjector::new(reg);
 
-    let wai_result = injector.inject(path, "WAI", inner)?;
+    let wai_result = injector.inject(path, "WAI", &wai_content)?;
 
     // For the REFLECT:REF block, handle ordering:
     // - If the file was just created, append REF block after WAI block

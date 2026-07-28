@@ -80,7 +80,7 @@ pub fn run(name: Option<String>) -> Result<()> {
                         },
                     ],
                 };
-                crate::output::print_json_line(&payload)?;
+                crate::output::print_envelope_ok(&payload)?;
             } else {
                 // Report actions taken
                 for action in &actions {
@@ -224,7 +224,7 @@ pub fn run(name: Option<String>) -> Result<()> {
                 detected_plugins: detected.iter().map(|s| s.to_string()).collect(),
                 suggestions,
             };
-            crate::output::print_json_line(&payload)?;
+            crate::output::print_envelope_ok(&payload)?;
         } else {
             println!("◆  Created .wai/ directory with PARA structure");
 

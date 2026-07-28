@@ -69,12 +69,14 @@ fn init_json_flag_emits_structured_output() {
     let stdout = String::from_utf8_lossy(&out);
     let payload: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
 
+    // Wrapped in genesis envelope
+    assert_eq!(payload["ok"], true, "envelope should have ok=true");
     assert_eq!(
-        payload["already_initialized"], false,
+        payload["data"]["already_initialized"], false,
         "fresh init should report already_initialized: false"
     );
     assert_eq!(
-        payload["project_name"], "my-ws",
+        payload["data"]["project_name"], "my-ws",
         "JSON should include the workspace name"
     );
 }

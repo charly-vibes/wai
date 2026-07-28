@@ -273,7 +273,7 @@ pub(super) fn list_skills(json: bool) -> Result<()> {
     // Output
     if json {
         let payload = SkillListPayload { skills: entries };
-        crate::output::print_json(&payload)?;
+        crate::output::print_envelope_ok(&payload)?;
     } else if entries.is_empty() {
         println!();
         println!("  {} No skills found", "○".dimmed());

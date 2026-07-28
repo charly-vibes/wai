@@ -124,6 +124,16 @@ fn test_wai_sync_injects_managed_block() {
     let agents_md = dir.path().join("AGENTS.md");
     assert!(agents_md.exists(), "AGENTS.md should exist after init");
     let content = std::fs::read_to_string(&agents_md).unwrap();
+    eprintln!(
+        "DEBUG after init: WAI:START count={}, REFLECT:REF:START count={}",
+        content.matches("<!-- WAI:START -->").count(),
+        content.matches("<!-- WAI:REFLECT:REF:START -->").count()
+    );
+    // Print first 300 chars of content
+    eprintln!(
+        "DEBUG content start: {:?}",
+        &content[..content.len().min(300)]
+    );
     assert!(
         content.contains("<!-- WAI:START -->"),
         "AGENTS.md should contain WAI:START after init"
@@ -142,6 +152,11 @@ fn test_wai_sync_injects_managed_block() {
 
     // Block is still there after sync
     let content = std::fs::read_to_string(&agents_md).unwrap();
+    eprintln!(
+        "DEBUG after sync: WAI:START count={}, REFLECT:REF:START count={}",
+        content.matches("<!-- WAI:START -->").count(),
+        content.matches("<!-- WAI:REFLECT:REF:START -->").count()
+    );
     assert_eq!(
         content.matches("<!-- WAI:START -->").count(),
         1,

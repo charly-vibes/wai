@@ -5,7 +5,7 @@ use walkdir::WalkDir;
 use crate::config::projects_dir;
 use crate::context::current_context;
 use crate::json::{TimelineEntry as JsonTimelineEntry, TimelinePayload};
-use crate::output::print_json;
+use crate::output::print_envelope_list;
 
 use super::require_project;
 
@@ -123,7 +123,7 @@ pub fn run(project: String, from: Option<String>, to: Option<String>, reverse: b
                 })
                 .collect(),
         };
-        return print_json(&payload);
+        return print_envelope_list(payload);
     }
 
     if entries.is_empty() {

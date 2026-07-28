@@ -4,7 +4,7 @@ use owo_colors::OwoColorize;
 use crate::cli::PluginCommands;
 use crate::context::current_context;
 use crate::json::{PluginCommandInfo, PluginDetector, PluginListItem};
-use crate::output::print_json;
+use crate::output::print_envelope_list;
 use crate::plugin;
 
 use super::require_project;
@@ -44,7 +44,7 @@ pub fn run(cmd: PluginCommands) -> Result<()> {
                         hooks: p.def.hooks.keys().cloned().collect(),
                     })
                     .collect::<Vec<_>>();
-                return print_json(&plugins);
+                return print_envelope_list(plugins);
             }
             println!();
             println!("  {} Plugins", "◆".cyan());
@@ -128,7 +128,7 @@ pub fn run(cmd: PluginCommands) -> Result<()> {
             config.save(&project_root)?;
 
             if context.json {
-                return print_json(&serde_json::json!({
+                return print_envelope_list(serde_json::json!({
                     "plugin": name,
                     "enabled": true,
                 }));
@@ -155,7 +155,7 @@ pub fn run(cmd: PluginCommands) -> Result<()> {
             config.save(&project_root)?;
 
             if context.json {
-                return print_json(&serde_json::json!({
+                return print_envelope_list(serde_json::json!({
                     "plugin": name,
                     "enabled": false,
                 }));

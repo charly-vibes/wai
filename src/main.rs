@@ -94,16 +94,21 @@ fn main() -> Result<()> {
         Err(err) => {
             let context = context::current_context();
             if context.json {
-                let payload = crate::error::ErrorPayload {
-                    code: err
-                        .code()
-                        .map(|c| format!("{}", c))
-                        .unwrap_or_else(|| "wai::error::unknown".to_string()),
-                    message: err.to_string(),
-                    help: None,
-                    details: None,
-                };
-                let _ = print_json_line(&payload);
+                use genesis::envelope::{Envelope, ErrorResult, RemediationEntry};
+                let err_result = ErrorResult::new(
+                    "E000",
+                    &err.to_string(),
+                    None,
+                    None,
+                    None,
+                    vec![],
+                    vec![RemediationEntry {
+                        command: "wai doctor".into(),
+                        description: "run workspace health check".into(),
+                    }],
+                )
+                .expect("remediation must be non-empty");
+                let _ = print_json_line(&Envelope::error(err_result, vec![]));
             }
             Err(err)
         }

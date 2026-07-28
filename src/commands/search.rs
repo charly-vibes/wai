@@ -5,7 +5,7 @@ use walkdir::WalkDir;
 use crate::config::{projects_dir, wai_dir};
 use crate::context::current_context;
 use crate::json::{SearchPayload, SearchResult};
-use crate::output::print_json;
+use crate::output::print_envelope_list;
 use crate::plugin::fetch_memories_for_query;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -192,7 +192,7 @@ pub fn run(args: SearchArgs) -> Result<()> {
                 )
                 .collect(),
         };
-        return print_json(&payload);
+        return print_envelope_list(payload);
     }
 
     if results.is_empty() && memory_matches.is_empty() {

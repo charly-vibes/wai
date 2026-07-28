@@ -207,9 +207,15 @@ fn init_json_fresh_includes_wai_way_suggestion() {
         .clone();
     let stdout = String::from_utf8_lossy(&out);
     let payload: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
-    assert_eq!(payload["already_initialized"], false);
-    assert_eq!(payload["project_name"], "test-ws");
-    let suggestions = payload["suggestions"].as_array().unwrap();
+    assert_eq!(
+        payload["data"]["already_initialized"], false,
+        "fresh init should report already_initialized: false"
+    );
+    assert_eq!(
+        payload["data"]["project_name"], "test-ws",
+        "JSON should include the workspace name"
+    );
+    let suggestions = payload["data"]["suggestions"].as_array().unwrap();
     let commands: Vec<&str> = suggestions
         .iter()
         .map(|s| s["command"].as_str().unwrap())
@@ -234,8 +240,11 @@ fn init_json_reinit_includes_wai_way_suggestion() {
         .clone();
     let stdout = String::from_utf8_lossy(&out);
     let payload: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
-    assert_eq!(payload["already_initialized"], true);
-    let suggestions = payload["suggestions"].as_array().unwrap();
+    assert_eq!(
+        payload["data"]["already_initialized"], true,
+        "reinit should report already_initialized: true"
+    );
+    let suggestions = payload["data"]["suggestions"].as_array().unwrap();
     let commands: Vec<&str> = suggestions
         .iter()
         .map(|s| s["command"].as_str().unwrap())
@@ -6904,20 +6913,25 @@ fn pipeline_current_json_reports_active_run() {
         .clone();
 
     let payload: serde_json::Value = serde_json::from_slice(&output).unwrap();
-    assert_eq!(payload["active"], true);
-    assert_eq!(payload["pipeline"], "my-pipe");
-    assert_eq!(payload["topic"], "my-topic");
-    assert_eq!(payload["step"]["index"], 1);
-    assert_eq!(payload["step"]["id"], "step-one");
+    assert_eq!(payload["data"]["active"], true);
+    assert_eq!(payload["data"]["pipeline"], "my-pipe");
+    assert_eq!(payload["data"]["topic"], "my-topic");
+    assert_eq!(payload["data"]["step"]["index"], 1);
+    assert_eq!(payload["data"]["step"]["id"], "step-one");
     assert!(
-        payload["step"]["prompt"]
+        payload["data"]["step"]["prompt"]
             .as_str()
             .unwrap()
             .contains("my-topic")
     );
-    assert_eq!(payload["next_command"], "wai pipeline next");
-    assert!(payload["run_id"].as_str().unwrap().contains("my-pipe"));
-    assert!(payload.get("gate_summary").is_some());
+    assert_eq!(payload["data"]["next_command"], "wai pipeline next");
+    assert!(
+        payload["data"]["run_id"]
+            .as_str()
+            .unwrap()
+            .contains("my-pipe")
+    );
+    assert!(payload["data"].get("gate_summary").is_some());
 }
 
 #[test]
@@ -6935,15 +6949,15 @@ fn pipeline_current_json_reports_no_active_run() {
         .clone();
 
     let payload: serde_json::Value = serde_json::from_slice(&output).unwrap();
-    assert_eq!(payload["active"], false);
+    assert_eq!(payload["data"]["active"], false);
     assert!(
-        payload["message"]
+        payload["data"]["message"]
             .as_str()
             .unwrap()
             .contains("No active pipeline run")
     );
     assert_eq!(
-        payload["next_command"],
+        payload["data"]["next_command"],
         "wai pipeline start <name> --topic=<topic>"
     );
 }
@@ -6969,9 +6983,9 @@ fn pipeline_status_json_reports_active_run() {
         .clone();
 
     let payload: serde_json::Value = serde_json::from_slice(&output).unwrap();
-    assert_eq!(payload["active"], true);
-    assert_eq!(payload["pipeline"], "my-pipe");
-    assert_eq!(payload["step"]["id"], "step-one");
+    assert_eq!(payload["data"]["active"], true);
+    assert_eq!(payload["data"]["pipeline"], "my-pipe");
+    assert_eq!(payload["data"]["step"]["id"], "step-one");
 }
 
 #[test]

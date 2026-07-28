@@ -6,7 +6,7 @@ use std::path::Path;
 
 use crate::config::{SKILLS_DIR, agent_config_dir, projects_dir};
 use crate::context::current_context;
-use crate::output::print_json;
+use crate::output::print_envelope_doctor;
 use crate::plugin;
 
 use super::require_project;
@@ -105,7 +105,7 @@ pub fn run(fix: bool) -> Result<()> {
                 checks,
                 summary: summary.clone(),
             };
-            print_json(&payload)?;
+            print_envelope_doctor(payload)?;
         } else {
             render_human(&checks, &summary)?;
         }
@@ -203,7 +203,7 @@ fn apply_fixes(
             fixes_applied,
             fixes_failed,
         };
-        print_json(&payload)?;
+        print_envelope_doctor(payload)?;
     } else {
         use cliclack::log;
         println!();

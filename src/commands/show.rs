@@ -4,7 +4,7 @@ use owo_colors::OwoColorize;
 use crate::config::{STATE_FILE, archives_dir, areas_dir, projects_dir, resources_dir};
 use crate::context::current_context;
 use crate::json::{ShowEntry, ShowItemEntry, ShowItemPayload, ShowPayload};
-use crate::output::print_json;
+use crate::output::print_envelope_ok;
 use crate::state::ProjectState;
 
 use super::require_project;
@@ -55,7 +55,7 @@ fn show_overview_json(project_root: &std::path::Path) -> Result<()> {
         resources: collect_entries(&resources_dir(project_root), false)?,
         archives: collect_entries(&archives_dir(project_root), false)?,
     };
-    print_json(&payload)?;
+    print_envelope_ok(payload)?;
     Ok(())
 }
 
@@ -87,7 +87,7 @@ fn show_item_json(project_root: &std::path::Path, name: &str) -> Result<()> {
                 path: path.display().to_string(),
                 contents,
             };
-            print_json(&payload)?;
+            print_envelope_ok(payload)?;
             return Ok(());
         }
     }

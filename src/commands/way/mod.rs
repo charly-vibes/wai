@@ -11,7 +11,7 @@ use std::path::Path;
 use crate::commands::resource::parse_skill_frontmatter;
 use crate::config::{SKILLS_DIR, agent_config_dir};
 use crate::context::current_context;
-use crate::output::print_json;
+use crate::output::print_envelope_check;
 
 const SKILL_RULE_OF_5: (&str, &str) = (
     "rule-of-5-universal",
@@ -104,7 +104,7 @@ pub fn run(topic: Option<String>, fix: Option<String>) -> Result<()> {
 
     if context.json {
         let payload = WayPayload { checks, summary };
-        print_json(&payload)?;
+        print_envelope_check(payload)?;
     } else {
         render_human(&checks, &summary, context.verbose)?;
     }

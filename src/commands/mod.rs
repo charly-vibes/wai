@@ -144,7 +144,7 @@ pub fn run(cli: Cli) -> Result<()> {
                         help: None,
                         details: None,
                     };
-                    let _ = crate::output::print_json_line(&payload);
+                    let _ = crate::output::print_envelope_ok(&payload);
                 } else {
                     eprintln!("{:?}", err);
                 }
@@ -213,7 +213,7 @@ fn show_welcome() -> Result<()> {
             suggestions,
             help_hint: "Run 'wai --help' for detailed usage".to_string(),
         };
-        crate::output::print_json_line(&payload)?;
+        crate::output::print_envelope_ok(&payload)?;
         return Ok(());
     }
 
