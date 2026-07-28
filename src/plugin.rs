@@ -154,6 +154,29 @@ pub fn builtin_plugins() -> Vec<PluginDef> {
             commands: vec![],
             hooks: HashMap::new(),
         },
+        PluginDef {
+            name: "testaruda".to_string(),
+            description: "Integration with testaruda test harness".to_string(),
+            intent: None,
+            success_criteria: None,
+            detector: Some(DetectorDef {
+                detector_type: "file".to_string(),
+                path: "testaruda.toml".to_string(),
+            }),
+            commands: vec![PluginCommand {
+                name: "select".to_string(),
+                description: "Select affected tests from a code change".to_string(),
+                passthrough: "testaruda select".to_string(),
+                read_only: true,
+            }],
+            hooks: HashMap::from([(
+                "on_status".to_string(),
+                HookDef {
+                    command: "testaruda metrics".to_string(),
+                    inject_as: "testaruda_metrics".to_string(),
+                },
+            )]),
+        },
     ]
 }
 
