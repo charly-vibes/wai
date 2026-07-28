@@ -598,3 +598,129 @@ pub(super) fn check_badge_managed_block_consistency(project_root: &Path) -> Vec<
         }]
     }
 }
+
+/// Check that suite tools' gate commands are wired into lefthook.
+///
+/// - If `.espectacular/` exists, pre-commit should run `ah check`.
+/// - If `.dont/` exists, pre-push should run `dont check`.
+/// - If `pretender.toml` or `testaruda.toml` exists, confirm presence.
+pub(super) fn check_suite_gates(project_root: &Path) -> Vec<CheckResult> {
+    let mut results = Vec::new();
+
+    // Read lefthook config if it exists
+    let lefthook_path = project_root.join("lefthook.yml");
+    let lefthook_content = if lefthook_path.exists() {
+        std::fs::read_to_string(&lefthook_path).ok()
+    } else {
+        None
+    };
+
+    let has_espectacular = project_root.join(".espectacular").is_dir();
+    let has_dont = project_root.join(".dont").is_dir();
+    let has_pretender_toml = project_root.join("pretender.toml").exists();
+    let has_testaruda_toml = project_root.join("testaruda.toml").exists();
+
+    // 1. Espectacular gate: .espectacular/ → pre-commit ah check
+    if has_espectacular {
+        let pre_commit_has_ah_check = lefthook_content.as_ref().is_some_and(|c| {
+            c.contains("ah check") || c.contains("ah-check") || c.contains("ah_check")
+        });
+        if pre_commit_has_ah_check {
+            results.push(CheckResult {
+                name: "Suite gate: espectacular".to_string(),
+                status: Status::Pass,
+                message: "ah check wired into pre-commit hooks".to_string(),
+                fix: None,
+                fix_fn: None,
+            });
+        } else {
+            results.push(CheckResult {
+                name: "Suite gate: espectacular".to_string(),
+                status: Status::Warn,
+                message: ".espectacular/ exists but 'ah check' not found in pre-commit hooks"
+                    .to_string(),
+                fix: Some("Add to pre-commit in lefthook.yml: ah-check: run: ah check".to_string()),
+                fix_fn: None,
+            });
+        }
+    }
+
+    // 2. Dont gate: .dont/ → pre-push dont check
+    if has_dont {
+        let pre_push_has_dont_check = lefthook_content.as_ref().is_some_and(|c| {
+            c.contains("dont check") || c.contains("dont-check") || c.contains("dont_check")
+        });
+        if pre_push_has_dont_check {
+            results.push(CheckResult {
+                name: "Suite gate: dont".to_string(),
+                status: Status::Pass,
+                message: "dont check wired into pre-push hooks".to_string(),
+                fix: None,
+                fix_fn: None,
+            });
+        } else {
+            results.push(CheckResult {
+                name: "Suite gate: dont".to_string(),
+                status: Status::Warn,
+                message: ".dont/ exists but 'dont check' not found in pre-push hooks".to_string(),
+                fix: Some(
+                    "Add to pre-push in lefthook.yml: dont-check: run: dont check".to_string(),
+                ),
+                fix_fn: None,
+            });
+        }
+    }
+
+    // 3. Pretender config presence
+    if has_pretender_toml {
+        results.push(CheckResult {
+            name: "Suite config: pretender".to_string(),
+            status: Status::Pass,
+            message: "pretender.toml present".to_string(),
+            fix: None,
+            fix_fn: None,
+        });
+    }
+
+    // 4. Testaruda config: check testaruda.toml is valid TOML
+    if has_testaruda_toml {
+        let testaruda_path = project_root.join("testaruda.toml");
+        let toml_content = std::fs::read_to_string(&testaruda_path);
+        match toml_content {
+            Ok(content) => {
+                // Basic parse check — full schema validation depends on testaruda-86m
+                match toml::from_str::<toml::Value>(&content) {
+                    Ok(_) => {
+                        results.push(CheckResult {
+                            name: "Suite config: testaruda".to_string(),
+                            status: Status::Pass,
+                            message: "testaruda.toml is valid".to_string(),
+                            fix: None,
+                            fix_fn: None,
+                        });
+                    }
+                    Err(e) => {
+                        results.push(CheckResult {
+                            name: "Suite config: testaruda".to_string(),
+                            status: Status::Fail,
+                            message: format!("testaruda.toml is invalid: {}", e),
+                            fix: Some("Fix the TOML syntax in testaruda.toml".to_string()),
+                            fix_fn: None,
+                        });
+                    }
+                }
+            }
+            Err(_) => {
+                results.push(CheckResult {
+                    name: "Suite config: testaruda".to_string(),
+                    status: Status::Fail,
+                    message: "testaruda.toml cannot be read".to_string(),
+                    fix: None,
+                    fix_fn: None,
+                });
+            }
+        }
+    }
+
+    results
+}
