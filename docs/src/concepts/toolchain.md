@@ -57,7 +57,10 @@ auto-detects each tool by its on-disk marker:
 - **testaruda** — detected when `testaruda.toml` exists. Test harness state
   is reported in `wai status`.
 - **vampiro / crua / livin** — detection signals to be defined as the tools
-  ship. The trio's state will appear in `wai status` once detected.
+  ship (expected: `vampiro.toml`, `crua.toml`, `livin.toml` or equivalent
+  config files). Currently spec-stage only — presence is tracked via
+  their spec documents (e.g. `crua-ears-spec.md`, `vampiro-ears-spec.md`).
+  The trio's state will appear in `wai status` once detected.
 
 **Cross-references** tie them together: beads tickets reference openspec tasks
 (e.g., `add-why-command:7.1` in the description), and completing a beads ticket
