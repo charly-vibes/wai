@@ -3,7 +3,6 @@ use miette::{IntoDiagnostic, Result};
 use serde::Serialize;
 
 /// Print a payload wrapped in the genesis shared envelope.
-#[allow(dead_code)]
 pub fn print_envelope<T: Serialize>(
     kind: EnvelopeKind,
     data: T,

@@ -14,7 +14,7 @@ use crate::json::{
     StatusPipelineActive, StatusPipelineAvailable, StatusPlugin, StatusProject, Suggestion,
 };
 use crate::openspec;
-use crate::output::print_json;
+use crate::output::print_envelope;
 use crate::plugin;
 use crate::state::{Phase, ProjectState};
 use crate::workflows;
@@ -550,7 +550,7 @@ fn render_json(project_root: &std::path::Path, _project_name: &str) -> Result<()
         suggestions,
     };
 
-    print_json(&payload)?;
+    print_envelope(genesis::envelope::EnvelopeKind::Ok, payload, vec![], vec![])?;
     Ok(())
 }
 

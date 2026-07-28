@@ -8,7 +8,7 @@ use crate::config::{HANDOFFS_DIR, PLANS_DIR, STATE_FILE, projects_dir};
 use crate::context::current_context;
 use crate::json::{BeadsSummary, OpenspecEntry, PrimePayload};
 use crate::openspec;
-use crate::output::print_json;
+use crate::output::print_envelope;
 use crate::plugin;
 use crate::plugin::{detect_main_worktree_root, fetch_memories};
 use crate::state::ProjectState;
@@ -36,7 +36,7 @@ pub fn run(project: Option<String>) -> Result<()> {
                 beads: None,
                 openspec: Vec::new(),
             };
-            return print_json(&payload);
+            return print_envelope(genesis::envelope::EnvelopeKind::Ok, payload, vec![], vec![]);
         }
         let today = Local::now().format("%Y-%m-%d");
         println!("{} wai prime — {}", "◆".cyan(), today);
@@ -248,7 +248,7 @@ fn render_json(
         beads,
         openspec,
     };
-    print_json(&payload)
+    print_envelope(genesis::envelope::EnvelopeKind::Ok, payload, vec![], vec![])
 }
 
 /// Parse the `date:` field from a handoff's frontmatter, returning `None` if

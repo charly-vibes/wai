@@ -60,23 +60,16 @@ fn main() -> Result<()> {
                 || (a.starts_with("-j") && !a.starts_with("--") && !a.contains('h'))
         });
         if has_json {
-            let envelope = serde_json::json!({
-                "ok": true,
-                "envelope_version": "0.2",
-                "cli_version": cli::VERSION,
-                "envelope_kind": "version",
-                "data": {
+            use genesis::envelope::Envelope;
+            let envelope = Envelope::success(
+                genesis::envelope::EnvelopeKind::Version,
+                serde_json::json!({
                     "name": "wai",
                     "version": cli::VERSION
-                },
-                "warnings": [],
-                "hints": [],
-                "meta": {
-                    "duration_ms": 0,
-                    "tx": serde_json::Value::Null,
-                    "request_id": serde_json::Value::Null
-                }
-            });
+                }),
+                vec![],
+                vec![],
+            );
             let _ = print_json_line(&envelope);
             return Ok(());
         }
