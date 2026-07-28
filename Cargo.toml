@@ -45,9 +45,6 @@ walkdir = "2"
 # Regex support for search
 regex = "1"
 
-# String similarity for typo detection
-strsim = "0.11"
-
 # HTTP client for Claude API (blocking, JSON)
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
 
