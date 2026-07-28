@@ -31,6 +31,7 @@ wai reflect                 # Synthesize context into CLAUDE.md
 wai way                     # Check repository best practices
 wai doctor                  # Workspace health check
 wai sync                    # Sync agent configs
+wai feedback bug            # File an issue against this tool's repo with context attached
 ```
 
 ## Project Structure
