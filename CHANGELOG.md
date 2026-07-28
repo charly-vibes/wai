@@ -5,6 +5,55 @@ All notable changes to wai will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Calendar Versioning](https://calver.org/) (YYYY.M.MICRO).
 
+## [2026.7.28] - 2026-07-28
+
+### Added
+
+- **genesis adoption** — wai is now a consumer of the
+  [genesis](https://github.com/charly-vibes/genesis) shared crate:
+  - `genesis::suggestions` — typo detection and `SuggestionEngine` (was local
+    `src/suggestions.rs`)
+  - `genesis::managed_block` — `BlockInjector` for `<!-- WAI:START -->`/`<!-- WAI:END -->`
+    blocks
+  - `genesis::envelope` — shared `Envelope` for all `--json` output
+  - `genesis::config` — `ProjectConfig`/`UserConfig` via `ConfigFile` trait
+  - `genesis::guide` — `Guide` scaffold threaded through CLI and command
+    handlers
+  - `genesis::feedback` — error-scratch recording, context gathering, GitHub
+    issue creation (`feedback` subcommand)
+- **feedback subcommand** — `wai feedback bug|friction|docs-gap|aix-gap|idea`
+  with `--dry-run`, `--from-last-error`, `--web`, `--no-context`,
+  `--redact-remote` flags
+- **suite plugin detection** — `wai status` now auto-detects the full
+  charly-vibes toolchain:
+  - `testaruda` — detected via `testaruda.toml`; surfaces metrics
+  - `espectacular` — detected via `.espectacular/`; surfaces doctor output
+  - `dont` — detected via `.dont/`; surfaces claim grounding status
+  - `pretender` — detected via `pretender.toml`; surfaces doctor output
+  - Each tool appears in `wai status` Plugins section with passthrough
+    commands (`wai testaruda select`, `wai espectacular check`, etc.)
+- **suite-config linter** — new `wai doctor` checks for suite consistency:
+  - espectacular gate: `.espectacular/` → `ah check` in pre-commit
+  - dont gate: `.dont/` → `dont check` in pre-push
+  - Badge consistency: "tracked with wai" badge → WAI managed block in AGENTS.md
+  - Config validation: `testaruda.toml` and `pretender.toml` presence/validity
+
+### Changed
+
+- **toolchain.md** — extended from 3 tools (wai + beads + openspec) to all
+  8 suite tools with detection signals, ownership, and integration docs
+- **suite-conventions.md** — canonical policies for Rust edition, license,
+  version scheme, just recipes, shell, and defaults across the suite
+- **dependency** — switched genesis dep from git-tag to crates.io
+  (`genesis-vibes = "0.2"`)
+
+### Fixed
+
+- **crates.io packaging** — `Cargo.toml` include field set to reduce package
+  size from 68 MiB to expected size
+
+---
+
 ## [2026.7.16] - 2026-07-15
 
 ### Fixed
