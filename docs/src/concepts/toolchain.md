@@ -128,3 +128,6 @@ pretender check .
 Each tool is optional. Wai works fine alone. But together, the full suite
 covers the entire lifecycle — from proposal through implementation, quality
 assurance, and archival.
+
+> **See also**: [Suite Conventions](./suite-conventions.md) for canonical
+> policies on edition, license, version scheme, and justfile setup.

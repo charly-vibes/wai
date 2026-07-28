@@ -20,6 +20,7 @@
 - [Agent Config Sync](./concepts/agent-config-sync.md)
 - [Ubiquitous Language](./concepts/ubiquitous-language.md)
 - [Toolchain Synergy](./concepts/toolchain.md)
+- [Suite Conventions](./concepts/suite-conventions.md)
 
 # How-To Guides
 
