@@ -2162,7 +2162,6 @@ dependencies = [
  "sha2",
  "shell-words",
  "slug",
- "strsim",
  "tar",
  "tempfile",
  "thiserror",
