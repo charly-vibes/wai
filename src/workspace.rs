@@ -6,7 +6,9 @@ use crate::config::{
     PROJECTS_DIR, ProjectConfig, REFLECTIONS_DIR, RESOURCES_DIR, RULES_DIR, SKILLS_DIR,
     TEMPLATES_DIR, agent_config_dir,
 };
-use crate::managed_block::{InstalledPipeline, inject_managed_block, write_detailed_agents_file};
+use crate::managed_block::{
+    InstalledPipeline, describe_inject_result, inject_managed_block, write_detailed_agents_file,
+};
 use crate::plugin;
 
 /// Actions taken during workspace repair/initialization
@@ -283,7 +285,9 @@ pub fn ensure_workspace_current(project_root: &Path) -> Result<Vec<WorkspaceActi
         if filename == &"AGENTS.md" || filename == &"CLAUDE.md" || path.exists() {
             match inject_managed_block(&path, &detected, &skill_name_refs, &installed_pipelines) {
                 Ok(result) => {
-                    actions.push(WorkspaceAction::new(result.description(filename)));
+                    actions.push(WorkspaceAction::new(describe_inject_result(
+                        &result, filename,
+                    )));
                 }
                 Err(e) => {
                     // Log but don't fail - this is a best-effort operation

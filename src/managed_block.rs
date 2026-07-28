@@ -1,3 +1,4 @@
+use genesis::managed_block::{BlockDef, BlockInjector, BlockRegistry, InjectResult};
 use std::path::Path;
 
 const WAI_START: &str = "<!-- WAI:START -->";
@@ -521,107 +522,84 @@ pub fn inject_managed_block(
     installed_pipelines: &[InstalledPipeline],
 ) -> Result<InjectResult, std::io::Error> {
     let repo_root = path.parent().unwrap_or(Path::new("."));
-    let wai_block = wai_block_content(
+    let wai_content = wai_block_content(
         repo_root,
         detected_plugins,
         installed_skills,
         installed_pipelines,
     );
-    let ref_block = format!(
-        "{}\n{}{}\n",
+    // Strip the WAI:START/WAI:END markers since BlockInjector will add them
+    let inner = wai_content
+        .strip_prefix(WAI_START)
+        .unwrap_or(&wai_content)
+        .strip_suffix(WAI_END)
+        .unwrap_or(&wai_content);
+    let ref_inner = format!("\n{}\n", wai_reflect_ref_content());
+    // Full REF block with markers, used for direct file append
+    let ref_full = format!(
+        "\n{}\n{}{}\n",
         REFLECT_REF_START,
         wai_reflect_ref_content(),
         REFLECT_REF_END
     );
 
-    if path.exists() {
-        let content = std::fs::read_to_string(path)?;
+    let mut reg = BlockRegistry::new();
+    reg.register(BlockDef::new("WAI"));
+    reg.register(BlockDef::with_markers(
+        "WAI:REFLECT:REF",
+        REFLECT_REF_START,
+        REFLECT_REF_END,
+    ));
+    let injector = BlockInjector::new(reg);
 
-        if let (Some(start_idx), Some(end_idx)) = (content.find(WAI_START), content.find(WAI_END)) {
-            let wai_end_pos = end_idx + WAI_END.len();
-            let mut new_content = String::with_capacity(content.len() + 512);
-            new_content.push_str(&content[..start_idx]);
-            new_content.push_str(&wai_block);
+    let wai_result = injector.inject(path, "WAI", inner)?;
 
-            // Handle content after WAI:END — update existing REF block or append one.
-            let tail = &content[wai_end_pos..];
-            if let (Some(ref_start), Some(ref_end)) =
-                (tail.find(REFLECT_REF_START), tail.find(REFLECT_REF_END))
-            {
-                if ref_start < ref_end {
-                    let ref_end_abs = ref_end + REFLECT_REF_END.len();
-                    new_content.push_str(&tail[..ref_start]);
-                    new_content.push_str(&ref_block);
-                    new_content.push_str(&tail[ref_end_abs..]);
-                } else {
-                    // Inverted markers — treat as no REF block.
-                    new_content.push_str("\n\n");
-                    new_content.push_str(&ref_block);
-                    new_content.push_str(tail);
-                }
-            } else {
-                new_content.push_str("\n\n");
-                new_content.push_str(&ref_block);
-                new_content.push_str(tail);
-            }
-
-            std::fs::write(path, new_content)?;
-            Ok(InjectResult::Updated)
-        } else {
-            let mut new_content = wai_block;
-            new_content.push_str("\n\n");
-            new_content.push_str(&ref_block);
-            new_content.push_str("\n\n");
-            new_content.push_str(&content);
-            std::fs::write(path, new_content)?;
-            Ok(InjectResult::Prepended)
-        }
+    // For the REFLECT:REF block, handle ordering:
+    // - If the file was just created, append REF block after WAI block
+    // - If the WAI block was prepended to an existing file, append REF block after WAI block
+    // - Otherwise, use BlockInjector (updates in place)
+    let ref_result = if wai_result == InjectResult::Created || wai_result == InjectResult::Prepended
+    {
+        let mut file_content = std::fs::read_to_string(path)?;
+        file_content.push_str(&ref_full);
+        std::fs::write(path, &file_content)?;
+        InjectResult::Created
     } else {
-        let mut new_content = wai_block;
-        new_content.push_str("\n\n");
-        new_content.push_str(&ref_block);
-        std::fs::write(path, &new_content)?;
-        Ok(InjectResult::Created)
-    }
+        injector.inject(path, "WAI:REFLECT:REF", &ref_inner)?
+    };
+
+    // Return the most significant result
+    Ok(match (wai_result, ref_result) {
+        (InjectResult::Created, _) | (_, InjectResult::Created) => InjectResult::Created,
+        (InjectResult::Prepended, _) | (_, InjectResult::Prepended) => InjectResult::Prepended,
+        _ => InjectResult::Updated,
+    })
 }
 
 /// Extract the actual WAI block content (between WAI:START and WAI:END, inclusive).
 /// Returns `None` if the file does not exist or has no block.
 pub fn read_managed_block(path: &Path) -> Option<String> {
-    let content = std::fs::read_to_string(path).ok()?;
-    let start = content.find(WAI_START)?;
-    let end = content.find(WAI_END)? + WAI_END.len();
-    if start > end {
-        return None;
-    }
-    Some(content[start..end].to_string())
+    let mut reg = BlockRegistry::new();
+    reg.register(BlockDef::new("WAI"));
+    let injector = BlockInjector::new(reg);
+    injector.read_block(path, "WAI")
 }
 
 pub fn has_managed_block(path: &Path) -> bool {
-    if !path.exists() {
-        return false;
-    }
-    match std::fs::read_to_string(path) {
-        Ok(content) => content.contains(WAI_START) && content.contains(WAI_END),
-        Err(_) => false,
-    }
+    let mut reg = BlockRegistry::new();
+    reg.register(BlockDef::new("WAI"));
+    let injector = BlockInjector::new(reg);
+    injector.has_block(path, "WAI")
 }
 
-pub enum InjectResult {
-    Created,
-    Prepended,
-    Updated,
-}
-
-impl InjectResult {
-    pub fn description(&self, filename: &str) -> String {
-        match self {
-            InjectResult::Created => format!("Created {} with wai instructions", filename),
-            InjectResult::Prepended => {
-                format!("Added wai instructions to existing {}", filename)
-            }
-            InjectResult::Updated => format!("Updated wai instructions in {}", filename),
+/// Describe the result of a managed block injection for user-facing messages.
+pub fn describe_inject_result(result: &InjectResult, filename: &str) -> String {
+    match result {
+        InjectResult::Created => format!("Created {} with wai instructions", filename),
+        InjectResult::Prepended => {
+            format!("Added wai instructions to existing {}", filename)
         }
+        InjectResult::Updated => format!("Updated wai instructions in {}", filename),
     }
 }
 
