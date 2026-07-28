@@ -99,21 +99,57 @@ pub(super) fn check_config(project_root: &Path) -> CheckResult {
         };
     }
 
-    match ProjectConfig::load(project_root) {
-        Ok(_) => CheckResult {
-            name: "Configuration".to_string(),
-            status: Status::Pass,
-            message: "config.toml is valid".to_string(),
-            fix: None,
-            fix_fn: None,
-        },
-        Err(e) => CheckResult {
+    // Parse check (delegates to genesis::config under the hood).
+    if let Err(e) = ProjectConfig::load(project_root) {
+        return CheckResult {
             name: "Configuration".to_string(),
             status: Status::Fail,
             message: format!("config.toml parse error: {}", e),
             fix: Some("Fix the syntax in .wai/config.toml".to_string()),
             fix_fn: None,
-        },
+        };
+    }
+
+    // Validation via genesis::config::ConfigStore (registered at startup).
+    let store = genesis::config::ConfigStore::new(crate::config::default_registry());
+    let validations = store.validate_all(project_root);
+    let errors: Vec<_> = validations
+        .iter()
+        .filter(|v| matches!(v.severity, genesis::config::ValidationSeverity::Error))
+        .collect();
+    if !errors.is_empty() {
+        return CheckResult {
+            name: "Configuration".to_string(),
+            status: Status::Fail,
+            message: format!(
+                "config.toml validation failed: {}",
+                errors
+                    .iter()
+                    .map(|v| v.message.clone())
+                    .collect::<Vec<_>>()
+                    .join("; ")
+            ),
+            fix: Some("Fix the reported fields in .wai/config.toml".to_string()),
+            fix_fn: None,
+        };
+    }
+
+    let message = if validations.is_empty() {
+        "config.toml is valid".to_string()
+    } else {
+        format!(
+            "config.toml is valid ({} warning{})",
+            validations.len(),
+            if validations.len() == 1 { "" } else { "s" }
+        )
+    };
+
+    CheckResult {
+        name: "Configuration".to_string(),
+        status: Status::Pass,
+        message,
+        fix: None,
+        fix_fn: None,
     }
 }
 

@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 use crate::error::WaiError;
+use genesis::config::ConfigFile;
 
 pub const CONFIG_DIR: &str = ".wai";
 pub const CONFIG_FILE: &str = "config.toml";
@@ -154,9 +155,15 @@ pub struct PluginConfig {
     pub settings: toml::Table,
 }
 
+impl genesis::config::ConfigFile for ProjectConfig {
+    fn path(repo_root: &Path) -> PathBuf {
+        repo_root.join(CONFIG_DIR).join(CONFIG_FILE)
+    }
+}
+
 impl ProjectConfig {
     pub fn load(project_root: &Path) -> Result<Self, WaiError> {
-        let config_path = project_root.join(CONFIG_DIR).join(CONFIG_FILE);
+        let config_path = <Self as genesis::config::ConfigFile>::path(project_root);
 
         if !config_path.exists() {
             // Check if .wai directory exists to provide better error message
@@ -166,23 +173,20 @@ impl ProjectConfig {
             return Err(WaiError::NotInitialized);
         }
 
-        let content = std::fs::read_to_string(&config_path)?;
-        toml::from_str(&content).map_err(|e| WaiError::ConfigError {
-            message: e.to_string(),
+        // Delegate read + parse to genesis::config (self-healing ConfigError).
+        <Self as genesis::config::ConfigFile>::read_from(&config_path).map_err(|e| {
+            WaiError::ConfigError {
+                message: e.to_string(),
+            }
         })
     }
 
     pub fn save(&self, project_root: &Path) -> Result<(), WaiError> {
-        let config_dir = project_root.join(CONFIG_DIR);
-        std::fs::create_dir_all(&config_dir)?;
-
-        let config_path = config_dir.join(CONFIG_FILE);
-        let content = toml::to_string_pretty(self).map_err(|e| WaiError::ConfigError {
+        // Delegate serialize + write (and parent dir creation) to genesis::config.
+        let path = <Self as genesis::config::ConfigFile>::path(project_root);
+        self.write_to(&path).map_err(|e| WaiError::ConfigError {
             message: e.to_string(),
-        })?;
-
-        std::fs::write(config_path, content)?;
-        Ok(())
+        })
     }
 }
 
@@ -198,6 +202,17 @@ pub fn find_project_root() -> Option<PathBuf> {
             return None;
         }
     }
+}
+
+/// Build a [`genesis::config::ConfigRegistry`] with wai's project config
+/// registered under the `"wai"` tool name (marker `.wai/config.toml`).
+///
+/// Constructed at startup so [`genesis::config::ConfigStore`] can discover
+/// and validate the project config alongside other suite tools.
+pub fn default_registry() -> genesis::config::ConfigRegistry {
+    let mut registry = genesis::config::ConfigRegistry::new();
+    registry.register::<ProjectConfig>("wai", ".wai/config.toml");
+    registry
 }
 
 /// Get the .wai directory path from a project root.
@@ -284,6 +299,12 @@ pub struct UserConfig {
     pub version: String,
 }
 
+impl genesis::config::ConfigFile for UserConfig {
+    fn path(_repo_root: &Path) -> PathBuf {
+        user_config_path()
+    }
+}
+
 impl UserConfig {
     /// Load user config from ~/.config/wai/config.toml.
     ///
@@ -300,24 +321,21 @@ impl UserConfig {
             return Ok(default);
         }
 
-        let content = std::fs::read_to_string(&config_path)?;
-        toml::from_str(&content).map_err(|e| WaiError::ConfigError {
-            message: e.to_string(),
+        // Delegate read + parse to genesis::config.
+        <Self as genesis::config::ConfigFile>::read_from(&config_path).map_err(|e| {
+            WaiError::ConfigError {
+                message: e.to_string(),
+            }
         })
     }
 
     /// Save user config to ~/.config/wai/config.toml
     pub fn save(&self) -> Result<(), WaiError> {
-        let config_dir = user_config_dir();
-        std::fs::create_dir_all(&config_dir)?;
-
-        let config_path = config_dir.join(USER_CONFIG_FILE);
-        let content = toml::to_string_pretty(self).map_err(|e| WaiError::ConfigError {
-            message: e.to_string(),
-        })?;
-
-        std::fs::write(config_path, content)?;
-        Ok(())
+        // Delegate serialize + write (and parent dir creation) to genesis::config.
+        self.write_to(&user_config_path())
+            .map_err(|e| WaiError::ConfigError {
+                message: e.to_string(),
+            })
     }
 
     /// Mark the tutorial as seen
@@ -392,5 +410,123 @@ pub fn read_pipeline_run_state(project_root: &Path) -> Option<String> {
         None
     } else {
         Some(trimmed)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::error::WaiError;
+    use genesis::config::ConfigFile;
+    use tempfile::TempDir;
+
+    fn write_project_config(root: &Path, name: &str) {
+        let wai_dir = root.join(CONFIG_DIR);
+        std::fs::create_dir_all(&wai_dir).unwrap();
+        let toml = format!("[project]\nname = \"{name}\"\nversion = \"\"\ndescription = \"\"\n");
+        std::fs::write(wai_dir.join(CONFIG_FILE), toml).unwrap();
+    }
+
+    #[test]
+    fn project_config_configfile_path_is_wai_config_toml() {
+        let path = ProjectConfig::path(Path::new("/repo"));
+        assert_eq!(path, PathBuf::from("/repo/.wai/config.toml"));
+    }
+
+    #[test]
+    fn project_config_load_roundtrips_through_genesis() {
+        let tmp = TempDir::new().unwrap();
+        write_project_config(tmp.path(), "demo");
+
+        let config = ProjectConfig::load(tmp.path()).unwrap();
+        assert_eq!(config.project.name, "demo");
+
+        // Mutate and save — delegates to genesis::config::ConfigFile::write_to.
+        let mut config = config;
+        config.project.description = "updated".into();
+        config.save(tmp.path()).unwrap();
+
+        let reloaded = ProjectConfig::load(tmp.path()).unwrap();
+        assert_eq!(reloaded.project.description, "updated");
+    }
+
+    #[test]
+    fn project_config_load_not_initialized_without_wai_dir() {
+        let tmp = TempDir::new().unwrap();
+        match ProjectConfig::load(tmp.path()) {
+            Err(WaiError::NotInitialized) => {}
+            other => panic!("expected NotInitialized, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn project_config_load_config_missing_when_wai_dir_exists() {
+        let tmp = TempDir::new().unwrap();
+        std::fs::create_dir_all(tmp.path().join(CONFIG_DIR)).unwrap();
+        match ProjectConfig::load(tmp.path()) {
+            Err(WaiError::ConfigMissing) => {}
+            other => panic!("expected ConfigMissing, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn project_config_load_reports_parse_error_via_genesis() {
+        let tmp = TempDir::new().unwrap();
+        write_project_config(tmp.path(), "demo");
+        // Corrupt the file with invalid TOML.
+        std::fs::write(
+            tmp.path().join(CONFIG_DIR).join(CONFIG_FILE),
+            "this is = = not valid toml",
+        )
+        .unwrap();
+        match ProjectConfig::load(tmp.path()) {
+            Err(WaiError::ConfigError { .. }) => {}
+            other => panic!("expected ConfigError, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn default_registry_registers_wai_with_config_marker() {
+        let registry = default_registry();
+        assert!(registry.is_registered("wai"));
+        assert_eq!(registry.marker("wai"), Some(".wai/config.toml"));
+    }
+
+    #[test]
+    fn default_registry_validates_existing_project_config() {
+        let tmp = TempDir::new().unwrap();
+        write_project_config(tmp.path(), "demo");
+
+        let store = genesis::config::ConfigStore::new(default_registry());
+        // No validate() override yet → no validation results, but discovery works.
+        assert!(store.validate_all(tmp.path()).is_empty());
+
+        let discovered = genesis::config::ConfigStore::discover(tmp.path(), &default_registry());
+        let wai_entry = discovered
+            .iter()
+            .find(|d| d.tool_name == "wai")
+            .expect("wai config discovered");
+        assert!(wai_entry.found);
+    }
+
+    #[test]
+    fn user_config_implements_configfile_and_roundtrips() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("config.toml");
+
+        // ConfigFile::path ignores repo_root for user-level config.
+        assert_eq!(UserConfig::path(tmp.path()), user_config_path());
+
+        let cfg = UserConfig {
+            seen_tutorial: true,
+            version: "test".into(),
+        };
+        // Delegate serialize + write to genesis::config::ConfigFile::write_to.
+        cfg.write_to(&path).unwrap();
+
+        // Delegate read + parse to genesis::config::ConfigFile::read_from.
+        let reloaded: UserConfig = UserConfig::read_from(&path).unwrap();
+        assert!(reloaded.seen_tutorial);
+        assert_eq!(reloaded.version, "test");
     }
 }
