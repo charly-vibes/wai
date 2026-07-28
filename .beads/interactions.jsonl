@@ -284,3 +284,4 @@
 {"id":"int-90b7d258","kind":"field_change","created_at":"2026-07-28T03:31:12.561312116Z","actor":"charly vibes","issue_id":"wai-wm47.8","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
 {"id":"int-030fcf98","kind":"field_change","created_at":"2026-07-28T03:34:55.523127357Z","actor":"charly vibes","issue_id":"wai-wm47.14","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
 {"id":"int-f43a7591","kind":"field_change","created_at":"2026-07-28T03:35:21.276723394Z","actor":"charly vibes","issue_id":"wai-wm47","extra":{"field":"status","new_value":"closed","old_value":"open","reason":"Closed"}}
+{"id":"int-fb76b51f","kind":"field_change","created_at":"2026-07-28T12:42:12.090039603Z","actor":"charly vibes","issue_id":"wai-tvek","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
