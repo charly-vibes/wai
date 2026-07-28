@@ -68,8 +68,8 @@ flate2 = "1"
 sha2 = "0.10"
 pathdiff = "0.2.3"
 
-# Shared infra crate (suggestions, managed_block, envelope)
-genesis = { git = "https://github.com/charly-vibes/genesis", tag = "v0.2.0" }
+# Shared infra crate (suggestions, managed_block, envelope, config, guide)
+genesis-vibes = "0.2"
 
 [features]
 default = []
