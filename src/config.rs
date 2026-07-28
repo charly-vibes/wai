@@ -155,6 +155,11 @@ pub struct PluginConfig {
     pub settings: toml::Table,
 }
 
+/// Path + serde I/O delegate for genesis::config.
+///
+/// `ProjectConfig::load`/`save` call through to `ConfigFile::read_from`/
+/// `write_to`, so all parsing/serialization and parent-dir creation lives in
+/// genesis. wai keeps only the struct definition and its error taxonomy.
 impl genesis::config::ConfigFile for ProjectConfig {
     fn path(repo_root: &Path) -> PathBuf {
         repo_root.join(CONFIG_DIR).join(CONFIG_FILE)
@@ -299,6 +304,12 @@ pub struct UserConfig {
     pub version: String,
 }
 
+/// `ConfigFile` impl for the user-global config.
+///
+/// Path-independent: `path(_repo_root)` ignores its argument and returns
+/// `user_config_path()` (~/.config/wai/config.toml). It exists so `load`/`save`
+/// can reuse genesis's `read_from`/`write_to` serde helpers — it is NOT
+/// registered in `default_registry()` (which is repo-root-scoped).
 impl genesis::config::ConfigFile for UserConfig {
     fn path(_repo_root: &Path) -> PathBuf {
         user_config_path()

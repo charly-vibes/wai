@@ -1052,15 +1052,17 @@ pub fn wai_subcommand_patterns() -> Vec<(String, String)> {
 
 /// Build the [`genesis::guide::Guide`] scaffold for wai.
 ///
-/// Assembles the tool name/version, one-line description, and the command
-/// registry (used for typo detection in `run_external`). Constructed once at
-/// startup and threaded through `commands::run`.
+/// Assembles the tool name/version, one-line description, the command
+/// registry (used for typo detection in `run_external`), and flags wai as a
+/// config-bearing tool so the Guide and `config::default_registry()` agree.
+/// Constructed once at startup and threaded through `commands::run`.
 pub fn build_guide() -> genesis::guide::Guide {
     let names = wai_subcommand_names();
     let names_ref: Vec<&str> = names.iter().map(|s| s.as_str()).collect();
     genesis::guide::Guide::builder("wai", env!("CARGO_PKG_VERSION"))
         .about("Workflow manager for AI-driven development")
         .commands(&names_ref)
+        .config::<crate::config::ProjectConfig>()
         .build()
 }
 

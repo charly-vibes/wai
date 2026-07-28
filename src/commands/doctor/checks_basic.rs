@@ -110,7 +110,8 @@ pub(super) fn check_config(project_root: &Path) -> CheckResult {
         };
     }
 
-    // Validation via genesis::config::ConfigStore (registered at startup).
+    // Validation via genesis::config::ConfigStore (registry built per doctor
+    // run via config::default_registry()).
     let store = genesis::config::ConfigStore::new(crate::config::default_registry());
     let validations = store.validate_all(project_root);
     let errors: Vec<_> = validations

@@ -147,11 +147,22 @@ pub fn run(cli: Cli, guide: &Guide) -> Result<()> {
                     };
                     let _ = crate::output::print_envelope_ok(&payload);
                 } else {
-                    // Self-healing error sink: print the message and persist it
-                    // to the error scratch (for a future `--from-last-error`
-                    // feedback flow). No generic footer — the bail messages
-                    // already carry specific guidance.
-                    let sink = guide.error_sink().with_suggest(false).with_feedback(None);
+                    // Self-healing error sink for the External (plugin/typo) path.
+                    //
+                    // Uses Display (err.to_string via ErrorSink::handle), not Debug —
+                    // intentional: run_external's bails carry their guidance inline, and
+                    // Display yields a clean `wai: <msg>` line. If a future bail! in
+                    // run_external attaches a #[diagnostic(help(...))], audit whether
+                    // that help needs separate rendering here (tracked with wai-0ly7).
+                    //
+                    // Scratch persistence is OFF until wai-0ly7 ships the
+                    // `--from-last-error` reader — don't write data nothing reads.
+                    // No generic footer — the bail messages already carry specific guidance.
+                    let sink = guide
+                        .error_sink()
+                        .with_suggest(false)
+                        .with_scratch(false)
+                        .with_feedback(None);
                     let mut stderr = std::io::stderr();
                     sink.handle(
                         <miette::Report as AsRef<dyn std::error::Error>>::as_ref(&err),
