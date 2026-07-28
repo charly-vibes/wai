@@ -69,7 +69,7 @@ sha2 = "0.10"
 pathdiff = "0.2.3"
 
 # Shared infra crate (suggestions, managed_block, envelope)
-genesis = { git = "https://github.com/charly-vibes/genesis", tag = "v0.1.0" }
+genesis = { git = "https://github.com/charly-vibes/genesis", tag = "v0.2.0" }
 
 [features]
 default = []
