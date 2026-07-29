@@ -12,6 +12,9 @@ use crate::output::print_envelope;
 use crate::plugin;
 use crate::plugin::{detect_main_worktree_root, fetch_memories};
 use crate::state::ProjectState;
+use crate::workspace::detect_installed_pipelines;
+
+use super::pipeline::pipeline_current_status;
 
 use super::{beads_counts, beads_summary, list_projects, require_project, resolve_project};
 
@@ -172,6 +175,9 @@ pub fn run(project: Option<String>) -> Result<()> {
             "→".cyan()
         );
     }
+
+    // Pipelines — surface available/active pipelines for the current project
+    render_pipelines(&project_root, &phase);
 
     // Suggested next via bd ready --json
     if let Some(next_id) = suggested_next(&project_root) {
@@ -495,4 +501,93 @@ fn suggested_next(project_root: &Path) -> Option<String> {
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).ok()?;
     let first = json.as_array()?.first()?;
     first.get("id")?.as_str().map(|s| s.to_string())
+}
+
+/// Render the `Pipelines` section of `wai prime` (terminal mode).
+///
+/// - If a pipeline run is active, show its current step and the next command.
+/// - Otherwise list installed pipelines (those with `[pipeline.metadata]`) and,
+///   when at least one matches the current project phase, suggest starting it.
+///
+/// The section is omitted entirely when no pipelines are installed and no run
+/// is active, keeping the orientation output concise.
+fn render_pipelines(project_root: &Path, phase: &str) {
+    // Active run takes precedence — show where the in-flight pipeline is.
+    if let Some(status) = pipeline_current_status(project_root).ok().flatten()
+        && status.active
+    {
+        let name = status.pipeline.unwrap_or_default();
+        println!("{} Pipelines", "◆".cyan());
+        match status.step {
+            Some(step) => println!(
+                "{} {} {} step {}/{} — {}",
+                "⚡".yellow(),
+                "PIPELINE ACTIVE:".yellow(),
+                name,
+                step.index,
+                step.total,
+                status.next_command.unwrap_or_default(),
+            ),
+            // Run is complete — nudge the user to close it.
+            None => println!(
+                "{} {} {} complete — {}",
+                "⚡".yellow(),
+                "PIPELINE ACTIVE:".yellow(),
+                name,
+                status
+                    .next_command
+                    .unwrap_or_else(|| "wai close".to_string()),
+            ),
+        }
+        return;
+    }
+
+    let pipelines = detect_installed_pipelines(project_root);
+    if pipelines.is_empty() {
+        return;
+    }
+
+    println!("{} Pipelines", "◆".cyan());
+    for p in &pipelines {
+        println!("{} {} ({} steps)", "•".dimmed(), p.name, p.step_count);
+    }
+
+    // Suggest starting the first pipeline whose `when` matches the phase.
+    if let Some(matched) = pipelines
+        .iter()
+        .find(|p| pipeline_matches_phase(&p.when, phase))
+    {
+        println!(
+            "{} Start: wai pipeline start {} --topic=<topic>",
+            "→".cyan(),
+            matched.name
+        );
+    }
+}
+
+/// Return the keyword tokens that associate a pipeline's `metadata.when` with
+/// a project phase. A pipeline "matches" a phase when its `when` contains any.
+fn phase_keywords(phase: &str) -> &'static [&'static str] {
+    match phase {
+        "research" => &["research", "investigat"],
+        "design" => &["design"],
+        "plan" => &["plan"],
+        "implement" => &[
+            "implement",
+            "execute",
+            "autonomous",
+            "tdd",
+            "build",
+            "develop",
+        ],
+        "review" => &["review", "ro5", "rule of 5"],
+        "archive" => &["archive"],
+        _ => &[],
+    }
+}
+
+/// True when a pipeline's `when` description mentions the current project phase.
+fn pipeline_matches_phase(when: &str, phase: &str) -> bool {
+    let w = when.to_lowercase();
+    phase_keywords(phase).iter().any(|kw| w.contains(kw))
 }
