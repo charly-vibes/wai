@@ -5,6 +5,48 @@ All notable changes to wai will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Calendar Versioning](https://calver.org/) (YYYY.M.MICRO).
 
+## [2026.7.29] - 2026-07-29
+
+### Added
+
+- **Pi session hook check** — `wai doctor` now reports whether the project
+  runs `wai prime` at pi's `session_start` via `.pi/extensions/`, mirroring
+  the existing Claude Code SessionStart check for pi users. Omitted when no
+  `.pi/` directory exists (systems without pi stay green).
+- **Pipeline utilization check** — `wai doctor` warns when AGENTS.md/CLAUDE.md
+  contain manual TDD+Ro5 cycle instructions alongside an equivalent pipeline,
+  nudging agents to prefer `wai pipeline start`.
+- **Prime Pipelines section** — `wai prime` now surfaces active pipeline runs
+  (step N/M + next command) and lists installed pipelines with a phase-gated
+  start suggestion, keeping orientation concise (1–3 lines).
+- **Inline health summary** — `wai status` and `wai prime` now run doctor
+  diagnostics inline and show a one-line summary when the workspace is not
+  green (`⚠ N warning(s) — run wai doctor for details`). Silent when green.
+
+### Changed
+
+- **AGENTS.md/CLAUDE.md Quick Start** — now prefers `wai pipeline start`
+  over manual TDD cycles for autonomous execution.
+- **Managed block staleness fix** — `wai_block_content` no longer inserts a
+  spurious `\n` after the `WAI:START` marker, matching the on-disk form
+  produced by the genesis `BlockInjector`. A fresh `wai init` workspace is
+  now doctor-green (0 warnings) instead of always reporting staleness.
+- **`.wai/.gitignore`** — added `.last-run` (active pipeline run pointer,
+  like `.pipeline-run`) to prevent git churn when `wai close` clears it.
+- **Suite badge consistency** — all suite repos (pretender/espectacular/
+  testaruda) now have consistent "tracked with wai" badges + WAI managed
+  blocks; the wai-bdqw epic (9 children) is complete.
+
+### Fixed
+
+- **Stale pipeline-run pointer** — `wai close` now clears `.wai/.pipeline-run`
+  and `.wai/resources/pipelines/.last-run` when the active pipeline run is
+  complete (current_step >= total), so `wai status`/`wai prime` stop
+  reporting a stale "PIPELINE ACTIVE ... complete" line. In-progress runs
+  are left intact.
+
+---
+
 ## [2026.7.28] - 2026-07-28
 
 ### Added
