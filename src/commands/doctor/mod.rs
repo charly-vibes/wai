@@ -8,6 +8,7 @@ use crate::config::{SKILLS_DIR, agent_config_dir, projects_dir};
 use crate::context::current_context;
 use crate::output::print_envelope_doctor;
 use crate::plugin;
+use crate::workspace::detect_installed_pipelines;
 
 use super::require_project;
 
@@ -88,6 +89,7 @@ pub fn run(fix: bool) -> Result<()> {
     checks.extend(checks_basic::check_wai_project_env(&project_root));
     checks.extend(check_artifact_locks(&project_root));
     checks.extend(check_dont_drift_signals(&project_root));
+    checks.extend(check_pipeline_utilization(&project_root));
 
     let summary = Summary {
         pass: checks.iter().filter(|c| c.status == Status::Pass).count(),
@@ -1249,6 +1251,98 @@ fn check_artifact_locks(project_root: &Path) -> Vec<CheckResult> {
 /// Enabled only when `WAI_DONT_SIGNALS=1` is set. Runs `ah signals` in the
 /// project root and surfaces any drift signals as warnings. Returns empty
 /// when the flag is absent or `ah` is not on PATH.
+/// Check for agent-workflow vs pipeline mismatch.
+///
+/// Detects when AGENTS.md or CLAUDE.md contain manual-cycle instructions
+/// (e.g. "TDD → ro5u → fix → commit → next ticket") but an equivalent
+/// pipeline (with  mentioning TDD, autonomous, or ro5) is
+/// available. Surfaces a warning so the agent prefers the pipeline.
+fn check_pipeline_utilization(project_root: &Path) -> Vec<CheckResult> {
+    let pipelines = detect_installed_pipelines(project_root);
+
+    // Which pipelines have TDD/autonomous/Ro5 in their  metadata?
+    let tdd_pipelines: Vec<&crate::managed_block::InstalledPipeline> = pipelines
+        .iter()
+        .filter(|p| {
+            let w = p.when.to_lowercase();
+            w.contains("tdd") || w.contains("ro5") || w.contains("autonomous")
+        })
+        .collect();
+
+    if tdd_pipelines.is_empty() {
+        return vec![];
+    }
+
+    // Patterns that indicate manual-cycle instructions
+    let manual_patterns = [
+        "Per-ticket pipeline",
+        "TDD → ro5u",
+        "TDD.*ro5.*fix.*commit",
+        "follow ",
+    ];
+
+    // Read AGENTS.md non-managed-block content
+    let agents_path = project_root.join("AGENTS.md");
+    let non_block_content = read_non_managed_block_content(&agents_path);
+
+    // Also check CLAUDE.md
+    let claude_path = project_root.join("CLAUDE.md");
+    let claude_content = read_non_managed_block_content(&claude_path);
+
+    let combined = format!("{}\n{}", non_block_content, claude_content);
+    let combined_lower = combined.to_lowercase();
+
+    let mut matches: Vec<&str> = Vec::new();
+    for pattern in &manual_patterns {
+        let pat_lower = pattern.to_lowercase();
+        if combined_lower.contains(&pat_lower)
+            || combined_lower.contains(&pattern.replace(" ", "").to_lowercase())
+        {
+            matches.push(pattern);
+        }
+    }
+
+    if matches.is_empty() {
+        return vec![];
+    }
+
+    let pipeline_names: Vec<&str> = tdd_pipelines.iter().map(|p| p.name.as_str()).collect();
+
+    vec![CheckResult {
+        name: "Pipeline utilization".to_string(),
+        status: Status::Warn,
+        message: format!(
+            "Pipeline(s) '{}' encode the TDD+Ro5 cycle, but AGENTS.md/CLAUDE.md contain manual-cycle instructions: {}",
+            pipeline_names.join(", "),
+            matches.join("; ")
+        ),
+        fix: Some(format!(
+            "Update the Quick Start in AGENTS.md to prefer 'wai pipeline start {} --topic=<...>' over the manual cycle",
+            pipeline_names[0]
+        )),
+        fix_fn: None,
+    }]
+}
+
+/// Read a file''s content excluding the WAI managed block (between <!-- WAI:START --> and <!-- WAI:END -->).
+/// Returns empty string if the file doesn't exist.
+fn read_non_managed_block_content(path: &Path) -> String {
+    let Ok(content) = std::fs::read_to_string(path) else {
+        return String::new();
+    };
+    // Strip managed block
+    if let Some(start) = content.find("<!-- WAI:START -->") {
+        let after_start = start + "<!-- WAI:START -->".len();
+        if let Some(end) = content[after_start..].find("<!-- WAI:END -->") {
+            let end_pos = after_start + end + "<!-- WAI:END -->".len();
+            let before = &content[..start];
+            let after = &content[end_pos..];
+            return format!("{}\n{}", before, after);
+        }
+    }
+    content
+}
+
 fn check_dont_drift_signals(project_root: &Path) -> Vec<CheckResult> {
     if std::env::var("WAI_DONT_SIGNALS").is_err() {
         return vec![];
