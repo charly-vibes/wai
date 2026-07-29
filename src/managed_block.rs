@@ -34,8 +34,10 @@ pub fn wai_block_content(
     installed_skills: &[&str],
     installed_pipelines: &[InstalledPipeline],
 ) -> String {
+    // Match the on-disk form produced by `inject_managed_block` (genesis
+    // `BlockInjector::inject` writes `start_marker + inner + end_marker` with no
+    // extra newline), so the doctor staleness check compares like-for-like.
     let mut block = String::from(WAI_START);
-    block.push('\n');
     block.push_str(&wai_block_inner(
         repo_root,
         detected_plugins,
