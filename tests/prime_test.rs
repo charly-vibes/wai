@@ -56,6 +56,18 @@ fn write_active_run(dir: &std::path::Path, pipeline: &str, current_step: usize) 
     fs::write(dir.join(".wai/resources/pipelines/.last-run"), &run_id).unwrap();
 }
 
+/// Write a pipeline TOML WITHOUT a `[pipeline.metadata]` section. This triggers
+/// a `wai doctor` warning ("Missing [pipeline.metadata]") — used to force a
+/// non-clean health summary in status/prime tests.
+fn write_pipeline_no_metadata(dir: &std::path::Path, name: &str) {
+    let pipelines_dir = dir.join(".wai/resources/pipelines");
+    fs::create_dir_all(&pipelines_dir).unwrap();
+    let toml = format!(
+        "[pipeline]\nname = \"{name}\"\ndescription = \"no metadata\"\n[[steps]]\nid = \"one\"\nprompt = \"do {{topic}}\"\n"
+    );
+    fs::write(pipelines_dir.join(format!("{name}.toml")), toml).unwrap();
+}
+
 // ── session orientation ───────────────────────────────────────────────────────
 
 #[test]
@@ -171,4 +183,36 @@ fn prime_omits_start_suggestion_when_no_pipeline_matches_phase() {
         .stdout(predicate::str::contains("deploy-bot"))
         // ... but no start suggestion because `when` doesn't match the phase.
         .stdout(predicate::str::contains("wai pipeline start").not());
+}
+
+// ── doctor health summary (wai-j56n) ─────────────────────────────────────────
+
+#[test]
+fn prime_surfaces_doctor_warning_when_not_clean() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproject");
+    // A pipeline without [pipeline.metadata] triggers a doctor Warn.
+    write_pipeline_no_metadata(tmp.path(), "orphan");
+
+    wai_cmd(tmp.path())
+        .args(["prime", "--project", "myproject", "--no-input"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("warning"))
+        .stdout(predicate::str::contains("wai doctor"));
+}
+
+#[test]
+fn prime_silent_on_health_when_doctor_is_clean() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproject");
+    // No doctor warnings in a clean workspace.
+
+    wai_cmd(tmp.path())
+        .args(["prime", "--project", "myproject", "--no-input"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("wai doctor").not());
 }

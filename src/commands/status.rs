@@ -311,6 +311,24 @@ pub fn run(verbose: u8) -> Result<()> {
         PipelineStatusInfo::None => {}
     }
 
+    // Doctor health summary — one line when not clean, silent when green.
+    let health = crate::commands::doctor::health_summary(&project_root);
+    if !health.is_clean() {
+        let mut parts: Vec<String> = Vec::new();
+        if health.warn > 0 {
+            parts.push(format!("{} warning(s)", health.warn));
+        }
+        if health.fail > 0 {
+            parts.push(format!("{} failure(s)", health.fail));
+        }
+        println!();
+        println!(
+            "  {} Health: {} — run `wai doctor` for details",
+            "⚠".yellow(),
+            parts.join(", ")
+        );
+    }
+
     // Suggestions — phase-aware when projects exist
     println!();
     println!("  {} Suggestions", "◆".cyan());

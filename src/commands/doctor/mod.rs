@@ -63,33 +63,75 @@ struct Summary {
     fail: usize,
 }
 
+/// Lightweight health summary used by `wai status` / `wai prime` to surface
+/// doctor warnings inline without running the full `wai doctor` report.
+///
+/// Only carries warning/failure counts — clean workspaces are reported
+/// silently (no output) by the callers.
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize)]
+pub struct DoctorHealthSummary {
+    pub warn: usize,
+    pub fail: usize,
+}
+
+impl DoctorHealthSummary {
+    /// True when there are no warnings or failures to report.
+    pub fn is_clean(&self) -> bool {
+        self.warn == 0 && self.fail == 0
+    }
+}
+
+/// Collect every doctor `CheckResult` for the given project root.
+///
+/// This is the single source of truth for the check set — both `wai doctor`
+/// (via [`run`]) and the inline health summaries (via [`health_summary`]) run
+/// exactly the same diagnostics, so the inline line never disagrees with the
+/// full report.
+fn collect_checks(project_root: &Path) -> Vec<CheckResult> {
+    let mut checks = Vec::new();
+    checks.extend(checks_basic::check_directories(project_root));
+    checks.push(checks_basic::check_config(project_root));
+    checks.push(checks_basic::check_version(project_root));
+    checks.extend(checks_basic::check_plugin_tools(project_root));
+    checks.extend(checks_sync::check_agent_config_sync(project_root));
+    checks.extend(check_skills_in_repo(project_root));
+    checks.extend(check_agent_tool_coverage(project_root));
+    checks.extend(checks_basic::check_project_state(project_root));
+    checks.extend(checks_basic::check_custom_plugins(project_root));
+    checks.extend(check_agent_instructions(project_root));
+    checks.extend(check_managed_block_staleness(project_root));
+    checks.extend(check_pipeline_definitions(project_root));
+    checks.extend(checks_basic::check_readme_badge(project_root));
+    checks.extend(checks_basic::check_badge_managed_block_consistency(
+        project_root,
+    ));
+    checks.extend(checks_basic::check_suite_gates(project_root));
+    checks.extend(check_claude_session_hook());
+    checks.extend(checks_basic::check_wai_project_env(project_root));
+    checks.extend(check_artifact_locks(project_root));
+    checks.extend(check_dont_drift_signals(project_root));
+    checks.extend(check_pipeline_utilization(project_root));
+    checks
+}
+
+/// Run the doctor checks and return a compact warn/fail count.
+///
+/// Used by `wai status` and `wai prime` to surface a one-line health summary
+/// when the workspace is not fully green. Returns `is_clean() == true` when
+/// nothing is wrong, so callers can stay silent in that case.
+pub fn health_summary(project_root: &Path) -> DoctorHealthSummary {
+    let checks = collect_checks(project_root);
+    DoctorHealthSummary {
+        warn: checks.iter().filter(|c| c.status == Status::Warn).count(),
+        fail: checks.iter().filter(|c| c.status == Status::Fail).count(),
+    }
+}
+
 pub fn run(fix: bool) -> Result<()> {
     let project_root = require_project()?;
     let context = current_context();
 
-    let mut checks = Vec::new();
-    checks.extend(checks_basic::check_directories(&project_root));
-    checks.push(checks_basic::check_config(&project_root));
-    checks.push(checks_basic::check_version(&project_root));
-    checks.extend(checks_basic::check_plugin_tools(&project_root));
-    checks.extend(checks_sync::check_agent_config_sync(&project_root));
-    checks.extend(check_skills_in_repo(&project_root));
-    checks.extend(check_agent_tool_coverage(&project_root));
-    checks.extend(checks_basic::check_project_state(&project_root));
-    checks.extend(checks_basic::check_custom_plugins(&project_root));
-    checks.extend(check_agent_instructions(&project_root));
-    checks.extend(check_managed_block_staleness(&project_root));
-    checks.extend(check_pipeline_definitions(&project_root));
-    checks.extend(checks_basic::check_readme_badge(&project_root));
-    checks.extend(checks_basic::check_badge_managed_block_consistency(
-        &project_root,
-    ));
-    checks.extend(checks_basic::check_suite_gates(&project_root));
-    checks.extend(check_claude_session_hook());
-    checks.extend(checks_basic::check_wai_project_env(&project_root));
-    checks.extend(check_artifact_locks(&project_root));
-    checks.extend(check_dont_drift_signals(&project_root));
-    checks.extend(check_pipeline_utilization(&project_root));
+    let checks = collect_checks(&project_root);
 
     let summary = Summary {
         pass: checks.iter().filter(|c| c.status == Status::Pass).count(),

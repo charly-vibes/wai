@@ -89,3 +89,48 @@ fn status_no_projects_succeeds_with_empty_workspace() {
 
     wai_cmd(tmp.path()).args(["status"]).assert().success();
 }
+
+// ── doctor health summary (wai-j56n) ─────────────────────────────────────────
+
+use std::fs;
+
+/// Write a pipeline TOML WITHOUT a `[pipeline.metadata]` section. This triggers
+/// a `wai doctor` warning ("Missing [pipeline.metadata]") — used to force a
+/// non-clean health summary in status tests.
+fn write_pipeline_no_metadata(dir: &std::path::Path, name: &str) {
+    let pipelines_dir = dir.join(".wai/resources/pipelines");
+    fs::create_dir_all(&pipelines_dir).unwrap();
+    let toml = format!(
+        "[pipeline]\nname = \"{name}\"\ndescription = \"no metadata\"\n[[steps]]\nid = \"one\"\nprompt = \"do {{topic}}\"\n"
+    );
+    fs::write(pipelines_dir.join(format!("{name}.toml")), toml).unwrap();
+}
+
+#[test]
+fn status_surfaces_doctor_warning_when_not_clean() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+    // A pipeline without [pipeline.metadata] triggers a doctor Warn.
+    write_pipeline_no_metadata(tmp.path(), "orphan");
+
+    wai_cmd(tmp.path())
+        .args(["status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("warning"))
+        .stdout(predicate::str::contains("wai doctor"));
+}
+
+#[test]
+fn status_silent_on_health_when_doctor_is_clean() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+
+    wai_cmd(tmp.path())
+        .args(["status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("wai doctor").not());
+}

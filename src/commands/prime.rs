@@ -14,6 +14,7 @@ use crate::plugin::{detect_main_worktree_root, fetch_memories};
 use crate::state::ProjectState;
 use crate::workspace::detect_installed_pipelines;
 
+use super::doctor::health_summary;
 use super::pipeline::pipeline_current_status;
 
 use super::{beads_counts, beads_summary, list_projects, require_project, resolve_project};
@@ -178,6 +179,9 @@ pub fn run(project: Option<String>) -> Result<()> {
 
     // Pipelines — surface available/active pipelines for the current project
     render_pipelines(&project_root, &phase);
+
+    // Doctor health summary — one line when not clean, silent when green.
+    render_health_summary(&project_root);
 
     // Suggested next via bd ready --json
     if let Some(next_id) = suggested_next(&project_root) {
@@ -590,4 +594,28 @@ fn phase_keywords(phase: &str) -> &'static [&'static str] {
 fn pipeline_matches_phase(when: &str, phase: &str) -> bool {
     let w = when.to_lowercase();
     phase_keywords(phase).iter().any(|kw| w.contains(kw))
+}
+
+/// Render a one-line `wai doctor` health summary when the workspace is not green.
+///
+/// Silent (no output) when doctor reports zero warnings and zero failures, so a
+/// clean `wai prime` gains no noise. The single line links to `wai doctor` for
+/// the full diagnostic detail.
+fn render_health_summary(project_root: &Path) {
+    let health = health_summary(project_root);
+    if health.is_clean() {
+        return;
+    }
+    let mut parts = Vec::new();
+    if health.warn > 0 {
+        parts.push(format!("{} warning(s)", health.warn));
+    }
+    if health.fail > 0 {
+        parts.push(format!("{} failure(s)", health.fail));
+    }
+    println!(
+        "{} Health: {} — run `wai doctor` for details",
+        "⚠".yellow(),
+        parts.join(", ")
+    );
 }
