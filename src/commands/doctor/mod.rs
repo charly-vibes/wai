@@ -2,7 +2,7 @@ use miette::{IntoDiagnostic, Result};
 use owo_colors::OwoColorize;
 use serde::Serialize;
 use std::collections::HashSet;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::config::{SKILLS_DIR, agent_config_dir, projects_dir};
 use crate::context::current_context;
@@ -111,6 +111,7 @@ fn collect_checks(project_root: &Path) -> Vec<CheckResult> {
     checks.extend(check_artifact_locks(project_root));
     checks.extend(check_dont_drift_signals(project_root));
     checks.extend(check_pipeline_utilization(project_root));
+    checks.extend(check_pi_session_hook(project_root));
     checks
 }
 
@@ -1366,6 +1367,100 @@ fn check_pipeline_utilization(project_root: &Path) -> Vec<CheckResult> {
     }]
 }
 
+// ─── pi session hook ─────────────────────────────────────────────────────────
+
+/// Recommended fix text: a minimal pi extension that runs `wai prime` on
+/// `session_start`. Shown when the check warns.
+const PI_WAI_PRIME_EXTENSION_FIX: &str = r#"Create .pi/extensions/wai-prime.ts (or ~/.pi/agent/extensions/wai-prime.ts) with:
+
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+export default function (pi: ExtensionAPI) {
+  pi.on("session_start", async () => { await pi.exec("wai", ["prime"]); });
+}"#;
+
+/// True when any of the given pi extension file contents registers a
+/// `session_start` handler that runs `wai prime` (or `wai status`).
+///
+/// Matches two forms an extension may use to invoke wai:
+/// - shell-string: a `wai prime` / `wai status` substring (e.g. `bash -c "wai prime`)
+/// - argv: quoted `"wai"` alongside `"prime"` / `"status"` (e.g. `pi.exec("wai", ["prime"])`)
+///
+/// Pure scanner so the logic can be unit-tested without touching the filesystem.
+fn pi_extensions_run_wai_prime(contents: &[String]) -> bool {
+    contents.iter().any(|c| {
+        if !c.contains("session_start") {
+            return false;
+        }
+        let shell_form = c.contains("wai prime") || c.contains("wai status");
+        let argv_form =
+            c.contains("\"wai\"") && (c.contains("\"prime\"") || c.contains("\"status\""));
+        shell_form || argv_form
+    })
+}
+
+/// Collect auto-discovered pi extension files from a directory:
+/// `*.ts` and `*/index.ts`. Returns paths that exist and are readable.
+fn collect_pi_extension_files(dir: &Path) -> Vec<PathBuf> {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    let mut files = Vec::new();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_file() && path.extension().and_then(|e| e.to_str()) == Some("ts") {
+            files.push(path);
+        } else if path.is_dir() {
+            let idx = path.join("index.ts");
+            if idx.is_file() {
+                files.push(idx);
+            }
+        }
+    }
+    files
+}
+
+/// Check whether the current project runs `wai prime` at pi's `session_start`.
+///
+/// Fires only when the project opts into pi via a `.pi/` directory (project-local
+/// config or extensions). Systems without pi, or projects that don't use pi, see
+/// no output from this check — it is omitted rather than warning, so a clean
+/// `wai init` workspace stays green regardless of the host's global pi install.
+///
+/// When pi is in use, scans `.pi/extensions/` for a `session_start` extension
+/// running `wai prime`/`wai status` and warns with an actionable fix otherwise.
+fn check_pi_session_hook(project_root: &Path) -> Vec<CheckResult> {
+    let pi_dir = project_root.join(".pi");
+    if !pi_dir.exists() {
+        return Vec::new();
+    }
+
+    let ext_dir = pi_dir.join("extensions");
+    let files = collect_pi_extension_files(&ext_dir);
+    let contents: Vec<String> = files
+        .iter()
+        .filter_map(|p| std::fs::read_to_string(p).ok())
+        .collect();
+
+    if pi_extensions_run_wai_prime(&contents) {
+        vec![CheckResult {
+            name: "Pi session hook".to_string(),
+            status: Status::Pass,
+            message: "`wai prime` runs at pi `session_start` (via .pi/extensions)".to_string(),
+            fix: None,
+            fix_fn: None,
+        }]
+    } else {
+        vec![CheckResult {
+            name: "Pi session hook".to_string(),
+            status: Status::Warn,
+            message: "No pi `session_start` extension runs `wai prime` in .pi/extensions"
+                .to_string(),
+            fix: Some(PI_WAI_PRIME_EXTENSION_FIX.to_string()),
+            fix_fn: None,
+        }]
+    }
+}
+
 /// Read a file''s content excluding the WAI managed block (between <!-- WAI:START --> and <!-- WAI:END -->).
 /// Returns empty string if the file doesn't exist.
 fn read_non_managed_block_content(path: &Path) -> String {
@@ -1600,5 +1695,95 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let results = check_dont_drift_signals(tmp.path());
         assert!(results.is_empty());
+    }
+
+    // --- pi session hook tests ---
+
+    #[test]
+    fn pi_extensions_detect_wai_prime_in_session_start() {
+        let contents = vec![
+            "import type { ExtensionAPI } from \"@earendil-works/pi-coding-agent\";
+
+export default function (pi: ExtensionAPI) {
+  pi.on(\"session_start\", async (_e, _ctx) => {
+    await pi.exec(\"wai\", [\"prime\"]);
+  });
+}
+"
+            .to_string(),
+        ];
+        assert!(pi_extensions_run_wai_prime(&contents));
+    }
+
+    #[test]
+    fn pi_extensions_detect_wai_status_in_session_start() {
+        let contents = vec![
+            "pi.on(\"session_start\", async () => { await pi.exec(\"wai\", [\"status\"]); });\n"
+                .to_string(),
+        ];
+        assert!(pi_extensions_run_wai_prime(&contents));
+    }
+
+    #[test]
+    fn pi_extensions_ignore_session_start_without_wai() {
+        let contents = vec![
+            "pi.on(\"session_start\", async (_e, ctx) => { ctx.ui.notify(\"hi\"); });\n"
+                .to_string(),
+        ];
+        assert!(!pi_extensions_run_wai_prime(&contents));
+    }
+
+    #[test]
+    fn pi_extensions_ignore_wai_without_session_start() {
+        // An extension that runs `wai prime` on a different event (e.g. a command)
+        // does not satisfy the session-start check.
+        let contents = vec![
+            "pi.registerCommand(\"orient\", async () => { await pi.exec(\"wai\", [\"prime\"]); });\n".to_string(),
+        ];
+        assert!(!pi_extensions_run_wai_prime(&contents));
+    }
+
+    #[test]
+    fn check_pi_session_hook_omitted_when_no_pi_dir() {
+        // No `.pi/` in the project → the check is omitted (pi not in use here).
+        let tmp = TempDir::new().unwrap();
+        let results = check_pi_session_hook(tmp.path());
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn check_pi_session_hook_warns_when_pi_present_without_wai_extension() {
+        let tmp = TempDir::new().unwrap();
+        // Project opts into pi but has no wai-prime session_start extension.
+        std::fs::create_dir_all(tmp.path().join(".pi/extensions")).unwrap();
+        std::fs::write(
+            tmp.path().join(".pi/extensions/other.ts"),
+            "pi.on(\"session_start\", async (_e, ctx) => { ctx.ui.notify(\"hi\"); });\n",
+        )
+        .unwrap();
+        let results = check_pi_session_hook(tmp.path());
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].status, Status::Warn);
+        assert!(
+            results[0]
+                .fix
+                .as_deref()
+                .unwrap_or("")
+                .contains("session_start")
+        );
+    }
+
+    #[test]
+    fn check_pi_session_hook_passes_when_wai_prime_extension_present() {
+        let tmp = TempDir::new().unwrap();
+        std::fs::create_dir_all(tmp.path().join(".pi/extensions")).unwrap();
+        std::fs::write(
+            tmp.path().join(".pi/extensions/wai-prime.ts"),
+            "pi.on(\"session_start\", async () => { await pi.exec(\"wai\", [\"prime\"]); });\n",
+        )
+        .unwrap();
+        let results = check_pi_session_hook(tmp.path());
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].status, Status::Pass);
     }
 }

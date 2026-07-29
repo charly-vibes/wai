@@ -134,3 +134,56 @@ fn doctor_fix_with_safe_flag_refuses_to_apply_fixes() {
             predicate::str::contains("apply doctor fixes").or(predicate::str::contains("--safe")),
         );
 }
+
+// ── pi session hook (wai-hfgz) ───────────────────────────────────────────────
+
+#[test]
+fn doctor_pi_hook_omitted_when_no_pi_dir() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    // No `.pi/` → the pi session hook check must not appear at all.
+    wai_cmd(tmp.path())
+        .args(["doctor"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Pi session hook").not());
+}
+
+#[test]
+fn doctor_pi_hook_warns_when_pi_present_without_wai_extension() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    fs::create_dir_all(tmp.path().join(".pi/extensions")).unwrap();
+    fs::write(
+        tmp.path().join(".pi/extensions/other.ts"),
+        "pi.on(\"session_start\", async (_e, ctx) => { ctx.ui.notify(\"hi\"); });\n",
+    )
+    .unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["doctor"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Pi session hook"))
+        .stdout(predicate::str::contains("session_start"));
+}
+
+#[test]
+fn doctor_pi_hook_passes_when_wai_prime_extension_present() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    fs::create_dir_all(tmp.path().join(".pi/extensions")).unwrap();
+    fs::write(
+        tmp.path().join(".pi/extensions/wai-prime.ts"),
+        "pi.on(\"session_start\", async () => { await pi.exec(\"wai\", [\"prime\"]); });\n",
+    )
+    .unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["doctor"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Pi session hook"))
+        .stdout(predicate::str::contains("wai prime"));
+}
