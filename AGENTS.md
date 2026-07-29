@@ -15,8 +15,7 @@ When creating or evaluating tickets, distinguish:
 
 Tool tickets require Rust implementation and typically need an openspec change first (`openspec/AGENTS.md`). Maintenance tickets do not touch `src/`.
 
-<!-- WAI:START -->
-# Workflow Tools
+<!-- WAI:START --># Workflow Tools
 
 This project uses **wai** to track the *why* behind decisions — research,
 reasoning, and design choices that shaped the code. Run `wai status` first
@@ -49,6 +48,7 @@ Do NOT skip `wai close` — it enables resume detection.
 
 | Pipeline | When to Use | Start |
 |----------|-------------|-------|
+| epic-autonomy-tdd-ro5 | Use when autonomously executing one ready child issue from epic wai-fvhv without routine confirmation | `wai pipeline start epic-autonomy-tdd-ro5 --topic=<topic>` |
 | scientific-research | Frontier-level research requiring systematic validation | `wai pipeline start scientific-research --topic=<topic>` |
 
 > Pipeline steps may have gates that enforce artifact creation, review coverage, and oracle checks before advancement. Run `wai pipeline gates <name>` for details.
@@ -91,6 +91,7 @@ context before starting research or creating tickets.
 
 > **Before research or ticket creation**: always run `wai search "<topic>"` to
 > check for known patterns. Do not rediscover what is already documented.
+
 <!-- WAI:REFLECT:REF:END -->
 
 
