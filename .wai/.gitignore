@@ -1,6 +1,7 @@
 # Local-only files
 *.local
 *.cache
-# Active pipeline run state (like .git/HEAD — written by `wai pipeline run`,
-# removed by `wai pipeline advance` when the last stage completes)
+# Active pipeline run pointers (like .git/HEAD — written by `wai pipeline start`,
+# cleared by `wai close` when the run completes). Runtime-only, not committed.
 .pipeline-run
+.last-run

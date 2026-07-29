@@ -28,10 +28,18 @@ pub fn run(project: Option<String>, remember: bool) -> Result<()> {
         );
     }
 
+    // If the active pipeline run is complete, clear its pointers so `wai status`/
+    // `wai prime` stop nudging about it. The run state file is kept as history;
+    // only the active-run pointers are removed. In-progress runs are left intact.
+    let cleared_pipeline = crate::commands::pipeline::clear_complete_pipeline_run(&project_root);
+
     let context = current_context();
     let quiet = context.quiet;
 
     if !quiet {
+        if let Some(name) = &cleared_pipeline {
+            println!("✓ Cleared complete pipeline run '{}'", name);
+        }
         // Display relative path from project root
         let display_path = handoff_path
             .strip_prefix(&project_root)

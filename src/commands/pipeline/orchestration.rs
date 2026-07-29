@@ -365,6 +365,32 @@ pub fn pipeline_current_status(project_root: &Path) -> Result<Option<PipelineCur
     }))
 }
 
+// ─── clear_complete_pipeline_run ─────────────────────────────────────────────
+
+/// If the active pipeline run is complete (its `current_step` has reached the
+/// final step), clear the file-based active-run pointers so `wai status` and
+/// `wai prime` stop reporting a stale "PIPELINE ACTIVE ... complete" line.
+///
+/// Returns the completed pipeline's name when a run was cleared, so callers can
+/// report it. Returns `None` when there is no active run or the run is still in
+/// progress — in both cases the pointers are left intact.
+///
+/// The run state file itself (`.wai/pipeline-runs/<run>.yml`) is kept as a
+/// historical record; only the *active* pointers (`.wai/.pipeline-run` and
+/// `.wai/resources/pipelines/.last-run`) are removed. An active run resolved via
+/// the `WAI_PIPELINE_RUN` env var is left to the caller's environment.
+pub fn clear_complete_pipeline_run(project_root: &Path) -> Option<String> {
+    let status = pipeline_current_status(project_root).ok().flatten()?;
+    // Only clear when the run has no current step, i.e. it is complete.
+    if status.step.is_some() {
+        return None;
+    }
+    let name = status.pipeline.clone();
+    let _ = fs::remove_file(crate::config::pipeline_run_file(project_root));
+    let _ = fs::remove_file(crate::config::last_run_path(project_root));
+    name
+}
+
 // ─── resolve_active_run_id ────────────────────────────────────────────────────
 
 /// Resolve the active run ID: check `WAI_PIPELINE_RUN` env var first, then

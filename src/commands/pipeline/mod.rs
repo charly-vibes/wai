@@ -16,7 +16,7 @@ mod setup;
 
 // Re-export public items that other modules reference
 pub use definition::load_pipeline_toml;
-pub use orchestration::pipeline_current_status;
+pub use orchestration::{clear_complete_pipeline_run, pipeline_current_status};
 
 // ─── Data structures ─────────────────────────────────────────────────────────
 
