@@ -572,6 +572,17 @@ fn render_json(project_root: &std::path::Path, _project_name: &str) -> Result<()
     Ok(())
 }
 
+/// Build a genesis StatusBuilder with wai's status contributors registered.
+#[allow(dead_code)]
+///
+/// This enables cross-tool discovery of wai's health status via
+/// genesis::status::StatusBuilder.
+pub fn status_builder() -> genesis::status::StatusBuilder {
+    let mut builder = genesis::status::StatusBuilder::new();
+    builder.register_doctor("wai", crate::commands::doctor::build_doctor_runner());
+    builder
+}
+
 fn format_phase(phase: Phase) -> String {
     match phase {
         Phase::Research => "research".yellow().to_string(),

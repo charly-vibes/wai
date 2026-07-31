@@ -126,7 +126,7 @@ impl DoctorCheck for WaiCheckAdapter {
 }
 
 /// Build a DoctorRunner from all registered wai check functions.
-fn build_doctor_runner() -> genesis::doctor::DoctorRunner {
+pub(crate) fn build_doctor_runner() -> genesis::doctor::DoctorRunner {
     genesis::doctor::DoctorRunner::new(vec![
         Box::new(WaiCheckAdapter {
             name: "directory-structure",

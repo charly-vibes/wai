@@ -158,51 +158,27 @@ struct PipelineMetadataForDiscovery {
 pub fn ensure_workspace_current(project_root: &Path) -> Result<Vec<WorkspaceAction>> {
     let mut actions = Vec::new();
 
-    // Create PARA directories
+    // Create PARA + resource directories and .gitignore using genesis Scaffold
     let wai_dir = project_root.join(CONFIG_DIR);
-    let para_dirs = [
-        PROJECTS_DIR,
-        AREAS_DIR,
-        RESOURCES_DIR,
-        ARCHIVES_DIR,
-        PLUGINS_DIR,
-    ];
-
-    for dir in &para_dirs {
-        let dir_path = wai_dir.join(dir);
-        if !dir_path.exists() {
-            std::fs::create_dir_all(&dir_path).into_diagnostic()?;
-            actions.push(WorkspaceAction::new(format!("Created .wai/{}", dir)));
-        }
-    }
-
-    // Create agent-config subdirectories
     let agent_config = wai_dir.join(RESOURCES_DIR).join(AGENT_CONFIG_DIR);
-    let agent_subdirs = [SKILLS_DIR, RULES_DIR, CONTEXT_DIR];
-
-    for subdir in &agent_subdirs {
-        let subdir_path = agent_config.join(subdir);
-        if !subdir_path.exists() {
-            std::fs::create_dir_all(&subdir_path).into_diagnostic()?;
-            actions.push(WorkspaceAction::new(format!(
-                "Created .wai/resources/agent-config/{}",
-                subdir
-            )));
-        }
-    }
-
-    // Create resource subdirectories
-    let resources = wai_dir.join(RESOURCES_DIR);
-    let resource_subdirs = [TEMPLATES_DIR, PATTERNS_DIR, REFLECTIONS_DIR, "oracles"];
-
-    for subdir in &resource_subdirs {
-        let subdir_path = resources.join(subdir);
-        if !subdir_path.exists() {
-            std::fs::create_dir_all(&subdir_path).into_diagnostic()?;
-            actions.push(WorkspaceAction::new(format!(
-                "Created .wai/resources/{}",
-                subdir
-            )));
+    let scaffold_result = genesis::scaffold::Scaffold::new(project_root)
+        .dir(wai_dir.join(PROJECTS_DIR))
+        .dir(wai_dir.join(AREAS_DIR))
+        .dir(wai_dir.join(RESOURCES_DIR))
+        .dir(wai_dir.join(ARCHIVES_DIR))
+        .dir(wai_dir.join(PLUGINS_DIR))
+        .dir(agent_config.join(SKILLS_DIR))
+        .dir(agent_config.join(RULES_DIR))
+        .dir(agent_config.join(CONTEXT_DIR))
+        .dir(wai_dir.join(RESOURCES_DIR).join(TEMPLATES_DIR))
+        .dir(wai_dir.join(RESOURCES_DIR).join(PATTERNS_DIR))
+        .dir(wai_dir.join(RESOURCES_DIR).join(REFLECTIONS_DIR))
+        .dir(wai_dir.join(RESOURCES_DIR).join("oracles"))
+        .build()
+        .into_diagnostic()?;
+    for p in &scaffold_result.created {
+        if let Ok(rel) = p.strip_prefix(project_root) {
+            actions.push(WorkspaceAction::new(format!("Created {}", rel.display())));
         }
     }
 
