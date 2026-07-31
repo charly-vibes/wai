@@ -4,6 +4,8 @@ use serde::Serialize;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
+use genesis::doctor::DoctorCheck;
+
 use crate::config::{SKILLS_DIR, agent_config_dir, projects_dir};
 use crate::context::current_context;
 use crate::output::print_envelope_doctor;
@@ -75,6 +77,165 @@ impl DoctorHealthSummary {
     }
 }
 
+/// Adapter wrapping a wai check function as a genesis::doctor::DoctorCheck.
+///
+/// This enables compatibility with DoctorRunner while keeping wai's
+/// CheckResult-based check functions and closure-based fix system intact.
+/// The adapter reports pass as empty Vec (no LintResults), and converts
+/// Warn/Fail to genesis LintResults. Fix closures are NOT exposed via
+/// DoctorCheck — wai's local `apply_fixes` handles them directly.
+struct WaiCheckAdapter {
+    name: &'static str,
+    description: &'static str,
+    func: fn(&Path) -> Vec<CheckResult>,
+}
+
+impl DoctorCheck for WaiCheckAdapter {
+    fn name(&self) -> &'static str {
+        self.name
+    }
+
+    fn description(&self) -> &'static str {
+        self.description
+    }
+
+    fn run(
+        &self,
+        repo_root: &Path,
+    ) -> std::result::Result<Vec<genesis::suite_linter::LintResult>, Box<dyn std::error::Error>>
+    {
+        let results = (self.func)(repo_root);
+        let lint_results: Vec<genesis::suite_linter::LintResult> = results
+            .into_iter()
+            .filter(|cr| cr.status != Status::Pass)
+            .map(|cr| {
+                let severity = match cr.status {
+                    Status::Pass => unreachable!(),
+                    Status::Warn => genesis::suite_linter::Severity::Warning,
+                    Status::Fail => genesis::suite_linter::Severity::Error,
+                };
+                let mut lr = genesis::suite_linter::LintResult::new(cr.message, severity);
+                if let Some(fix) = cr.fix {
+                    lr = genesis::suite_linter::LintResult::with_fix(lr.message, lr.severity, &fix);
+                }
+                lr
+            })
+            .collect();
+        Ok(lint_results)
+    }
+}
+
+/// Build a DoctorRunner from all registered wai check functions.
+fn build_doctor_runner() -> genesis::doctor::DoctorRunner {
+    genesis::doctor::DoctorRunner::new(vec![
+        Box::new(WaiCheckAdapter {
+            name: "directory-structure",
+            description: "Check that all .wai/ PARA directories exist",
+            func: |root| checks_basic::check_directories(root),
+        }),
+        Box::new(WaiCheckAdapter {
+            name: "config",
+            description: "Check that config.toml is valid",
+            func: |root| vec![checks_basic::check_config(root)],
+        }),
+        Box::new(WaiCheckAdapter {
+            name: "version",
+            description: "Check that workspace version matches binary",
+            func: |root| vec![checks_basic::check_version(root)],
+        }),
+        Box::new(WaiCheckAdapter {
+            name: "plugin-tools",
+            description: "Check that detected plugin tools are available on PATH",
+            func: |root| checks_basic::check_plugin_tools(root),
+        }),
+        Box::new(WaiCheckAdapter {
+            name: "agent-config-sync",
+            description: "Check that agent config projections are in sync",
+            func: |root| checks_sync::check_agent_config_sync(root),
+        }),
+        Box::new(WaiCheckAdapter {
+            name: "skills-in-repo",
+            description: "Check that skills directory exists",
+            func: |root| check_skills_in_repo(root),
+        }),
+        Box::new(WaiCheckAdapter {
+            name: "agent-tool-coverage",
+            description: "Check for known agent tool directories",
+            func: |root| check_agent_tool_coverage(root),
+        }),
+        Box::new(WaiCheckAdapter {
+            name: "project-state",
+            description: "Check project state file integrity",
+            func: |root| checks_basic::check_project_state(root),
+        }),
+        Box::new(WaiCheckAdapter {
+            name: "custom-plugins",
+            description: "Check custom plugin definitions",
+            func: |root| checks_basic::check_custom_plugins(root),
+        }),
+        Box::new(WaiCheckAdapter {
+            name: "agent-instructions",
+            description: "Check that AGENTS.md / CLAUDE.md contain required managed blocks",
+            func: |root| check_agent_instructions(root),
+        }),
+        Box::new(WaiCheckAdapter {
+            name: "managed-block-staleness",
+            description: "Check that managed blocks are up to date",
+            func: |root| check_managed_block_staleness(root),
+        }),
+        Box::new(WaiCheckAdapter {
+            name: "pipeline-definitions",
+            description: "Check pipeline definitions for issues",
+            func: |root| check_pipeline_definitions(root),
+        }),
+        Box::new(WaiCheckAdapter {
+            name: "readme-badge",
+            description: "Check that README has wai badge",
+            func: |root| checks_basic::check_readme_badge(root),
+        }),
+        Box::new(WaiCheckAdapter {
+            name: "badge-block-consistency",
+            description: "Check that badge and managed block agree",
+            func: |root| checks_basic::check_badge_managed_block_consistency(root),
+        }),
+        Box::new(WaiCheckAdapter {
+            name: "suite-gates",
+            description: "Check suite gate configuration",
+            func: |root| checks_basic::check_suite_gates(root),
+        }),
+        Box::new(WaiCheckAdapter {
+            name: "claude-session-hook",
+            description: "Check Claude Code session hook for wai status",
+            func: |_| check_claude_session_hook(),
+        }),
+        Box::new(WaiCheckAdapter {
+            name: "wai-project-env",
+            description: "Check WAI_PROJECT environment variable",
+            func: |root| checks_basic::check_wai_project_env(root),
+        }),
+        Box::new(WaiCheckAdapter {
+            name: "artifact-locks",
+            description: "Check artifact lock file integrity",
+            func: |root| check_artifact_locks(root),
+        }),
+        Box::new(WaiCheckAdapter {
+            name: "dont-drift-signals",
+            description: "Check dont drift signal files",
+            func: |root| check_dont_drift_signals(root),
+        }),
+        Box::new(WaiCheckAdapter {
+            name: "pipeline-utilization",
+            description: "Check pipeline run utilization",
+            func: |root| check_pipeline_utilization(root),
+        }),
+        Box::new(WaiCheckAdapter {
+            name: "pi-session-hook",
+            description: "Check Pi agent session hook",
+            func: |root| check_pi_session_hook(root),
+        }),
+    ])
+}
+
 /// Collect every doctor `CheckResult` for the given project root.
 ///
 /// This is the single source of truth for the check set — both `wai doctor`
@@ -115,10 +276,13 @@ fn collect_checks(project_root: &Path) -> Vec<CheckResult> {
 /// when the workspace is not fully green. Returns `is_clean() == true` when
 /// nothing is wrong, so callers can stay silent in that case.
 pub fn health_summary(project_root: &Path) -> DoctorHealthSummary {
-    let checks = collect_checks(project_root);
+    let runner = build_doctor_runner();
+    let report = runner
+        .run(project_root, false)
+        .unwrap_or_else(|_| genesis::doctor::DoctorReport::new("wai", vec![]));
     DoctorHealthSummary {
-        warn: checks.iter().filter(|c| c.status == Status::Warn).count(),
-        fail: checks.iter().filter(|c| c.status == Status::Fail).count(),
+        warn: report.summary.warn,
+        fail: report.summary.fail,
     }
 }
 
@@ -142,35 +306,12 @@ pub fn run(fix: bool) -> Result<()> {
         }
         apply_fixes(&project_root, checks, &context)?;
     } else {
-        // In diagnostic mode, just show results
+        // In diagnostic mode, use DoctorRunner for JSON, render_human for tty
         if context.json {
-            let entries: Vec<genesis::doctor::CheckEntry> = checks
-                .iter()
-                .map(|c| {
-                    let status = match c.status {
-                        Status::Pass => genesis::doctor::CheckStatus::Pass,
-                        Status::Warn => genesis::doctor::CheckStatus::Warn,
-                        Status::Fail => genesis::doctor::CheckStatus::Fail,
-                    };
-                    // Use name as description since wai checks don't have a separate description field
-                    let desc = c.name.clone();
-                    match status {
-                        genesis::doctor::CheckStatus::Pass => {
-                            genesis::doctor::CheckEntry::pass(&c.name, &desc, &c.message)
-                        }
-                        genesis::doctor::CheckStatus::Warn => {
-                            genesis::doctor::CheckEntry::warn(&c.name, &desc, &c.message)
-                        }
-                        genesis::doctor::CheckStatus::Fail => genesis::doctor::CheckEntry::fail(
-                            &c.name,
-                            &desc,
-                            &c.message,
-                            c.fix.clone(),
-                        ),
-                    }
-                })
-                .collect();
-            let report = genesis::doctor::DoctorReport::new("wai", entries);
+            let runner = build_doctor_runner();
+            let report = runner
+                .run(&project_root, false)
+                .map_err(|e| miette::miette!("{}", e))?;
             crate::output::print_json(&report.to_envelope())?;
         } else {
             render_human(&checks, &summary)?;

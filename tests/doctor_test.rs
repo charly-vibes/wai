@@ -97,7 +97,7 @@ fn doctor_corrupted_project_state_reports_fail() {
         .code(1)
         .stdout(
             predicate::str::contains("\"status\": \"fail\"")
-                .and(predicate::str::contains("Project state: broken")),
+                .and(predicate::str::contains("project-state")),
         );
 }
 
