@@ -1,2 +1,4 @@
 sync:
     mode: dolt-native
+
+sync.remote: "git+ssh://git@cv/charly-vibes/wai.git"
