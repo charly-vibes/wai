@@ -151,9 +151,7 @@ pub fn run(cli: Cli, guide: &Guide) -> Result<()> {
         }),
         Some(Commands::Completions { shell }) => {
             let mut cmd = crate::cli::Cli::command();
-            let name = cmd.get_name().to_string();
-            clap_complete::generate(shell, &mut cmd, &name, &mut std::io::stdout());
-            Ok(())
+            genesis::cli::generate_completions(&mut cmd, shell).into_diagnostic()
         }
         Some(Commands::External(args)) => match run_external(args, guide) {
             Ok(_) => Ok(()),

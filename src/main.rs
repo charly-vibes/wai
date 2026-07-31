@@ -40,40 +40,13 @@ fn main() -> Result<()> {
     }))
     .ok();
 
-    let args: Vec<String> = std::env::args().collect();
-
     // Handle --version --json before clap processes it (clap's built-in --version
     // doesn't participate in the global --json flag)
-    let has_version = args.iter().any(|a| {
-        a == "--version"
-            || a == "-V"
-            || (a.starts_with("-") && !a.starts_with("--") && a.contains('V') && !a.contains('h'))
-    });
-    if has_version
-        && !args
-            .iter()
-            .any(|a| a == "--help" || a == "-h" || a == "-jh")
-    {
-        let has_json = args.iter().any(|a| {
-            a == "--json"
-                || a == "-j"
-                || (a.starts_with("-j") && !a.starts_with("--") && !a.contains('h'))
-        });
-        if has_json {
-            use genesis::envelope::Envelope;
-            let envelope = Envelope::success(
-                genesis::envelope::EnvelopeKind::Version,
-                serde_json::json!({
-                    "name": "wai",
-                    "version": cli::VERSION
-                }),
-                vec![],
-                vec![],
-            );
-            let _ = print_json_line(&envelope);
-            return Ok(());
-        }
+    if genesis::cli::maybe_print_version_json("wai", cli::VERSION) {
+        return Ok(());
     }
+
+    let args: Vec<String> = std::env::args().collect();
 
     if let Some(output) = help::try_render_help(&args) {
         print!("{}", output);
