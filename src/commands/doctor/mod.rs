@@ -50,12 +50,6 @@ impl Serialize for CheckResult {
     }
 }
 
-#[derive(Serialize)]
-struct DoctorPayload {
-    checks: Vec<CheckResult>,
-    summary: Summary,
-}
-
 #[derive(Debug, Clone, Serialize)]
 struct Summary {
     pass: usize,
@@ -150,11 +144,34 @@ pub fn run(fix: bool) -> Result<()> {
     } else {
         // In diagnostic mode, just show results
         if context.json {
-            let payload = DoctorPayload {
-                checks,
-                summary: summary.clone(),
-            };
-            print_envelope_doctor(payload)?;
+            let entries: Vec<genesis::doctor::CheckEntry> = checks
+                .iter()
+                .map(|c| {
+                    let status = match c.status {
+                        Status::Pass => genesis::doctor::CheckStatus::Pass,
+                        Status::Warn => genesis::doctor::CheckStatus::Warn,
+                        Status::Fail => genesis::doctor::CheckStatus::Fail,
+                    };
+                    // Use name as description since wai checks don't have a separate description field
+                    let desc = c.name.clone();
+                    match status {
+                        genesis::doctor::CheckStatus::Pass => {
+                            genesis::doctor::CheckEntry::pass(&c.name, &desc, &c.message)
+                        }
+                        genesis::doctor::CheckStatus::Warn => {
+                            genesis::doctor::CheckEntry::warn(&c.name, &desc, &c.message)
+                        }
+                        genesis::doctor::CheckStatus::Fail => genesis::doctor::CheckEntry::fail(
+                            &c.name,
+                            &desc,
+                            &c.message,
+                            c.fix.clone(),
+                        ),
+                    }
+                })
+                .collect();
+            let report = genesis::doctor::DoctorReport::new("wai", entries);
+            crate::output::print_json(&report.to_envelope())?;
         } else {
             render_human(&checks, &summary)?;
         }
