@@ -37,7 +37,12 @@ phase: research
 ```
  M .beads/backup/backup_state.json
  M .beads/interactions.jsonl
- D .wai/projects/qa-round-execution/.pending-resume
+M  .beads/issues.jsonl
+ M .wai/config.toml
+ M src/commands/close.rs
+ M src/commands/pipeline/mod.rs
+ M src/commands/pipeline/orchestration.rs
+ M tests/close_test.rs
 ```
 
 ### open_issues
@@ -81,16 +86,14 @@ phase: research
 └── ○ wai-fvhv.110 ● P3 Docs: strengthen guidance for `wai plugin` management and passthrough behavior
 ○ wai-42ig ● P2 Write ADR: command taxonomy and admission criteria
 ○ wai-ekwq ● P2 Detail docs IA restructuring work
-○ wai-j56n ● P2 Surface wai doctor warnings in wai status and wai prime (automatic health awareness)
-○ wai-knbl ● P2 wai prime should highlight available pipelines and suggest starting one
+○ wai-pa3b ● P2 [bug] wai close should clear stale complete pipeline-run pointer
 ○ wai-wra0 ● P2 Design: absorb sync into doctor --fix
 ○ wai-4z3q ● P3 Add --dry-run flag to wai import
 ○ wai-anez ● P3 Strengthen tutorial exit CTA
-○ wai-hfgz ● P3 Add wai doctor check for pi session hook (wai prime on session start)
 ○ wai-ocx7 ● P3 Add guided first-use output to wai pipeline (bare subcommand)
 
 --------------------------------------------------------------------------------
-Total: 45 issues (45 open, 0 in progress)
+Total: 43 issues (43 open, 0 in progress)
 
 Status: ○ open  ◐ in_progress  ● blocked  ✓ closed  ❄ deferred
 ```

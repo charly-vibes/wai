@@ -86,6 +86,10 @@ setup:
     @echo "✅ Development environment ready"
     @echo "Run 'just test' to verify setup"
 
+# Regenerate llms.txt and llm.txt from aix module metadata
+aix-gen:
+    cargo run --example gen-aix
+
 # === Docs Commands ===
 
 # Build docs locally (requires mdbook)

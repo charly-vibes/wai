@@ -5,6 +5,18 @@ use crate::config::{CONFIG_DIR, LlmConfig, ProjectConfig, ProjectSettings};
 use crate::context::current_context;
 use crate::workspace::{ensure_workspace_current, sync_tool_commit};
 
+/// Register wai in the shared genesis tool manifest (.genesis/tools.toml).
+fn register_in_genesis_discovery(project_root: &std::path::Path) {
+    // Best-effort: silently skip if genesis dep is absent or write fails.
+    let _ = genesis::discovery::register(
+        project_root,
+        "wai",
+        "Workflow manager for AI-assisted development",
+        "directory",
+        ".wai",
+    );
+}
+
 pub fn run(name: Option<String>) -> Result<()> {
     let current_dir = std::env::current_dir().into_diagnostic()?;
     let config_dir = current_dir.join(CONFIG_DIR);
@@ -51,6 +63,9 @@ pub fn run(name: Option<String>) -> Result<()> {
         if let Some(action) = sync_tool_commit(&current_dir)? {
             actions.push(action);
         }
+
+        // Re-register in genesis tool manifest (ensures .genesis/tools.toml is up to date)
+        register_in_genesis_discovery(&current_dir);
 
         if !quiet {
             if context.json {
@@ -157,6 +172,9 @@ pub fn run(name: Option<String>) -> Result<()> {
 
     // Create/repair all workspace artifacts using shared function
     let actions = ensure_workspace_current(&current_dir)?;
+
+    // Register wai in the shared genesis tool manifest
+    register_in_genesis_discovery(&current_dir);
 
     // Auto-commit .wai/ to git if inside a repo
     let git_committed = if current_dir.join(".git").exists() {

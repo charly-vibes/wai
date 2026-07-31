@@ -4,7 +4,9 @@
 
 ## What It Does
 
-wai is a CLI tool that helps teams document the reasoning, research, and design decisions that shaped their code. When you revisit a project later, wai tells you *why* it was built that way.
+wai is a CLI tool that helps teams document the reasoning, research, and design
+decisions that shaped their code. When you revisit a project later, wai tells you
+*why* it was built that way.
 
 - **Artifact tracking** — research, design, and plan documents organized by project and phase
 - **PARA method** — Projects / Areas / Resources / Archives structure
@@ -19,19 +21,17 @@ wai is a CLI tool that helps teams document the reasoning, research, and design 
 ```
 wai init                    # Initialize in current directory
 wai status                  # Project status and suggestions
+wai prime                   # Orient at session start
 wai add research "..."      # Add research artifact
 wai add design "..."        # Add design artifact
 wai add plan "..."          # Add plan artifact
-wai search "query"          # Search all artifacts
-wai phase next              # Advance project phase
-wai prime                   # Orient at session start
 wai close                   # Session handoff
 wai why "why X?"            # LLM-powered reasoning oracle
 wai reflect                 # Synthesize context into CLAUDE.md
-wai way                     # Check repository best practices
 wai doctor                  # Workspace health check
 wai sync                    # Sync agent configs
-wai feedback bug            # File an issue against this tool's repo with context attached
+wai pipeline start          # Run an automated workflow pipeline
+wai feedback bug            # File an issue with context attached
 ```
 
 ## Project Structure
@@ -59,18 +59,29 @@ src/
 │   ├── search.rs       # wai search
 │   └── ...
 ├── plugin.rs           # Plugin detection and dispatch
-├── output.rs           # JSON output (wraps genesis::envelope for --json)
-├── managed_block.rs    # Content generation (injector from genesis::managed_block)
+├── output.rs           # JSON output (wraps genesis::envelope)
+├── managed_block.rs    # Content generation (via genesis::managed_block)
 └── config.rs           # Config loading and paths
+```
 
 ## Shared Infrastructure
 
 wai is a consumer of the **genesis** shared crate (https://github.com/charly-vibes/genesis):
-- `genesis::suggestions` — typo detection and `SuggestionEngine` (was local `src/suggestions.rs`)
-- `genesis::managed_block` — `BlockInjector` for `<!-- WAI:START -->/<!-- WAI:END -->` blocks
-- `genesis::envelope` — shared `Envelope` for all `--json` output
 
-```
+- `genesis::envelope` — Envelope, EnvelopeKind, ErrorResult
+- `genesis::suggestions` — Suggestion, SuggestionEngine
+- `genesis::managed_block` — managed block injector
+- `genesis::aix` — agents_block generation
+- `genesis::config` — ConfigFile trait, ConfigRegistry
+- `genesis::guide` — Verbosity, OutputFormat
+- `genesis::fixture` — Fixture builder
+- `genesis::feedback` — handle_feedback(), FeedbackArgs
+- `genesis::suite_linter` — LintCheck trait
+- `genesis::doctor` — DoctorCheck trait, DoctorRunner, DoctorReport
+- `genesis::cli` — completions, version-json pre-parse
+- `genesis::status` — StatusContributor, StatusBuilder, DoctorStatusBridge
+- `genesis::scaffold` — Scaffold builder
+- `genesis::discovery` — tool manifest registration
 
 ## Installation
 
@@ -79,11 +90,12 @@ wai is a consumer of the **genesis** shared crate (https://github.com/charly-vib
 brew tap charly-vibes/charly && brew install wai
 
 # Cargo
-cargo install --path .
+cargo install wai-cli
 ```
 
 ## Links
 
-- Repository: https://github.com/charly-vibes/wai
-- Issues: https://github.com/charly-vibes/wai/issues
+- Repository: https://github.com/gastownhall/wai
+- crates.io: https://crates.io/crates/wai-cli
 - Changelog: CHANGELOG.md
+- charly-vibes suite: https://charly-vibes.github.io/charly-vibes/

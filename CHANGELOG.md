@@ -5,6 +5,24 @@ All notable changes to wai will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Calendar Versioning](https://calver.org/) (YYYY.M.MICRO).
 
+## [2026.7.31] - 2026-07-31
+
+### Added
+
+- **Full genesis v0.4.0 adoption** — all 14 genesis modules now adopted:
+  - `discovery` — wai registers in `.genesis/tools.toml` during `wai init`
+  - `aix` — AIX artifact generation via `examples/gen-aix.rs`; run `just aix-gen`
+  - `fixture` — shared `Fixture` builder for test environments
+  - `cli`, `doctor`, `status`, `scaffold` — adopted this cycle
+- **`just aix-gen`** — regenerate `llms.txt` and `llm.txt` from tool metadata
+- **Fixture tests** — `tests/genesis_fixture_test.rs` demonstrates genesis::fixture::Fixture pattern
+
+### Changed
+
+- **llms.txt / llm.txt** — now generated from `examples/gen-aix.rs` instead of manually maintained
+
+---
+
 ## [2026.7.29] - 2026-07-29
 
 ### Added
