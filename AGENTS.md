@@ -17,6 +17,13 @@ Tool tickets require Rust implementation and typically need an openspec change f
 
 <!-- WAI:START --># Workflow Tools
 
+## PRIMARY OBJECTIVE
+
+Support and evolve **wai** — the workflow manager for AI-driven development —
+by shipping correct, well-tested, well-governed changes to the Rust CLI.
+Every action should trace back to: does this make wai more reliable,
+more capable, or better documented for its users?
+
 This project uses **wai** to track the *why* behind decisions — research,
 reasoning, and design choices that shaped the code. Run `wai status` first
 to orient yourself.
@@ -59,18 +66,7 @@ If `.wai/resources/ubiquitous-language/README.md` exists, read it first as the
 navigation index, then open only the bounded-context files relevant to the task.
 Avoid loading every terminology file unless the work truly spans multiple contexts.
 
-## Autonomous Work Policy
 
-Proceed without routine confirmation when the next step is clear.
-Do not ask to continue, fix, or commit — just do it.
-
-**Stop and ask** only when:
-- Conflicting requirements or ambiguous intent
-- Destructive actions (data loss, force-push, drop table)
-- Credentials, secrets, or external services not yet authorized
-- Unresolved test failures after two attempts
-- Push, deploy, or release — always get explicit authorization
-- Context approaching 40% — recommend `wai close` then `/clear`
 
 ## Detailed Instructions
 
@@ -78,9 +74,64 @@ Full workflow reference — session lifecycle, capturing work, command cheat
 sheets, cross-tool sync, and PARA structure — lives in **`.wai/AGENTS.md`**.
 Read it at the start of your first session or when you need detailed guidance.
 
+## PRIMARY OBJECTIVE (echo)
+
+Support and evolve **wai** — the workflow manager for AI-driven development —
+by shipping correct, well-tested, well-governed changes to the Rust CLI.
+Every action should trace back to: does this make wai more reliable,
+more capable, or better documented for its users?
+
 Keep this managed block so `wai init` can refresh the instructions.
 
 <!-- WAI:END -->
+
+## Behavioral Constraints
+
+These constraints are **persistent** — they live outside the WAI managed
+block so they survive `wai init`. Do not remove or edit them without
+deliberate intent.
+
+### Prohibited (DON'T)
+
+- **DON'T** make breaking changes without an openspec proposal and approval
+- **DON'T** push directly to main — all changes go through feature branches with PR review
+- **DON'T** modify `<!-- WAI: -->` / `<!-- OPENSPEC: -->` / `<!-- BEADS: -->` managed blocks — they are overwritten by tool commands
+- **DON'T** skip tests, clippy, or fmt — CI gates are mandatory
+- **DON'T** refactor code without test coverage for the refactored paths
+- **DON'T** commit generated artifacts (`target/`, vendored deps)
+
+### Stop and Ask
+
+Pause and request human input when any of these triggers fire:
+1. **Ambiguity** — the ticket text itself is contradictory or underspecified
+2. **Scope uncertainty** — the ticket is clear but the change naturally touches code or features not mentioned in it
+3. **Irreversibility** — data loss, force-push, schema migration, or destructive action
+4. **Secrets/credentials** — any external service, API key, or credential not yet authorized
+5. **Test failure persistence** — unresolved test failure after two repair attempts, or the same failure across 3 different approaches
+6. **Push/release** — pushing to remote, creating a release, or deploying
+7. **Context saturation** — context approaching ~40%; recommend `wai close` then `/clear`
+
+### Minimal Footprint
+
+- Prefer small, focused changes over large refactors — one ticket, one concern
+- Delete unused code, don't leave commented-out code behind
+- Keep PRs under 400 lines changed. If you cannot, split the work into multiple PRs before proceeding.
+- Use existing abstractions (genesis, wai patterns) before introducing new ones
+- Do not add dependencies unless the cost is justified by the benefit
+
+### Drift Detection
+
+Proceed without routine confirmation when the next step is clear.
+Do not ask to continue, fix, or commit — just do it. After each major
+action (edit, test run, commit), pause and self-check:
+1. **ALIGNMENT** — does this still serve the PRIMARY OBJECTIVE?
+2. **SCOPE** — did I stay within the ticket scope or did I expand into unticketed work?
+3. **FOOTPRINT** — did I leave dead code, debug prints, or unnecessary changes?
+4. **GOVERNANCE** — did I follow openspec workflow for spec changes?
+
+If any check fails: undo the last change (`git checkout -- <files>` for
+uncommitted edits, `git revert HEAD` for committed) before proceeding,
+or open a follow-up ticket.
 
 <!-- WAI:REFLECT:REF:START -->
 ## Accumulated Project Patterns
