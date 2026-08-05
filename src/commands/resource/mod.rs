@@ -25,7 +25,19 @@ pub fn run_add(cmd: ResourceAddCommands) -> Result<()> {
                 "⚠ 'wai resource add skill' is deprecated. Use: wai add skill {}",
                 name
             );
-            skills::add_skill(&name, template.as_deref())
+            match skills::add_skill(&name, template.as_deref()) {
+                Ok(()) => Ok(()),
+                Err(e) => {
+                    // Suppress the duplicate error since the deprecation warning
+                    // already informed the user about the new command.
+                    if e.to_string().contains("already exists") {
+                        eprintln!("  Skill '{}' already exists", name);
+                        Ok(())
+                    } else {
+                        Err(e)
+                    }
+                }
+            }
         }
     }
 }

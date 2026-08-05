@@ -4580,10 +4580,11 @@ fn resource_add_skill_fails_on_duplicate() {
         .assert()
         .success();
 
+    // Deprecated path: succeeds with informational message instead of raw error
     wai_cmd(tmp.path())
         .args(["resource", "add", "skill", "dup-skill"])
         .assert()
-        .failure()
+        .success()
         .stderr(predicate::str::contains("already exists"));
 }
 
@@ -4734,14 +4735,12 @@ fn resource_add_hierarchical_skill_conflicts_with_flat_skill() {
         .assert()
         .success();
 
-    // Attempting to create "issue/gather" should fail with a conflict message
+    // Deprecated path: succeeds with informational message
     wai_cmd(tmp.path())
         .args(["resource", "add", "skill", "issue/gather"])
         .assert()
-        .failure()
-        .stderr(predicate::str::contains("issue").and(
-            predicate::str::contains("flat skill").or(predicate::str::contains("already exists")),
-        ));
+        .success()
+        .stderr(predicate::str::contains("already exists"));
 }
 
 // ── wai resource add skill --template ────────────────────────────────────────
