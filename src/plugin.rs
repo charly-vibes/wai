@@ -437,17 +437,29 @@ pub fn execute_hook(project_root: &Path, hook: &HookDef) -> Option<HookOutput> {
         .spawn()
         .ok()?;
 
-    // Wrap in Arc<Mutex<>> so both the waiter thread and the timeout path can
-    // access the child handle.
+    let _pid = child.id();
     let child = Arc::new(Mutex::new(child));
     let child_thread = Arc::clone(&child);
 
-    let (tx, rx) = mpsc::channel();
+    let (tx, rx): (mpsc::Sender<std::io::Result<std::process::ExitStatus>>, _) = mpsc::channel();
     std::thread::spawn(move || {
-        // `wait_with_output` consumes the Child, but we hold it behind a Mutex.
-        // Instead, use `wait` to get the exit status, then read stdout separately.
-        let result = child_thread.lock().unwrap().wait();
-        let _ = tx.send(result);
+        // Poll try_wait() in a loop so the mutex is released between iterations,
+        // allowing the timeout path to acquire it for kill().
+        // IMPORTANT: extract the result before the match so the MutexGuard
+        // is dropped before the sleep (Rust edition 2024 scoping rules).
+        loop {
+            let exited = child_thread.lock().unwrap().try_wait().ok().flatten();
+            match exited {
+                Some(status) => {
+                    let _ = tx.send(Ok(status));
+                    break;
+                }
+                None => {
+                    std::thread::sleep(Duration::from_millis(50));
+                    continue;
+                }
+            }
+        }
     });
 
     match rx.recv_timeout(PLUGIN_TIMEOUT) {
@@ -475,7 +487,11 @@ pub fn execute_hook(project_root: &Path, hook: &HookDef) -> Option<HookOutput> {
         Ok(Err(_)) => None,
         Err(_) => {
             // Timed out — terminate the child process.
+            // The waiter thread releases the mutex between try_wait() calls,
+            // so we can acquire it here (unlike the old wait() which held it).
             let _ = child.lock().unwrap().kill();
+            // Wait briefly for the waiter thread to reap the child.
+            let _ = rx.recv_timeout(Duration::from_secs(2));
             None
         }
     }
@@ -711,17 +727,36 @@ pub fn execute_passthrough(
     let child = Arc::new(Mutex::new(child));
     let child_thread = Arc::clone(&child);
 
-    let (tx, rx) = mpsc::channel();
+    let (tx, rx): (mpsc::Sender<std::io::Result<std::process::ExitStatus>>, _) = mpsc::channel();
     std::thread::spawn(move || {
-        let result = child_thread.lock().unwrap().wait();
-        let _ = tx.send(result);
+        // Poll try_wait() in a loop so the mutex is released between iterations,
+        // allowing the timeout path to acquire it for kill().
+        // IMPORTANT: extract the result before the match so the MutexGuard
+        // is dropped before the sleep (Rust edition 2024 scoping rules).
+        loop {
+            let exited = child_thread.lock().unwrap().try_wait().ok().flatten();
+            match exited {
+                Some(status) => {
+                    let _ = tx.send(Ok(status));
+                    break;
+                }
+                None => {
+                    std::thread::sleep(Duration::from_millis(50));
+                    continue;
+                }
+            }
+        }
     });
 
     match rx.recv_timeout(PLUGIN_TIMEOUT) {
         Ok(result) => result,
         Err(_) => {
             // Timed out — kill the child and report an error.
+            // The waiter thread releases the mutex between try_wait() calls,
+            // so we can acquire it here (unlike the old wait() which held it).
             let _ = child.lock().unwrap().kill();
+            // Wait briefly for the waiter thread to reap the child.
+            let _ = rx.recv_timeout(Duration::from_secs(2));
             Err(std::io::Error::new(
                 std::io::ErrorKind::TimedOut,
                 "plugin command exceeded 30-second timeout",
@@ -1027,5 +1062,42 @@ inject_as = "evil_marker"
             Some(v) => unsafe { std::env::set_var("WAI_DATA_DIR", v) },
             None => unsafe { std::env::remove_var("WAI_DATA_DIR") },
         }
+    }
+
+    // ── timeout ───────────────────────────────────────────────────────────────
+
+    #[test]
+    fn execute_hook_timeout_kills_hung_process() {
+        // A process that sleeps for 60 seconds should be killed by the 30s timeout.
+        let hook = HookDef {
+            command: "sleep 60".to_string(),
+            inject_as: "timeout_test".to_string(),
+        };
+        let tmp = TempDir::new().unwrap();
+        let start = std::time::Instant::now();
+        let result = execute_hook(tmp.path(), &hook);
+        let elapsed = start.elapsed();
+
+        // Must complete in well under 60 seconds (the sleep duration).
+        assert!(
+            elapsed < Duration::from_secs(40),
+            "hook must be killed within timeout, took {:.1}s",
+            elapsed.as_secs_f64()
+        );
+        // The killed process produces no output.
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn execute_hook_no_deadlock_on_fast_command() {
+        // A fast command should complete normally (no timeout, no deadlock).
+        let hook = HookDef {
+            command: "echo 'hello'".to_string(),
+            inject_as: "fast_test".to_string(),
+        };
+        let tmp = TempDir::new().unwrap();
+        let result = execute_hook(tmp.path(), &hook);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().label, "fast_test");
     }
 }
