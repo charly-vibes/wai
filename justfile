@@ -46,9 +46,9 @@ test-one name:
 
 # === Lint Commands ===
 
-# Run clippy linter
+# Run clippy linter (checks all targets, including tests)
 lint:
-    cargo clippy -- -D warnings
+    cargo clippy --all-targets -- -D warnings
 
 # Format all Rust files
 fmt:
