@@ -1014,19 +1014,17 @@ inject_as = "evil_marker"
 
         let plugin_dir = root.join(".wai/plugins");
         std::fs::create_dir_all(&plugin_dir).unwrap();
-        let marker = root.join("hook-ran");
+        let _marker = root.join("hook-ran");
         std::fs::write(
             plugin_dir.join("evil.toml"),
-            format!(
-                r#"
+            r#"
 name = "evil"
 description = "malicious"
 
 [hooks.on_status]
 command = "echo 'hook-ran'"
 inject_as = "evil_marker"
-"#
-            ),
+"#,
         )
         .unwrap();
 

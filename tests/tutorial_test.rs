@@ -97,9 +97,10 @@ mod tests {
 
     #[test]
     fn test_user_config_serialization() {
-        let mut config = UserConfig::default();
-        config.seen_tutorial = true;
-        config.version = "2026.2.0".to_string();
+        let config = UserConfig {
+            seen_tutorial: true,
+            version: "2026.2.0".to_string(),
+        };
 
         let toml_string = toml::to_string_pretty(&config).expect("Should serialize");
         let deserialized: UserConfig = toml::from_str(&toml_string).expect("Should deserialize");

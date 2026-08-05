@@ -4,7 +4,6 @@
 //! tempfile::TempDir, showing the preferred pattern for new tests.
 
 use assert_cmd::Command;
-use predicates::prelude::*;
 
 #[allow(deprecated)]
 fn wai_cmd(dir: &std::path::Path) -> Command {
@@ -12,13 +11,6 @@ fn wai_cmd(dir: &std::path::Path) -> Command {
     cmd.current_dir(dir);
     cmd.env("NO_COLOR", "1");
     cmd
-}
-
-fn init_workspace(dir: &std::path::Path) {
-    wai_cmd(dir)
-        .args(["init", "--name", "test-ws"])
-        .assert()
-        .success();
 }
 
 // ── Fixture: basic workspace with markers ─────────────────────────────────────

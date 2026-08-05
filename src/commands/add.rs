@@ -447,12 +447,129 @@ fn get_content(content: Option<&str>, file: Option<&str>) -> Result<String> {
     ))
 }
 
+/// Check if an artifact has any associated .lock sidecar files.
+///
+/// Lock files follow the naming convention `<artifact-filename>.<run-id>.lock`
+/// in the same directory as the artifact. Returns `true` if at least one such
+/// file exists.
+fn has_lock_file(artifact_path: &str) -> bool {
+    let path = std::path::Path::new(artifact_path);
+    let dir = match path.parent() {
+        Some(d) => d,
+        None => return false,
+    };
+    let filename = match path.file_name() {
+        Some(f) => f.to_string_lossy(),
+        None => return false,
+    };
+    let prefix = format!("{}.", filename);
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.starts_with(&prefix) && name.ends_with(".lock") {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Warn when `--corrects` targets an artifact whose pipeline step is not locked.
+///
+/// This is informational only — the addendum is still created regardless.
+fn warn_if_unlocked(corrects_path: &str, step_id: &str) -> Result<()> {
+    if !has_lock_file(corrects_path) && !current_context().quiet {
+        cliclack::log::warning(format!(
+            "Step '{}' is not locked — consider editing the original artifact directly.",
+            step_id
+        ))
+        .into_diagnostic()?;
+    }
+    Ok(())
+}
+
+/// Extract `pipeline-step:<id>` tag from an artifact's YAML frontmatter.
+///
+/// Returns `None` gracefully if the file cannot be read, has no frontmatter,
+/// or contains no `pipeline-step:` tag.
+fn resolve_pipeline_step_from_artifact(path: &str) -> Option<String> {
+    let content = std::fs::read_to_string(path).ok()?;
+    if !content.starts_with("---\n") {
+        return None;
+    }
+    let end = content[4..].find("---\n")?;
+    let fm = &content[4..4 + end];
+    for line in fm.lines() {
+        if line.starts_with("tags:") {
+            for tag in line
+                .trim_start_matches("tags:")
+                .trim()
+                .trim_matches(|c| c == '[' || c == ']')
+                .split(',')
+            {
+                let tag = tag.trim();
+                if let Some(step) = tag.strip_prefix("pipeline-step:") {
+                    return Some(step.to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
 /// Build the final tags list: user-supplied tags merged with the auto-injected
 /// `pipeline-run:<id>` tag when an active pipeline run can be resolved.
 ///
 /// Resolution order (first non-empty value wins):
 ///   1. `WAI_PIPELINE_RUN` environment variable (backwards-compatible).
 ///   2. `.wai/resources/pipelines/.last-run` pointer file (written by `wai pipeline start`).
+fn build_tags(user_tags: Option<&str>, project_root: &std::path::Path) -> Vec<String> {
+    let mut tags: Vec<String> = Vec::new();
+
+    if let Some(t) = user_tags {
+        tags.extend(
+            t.split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty()),
+        );
+    }
+
+    // Resolve active pipeline run: env var first (backwards compat), then state file.
+    let active_run = std::env::var("WAI_PIPELINE_RUN")
+        .ok()
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+        .or_else(|| read_pipeline_run_state(project_root));
+
+    if let Some(ref run_id) = active_run {
+        tags.push(format!("pipeline-run:{}", run_id));
+
+        // Also inject pipeline-step:<step-id> from the run state + definition.
+        if let Some(step_id) = resolve_current_step_id(project_root, run_id) {
+            tags.push(format!("pipeline-step:{}", step_id));
+        }
+    }
+
+    tags
+}
+
+/// Resolve the current step ID by reading the pipeline run state and definition.
+///
+/// Returns `None` gracefully if anything fails (missing files, parse errors,
+/// step index out of bounds), so it never breaks artifact creation.
+fn resolve_current_step_id(project_root: &std::path::Path, run_id: &str) -> Option<String> {
+    let runs_dir = crate::config::wai_dir(project_root).join("pipeline-runs");
+    let run_path = runs_dir.join(format!("{}.yml", run_id));
+    let content = std::fs::read_to_string(&run_path).ok()?;
+    let run: super::pipeline::PipelineRun = serde_yml::from_str(&content).ok()?;
+
+    let def_path =
+        crate::config::pipelines_dir(project_root).join(format!("{}.toml", run.pipeline));
+    let definition = super::pipeline::load_pipeline_toml(&def_path).ok()?;
+
+    definition.steps.get(run.current_step).map(|s| s.id.clone())
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -470,7 +587,7 @@ mod tests {
         let mut file_content = String::new();
         let all_tags: Vec<String> = vec![];
         // Replicate the frontmatter logic from run()
-        if !all_tags.is_empty() || true {
+        if true {
             file_content.push_str("---\n");
             if !all_tags.is_empty() {
                 file_content.push_str(&format!("tags: [{}]\n", all_tags.join(", ")));
@@ -497,7 +614,7 @@ mod tests {
     #[test]
     fn bead_and_tags_both_written_when_both_provided() {
         let bead_id = "wai-abc";
-        let tags = vec!["research".to_string(), "design".to_string()];
+        let tags = ["research".to_string(), "design".to_string()];
         let mut file_content = String::new();
         file_content.push_str("---\n");
         if !tags.is_empty() {
@@ -852,121 +969,4 @@ current_step: 0
             "warn_if_unlocked should not error when locked"
         );
     }
-}
-
-/// Check if an artifact has any associated .lock sidecar files.
-///
-/// Lock files follow the naming convention `<artifact-filename>.<run-id>.lock`
-/// in the same directory as the artifact. Returns `true` if at least one such
-/// file exists.
-fn has_lock_file(artifact_path: &str) -> bool {
-    let path = std::path::Path::new(artifact_path);
-    let dir = match path.parent() {
-        Some(d) => d,
-        None => return false,
-    };
-    let filename = match path.file_name() {
-        Some(f) => f.to_string_lossy(),
-        None => return false,
-    };
-    let prefix = format!("{}.", filename);
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let name = entry.file_name().to_string_lossy().to_string();
-            if name.starts_with(&prefix) && name.ends_with(".lock") {
-                return true;
-            }
-        }
-    }
-    false
-}
-
-/// Warn when `--corrects` targets an artifact whose pipeline step is not locked.
-///
-/// This is informational only — the addendum is still created regardless.
-fn warn_if_unlocked(corrects_path: &str, step_id: &str) -> Result<()> {
-    if !has_lock_file(corrects_path) && !current_context().quiet {
-        cliclack::log::warning(format!(
-            "Step '{}' is not locked — consider editing the original artifact directly.",
-            step_id
-        ))
-        .into_diagnostic()?;
-    }
-    Ok(())
-}
-
-/// Extract `pipeline-step:<id>` tag from an artifact's YAML frontmatter.
-///
-/// Returns `None` gracefully if the file cannot be read, has no frontmatter,
-/// or contains no `pipeline-step:` tag.
-fn resolve_pipeline_step_from_artifact(path: &str) -> Option<String> {
-    let content = std::fs::read_to_string(path).ok()?;
-    if !content.starts_with("---\n") {
-        return None;
-    }
-    let end = content[4..].find("---\n")?;
-    let fm = &content[4..4 + end];
-    for line in fm.lines() {
-        if line.starts_with("tags:") {
-            for tag in line
-                .trim_start_matches("tags:")
-                .trim()
-                .trim_matches(|c| c == '[' || c == ']')
-                .split(',')
-            {
-                let tag = tag.trim();
-                if let Some(step) = tag.strip_prefix("pipeline-step:") {
-                    return Some(step.to_string());
-                }
-            }
-        }
-    }
-    None
-}
-
-fn build_tags(user_tags: Option<&str>, project_root: &std::path::Path) -> Vec<String> {
-    let mut tags: Vec<String> = Vec::new();
-
-    if let Some(t) = user_tags {
-        tags.extend(
-            t.split(',')
-                .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty()),
-        );
-    }
-
-    // Resolve active pipeline run: env var first (backwards compat), then state file.
-    let active_run = std::env::var("WAI_PIPELINE_RUN")
-        .ok()
-        .map(|v| v.trim().to_string())
-        .filter(|v| !v.is_empty())
-        .or_else(|| read_pipeline_run_state(project_root));
-
-    if let Some(ref run_id) = active_run {
-        tags.push(format!("pipeline-run:{}", run_id));
-
-        // Also inject pipeline-step:<step-id> from the run state + definition.
-        if let Some(step_id) = resolve_current_step_id(project_root, run_id) {
-            tags.push(format!("pipeline-step:{}", step_id));
-        }
-    }
-
-    tags
-}
-
-/// Resolve the current step ID by reading the pipeline run state and definition.
-///
-/// Returns `None` gracefully if anything fails (missing files, parse errors,
-/// step index out of bounds), so it never breaks artifact creation.
-fn resolve_current_step_id(project_root: &std::path::Path, run_id: &str) -> Option<String> {
-    let runs_dir = crate::config::wai_dir(project_root).join("pipeline-runs");
-    let run_path = runs_dir.join(format!("{}.yml", run_id));
-    let content = std::fs::read_to_string(&run_path).ok()?;
-    let run: super::pipeline::PipelineRun = serde_yml::from_str(&content).ok()?;
-
-    let def_path =
-        crate::config::pipelines_dir(project_root).join(format!("{}.toml", run.pipeline));
-    let definition = super::pipeline::load_pipeline_toml(&def_path).ok()?;
-
-    definition.steps.get(run.current_step).map(|s| s.id.clone())
 }

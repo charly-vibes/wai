@@ -1760,11 +1760,7 @@ fn plugin_trust_revoke_disables_hook() {
         let line = line.trim();
         if let Some(start) = line.find("\"digest\":\"") {
             let rest = &line[start + 10..];
-            if let Some(end) = rest.find('"') {
-                Some(rest[..end].to_string())
-            } else {
-                None
-            }
+            rest.find('"').map(|end| rest[..end].to_string())
         } else {
             None
         }
@@ -4254,11 +4250,7 @@ fn set_privacy_notice_shown(dir: &std::path::Path) {
     let base = existing
         .split("[llm]")
         .next()
-        .and_then(|s| {
-            // Also strip a trailing [why] that may be present in workspaces
-            // initialised by an older version of wai.
-            Some(s.split("[why]").next().unwrap_or(s))
-        })
+        .map(|s| s.split("[why]").next().unwrap_or(s))
         .unwrap_or(&existing)
         .trim_end();
     let updated = format!("{}\n[llm]\nprivacy_notice_shown = true\n", base);
@@ -4278,7 +4270,7 @@ fn force_why_llm(dir: &std::path::Path, llm: &str) {
     let base = existing
         .split("[llm]")
         .next()
-        .and_then(|s| Some(s.split("[why]").next().unwrap_or(s)))
+        .map(|s| s.split("[why]").next().unwrap_or(s))
         .unwrap_or(&existing)
         .trim_end();
     let updated = format!(
