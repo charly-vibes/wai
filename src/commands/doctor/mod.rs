@@ -1035,10 +1035,12 @@ fn check_agent_instructions(project_root: &Path) -> Vec<WaiCheckEntry> {
 
 /// Check managed block staleness by comparing generated vs actual content.
 fn check_managed_block_staleness(project_root: &Path) -> Vec<WaiCheckEntry> {
-    use crate::managed_block::{read_managed_block, wai_block_content, wai_detailed_content};
+    use crate::managed_block::{
+        inject_managed_block, read_managed_block, wai_block_content, wai_detailed_content,
+    };
     use crate::workspace::{detect_installed_pipelines, detect_installed_skill_names};
 
-    let mut results = Vec::new();
+    let mut results = Vec::<WaiCheckEntry>::new();
 
     let plugins = plugin::detect_plugins(project_root);
     let plugin_names: Vec<&str> = plugins
@@ -1050,9 +1052,16 @@ fn check_managed_block_staleness(project_root: &Path) -> Vec<WaiCheckEntry> {
     let skill_name_refs: Vec<&str> = skill_names.iter().map(|s| s.as_str()).collect();
     let installed_pipelines = detect_installed_pipelines(project_root);
 
+    // Owned copies for the fix_fn closures
+    let owned_plugins: Vec<String> = plugin_names.iter().map(|s| (*s).to_string()).collect();
+    let owned_skills: Vec<String> = skill_name_refs.iter().map(|s| (*s).to_string()).collect();
+    let owned_pipelines = installed_pipelines.clone();
+
+    let project_root = project_root.to_path_buf();
+
     // Check root CLAUDE.md / AGENTS.md against slim block
     let expected = wai_block_content(
-        project_root,
+        &project_root,
         &plugin_names,
         &skill_name_refs,
         &installed_pipelines,
@@ -1063,6 +1072,10 @@ fn check_managed_block_staleness(project_root: &Path) -> Vec<WaiCheckEntry> {
         if let Some(actual) = read_managed_block(&path)
             && actual != expected
         {
+            let fname = filename.to_string();
+            let owned_plugins = owned_plugins.clone();
+            let owned_skills = owned_skills.clone();
+            let owned_pipelines = owned_pipelines.clone();
             results.push(WaiCheckEntry {
                 name: format!("Managed block staleness: {}", filename),
                 status: CheckStatus::Warn,
@@ -1071,7 +1084,19 @@ fn check_managed_block_staleness(project_root: &Path) -> Vec<WaiCheckEntry> {
                     filename
                 ),
                 fix: Some("Run: wai init".to_string()),
-                fix_fn: None,
+                fix_fn: Some(Box::new(move |root| {
+                    let root = root.to_path_buf();
+                    let plugin_refs: Vec<&str> = owned_plugins.iter().map(|s| s.as_str()).collect();
+                    let skill_refs: Vec<&str> = owned_skills.iter().map(|s| s.as_str()).collect();
+                    inject_managed_block(
+                        &root.join(&fname),
+                        &plugin_refs,
+                        &skill_refs,
+                        &owned_pipelines,
+                    )
+                    .map(|_| ())
+                    .map_err(|e| miette::miette!("Failed to fix {}: {}", fname, e))
+                })),
             });
         }
     }
@@ -1080,7 +1105,7 @@ fn check_managed_block_staleness(project_root: &Path) -> Vec<WaiCheckEntry> {
     let detailed_path = project_root.join(".wai").join("AGENTS.md");
     if detailed_path.exists() {
         let expected_detailed = wai_detailed_content(
-            project_root,
+            &project_root,
             &plugin_names,
             &skill_name_refs,
             &installed_pipelines,
@@ -1088,21 +1113,51 @@ fn check_managed_block_staleness(project_root: &Path) -> Vec<WaiCheckEntry> {
         if let Ok(actual_detailed) = std::fs::read_to_string(&detailed_path)
             && actual_detailed != expected_detailed
         {
+            let owned_plugins = owned_plugins.clone();
+            let owned_skills = owned_skills.clone();
+            let owned_pipelines = owned_pipelines.clone();
             results.push(WaiCheckEntry {
                 name: "Managed block staleness: .wai/AGENTS.md".to_string(),
                 status: CheckStatus::Warn,
                 message: ".wai/AGENTS.md outdated — run 'wai init' to refresh".to_string(),
                 fix: Some("Run: wai init".to_string()),
-                fix_fn: None,
+                fix_fn: Some(Box::new(move |root| {
+                    let root = root.to_path_buf();
+                    let plugin_refs: Vec<&str> = owned_plugins.iter().map(|s| s.as_str()).collect();
+                    let skill_refs: Vec<&str> = owned_skills.iter().map(|s| s.as_str()).collect();
+                    inject_managed_block(
+                        &root.join(".wai/AGENTS.md"),
+                        &plugin_refs,
+                        &skill_refs,
+                        &owned_pipelines,
+                    )
+                    .map(|_| ())
+                    .map_err(|e| miette::miette!("Failed to fix .wai/AGENTS.md: {}", e))
+                })),
             });
         }
     } else {
+        let owned_plugins = owned_plugins.clone();
+        let owned_skills = owned_skills.clone();
+        let owned_pipelines = owned_pipelines.clone();
         results.push(WaiCheckEntry {
             name: "Managed block staleness: .wai/AGENTS.md".to_string(),
             status: CheckStatus::Warn,
             message: ".wai/AGENTS.md missing — run 'wai init' to create it".to_string(),
             fix: Some("Run: wai init".to_string()),
-            fix_fn: None,
+            fix_fn: Some(Box::new(move |root| {
+                let root = root.to_path_buf();
+                let plugin_refs: Vec<&str> = owned_plugins.iter().map(|s| s.as_str()).collect();
+                let skill_refs: Vec<&str> = owned_skills.iter().map(|s| s.as_str()).collect();
+                inject_managed_block(
+                    &root.join(".wai/AGENTS.md"),
+                    &plugin_refs,
+                    &skill_refs,
+                    &owned_pipelines,
+                )
+                .map(|_| ())
+                .map_err(|e| miette::miette!("Failed to create .wai/AGENTS.md: {}", e))
+            })),
         });
     }
 
