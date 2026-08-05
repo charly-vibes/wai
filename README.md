@@ -55,7 +55,7 @@ Requires [Rust](https://www.rust-lang.org/tools/install) (stable toolchain):
 git clone https://github.com/charly-vibes/wai
 cd wai
 cargo build --release
-
+```
 
 ## Quick Start
 
