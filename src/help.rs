@@ -94,6 +94,8 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 "--verdict <VERDICT>     Review verdict: pass, fail, or needs-work",
                 "--severity <COUNTS>     Severity counts (e.g. critical:0,high:1,medium:3,low:2)",
                 "--skill <NAME>          Skill that produced this review",
+                "--bead <ID>             Link artifact to a beads issue ID",
+                "--corrects <PATH>       Path to the artifact this review or evidence corrects",
             ],
             env_vars: &[
                 ("NO_COLOR", "Disable colored output"),
@@ -162,7 +164,10 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 ),
             ],
             options: &[],
-            advanced_options: &["--status    Only show sync status without modifying files"],
+            advanced_options: &[
+                "--status          Only show sync status without modifying files",
+                "--from-main       Sync from the main branch of the source repo",
+            ],
             env_vars: &[("NO_COLOR", "Disable colored output")],
             internals: &[
                 "Reads .projections.yml for tool-specific mappings",
@@ -190,6 +195,8 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 "--regex          Treat query as regular expression",
                 "--tag <TAG>      Filter by frontmatter tag (repeatable)",
                 "--latest         Return only the most recently dated match",
+                "-C <N>           Show N lines of context around each match",
+                "--include-memories  Include beads memories in search results",
             ],
             env_vars: &[("NO_COLOR", "Disable colored output")],
             internals: &[
@@ -486,6 +493,7 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 "-o, --output <TARGET>        Output target: claude.md, agents.md, or both",
                 "    --dry-run                Show what would change without writing",
                 "-y, --yes                    Skip confirmation prompt",
+                "    --save-memories          Save insights as beads memories",
             ],
             env_vars: &[
                 ("NO_COLOR", "Disable colored output"),
