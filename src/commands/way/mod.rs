@@ -61,7 +61,10 @@ pub fn run(topic: Option<String>, fix: Option<String>) -> Result<()> {
     if let Some(target) = fix {
         return match target.as_str() {
             "skills" => fix_skills(&repo_root),
-            other => miette::bail!("Unknown fix target '{}'. Available: skills", other),
+            other => miette::bail!(
+                "Unknown fix target '{other}'. Available: 'skills'. Use 'wai way <topic>' (e.g. 'wai way ci') for interactive guidance on: {}",
+                AVAILABLE_TOPICS.join(", ")
+            ),
         };
     }
 
