@@ -208,9 +208,26 @@ fn prime_silent_on_health_when_doctor_is_clean() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
-    // No doctor warnings in a clean workspace.
+
+    // Stub HOME so the claude-session-hook check passes (it needs
+    // ~/.claude/settings.json with a wai status SessionStart hook).
+    let home = tmp.path().join("fake-home");
+    let claude_dir = home.join(".claude");
+    std::fs::create_dir_all(&claude_dir).unwrap();
+    std::fs::write(
+        claude_dir.join("settings.json"),
+        r#"{
+  "hooks": {
+    "SessionStart": [
+      {"matcher": "", "hooks": [{"type": "command", "command": "wai status 2>/dev/null || true"}]}
+    ]
+  }
+}"#,
+    )
+    .unwrap();
 
     wai_cmd(tmp.path())
+        .env("HOME", &home)
         .args(["prime", "--project", "myproject", "--no-input"])
         .assert()
         .success()
