@@ -62,7 +62,6 @@ fmt-check:
 
 # Full CI pipeline
 ci: fmt-check lint test build-release
-    pretender doctor
     pretender check --diff-only
     @echo "✅ CI pipeline passed"
 
