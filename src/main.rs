@@ -55,14 +55,15 @@ fn main() -> Result<()> {
 
     let cli = Cli::parse();
     set_context(CliContext {
-        json: cli.json,
+        json: cli.format.json,
         no_input: cli.no_input,
         yes: cli.yes,
         safe: cli.safe,
-        verbose: cli.verbose,
-        quiet: cli.quiet,
+        verbose: cli.verbose.raw_count(),
+        quiet: cli.verbose.quiet,
     });
-    let guide = cli::build_guide();
+    let mut guide = cli::build_guide();
+    guide.set_verbosity(cli.verbose.verbosity());
     let argv: Vec<String> = std::env::args().collect();
     match commands::run(cli, &guide) {
         Ok(_) => Ok(()),

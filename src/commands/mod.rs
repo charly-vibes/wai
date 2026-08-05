@@ -41,7 +41,7 @@ mod why;
 pub fn run(cli: Cli, guide: &Guide) -> Result<()> {
     match cli.command {
         Some(Commands::Init { name }) => init::run(name),
-        Some(Commands::Status) => status::run(cli.verbose),
+        Some(Commands::Status) => status::run(cli.verbose.raw_count()),
         Some(Commands::New(cmd)) => new::run(cmd),
         Some(Commands::Add(cmd)) => add::run(cmd),
         Some(Commands::Show { name }) => show::run(name),
@@ -130,7 +130,7 @@ pub fn run(cli: Cli, guide: &Guide) -> Result<()> {
             query,
             no_llm,
             json,
-        }) => why::run(query, no_llm, json, cli.verbose),
+        }) => why::run(query, no_llm, json, cli.verbose.raw_count()),
         Some(Commands::Reflect {
             project,
             conversation,
@@ -146,7 +146,7 @@ pub fn run(cli: Cli, guide: &Guide) -> Result<()> {
             dry_run,
             yes,
             inject_content,
-            verbose: cli.verbose,
+            verbose: cli.verbose.raw_count(),
             save_memories,
         }),
         Some(Commands::Completions { shell }) => {

@@ -9276,3 +9276,75 @@ fn doctor_warns_wai_project_empty() {
         stdout
     );
 }
+
+// ─── Genesis CLI ergonomics (wai-4guc) ────────────────────────────────────────
+
+#[test]
+fn cli_format_human_flag_is_accepted() {
+    // `--human` is provided by genesis CliFormat; it must parse and behave as
+    // the default human output (no JSON envelope) in an initialized workspace.
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    let out = wai_cmd(tmp.path())
+        .args(["--human", "status"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let stdout = strip_ansi(&String::from_utf8_lossy(&out));
+    assert!(
+        !stdout.trim_start().starts_with('{'),
+        "--human should emit human text, not a JSON envelope: {}",
+        stdout
+    );
+}
+
+#[test]
+fn cli_format_json_and_human_conflict() {
+    // CliFormat declares --json/--human as mutually exclusive; clap must reject
+    // passing both together.
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["--json", "--human", "status"])
+        .assert()
+        .failure();
+}
+
+#[test]
+fn cli_verbosity_counts_with_format_flags() {
+    // CliVerbosity (-v/-vv) and CliFormat (--json) must coexist as global
+    // flags: a verbose JSON status call still emits a parseable envelope.
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    let out = wai_cmd(tmp.path())
+        .args(["-vv", "--json", "status"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let stdout = String::from_utf8_lossy(&out);
+    let payload: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(
+        payload["ok"], true,
+        "verbose --json status should be valid envelope"
+    );
+}
+
+#[test]
+fn cli_verbosity_quiet_and_verbose_coexist() {
+    // CliVerbosity accepts -q and -v together; --quiet takes precedence over
+    // the -v count, but both must parse as valid global flags.
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["-q", "-v", "status"])
+        .assert()
+        .success();
+}

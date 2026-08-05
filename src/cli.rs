@@ -1,4 +1,5 @@
 use clap::{Args, CommandFactory, Parser, Subcommand};
+use genesis::guide::{CliFormat, CliVerbosity};
 use std::path::PathBuf;
 
 pub const VERSION: &str = concat!(
@@ -30,17 +31,13 @@ pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Commands>,
 
-    /// Increase output verbosity
-    #[arg(short, long, global = true, action = clap::ArgAction::Count)]
-    pub verbose: u8,
+    /// Output verbosity (-v, -vv, -vvv) and quiet mode
+    #[command(flatten)]
+    pub verbose: CliVerbosity,
 
-    /// Suppress non-error output
-    #[arg(short, long, global = true)]
-    pub quiet: bool,
-
-    /// Output machine-readable JSON
-    #[arg(short = 'j', long, global = true)]
-    pub json: bool,
+    /// Output format (--json, --human)
+    #[command(flatten)]
+    pub format: CliFormat,
 
     /// Disable interactive prompts
     #[arg(long, global = true)]
