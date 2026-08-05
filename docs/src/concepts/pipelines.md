@@ -53,7 +53,7 @@ prompt = """
 
 The `{topic}` placeholder is replaced with the `--topic` value when the run starts.
 
-Place custom pipelines in `.wai/resources/pipelines/` and run `wai init --update` to refresh the managed block in CLAUDE.md.
+Place custom pipelines in `.wai/resources/pipelines/` and run `wai init` to refresh the managed block in CLAUDE.md.
 
 ## Pipeline Gates
 

@@ -1067,7 +1067,7 @@ fn check_managed_block_staleness(project_root: &Path) -> Vec<WaiCheckEntry> {
                 name: format!("Managed block staleness: {}", filename),
                 status: CheckStatus::Warn,
                 message: format!(
-                    "{} managed block outdated — run 'wai init --update' to refresh",
+                    "{} managed block outdated — run 'wai init' to refresh",
                     filename
                 ),
                 fix: Some("Run: wai init".to_string()),
@@ -1091,7 +1091,7 @@ fn check_managed_block_staleness(project_root: &Path) -> Vec<WaiCheckEntry> {
             results.push(WaiCheckEntry {
                 name: "Managed block staleness: .wai/AGENTS.md".to_string(),
                 status: CheckStatus::Warn,
-                message: ".wai/AGENTS.md outdated — run 'wai init --update' to refresh".to_string(),
+                message: ".wai/AGENTS.md outdated — run 'wai init' to refresh".to_string(),
                 fix: Some("Run: wai init".to_string()),
                 fix_fn: None,
             });
