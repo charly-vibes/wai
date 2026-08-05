@@ -15,15 +15,9 @@ use crate::config::{SKILLS_DIR, agent_config_dir};
 use crate::context::current_context;
 use crate::output::print_envelope_check;
 
-const SKILL_RULE_OF_5: (&str, &str) = (
-    "rule-of-5-universal",
-    include_str!("../../../.wai/resources/agent-config/skills/rule-of-5-universal/SKILL.md"),
-);
+const SKILL_RULE_OF_5: (&str, &str) = ("rule-of-5-universal", include_str!("skill-rule-of-5.md"));
 
-const SKILL_COMMIT: (&str, &str) = (
-    "commit",
-    include_str!("../../../.wai/resources/agent-config/skills/commit/SKILL.md"),
-);
+const SKILL_COMMIT: (&str, &str) = ("commit", include_str!("skill-commit.md"));
 
 #[derive(Serialize)]
 struct WayCheckEntry {
