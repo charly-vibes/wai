@@ -603,15 +603,15 @@ fn pipeline_matches_phase(when: &str, phase: &str) -> bool {
 /// the full diagnostic detail.
 fn render_health_summary(project_root: &Path) {
     let health = health_summary(project_root);
-    if health.is_clean() {
+    if health.is_healthy() {
         return;
     }
     let mut parts = Vec::new();
-    if health.warn > 0 {
-        parts.push(format!("{} warning(s)", health.warn));
+    if health.summary.warn > 0 {
+        parts.push(format!("{} warning(s)", health.summary.warn));
     }
-    if health.fail > 0 {
-        parts.push(format!("{} failure(s)", health.fail));
+    if health.summary.fail > 0 {
+        parts.push(format!("{} failure(s)", health.summary.fail));
     }
     println!(
         "{} Health: {} — run `wai doctor` for details",

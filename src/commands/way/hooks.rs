@@ -1,6 +1,7 @@
 use std::path::Path;
 
-use super::{CheckResult, Status};
+use super::WayCheckEntry;
+use genesis::doctor::CheckStatus;
 
 /// Read a hook file from an arbitrary path. Returns `None` if the file does not
 /// exist, is a directory, or cannot be read.
@@ -74,7 +75,7 @@ pub(super) fn hook_owner(repo_root: &Path) -> Option<&'static str> {
     None
 }
 
-pub(super) fn check_git_hooks(repo_root: &Path) -> CheckResult {
+pub(super) fn check_git_hooks(repo_root: &Path) -> WayCheckEntry {
     let name = "Pre-commit quality gates";
     let intent = Some(
         "Prevent low-quality commits by running automated checks before code is saved to history."
@@ -93,9 +94,9 @@ pub(super) fn check_git_hooks(repo_root: &Path) -> CheckResult {
     if prek_config.exists() {
         // core.hooksPath being set means prek refuses to install — report this first.
         if let Some(hooks_path) = git_core_hooks_path(repo_root) {
-            return CheckResult {
+            return WayCheckEntry {
                 name: name.to_string(),
-                status: Status::Info,
+                status: CheckStatus::Warn,
                 message: format!(
                     "prek.toml found but core.hooksPath is set ('{}') — prek cannot install",
                     hooks_path
@@ -109,9 +110,9 @@ pub(super) fn check_git_hooks(repo_root: &Path) -> CheckResult {
         }
         // Check both pre-commit and pre-push for prek signature.
         if hook_contains(repo_root, "prek") {
-            return CheckResult {
+            return WayCheckEntry {
                 name: name.to_string(),
-                status: Status::Pass,
+                status: CheckStatus::Pass,
                 message: "prek detected and installed".to_string(),
                 intent,
                 success_criteria,
@@ -120,9 +121,9 @@ pub(super) fn check_git_hooks(repo_root: &Path) -> CheckResult {
         }
         // Another tool owns the hook — name it rather than suggest a re-install.
         if let Some(owner) = hook_owner(repo_root) {
-            return CheckResult {
+            return WayCheckEntry {
                 name: name.to_string(),
-                status: Status::Info,
+                status: CheckStatus::Warn,
                 message: format!(
                     "prek.toml found but hook is owned by {} — chain prek or use {}'s runner",
                     owner, owner
@@ -132,9 +133,9 @@ pub(super) fn check_git_hooks(repo_root: &Path) -> CheckResult {
                 suggestion: None,
             };
         }
-        CheckResult {
+        WayCheckEntry {
             name: name.to_string(),
-            status: Status::Info,
+            status: CheckStatus::Warn,
             message: "prek.toml found but hooks not installed — run: prek install".to_string(),
             intent,
             success_criteria,
@@ -151,18 +152,18 @@ pub(super) fn check_git_hooks(repo_root: &Path) -> CheckResult {
                 || read_hook_from_path(&delegated_prepush).is_some_and(|c| c.contains("lefthook"));
 
             if lefthook_in_delegated {
-                CheckResult {
+                WayCheckEntry {
                     name: name.to_string(),
-                    status: Status::Pass,
+                    status: CheckStatus::Pass,
                     message: "lefthook detected and installed".to_string(),
                     intent,
                     success_criteria,
                     suggestion: None,
                 }
             } else {
-                CheckResult {
+                WayCheckEntry {
                     name: name.to_string(),
-                    status: Status::Info,
+                    status: CheckStatus::Warn,
                     message: format!(
                         "lefthook.yml found but core.hooksPath is set ('{}') — lefthook not found in delegated path",
                         hooks_path,
@@ -173,18 +174,18 @@ pub(super) fn check_git_hooks(repo_root: &Path) -> CheckResult {
                 }
             }
         } else if hook_contains(repo_root, "lefthook") {
-            CheckResult {
+            WayCheckEntry {
                 name: name.to_string(),
-                status: Status::Pass,
+                status: CheckStatus::Pass,
                 message: "lefthook detected and installed".to_string(),
                 intent,
                 success_criteria,
                 suggestion: None,
             }
         } else {
-            CheckResult {
+            WayCheckEntry {
                 name: name.to_string(),
-                status: Status::Info,
+                status: CheckStatus::Warn,
                 message: "lefthook.yml found but hooks not installed — run: lefthook install"
                     .to_string(),
                 intent,
@@ -194,18 +195,18 @@ pub(super) fn check_git_hooks(repo_root: &Path) -> CheckResult {
         }
     } else if husky_dir.exists() && husky_dir.is_dir() {
         if hook_exists_nonempty(repo_root) {
-            CheckResult {
+            WayCheckEntry {
                 name: name.to_string(),
-                status: Status::Pass,
+                status: CheckStatus::Pass,
                 message: "husky detected and installed".to_string(),
                 intent,
                 success_criteria,
                 suggestion: None,
             }
         } else {
-            CheckResult {
+            WayCheckEntry {
                 name: name.to_string(),
-                status: Status::Info,
+                status: CheckStatus::Warn,
                 message: ".husky/ found but hooks not installed — run: npx husky install"
                     .to_string(),
                 intent,
@@ -215,9 +216,9 @@ pub(super) fn check_git_hooks(repo_root: &Path) -> CheckResult {
         }
     } else if precommit_config.exists() {
         if hook_contains(repo_root, "pre-commit") {
-            CheckResult {
+            WayCheckEntry {
                 name: name.to_string(),
-                status: Status::Pass,
+                status: CheckStatus::Pass,
                 message: "pre-commit detected and installed".to_string(),
                 intent,
                 success_criteria,
@@ -227,9 +228,9 @@ pub(super) fn check_git_hooks(repo_root: &Path) -> CheckResult {
                 ),
             }
         } else {
-            CheckResult {
+            WayCheckEntry {
                 name: name.to_string(),
-                status: Status::Info,
+                status: CheckStatus::Warn,
                 message: ".pre-commit-config.yaml found but hooks not installed — run: pre-commit install".to_string(),
                 intent,
                 success_criteria,
@@ -240,9 +241,9 @@ pub(super) fn check_git_hooks(repo_root: &Path) -> CheckResult {
             }
         }
     } else {
-        CheckResult {
+        WayCheckEntry {
             name: name.to_string(),
-            status: Status::Info,
+            status: CheckStatus::Warn,
             message: "No git hook manager detected".to_string(),
             intent,
             success_criteria,
@@ -295,7 +296,7 @@ mod tests {
             .unwrap();
 
         let result = check_git_hooks(dir.path());
-        assert_eq!(result.status, Status::Info);
+        assert_eq!(result.status, CheckStatus::Warn);
         assert!(
             result.message.contains("core.hooksPath"),
             "expected core.hooksPath conflict, got: {}",
@@ -322,7 +323,7 @@ mod tests {
         );
 
         let result = check_git_hooks(dir.path());
-        assert_eq!(result.status, Status::Info);
+        assert_eq!(result.status, CheckStatus::Warn);
         assert!(
             result.message.contains("bd"),
             "expected bd as owner, got: {}",
@@ -341,7 +342,7 @@ mod tests {
         );
 
         let result = check_git_hooks(dir.path());
-        assert_eq!(result.status, Status::Info);
+        assert_eq!(result.status, CheckStatus::Warn);
         assert!(
             result.message.contains("lefthook"),
             "expected lefthook as owner, got: {}",
@@ -362,7 +363,7 @@ mod tests {
         );
 
         let result = check_git_hooks(dir.path());
-        assert_eq!(result.status, Status::Pass);
+        assert_eq!(result.status, CheckStatus::Pass);
         assert_eq!(result.message, "prek detected and installed");
     }
 
@@ -377,7 +378,7 @@ mod tests {
         );
 
         let result = check_git_hooks(dir.path());
-        assert_eq!(result.status, Status::Pass);
+        assert_eq!(result.status, CheckStatus::Pass);
         assert_eq!(result.message, "prek detected and installed");
     }
 
@@ -392,7 +393,7 @@ mod tests {
         );
 
         let result = check_git_hooks(dir.path());
-        assert_eq!(result.status, Status::Pass);
+        assert_eq!(result.status, CheckStatus::Pass);
     }
 
     // -- lefthook via delegated core.hooksPath --
@@ -420,7 +421,7 @@ mod tests {
         let result = check_git_hooks(dir.path());
         assert_eq!(
             result.status,
-            Status::Pass,
+            CheckStatus::Pass,
             "expected Pass for lefthook via delegated hooksPath, got: {:?} — {}",
             result.status,
             result.message
@@ -455,7 +456,7 @@ mod tests {
         let result = check_git_hooks(dir.path());
         assert_eq!(
             result.status,
-            Status::Info,
+            CheckStatus::Warn,
             "expected Info for unresolved hooksPath conflict, got: {:?} — {}",
             result.status,
             result.message
@@ -474,7 +475,7 @@ mod tests {
         fs::write(dir.path().join("lefthook.yml"), "pre-commit: [echo test]\n").unwrap();
 
         let result = check_git_hooks(dir.path());
-        assert_eq!(result.status, Status::Info);
+        assert_eq!(result.status, CheckStatus::Warn);
         assert!(
             result.message.contains("lefthook install"),
             "expected lefthook install suggestion, got: {}",
@@ -490,7 +491,7 @@ mod tests {
         write_prek_toml(&dir);
 
         let result = check_git_hooks(dir.path());
-        assert_eq!(result.status, Status::Info);
+        assert_eq!(result.status, CheckStatus::Warn);
         assert!(
             result.message.contains("prek install"),
             "expected prek install suggestion, got: {}",

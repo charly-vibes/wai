@@ -1,6 +1,7 @@
 use std::path::Path;
 
-use super::{CheckResult, Status};
+use super::WayCheckEntry;
+use genesis::doctor::CheckStatus;
 
 pub(super) fn has_binary_target(repo_root: &Path) -> bool {
     // Rust: src/main.rs or [[bin]] in Cargo.toml
@@ -76,7 +77,7 @@ pub(super) fn has_release_workflow(repo_root: &Path) -> bool {
     false
 }
 
-pub(super) fn check_release_pipeline(repo_root: &Path) -> CheckResult {
+pub(super) fn check_release_pipeline(repo_root: &Path) -> WayCheckEntry {
     let name = "Automated delivery";
     let intent = Some(
         "Automate the process of building, packaging, and publishing software releases."
@@ -87,9 +88,9 @@ pub(super) fn check_release_pipeline(repo_root: &Path) -> CheckResult {
     );
 
     if !has_binary_target(repo_root) {
-        return CheckResult {
+        return WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: "Library project — release pipeline not required".to_string(),
             intent,
             success_criteria,
@@ -98,9 +99,9 @@ pub(super) fn check_release_pipeline(repo_root: &Path) -> CheckResult {
     }
 
     if repo_root.join(".goreleaser.yml").exists() || repo_root.join(".goreleaser.yaml").exists() {
-        return CheckResult {
+        return WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: "goreleaser detected".to_string(),
             intent,
             success_criteria,
@@ -109,9 +110,9 @@ pub(super) fn check_release_pipeline(repo_root: &Path) -> CheckResult {
     }
 
     if repo_root.join("dist.toml").exists() || has_cargo_dist_in_toml(repo_root) {
-        return CheckResult {
+        return WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: "cargo-dist detected".to_string(),
             intent,
             success_criteria,
@@ -120,9 +121,9 @@ pub(super) fn check_release_pipeline(repo_root: &Path) -> CheckResult {
     }
 
     if has_release_workflow(repo_root) {
-        return CheckResult {
+        return WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: "GitHub Actions release workflow detected".to_string(),
             intent,
             success_criteria,
@@ -130,9 +131,9 @@ pub(super) fn check_release_pipeline(repo_root: &Path) -> CheckResult {
         };
     }
 
-    CheckResult {
+    WayCheckEntry {
         name: name.to_string(),
-        status: Status::Info,
+        status: CheckStatus::Warn,
         message: "No release pipeline found".to_string(),
         intent,
         success_criteria,

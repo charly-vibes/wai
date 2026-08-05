@@ -313,13 +313,13 @@ pub fn run(verbose: u8) -> Result<()> {
 
     // Doctor health summary — one line when not clean, silent when green.
     let health = crate::commands::doctor::health_summary(&project_root);
-    if !health.is_clean() {
+    if !health.is_healthy() {
         let mut parts: Vec<String> = Vec::new();
-        if health.warn > 0 {
-            parts.push(format!("{} warning(s)", health.warn));
+        if health.summary.warn > 0 {
+            parts.push(format!("{} warning(s)", health.summary.warn));
         }
-        if health.fail > 0 {
-            parts.push(format!("{} failure(s)", health.fail));
+        if health.summary.fail > 0 {
+            parts.push(format!("{} failure(s)", health.summary.fail));
         }
         println!();
         println!(

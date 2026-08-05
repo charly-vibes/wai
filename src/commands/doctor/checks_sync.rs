@@ -6,7 +6,8 @@ use serde::Deserialize;
 
 use crate::config::agent_config_dir;
 
-use super::{CheckResult, Status};
+use super::WaiCheckEntry;
+use genesis::doctor::CheckStatus;
 
 #[derive(Deserialize)]
 pub(super) struct ProjectionsConfig {
@@ -22,15 +23,15 @@ pub(super) struct ProjectionEntry {
     pub(super) sources: Vec<String>,
 }
 
-pub(super) fn check_agent_config_sync(project_root: &Path) -> Vec<CheckResult> {
+pub(super) fn check_agent_config_sync(project_root: &Path) -> Vec<WaiCheckEntry> {
     let config_dir = agent_config_dir(project_root);
     let projections_path = config_dir.join(".projections.yml");
     let mut results = Vec::new();
 
     if !projections_path.exists() {
-        results.push(CheckResult {
+        results.push(WaiCheckEntry {
             name: "Agent config sync".to_string(),
-            status: Status::Warn,
+            status: CheckStatus::Warn,
             message: ".projections.yml not found".to_string(),
             fix: Some(
                 "Run: wai init (or create .wai/resources/agent-config/.projections.yml)"
@@ -44,9 +45,9 @@ pub(super) fn check_agent_config_sync(project_root: &Path) -> Vec<CheckResult> {
     let content = match std::fs::read_to_string(&projections_path) {
         Ok(c) => c,
         Err(e) => {
-            results.push(CheckResult {
+            results.push(WaiCheckEntry {
                 name: "Agent config sync".to_string(),
-                status: Status::Fail,
+                status: CheckStatus::Fail,
                 message: format!("Cannot read .projections.yml: {}", e),
                 fix: None,
                 fix_fn: None,
@@ -58,9 +59,9 @@ pub(super) fn check_agent_config_sync(project_root: &Path) -> Vec<CheckResult> {
     match serde_yml::from_str::<ProjectionsConfig>(&content) {
         Ok(config) => {
             if config.projections.is_empty() {
-                results.push(CheckResult {
+                results.push(WaiCheckEntry {
                     name: "Agent config sync".to_string(),
-                    status: Status::Pass,
+                    status: CheckStatus::Pass,
                     message: "No projections configured".to_string(),
                     fix: None,
                     fix_fn: None,
@@ -72,9 +73,9 @@ pub(super) fn check_agent_config_sync(project_root: &Path) -> Vec<CheckResult> {
             }
         }
         Err(e) => {
-            results.push(CheckResult {
+            results.push(WaiCheckEntry {
                 name: "Agent config sync".to_string(),
-                status: Status::Fail,
+                status: CheckStatus::Fail,
                 message: format!("Invalid .projections.yml: {}", e),
                 fix: Some(
                     "Fix the YAML syntax in .wai/resources/agent-config/.projections.yml"
@@ -92,16 +93,16 @@ pub(super) fn check_projection(
     project_root: &Path,
     config_dir: &Path,
     proj: &ProjectionEntry,
-) -> Vec<CheckResult> {
+) -> Vec<WaiCheckEntry> {
     let mut results = Vec::new();
 
     // Check if source directories exist
     for source in &proj.sources {
         let source_path = config_dir.join(source);
         if !source_path.exists() {
-            results.push(CheckResult {
+            results.push(WaiCheckEntry {
                 name: format!("Projection source: {}", source),
-                status: Status::Warn,
+                status: CheckStatus::Warn,
                 message: format!("Source directory '{}' not found", source),
                 fix: Some("Check .projections.yml sources".to_string()),
                 fix_fn: None,
@@ -119,9 +120,9 @@ pub(super) fn check_projection(
             strategy: proj.strategy.clone(),
             sources: proj.sources.clone(),
         };
-        results.push(CheckResult {
+        results.push(WaiCheckEntry {
             name: format!("Projection → {}", proj.target),
-            status: Status::Warn,
+            status: CheckStatus::Warn,
             message: "Target not synced".to_string(),
             fix: Some("Run: wai sync".to_string()),
             fix_fn: Some(Box::new(move |project_root| {
@@ -166,9 +167,9 @@ pub(super) fn check_projection(
         }
         _ => {
             // Unknown strategy - just check target exists
-            results.push(CheckResult {
+            results.push(WaiCheckEntry {
                 name: format!("Projection → {}", proj.target),
-                status: Status::Pass,
+                status: CheckStatus::Pass,
                 message: format!("Target exists (unknown strategy: {})", proj.strategy),
                 fix: None,
                 fix_fn: None,
@@ -184,7 +185,7 @@ fn check_symlink_strategy(
     config_dir: &Path,
     proj: &ProjectionEntry,
     target_path: &Path,
-) -> Vec<CheckResult> {
+) -> Vec<WaiCheckEntry> {
     let mut results = Vec::new();
     let mut has_issues = false;
     let mut broken_count = 0;
@@ -266,9 +267,9 @@ fn check_symlink_strategy(
         } else {
             "Symlink issues detected".to_string()
         };
-        results.push(CheckResult {
+        results.push(WaiCheckEntry {
             name: format!("Projection → {}", proj.target),
-            status: Status::Warn,
+            status: CheckStatus::Warn,
             message,
             fix: Some("Run: wai sync".to_string()),
             fix_fn: Some(Box::new(move |project_root| {
@@ -276,9 +277,9 @@ fn check_symlink_strategy(
             })),
         });
     } else {
-        results.push(CheckResult {
+        results.push(WaiCheckEntry {
             name: format!("Projection → {}", proj.target),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: "In sync".to_string(),
             fix: None,
             fix_fn: None,
@@ -292,7 +293,7 @@ fn check_inline_strategy(
     config_dir: &Path,
     proj: &ProjectionEntry,
     target_path: &Path,
-) -> Vec<CheckResult> {
+) -> Vec<WaiCheckEntry> {
     let mut results = Vec::new();
 
     let expected_content = build_inline_content(config_dir, &proj.sources);
@@ -307,9 +308,9 @@ fn check_inline_strategy(
                 strategy: proj.strategy.clone(),
                 sources: proj.sources.clone(),
             };
-            results.push(CheckResult {
+            results.push(WaiCheckEntry {
                 name: format!("Projection → {}", proj.target),
-                status: Status::Warn,
+                status: CheckStatus::Warn,
                 message: "Cannot read target file".to_string(),
                 fix: Some("Run: wai sync".to_string()),
                 fix_fn: Some(Box::new(move |project_root| {
@@ -328,9 +329,9 @@ fn check_inline_strategy(
             strategy: proj.strategy.clone(),
             sources: proj.sources.clone(),
         };
-        results.push(CheckResult {
+        results.push(WaiCheckEntry {
             name: format!("Projection → {}", proj.target),
-            status: Status::Warn,
+            status: CheckStatus::Warn,
             message: "Stale (content changed)".to_string(),
             fix: Some("Run: wai sync".to_string()),
             fix_fn: Some(Box::new(move |project_root| {
@@ -338,9 +339,9 @@ fn check_inline_strategy(
             })),
         });
     } else {
-        results.push(CheckResult {
+        results.push(WaiCheckEntry {
             name: format!("Projection → {}", proj.target),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: "In sync".to_string(),
             fix: None,
             fix_fn: None,
@@ -354,7 +355,7 @@ fn check_reference_strategy(
     config_dir: &Path,
     proj: &ProjectionEntry,
     target_path: &Path,
-) -> Vec<CheckResult> {
+) -> Vec<WaiCheckEntry> {
     let mut results = Vec::new();
 
     let expected_content = build_reference_content(config_dir, &proj.sources);
@@ -369,9 +370,9 @@ fn check_reference_strategy(
                 strategy: proj.strategy.clone(),
                 sources: proj.sources.clone(),
             };
-            results.push(CheckResult {
+            results.push(WaiCheckEntry {
                 name: format!("Projection → {}", proj.target),
-                status: Status::Warn,
+                status: CheckStatus::Warn,
                 message: "Cannot read target file".to_string(),
                 fix: Some("Run: wai sync".to_string()),
                 fix_fn: Some(Box::new(move |project_root| {
@@ -390,9 +391,9 @@ fn check_reference_strategy(
             strategy: proj.strategy.clone(),
             sources: proj.sources.clone(),
         };
-        results.push(CheckResult {
+        results.push(WaiCheckEntry {
             name: format!("Projection → {}", proj.target),
-            status: Status::Warn,
+            status: CheckStatus::Warn,
             message: "Stale (content changed)".to_string(),
             fix: Some("Run: wai sync".to_string()),
             fix_fn: Some(Box::new(move |project_root| {
@@ -400,9 +401,9 @@ fn check_reference_strategy(
             })),
         });
     } else {
-        results.push(CheckResult {
+        results.push(WaiCheckEntry {
             name: format!("Projection → {}", proj.target),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: "In sync".to_string(),
             fix: None,
             fix_fn: None,

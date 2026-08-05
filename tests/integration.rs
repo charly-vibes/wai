@@ -3084,7 +3084,7 @@ fn way_check_task_runner_missing() {
         .stdout(
             predicate::str::contains("Command standardization")
                 .and(predicate::str::contains("No task runner detected"))
-                .and(predicate::str::contains("\"info\"")),
+                .and(predicate::str::contains("\"warn\"")),
         );
 }
 
@@ -3125,7 +3125,7 @@ fn way_check_git_hooks_prek_not_installed() {
                 .and(predicate::str::contains(
                     "prek.toml found but hooks not installed",
                 ))
-                .and(predicate::str::contains("\"info\"")),
+                .and(predicate::str::contains("\"warn\"")),
         );
 }
 
@@ -3168,7 +3168,7 @@ fn way_check_git_hooks_precommit_not_installed() {
                 .and(predicate::str::contains(
                     ".pre-commit-config.yaml found but hooks not installed",
                 ))
-                .and(predicate::str::contains("\"info\"")),
+                .and(predicate::str::contains("\"warn\"")),
         );
 }
 
@@ -3216,7 +3216,7 @@ fn way_check_git_hooks_lefthook_not_installed() {
                 .and(predicate::str::contains(
                     "lefthook.yml found but hooks not installed",
                 ))
-                .and(predicate::str::contains("\"info\"")),
+                .and(predicate::str::contains("\"warn\"")),
         );
 }
 
@@ -3231,7 +3231,7 @@ fn way_check_git_hooks_missing() {
         .stdout(
             predicate::str::contains("Pre-commit quality gates")
                 .and(predicate::str::contains("No git hook manager detected"))
-                .and(predicate::str::contains("\"info\"")),
+                .and(predicate::str::contains("\"warn\"")),
         );
 }
 
@@ -3262,7 +3262,7 @@ fn way_check_editorconfig_missing() {
         .stdout(
             predicate::str::contains("Consistent formatting")
                 .and(predicate::str::contains("No .editorconfig detected"))
-                .and(predicate::str::contains("\"info\"")),
+                .and(predicate::str::contains("\"warn\"")),
         );
 }
 
@@ -3299,7 +3299,7 @@ fn way_check_documentation_not_configured() {
         .stdout(
             predicate::str::contains("Project documentation")
                 .and(predicate::str::contains("Missing critical files"))
-                .and(predicate::str::contains("\"info\"")),
+                .and(predicate::str::contains("\"warn\"")),
         );
 }
 
@@ -3317,7 +3317,7 @@ fn way_check_documentation_missing_critical() {
         .stdout(
             predicate::str::contains("Project documentation")
                 .and(predicate::str::contains("Missing critical files"))
-                .and(predicate::str::contains("\"info\"")),
+                .and(predicate::str::contains("\"warn\"")),
         );
 }
 
@@ -3451,7 +3451,7 @@ fn way_check_ai_instructions_missing() {
         .stdout(
             predicate::str::contains("AI-agent context")
                 .and(predicate::str::contains("No AI instruction files detected"))
-                .and(predicate::str::contains("\"info\"")),
+                .and(predicate::str::contains("\"warn\"")),
         );
 }
 
@@ -3492,7 +3492,7 @@ fn way_check_agent_config_sync_info_missing() {
                 .and(predicate::str::contains(
                     "No agent config projections found",
                 ))
-                .and(predicate::str::contains("\"info\"")),
+                .and(predicate::str::contains("\"warn\"")),
         );
 }
 
@@ -3512,7 +3512,7 @@ fn way_check_agent_config_sync_info_empty() {
                 .and(predicate::str::contains(
                     "Projections file exists but no projections are configured",
                 ))
-                .and(predicate::str::contains("\"info\"")),
+                .and(predicate::str::contains("\"warn\"")),
         );
 }
 
@@ -3577,7 +3577,7 @@ fn way_check_cicd_missing() {
         .stdout(
             predicate::str::contains("Automated verification")
                 .and(predicate::str::contains("No CI/CD configuration detected"))
-                .and(predicate::str::contains("\"info\"")),
+                .and(predicate::str::contains("\"warn\"")),
         );
 }
 
@@ -3628,7 +3628,7 @@ fn way_check_devcontainer_missing() {
                 .and(predicate::str::contains(
                     "No dev container configuration detected",
                 ))
-                .and(predicate::str::contains("\"info\"")),
+                .and(predicate::str::contains("\"warn\"")),
         );
 }
 
@@ -3662,7 +3662,7 @@ fn way_check_llm_txt_missing() {
             predicate::str::contains("LLM-friendly context")
                 .and(predicate::str::contains("No llm.txt detected"))
                 .and(predicate::str::contains("llmstxt.org"))
-                .and(predicate::str::contains("\"info\"")),
+                .and(predicate::str::contains("\"warn\"")),
         );
 }
 
@@ -3704,7 +3704,7 @@ fn way_check_agent_skills_empty_dir() {
                 .and(predicate::str::contains(
                     "Skills directory present but empty",
                 ))
-                .and(predicate::str::contains("\"info\"")),
+                .and(predicate::str::contains("\"warn\"")),
         );
 }
 
@@ -3719,7 +3719,7 @@ fn way_check_agent_skills_missing() {
         .stdout(
             predicate::str::contains("Extended agent capabilities")
                 .and(predicate::str::contains("No skills configured"))
-                .and(predicate::str::contains("\"info\"")),
+                .and(predicate::str::contains("\"warn\"")),
         );
 }
 
@@ -3783,7 +3783,7 @@ fn way_check_ubiquitous_language_skeleton_tree_reports_info() {
         .success()
         .stdout(
             predicate::str::contains("Ubiquitous language context")
-                .and(predicate::str::contains("\"info\""))
+                .and(predicate::str::contains("\"warn\""))
                 .and(predicate::str::contains("bounded-context files")),
         );
 }
@@ -3811,7 +3811,7 @@ fn way_check_ubiquitous_language_shared_only_tree_reports_info() {
         .success()
         .stdout(
             predicate::str::contains("Ubiquitous language context")
-                .and(predicate::str::contains("\"info\""))
+                .and(predicate::str::contains("\"warn\""))
                 .and(predicate::str::contains("valid starting point")),
         );
 }
@@ -3837,7 +3837,7 @@ fn way_check_ubiquitous_language_malformed_tree_without_index_reports_info() {
         .success()
         .stdout(
             predicate::str::contains("Ubiquitous language context")
-                .and(predicate::str::contains("\"info\""))
+                .and(predicate::str::contains("\"warn\""))
                 .and(predicate::str::contains("README.md is required")),
         );
 }
@@ -3985,7 +3985,7 @@ fn way_check_test_coverage_not_configured() {
         .stdout(
             predicate::str::contains("Test coverage")
                 .and(predicate::str::contains("No coverage tool configured"))
-                .and(predicate::str::contains("\"info\"")),
+                .and(predicate::str::contains("\"warn\"")),
         );
 }
 
@@ -4016,7 +4016,7 @@ fn way_check_beads_absent() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("Issue tracking").and(predicate::str::contains("\"info\"")),
+            predicate::str::contains("Issue tracking").and(predicate::str::contains("\"warn\"")),
         );
 }
 
@@ -4047,7 +4047,7 @@ fn way_check_openspec_absent() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("Change proposals").and(predicate::str::contains("\"info\"")),
+            predicate::str::contains("Change proposals").and(predicate::str::contains("\"warn\"")),
         );
 }
 

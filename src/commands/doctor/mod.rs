@@ -4,7 +4,8 @@ use serde::Serialize;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-use genesis::doctor::DoctorCheck;
+use genesis::doctor::{CheckStatus, DoctorCheck, DoctorReport, DoctorSummary};
+use genesis::suite_linter::{LintResult, Severity};
 
 use crate::config::{SKILLS_DIR, agent_config_dir, projects_dir};
 use crate::context::current_context;
@@ -17,77 +18,29 @@ use super::require_project;
 mod checks_basic;
 mod checks_sync;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "lowercase")]
-pub(super) enum Status {
-    Pass,
-    Warn,
-    Fail,
-}
-
-pub(super) struct CheckResult {
-    name: String,
-    status: Status,
-    message: String,
-    fix: Option<String>,
-    #[allow(clippy::type_complexity)]
-    fix_fn: Option<Box<dyn FnOnce(&Path) -> Result<()>>>,
-}
-
-impl Serialize for CheckResult {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        use serde::ser::SerializeStruct;
-        let field_count = 3 + self.fix.is_some() as usize;
-        let mut s = serializer.serialize_struct("CheckResult", field_count)?;
-        s.serialize_field("name", &self.name)?;
-        s.serialize_field("status", &self.status)?;
-        s.serialize_field("message", &self.message)?;
-        if let Some(ref fix) = self.fix {
-            s.serialize_field("fix", fix)?;
-        }
-        s.end()
-    }
-}
-
-#[derive(Debug, Clone, Serialize)]
-struct Summary {
-    pass: usize,
-    warn: usize,
-    fail: usize,
-}
-
-/// Lightweight health summary used by `wai status` / `wai prime` to surface
-/// doctor warnings inline without running the full `wai doctor` report.
+/// Internal check result with a fix closure.
 ///
-/// Only carries warning/failure counts — clean workspaces are reported
-/// silently (no output) by the callers.
-#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize)]
-pub struct DoctorHealthSummary {
-    pub warn: usize,
-    pub fail: usize,
-}
-
-impl DoctorHealthSummary {
-    /// True when there are no warnings or failures to report.
-    pub fn is_clean(&self) -> bool {
-        self.warn == 0 && self.fail == 0
-    }
+/// The public doctor API uses `genesis::doctor::CheckEntry` / `DoctorReport`;
+/// this internal wrapper carries the optional fix closure that wai applies
+/// via `--fix`. It converts losslessly to a genesis `CheckEntry`.
+pub(super) struct WaiCheckEntry {
+    pub name: String,
+    pub status: CheckStatus,
+    pub message: String,
+    pub fix: Option<String>,
+    #[allow(clippy::type_complexity)]
+    pub fix_fn: Option<Box<dyn FnOnce(&Path) -> Result<()>>>,
 }
 
 /// Adapter wrapping a wai check function as a genesis::doctor::DoctorCheck.
 ///
-/// This enables compatibility with DoctorRunner while keeping wai's
-/// CheckResult-based check functions and closure-based fix system intact.
-/// The adapter reports pass as empty Vec (no LintResults), and converts
-/// Warn/Fail to genesis LintResults. Fix closures are NOT exposed via
-/// DoctorCheck — wai's local `apply_fixes` handles them directly.
+/// The adapter converts WaiCheckEntry results to LintResults for the
+/// DoctorRunner, skipping pass entries and mapping Warn/Fail to
+/// Warning/Error severity.
 struct WaiCheckAdapter {
     name: &'static str,
     description: &'static str,
-    func: fn(&Path) -> Vec<CheckResult>,
+    func: fn(&Path) -> Vec<WaiCheckEntry>,
 }
 
 impl DoctorCheck for WaiCheckAdapter {
@@ -102,21 +55,20 @@ impl DoctorCheck for WaiCheckAdapter {
     fn run(
         &self,
         repo_root: &Path,
-    ) -> std::result::Result<Vec<genesis::suite_linter::LintResult>, Box<dyn std::error::Error>>
-    {
+    ) -> std::result::Result<Vec<LintResult>, Box<dyn std::error::Error>> {
         let results = (self.func)(repo_root);
-        let lint_results: Vec<genesis::suite_linter::LintResult> = results
+        let lint_results: Vec<LintResult> = results
             .into_iter()
-            .filter(|cr| cr.status != Status::Pass)
-            .map(|cr| {
-                let severity = match cr.status {
-                    Status::Pass => unreachable!(),
-                    Status::Warn => genesis::suite_linter::Severity::Warning,
-                    Status::Fail => genesis::suite_linter::Severity::Error,
+            .filter(|w| w.status != CheckStatus::Pass)
+            .map(|w| {
+                let severity = match w.status {
+                    CheckStatus::Pass => unreachable!(),
+                    CheckStatus::Warn => Severity::Warning,
+                    CheckStatus::Fail => Severity::Error,
                 };
-                let mut lr = genesis::suite_linter::LintResult::new(cr.message, severity);
-                if let Some(fix) = cr.fix {
-                    lr = genesis::suite_linter::LintResult::with_fix(lr.message, lr.severity, &fix);
+                let mut lr = LintResult::new(w.message, severity);
+                if let Some(fix) = w.fix {
+                    lr = LintResult::with_fix(lr.message, lr.severity, &fix);
                 }
                 lr
             })
@@ -236,13 +188,13 @@ pub(crate) fn build_doctor_runner() -> genesis::doctor::DoctorRunner {
     ])
 }
 
-/// Collect every doctor `CheckResult` for the given project root.
+/// Collect every doctor `WaiCheckEntry` for the given project root.
 ///
 /// This is the single source of truth for the check set — both `wai doctor`
 /// (via [`run`]) and the inline health summaries (via [`health_summary`]) run
 /// exactly the same diagnostics, so the inline line never disagrees with the
 /// full report.
-fn collect_checks(project_root: &Path) -> Vec<CheckResult> {
+fn collect_checks(project_root: &Path) -> Vec<WaiCheckEntry> {
     let mut checks = Vec::new();
     checks.extend(checks_basic::check_directories(project_root));
     checks.push(checks_basic::check_config(project_root));
@@ -270,20 +222,16 @@ fn collect_checks(project_root: &Path) -> Vec<CheckResult> {
     checks
 }
 
-/// Run the doctor checks and return a compact warn/fail count.
+/// Run the doctor checks and return a compact warn/fail report.
 ///
 /// Used by `wai status` and `wai prime` to surface a one-line health summary
-/// when the workspace is not fully green. Returns `is_clean() == true` when
+/// when the workspace is not fully green. Returns `is_healthy() == true` when
 /// nothing is wrong, so callers can stay silent in that case.
-pub fn health_summary(project_root: &Path) -> DoctorHealthSummary {
+pub fn health_summary(project_root: &Path) -> DoctorReport {
     let runner = build_doctor_runner();
-    let report = runner
+    runner
         .run(project_root, false)
-        .unwrap_or_else(|_| genesis::doctor::DoctorReport::new("wai", vec![]));
-    DoctorHealthSummary {
-        warn: report.summary.warn,
-        fail: report.summary.fail,
-    }
+        .unwrap_or_else(|_| DoctorReport::new("wai", vec![]))
 }
 
 pub fn run(fix: bool) -> Result<()> {
@@ -292,10 +240,19 @@ pub fn run(fix: bool) -> Result<()> {
 
     let checks = collect_checks(&project_root);
 
-    let summary = Summary {
-        pass: checks.iter().filter(|c| c.status == Status::Pass).count(),
-        warn: checks.iter().filter(|c| c.status == Status::Warn).count(),
-        fail: checks.iter().filter(|c| c.status == Status::Fail).count(),
+    let summary = DoctorSummary {
+        pass: checks
+            .iter()
+            .filter(|c| c.status == CheckStatus::Pass)
+            .count(),
+        warn: checks
+            .iter()
+            .filter(|c| c.status == CheckStatus::Warn)
+            .count(),
+        fail: checks
+            .iter()
+            .filter(|c| c.status == CheckStatus::Fail)
+            .count(),
     };
 
     // Handle fix mode vs diagnostic mode
@@ -327,7 +284,7 @@ pub fn run(fix: bool) -> Result<()> {
 
 fn apply_fixes(
     project_root: &Path,
-    mut checks: Vec<CheckResult>,
+    mut checks: Vec<WaiCheckEntry>,
     context: &crate::context::CliContext,
 ) -> Result<()> {
     use crate::error::WaiError;
@@ -341,7 +298,7 @@ fn apply_fixes(
     }
 
     // Filter to fixable checks
-    let fixable_checks: Vec<CheckResult> =
+    let fixable_checks: Vec<WaiCheckEntry> =
         checks.drain(..).filter(|c| c.fix_fn.is_some()).collect();
 
     if fixable_checks.is_empty() {
@@ -452,7 +409,7 @@ struct FixResult {
     error: Option<String>,
 }
 
-fn render_human(checks: &[CheckResult], summary: &Summary) -> Result<()> {
+fn render_human(checks: &[WaiCheckEntry], summary: &DoctorSummary) -> Result<()> {
     use cliclack::outro;
 
     println!();
@@ -465,9 +422,9 @@ fn render_human(checks: &[CheckResult], summary: &Summary) -> Result<()> {
 
     for check in checks {
         let icon = match check.status {
-            Status::Pass => "✓".green().to_string(),
-            Status::Warn => "⚠".yellow().to_string(),
-            Status::Fail => "✗".red().to_string(),
+            CheckStatus::Pass => "✓".green().to_string(),
+            CheckStatus::Warn => "⚠".yellow().to_string(),
+            CheckStatus::Fail => "✗".red().to_string(),
         };
         println!("  {} {}: {}", icon, check.name.bold(), check.message);
         if let Some(ref fix) = check.fix {
@@ -491,13 +448,13 @@ fn render_human(checks: &[CheckResult], summary: &Summary) -> Result<()> {
     Ok(())
 }
 
-fn check_claude_session_hook() -> Vec<CheckResult> {
+fn check_claude_session_hook() -> Vec<WaiCheckEntry> {
     let settings_path = match dirs::home_dir() {
         Some(home) => home.join(".claude").join("settings.json"),
         None => {
-            return vec![CheckResult {
+            return vec![WaiCheckEntry {
                 name: "Claude Code session hook".to_string(),
-                status: Status::Warn,
+                status: CheckStatus::Warn,
                 message: "Could not determine home directory".to_string(),
                 fix: None,
                 fix_fn: None,
@@ -506,9 +463,9 @@ fn check_claude_session_hook() -> Vec<CheckResult> {
     };
 
     if !settings_path.exists() {
-        return vec![CheckResult {
+        return vec![WaiCheckEntry {
             name: "Claude Code session hook".to_string(),
-            status: Status::Warn,
+            status: CheckStatus::Warn,
             message: "~/.claude/settings.json not found — Claude Code may not be installed"
                 .to_string(),
             fix: None,
@@ -519,9 +476,9 @@ fn check_claude_session_hook() -> Vec<CheckResult> {
     let content = match std::fs::read_to_string(&settings_path) {
         Ok(c) => c,
         Err(e) => {
-            return vec![CheckResult {
+            return vec![WaiCheckEntry {
                 name: "Claude Code session hook".to_string(),
-                status: Status::Warn,
+                status: CheckStatus::Warn,
                 message: format!("Cannot read ~/.claude/settings.json: {}", e),
                 fix: None,
                 fix_fn: None,
@@ -532,9 +489,9 @@ fn check_claude_session_hook() -> Vec<CheckResult> {
     let json: serde_json::Value = match serde_json::from_str(&content) {
         Ok(v) => v,
         Err(e) => {
-            return vec![CheckResult {
+            return vec![WaiCheckEntry {
                 name: "Claude Code session hook".to_string(),
-                status: Status::Warn,
+                status: CheckStatus::Warn,
                 message: format!("~/.claude/settings.json is not valid JSON: {}", e),
                 fix: None,
                 fix_fn: None,
@@ -566,17 +523,17 @@ fn check_claude_session_hook() -> Vec<CheckResult> {
         .unwrap_or(false);
 
     if has_hook {
-        vec![CheckResult {
+        vec![WaiCheckEntry {
             name: "Claude Code session hook".to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: "`wai status` is in the SessionStart hook".to_string(),
             fix: None,
             fix_fn: None,
         }]
     } else {
-        vec![CheckResult {
+        vec![WaiCheckEntry {
             name: "Claude Code session hook".to_string(),
-            status: Status::Warn,
+            status: CheckStatus::Warn,
             message: "`wai status` not found in ~/.claude/settings.json SessionStart hooks"
                 .to_string(),
             fix: Some(
@@ -641,7 +598,7 @@ const AGENT_TOOL_DIRS: &[(&str, &str)] = &[
 /// Find SKILL.md files outside `.wai/` and agent tool directories, and report any not yet
 /// imported into wai. Agent tool directories (.claude, .amp, .gemini, .cursor) are excluded
 /// because they hold synced copies of skills, not source definitions.
-fn check_skills_in_repo(project_root: &Path) -> Vec<CheckResult> {
+fn check_skills_in_repo(project_root: &Path) -> Vec<WaiCheckEntry> {
     use walkdir::WalkDir;
 
     let wai_path = project_root.join(".wai");
@@ -704,9 +661,9 @@ fn check_skills_in_repo(project_root: &Path) -> Vec<CheckResult> {
     }
 
     if unimported.is_empty() {
-        vec![CheckResult {
+        vec![WaiCheckEntry {
             name: "Skills import".to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: format!(
                 "{} SKILL.md file(s) found outside wai — all imported",
                 external_skills.len()
@@ -715,9 +672,9 @@ fn check_skills_in_repo(project_root: &Path) -> Vec<CheckResult> {
             fix_fn: None,
         }]
     } else {
-        vec![CheckResult {
+        vec![WaiCheckEntry {
             name: "Skills import".to_string(),
-            status: Status::Warn,
+            status: CheckStatus::Warn,
             message: format!(
                 "{} SKILL.md file(s) found outside wai but not imported: {}",
                 unimported.len(),
@@ -733,7 +690,7 @@ fn check_skills_in_repo(project_root: &Path) -> Vec<CheckResult> {
 
 /// Check that detected agent tool directories (.claude, .amp, .gemini, .cursor) are covered by
 /// projections, and that wai skills are synced to them.
-fn check_agent_tool_coverage(project_root: &Path) -> Vec<CheckResult> {
+fn check_agent_tool_coverage(project_root: &Path) -> Vec<WaiCheckEntry> {
     let config_dir = agent_config_dir(project_root);
     let projections_path = config_dir.join(".projections.yml");
     let skills_dir = config_dir.join(SKILLS_DIR);
@@ -793,9 +750,9 @@ fn check_agent_tool_coverage(project_root: &Path) -> Vec<CheckResult> {
             .collect();
 
         if covering.is_empty() {
-            results.push(CheckResult {
+            results.push(WaiCheckEntry {
                 name: format!("Agent tool projection: {}", tool_name),
-                status: Status::Warn,
+                status: CheckStatus::Warn,
                 message: format!(
                     "{} directory detected but not in .projections.yml",
                     tool_dir
@@ -813,17 +770,17 @@ fn check_agent_tool_coverage(project_root: &Path) -> Vec<CheckResult> {
                     .any(|s| s == SKILLS_DIR || s.ends_with(&format!("/{}", SKILLS_DIR)))
             });
             if skills_synced {
-                results.push(CheckResult {
+                results.push(WaiCheckEntry {
                     name: format!("Agent tool projection: {}", tool_name),
-                    status: Status::Pass,
+                    status: CheckStatus::Pass,
                     message: format!("{} projected with skills synced", tool_dir),
                     fix: None,
                     fix_fn: None,
                 });
             } else {
-                results.push(CheckResult {
+                results.push(WaiCheckEntry {
                     name: format!("Agent tool projection: {}", tool_name),
-                    status: Status::Warn,
+                    status: CheckStatus::Warn,
                     message: format!(
                         "{} projected but skills source not included — wai skills won't sync to {}",
                         tool_dir, tool_name
@@ -836,9 +793,9 @@ fn check_agent_tool_coverage(project_root: &Path) -> Vec<CheckResult> {
                 });
             }
         } else {
-            results.push(CheckResult {
+            results.push(WaiCheckEntry {
                 name: format!("Agent tool projection: {}", tool_name),
-                status: Status::Pass,
+                status: CheckStatus::Pass,
                 message: format!("{} has a projection defined", tool_dir),
                 fix: None,
                 fix_fn: None,
@@ -864,7 +821,7 @@ fn managed_block_mentions_ro5(path: &std::path::Path) -> bool {
     }
 }
 
-fn check_agent_instructions(project_root: &Path) -> Vec<CheckResult> {
+fn check_agent_instructions(project_root: &Path) -> Vec<WaiCheckEntry> {
     use crate::managed_block::has_managed_block;
     use crate::workspace::detect_installed_skill_names;
 
@@ -878,9 +835,9 @@ fn check_agent_instructions(project_root: &Path) -> Vec<CheckResult> {
     // Check AGENTS.md
     let agents_md = project_root.join("AGENTS.md");
     if !agents_md.exists() {
-        results.push(CheckResult {
+        results.push(WaiCheckEntry {
             name: "Agent instructions: AGENTS.md".to_string(),
-            status: Status::Warn,
+            status: CheckStatus::Warn,
             message: "AGENTS.md not found — LLMs won't know to use wai".to_string(),
             fix: Some("Run: wai init (to create AGENTS.md with wai instructions)".to_string()),
             fix_fn: Some(Box::new(move |project_root| {
@@ -906,9 +863,9 @@ fn check_agent_instructions(project_root: &Path) -> Vec<CheckResult> {
         });
     } else if has_managed_block(&agents_md) {
         if has_ro5_skill && !managed_block_mentions_ro5(&agents_md) {
-            results.push(CheckResult {
+            results.push(WaiCheckEntry {
                 name: "Agent instructions: AGENTS.md".to_string(),
-                status: Status::Warn,
+                status: CheckStatus::Warn,
                 message: "Managed block is stale: ro5 skill installed but not reflected"
                     .to_string(),
                 fix: Some(
@@ -937,18 +894,18 @@ fn check_agent_instructions(project_root: &Path) -> Vec<CheckResult> {
                 })),
             });
         } else {
-            results.push(CheckResult {
+            results.push(WaiCheckEntry {
                 name: "Agent instructions: AGENTS.md".to_string(),
-                status: Status::Pass,
+                status: CheckStatus::Pass,
                 message: "Contains wai managed block".to_string(),
                 fix: None,
                 fix_fn: None,
             });
         }
     } else {
-        results.push(CheckResult {
+        results.push(WaiCheckEntry {
             name: "Agent instructions: AGENTS.md".to_string(),
-            status: Status::Warn,
+            status: CheckStatus::Warn,
             message: "Exists but missing wai managed block".to_string(),
             fix: Some("Run: wai init (to inject wai instructions into AGENTS.md)".to_string()),
             fix_fn: Some(Box::new(move |project_root| {
@@ -977,9 +934,9 @@ fn check_agent_instructions(project_root: &Path) -> Vec<CheckResult> {
     // Check CLAUDE.md
     let claude_md = project_root.join("CLAUDE.md");
     if !claude_md.exists() {
-        results.push(CheckResult {
+        results.push(WaiCheckEntry {
             name: "Agent instructions: CLAUDE.md".to_string(),
-            status: Status::Warn,
+            status: CheckStatus::Warn,
             message: "CLAUDE.md not found — Claude Code won't know to use wai".to_string(),
             fix: Some("Run: wai init (to create CLAUDE.md with wai instructions)".to_string()),
             fix_fn: Some(Box::new(move |project_root| {
@@ -1005,9 +962,9 @@ fn check_agent_instructions(project_root: &Path) -> Vec<CheckResult> {
         });
     } else if has_managed_block(&claude_md) {
         if has_ro5_skill && !managed_block_mentions_ro5(&claude_md) {
-            results.push(CheckResult {
+            results.push(WaiCheckEntry {
                 name: "Agent instructions: CLAUDE.md".to_string(),
-                status: Status::Warn,
+                status: CheckStatus::Warn,
                 message: "Managed block is stale: ro5 skill installed but not reflected"
                     .to_string(),
                 fix: Some(
@@ -1036,18 +993,18 @@ fn check_agent_instructions(project_root: &Path) -> Vec<CheckResult> {
                 })),
             });
         } else {
-            results.push(CheckResult {
+            results.push(WaiCheckEntry {
                 name: "Agent instructions: CLAUDE.md".to_string(),
-                status: Status::Pass,
+                status: CheckStatus::Pass,
                 message: "Contains wai managed block".to_string(),
                 fix: None,
                 fix_fn: None,
             });
         }
     } else {
-        results.push(CheckResult {
+        results.push(WaiCheckEntry {
             name: "Agent instructions: CLAUDE.md".to_string(),
-            status: Status::Warn,
+            status: CheckStatus::Warn,
             message: "Exists but missing wai managed block".to_string(),
             fix: Some("Run: wai init (to inject wai instructions into CLAUDE.md)".to_string()),
             fix_fn: Some(Box::new(move |project_root| {
@@ -1077,7 +1034,7 @@ fn check_agent_instructions(project_root: &Path) -> Vec<CheckResult> {
 }
 
 /// Check managed block staleness by comparing generated vs actual content.
-fn check_managed_block_staleness(project_root: &Path) -> Vec<CheckResult> {
+fn check_managed_block_staleness(project_root: &Path) -> Vec<WaiCheckEntry> {
     use crate::managed_block::{read_managed_block, wai_block_content, wai_detailed_content};
     use crate::workspace::{detect_installed_pipelines, detect_installed_skill_names};
 
@@ -1106,9 +1063,9 @@ fn check_managed_block_staleness(project_root: &Path) -> Vec<CheckResult> {
         if let Some(actual) = read_managed_block(&path)
             && actual != expected
         {
-            results.push(CheckResult {
+            results.push(WaiCheckEntry {
                 name: format!("Managed block staleness: {}", filename),
-                status: Status::Warn,
+                status: CheckStatus::Warn,
                 message: format!(
                     "{} managed block outdated — run 'wai init --update' to refresh",
                     filename
@@ -1131,18 +1088,18 @@ fn check_managed_block_staleness(project_root: &Path) -> Vec<CheckResult> {
         if let Ok(actual_detailed) = std::fs::read_to_string(&detailed_path)
             && actual_detailed != expected_detailed
         {
-            results.push(CheckResult {
+            results.push(WaiCheckEntry {
                 name: "Managed block staleness: .wai/AGENTS.md".to_string(),
-                status: Status::Warn,
+                status: CheckStatus::Warn,
                 message: ".wai/AGENTS.md outdated — run 'wai init --update' to refresh".to_string(),
                 fix: Some("Run: wai init".to_string()),
                 fix_fn: None,
             });
         }
     } else {
-        results.push(CheckResult {
+        results.push(WaiCheckEntry {
             name: "Managed block staleness: .wai/AGENTS.md".to_string(),
-            status: Status::Warn,
+            status: CheckStatus::Warn,
             message: ".wai/AGENTS.md missing — run 'wai init' to create it".to_string(),
             fix: Some("Run: wai init".to_string()),
             fix_fn: None,
@@ -1153,7 +1110,7 @@ fn check_managed_block_staleness(project_root: &Path) -> Vec<CheckResult> {
 }
 
 /// Validate pipeline TOML definitions for correctness.
-fn check_pipeline_definitions(project_root: &Path) -> Vec<CheckResult> {
+fn check_pipeline_definitions(project_root: &Path) -> Vec<WaiCheckEntry> {
     use crate::config::pipelines_dir;
 
     let mut results = Vec::new();
@@ -1181,9 +1138,9 @@ fn check_pipeline_definitions(project_root: &Path) -> Vec<CheckResult> {
         let content = match std::fs::read_to_string(&path) {
             Ok(c) => c,
             Err(e) => {
-                results.push(CheckResult {
+                results.push(WaiCheckEntry {
                     name: format!("Pipeline: {}", file_stem),
-                    status: Status::Fail,
+                    status: CheckStatus::Fail,
                     message: format!("Cannot read: {}", e),
                     fix: None,
                     fix_fn: None,
@@ -1196,9 +1153,9 @@ fn check_pipeline_definitions(project_root: &Path) -> Vec<CheckResult> {
         let parsed: Result<toml::Value, _> = toml::from_str(&content);
         match parsed {
             Err(e) => {
-                results.push(CheckResult {
+                results.push(WaiCheckEntry {
                     name: format!("Pipeline: {}", file_stem),
-                    status: Status::Fail,
+                    status: CheckStatus::Fail,
                     message: format!("Invalid TOML: {}", e),
                     fix: None,
                     fix_fn: None,
@@ -1214,9 +1171,9 @@ fn check_pipeline_definitions(project_root: &Path) -> Vec<CheckResult> {
                     .unwrap_or("");
 
                 if pipeline_name.is_empty() {
-                    results.push(CheckResult {
+                    results.push(WaiCheckEntry {
                         name: format!("Pipeline: {}", file_stem),
-                        status: Status::Fail,
+                        status: CheckStatus::Fail,
                         message: "Missing [pipeline].name".to_string(),
                         fix: None,
                         fix_fn: None,
@@ -1226,9 +1183,9 @@ fn check_pipeline_definitions(project_root: &Path) -> Vec<CheckResult> {
 
                 // Check for duplicate names
                 if let Some((_, prev_file)) = names_seen.iter().find(|(n, _)| n == pipeline_name) {
-                    results.push(CheckResult {
+                    results.push(WaiCheckEntry {
                         name: format!("Pipeline: {}", file_stem),
-                        status: Status::Fail,
+                        status: CheckStatus::Fail,
                         message: format!(
                             "Duplicate pipeline name '{}' (also in {})",
                             pipeline_name, prev_file
@@ -1249,9 +1206,9 @@ fn check_pipeline_definitions(project_root: &Path) -> Vec<CheckResult> {
                     .is_some();
 
                 if !has_metadata {
-                    results.push(CheckResult {
+                    results.push(WaiCheckEntry {
                         name: format!("Pipeline: {}", file_stem),
-                        status: Status::Warn,
+                        status: CheckStatus::Warn,
                         message: format!(
                             "Missing [pipeline.metadata] — pipeline '{}' won't appear in managed block",
                             pipeline_name
@@ -1284,9 +1241,9 @@ fn check_pipeline_definitions(project_root: &Path) -> Vec<CheckResult> {
                                 .iter()
                                 .any(|ext| oracles_dir.join(format!("{}{}", name, ext)).exists());
                             if !found {
-                                results.push(CheckResult {
+                                results.push(WaiCheckEntry {
                                     name: format!("Pipeline: {}", file_stem),
-                                    status: Status::Warn,
+                                    status: CheckStatus::Warn,
                                     message: format!("Gate oracle '{}' — command not found", name),
                                     fix: None,
                                     fix_fn: None,
@@ -1315,9 +1272,9 @@ fn check_pipeline_definitions(project_root: &Path) -> Vec<CheckResult> {
                                 }
                             }
                             if !executable {
-                                results.push(CheckResult {
+                                results.push(WaiCheckEntry {
                                     name: format!("Pipeline: {}", file_stem),
-                                    status: Status::Warn,
+                                    status: CheckStatus::Warn,
                                     message: format!("Gate oracle '{}' — not executable", name),
                                     fix: None,
                                     fix_fn: None,
@@ -1333,7 +1290,7 @@ fn check_pipeline_definitions(project_root: &Path) -> Vec<CheckResult> {
     results
 }
 
-fn check_artifact_locks(project_root: &Path) -> Vec<CheckResult> {
+fn check_artifact_locks(project_root: &Path) -> Vec<WaiCheckEntry> {
     use super::pipeline::{artifact_hash, read_artifact_lock};
     use walkdir::WalkDir;
 
@@ -1364,9 +1321,9 @@ fn check_artifact_locks(project_root: &Path) -> Vec<CheckResult> {
         let lock = match read_artifact_lock(lock_path) {
             Ok(l) => l,
             Err(_) => {
-                mismatches.push(CheckResult {
+                mismatches.push(WaiCheckEntry {
                     name: "Artifact lock".to_string(),
-                    status: Status::Warn,
+                    status: CheckStatus::Warn,
                     message: format!(
                         "Cannot read lock file: {}",
                         lock_path
@@ -1383,9 +1340,9 @@ fn check_artifact_locks(project_root: &Path) -> Vec<CheckResult> {
 
         let artifact_path = lock_path.parent().unwrap().join(&lock.artifact);
         if !artifact_path.exists() {
-            mismatches.push(CheckResult {
+            mismatches.push(WaiCheckEntry {
                 name: "Artifact lock".to_string(),
-                status: Status::Warn,
+                status: CheckStatus::Warn,
                 message: format!(
                     "Locked artifact missing: {}",
                     artifact_path
@@ -1402,9 +1359,9 @@ fn check_artifact_locks(project_root: &Path) -> Vec<CheckResult> {
         match artifact_hash(&artifact_path) {
             Ok(current_hash) => {
                 if current_hash != lock.lock_hash {
-                    mismatches.push(CheckResult {
+                    mismatches.push(WaiCheckEntry {
                         name: "Artifact lock".to_string(),
-                        status: Status::Warn,
+                        status: CheckStatus::Warn,
                         message: format!(
                             "Hash mismatch: {} (run {})",
                             lock.artifact, lock.pipeline_run
@@ -1417,9 +1374,9 @@ fn check_artifact_locks(project_root: &Path) -> Vec<CheckResult> {
                 }
             }
             Err(_) => {
-                mismatches.push(CheckResult {
+                mismatches.push(WaiCheckEntry {
                     name: "Artifact lock".to_string(),
-                    status: Status::Warn,
+                    status: CheckStatus::Warn,
                     message: format!(
                         "Cannot hash artifact: {}",
                         artifact_path
@@ -1435,9 +1392,9 @@ fn check_artifact_locks(project_root: &Path) -> Vec<CheckResult> {
     }
 
     if mismatches.is_empty() {
-        vec![CheckResult {
+        vec![WaiCheckEntry {
             name: "Artifact locks".to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: format!("All {} locked artifacts verified", verified),
             fix: None,
             fix_fn: None,
@@ -1458,7 +1415,7 @@ fn check_artifact_locks(project_root: &Path) -> Vec<CheckResult> {
 /// (e.g. "TDD → ro5u → fix → commit → next ticket") but an equivalent
 /// pipeline (with  mentioning TDD, autonomous, or ro5) is
 /// available. Surfaces a warning so the agent prefers the pipeline.
-fn check_pipeline_utilization(project_root: &Path) -> Vec<CheckResult> {
+fn check_pipeline_utilization(project_root: &Path) -> Vec<WaiCheckEntry> {
     let pipelines = detect_installed_pipelines(project_root);
 
     // Which pipelines have TDD/autonomous/Ro5 in their  metadata?
@@ -1509,9 +1466,9 @@ fn check_pipeline_utilization(project_root: &Path) -> Vec<CheckResult> {
 
     let pipeline_names: Vec<&str> = tdd_pipelines.iter().map(|p| p.name.as_str()).collect();
 
-    vec![CheckResult {
+    vec![WaiCheckEntry {
         name: "Pipeline utilization".to_string(),
-        status: Status::Warn,
+        status: CheckStatus::Warn,
         message: format!(
             "Pipeline(s) '{}' encode the TDD+Ro5 cycle, but AGENTS.md/CLAUDE.md contain manual-cycle instructions: {}",
             pipeline_names.join(", "),
@@ -1586,7 +1543,7 @@ fn collect_pi_extension_files(dir: &Path) -> Vec<PathBuf> {
 ///
 /// When pi is in use, scans `.pi/extensions/` for a `session_start` extension
 /// running `wai prime`/`wai status` and warns with an actionable fix otherwise.
-fn check_pi_session_hook(project_root: &Path) -> Vec<CheckResult> {
+fn check_pi_session_hook(project_root: &Path) -> Vec<WaiCheckEntry> {
     let pi_dir = project_root.join(".pi");
     if !pi_dir.exists() {
         return Vec::new();
@@ -1600,17 +1557,17 @@ fn check_pi_session_hook(project_root: &Path) -> Vec<CheckResult> {
         .collect();
 
     if pi_extensions_run_wai_prime(&contents) {
-        vec![CheckResult {
+        vec![WaiCheckEntry {
             name: "Pi session hook".to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: "`wai prime` runs at pi `session_start` (via .pi/extensions)".to_string(),
             fix: None,
             fix_fn: None,
         }]
     } else {
-        vec![CheckResult {
+        vec![WaiCheckEntry {
             name: "Pi session hook".to_string(),
-            status: Status::Warn,
+            status: CheckStatus::Warn,
             message: "No pi `session_start` extension runs `wai prime` in .pi/extensions"
                 .to_string(),
             fix: Some(PI_WAI_PRIME_EXTENSION_FIX.to_string()),
@@ -1638,7 +1595,7 @@ fn read_non_managed_block_content(path: &Path) -> String {
     content
 }
 
-fn check_dont_drift_signals(project_root: &Path) -> Vec<CheckResult> {
+fn check_dont_drift_signals(project_root: &Path) -> Vec<WaiCheckEntry> {
     if std::env::var("WAI_DONT_SIGNALS").is_err() {
         return vec![];
     }
@@ -1657,15 +1614,15 @@ fn check_dont_drift_signals(project_root: &Path) -> Vec<CheckResult> {
 
 /// Parse the JSON output of `ah signals` and return check results.
 /// Extracted for unit testing without a subprocess dependency.
-fn drift_signals_to_check_results(json_bytes: &[u8]) -> Vec<CheckResult> {
+fn drift_signals_to_check_results(json_bytes: &[u8]) -> Vec<WaiCheckEntry> {
     let signals: Vec<serde_json::Value> = match serde_json::from_slice(json_bytes) {
         Ok(v) => v,
         Err(_) => return vec![],
     };
     if signals.is_empty() {
-        return vec![CheckResult {
+        return vec![WaiCheckEntry {
             name: "dont drift signals".to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: "No dont rejection signals detected".to_string(),
             fix: None,
             fix_fn: None,
@@ -1678,9 +1635,9 @@ fn drift_signals_to_check_results(json_bytes: &[u8]) -> Vec<CheckResult> {
         .collect::<std::collections::HashSet<_>>()
         .into_iter()
         .collect();
-    vec![CheckResult {
+    vec![WaiCheckEntry {
         name: "dont drift signals".to_string(),
-        status: Status::Warn,
+        status: CheckStatus::Warn,
         message: format!(
             "{count} dont rejection signal(s) detected (rules: {}); run `ah signals` for details",
             rules.join(", ")
@@ -1756,7 +1713,7 @@ mod tests {
 
         let results = check_artifact_locks(tmp.path());
         assert_eq!(results.len(), 1);
-        assert_eq!(results[0].status, Status::Pass);
+        assert_eq!(results[0].status, CheckStatus::Pass);
         assert!(results[0].message.contains("1 locked artifacts verified"));
     }
 
@@ -1768,7 +1725,7 @@ mod tests {
 
         let results = check_artifact_locks(tmp.path());
         assert_eq!(results.len(), 1);
-        assert_eq!(results[0].status, Status::Warn);
+        assert_eq!(results[0].status, CheckStatus::Warn);
         assert!(results[0].message.contains("Hash mismatch"));
     }
 
@@ -1789,7 +1746,7 @@ mod tests {
 
         let results = check_artifact_locks(tmp.path());
         assert_eq!(results.len(), 1);
-        assert_eq!(results[0].status, Status::Warn);
+        assert_eq!(results[0].status, CheckStatus::Warn);
         assert!(results[0].message.contains("Locked artifact missing"));
     }
 
@@ -1803,7 +1760,7 @@ mod tests {
         let results = check_artifact_locks(tmp.path());
         // Should only contain the mismatch warning (pass is suppressed when mismatches exist)
         assert_eq!(results.len(), 1);
-        assert_eq!(results[0].status, Status::Warn);
+        assert_eq!(results[0].status, CheckStatus::Warn);
         assert!(results[0].message.contains("Hash mismatch"));
         assert!(results[0].message.contains("bad.md"));
     }
@@ -1814,7 +1771,7 @@ mod tests {
     fn drift_signals_empty_json_array_returns_pass() {
         let results = drift_signals_to_check_results(b"[]");
         assert_eq!(results.len(), 1);
-        assert_eq!(results[0].status, Status::Pass);
+        assert_eq!(results[0].status, CheckStatus::Pass);
         assert!(results[0].message.contains("No dont rejection signals"));
     }
 
@@ -1833,7 +1790,7 @@ mod tests {
         .unwrap();
         let results = drift_signals_to_check_results(&json);
         assert_eq!(results.len(), 1);
-        assert_eq!(results[0].status, Status::Warn);
+        assert_eq!(results[0].status, CheckStatus::Warn);
         assert!(results[0].message.contains("1 dont rejection signal"));
         assert!(results[0].message.contains("ungrounded"));
     }
@@ -1921,7 +1878,7 @@ export default function (pi: ExtensionAPI) {
         .unwrap();
         let results = check_pi_session_hook(tmp.path());
         assert_eq!(results.len(), 1);
-        assert_eq!(results[0].status, Status::Warn);
+        assert_eq!(results[0].status, CheckStatus::Warn);
         assert!(
             results[0]
                 .fix
@@ -1942,6 +1899,6 @@ export default function (pi: ExtensionAPI) {
         .unwrap();
         let results = check_pi_session_hook(tmp.path());
         assert_eq!(results.len(), 1);
-        assert_eq!(results[0].status, Status::Pass);
+        assert_eq!(results[0].status, CheckStatus::Pass);
     }
 }

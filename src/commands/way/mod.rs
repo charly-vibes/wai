@@ -8,6 +8,8 @@ use serde::Serialize;
 use std::collections::HashSet;
 use std::path::Path;
 
+use genesis::doctor::CheckStatus;
+
 use crate::commands::resource::parse_skill_frontmatter;
 use crate::config::{SKILLS_DIR, agent_config_dir};
 use crate::context::current_context;
@@ -23,17 +25,10 @@ const SKILL_COMMIT: (&str, &str) = (
     include_str!("../../../.wai/resources/agent-config/skills/commit/SKILL.md"),
 );
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "lowercase")]
-enum Status {
-    Pass,
-    Info,
-}
-
 #[derive(Serialize)]
-struct CheckResult {
+struct WayCheckEntry {
     name: String,
-    status: Status,
+    status: CheckStatus,
     message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     intent: Option<String>,
@@ -44,7 +39,7 @@ struct CheckResult {
 
 #[derive(Serialize)]
 struct WayPayload {
-    checks: Vec<CheckResult>,
+    checks: Vec<WayCheckEntry>,
     summary: Summary,
 }
 
@@ -98,8 +93,14 @@ pub fn run(topic: Option<String>, fix: Option<String>) -> Result<()> {
     ];
 
     let summary = Summary {
-        pass: checks.iter().filter(|c| c.status == Status::Pass).count(),
-        recommendations: checks.iter().filter(|c| c.status == Status::Info).count(),
+        pass: checks
+            .iter()
+            .filter(|c| c.status == CheckStatus::Pass)
+            .count(),
+        recommendations: checks
+            .iter()
+            .filter(|c| c.status == CheckStatus::Warn)
+            .count(),
     };
 
     if context.json {
@@ -1498,7 +1499,7 @@ fn fix_skills(repo_root: &Path) -> Result<()> {
     Ok(())
 }
 
-fn render_human(checks: &[CheckResult], summary: &Summary, verbose: u8) -> Result<()> {
+fn render_human(checks: &[WayCheckEntry], summary: &Summary, verbose: u8) -> Result<()> {
     use cliclack::outro;
     use miette::IntoDiagnostic;
 
@@ -1512,8 +1513,9 @@ fn render_human(checks: &[CheckResult], summary: &Summary, verbose: u8) -> Resul
 
     for check in checks {
         let icon = match check.status {
-            Status::Pass => "✓".green().to_string(),
-            Status::Info => "ℹ".cyan().to_string(),
+            CheckStatus::Pass => "✓".green().to_string(),
+            CheckStatus::Warn => "ℹ".cyan().to_string(),
+            _ => "?".to_string(),
         };
         println!("  {} {}: {}", icon, check.name.bold(), check.message);
         if verbose > 0 {
@@ -1558,7 +1560,7 @@ fn render_human(checks: &[CheckResult], summary: &Summary, verbose: u8) -> Resul
     Ok(())
 }
 
-fn check_task_runner(repo_root: &Path) -> CheckResult {
+fn check_task_runner(repo_root: &Path) -> WayCheckEntry {
     let name = "Command standardization";
     let intent = Some("Provide a single, tool-agnostic entry point for common repository tasks (build, test, deploy).".to_string());
     let success_criteria = Some(
@@ -1577,18 +1579,18 @@ fn check_task_runner(repo_root: &Path) -> CheckResult {
             format!("justfile detected (recipes: {})", recipes.join(", "))
         };
 
-        CheckResult {
+        WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message,
             intent,
             success_criteria,
             suggestion: None,
         }
     } else if makefile.exists() {
-        CheckResult {
+        WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: "Makefile detected".to_string(),
             intent,
             success_criteria,
@@ -1598,9 +1600,9 @@ fn check_task_runner(repo_root: &Path) -> CheckResult {
             ),
         }
     } else if repo_root.join("mise.toml").exists() || repo_root.join(".mise.toml").exists() {
-        CheckResult {
+        WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: "mise.toml detected".to_string(),
             intent,
             success_criteria,
@@ -1610,9 +1612,9 @@ fn check_task_runner(repo_root: &Path) -> CheckResult {
             ),
         }
     } else {
-        CheckResult {
+        WayCheckEntry {
             name: name.to_string(),
-            status: Status::Info,
+            status: CheckStatus::Warn,
             message: "No task runner detected".to_string(),
             intent,
             success_criteria,
@@ -1657,7 +1659,7 @@ fn parse_justfile_recipes(justfile_path: &Path) -> Vec<String> {
     found_recipes
 }
 
-fn check_editorconfig(repo_root: &Path) -> CheckResult {
+fn check_editorconfig(repo_root: &Path) -> WayCheckEntry {
     let name = "Consistent formatting";
     let intent =
         Some("Ensure consistent code formatting across different editors and IDEs.".to_string());
@@ -1667,18 +1669,18 @@ fn check_editorconfig(repo_root: &Path) -> CheckResult {
     let editorconfig = repo_root.join(".editorconfig");
 
     if editorconfig.exists() {
-        CheckResult {
+        WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: ".editorconfig detected".to_string(),
             intent,
             success_criteria,
             suggestion: None,
         }
     } else {
-        CheckResult {
+        WayCheckEntry {
             name: name.to_string(),
-            status: Status::Info,
+            status: CheckStatus::Warn,
             message: "No .editorconfig detected".to_string(),
             intent,
             success_criteria,
@@ -1709,7 +1711,7 @@ fn detect_doc_tool(repo_root: &Path) -> Option<String> {
     None
 }
 
-fn check_documentation(repo_root: &Path) -> CheckResult {
+fn check_documentation(repo_root: &Path) -> WayCheckEntry {
     let name = "Project documentation";
     let intent = Some(
         "Provide essential project identity, onboarding, and a discoverable docs/ folder with generated API docs."
@@ -1772,9 +1774,9 @@ fn check_documentation(repo_root: &Path) -> CheckResult {
     }
 
     if !missing_critical.is_empty() {
-        return CheckResult {
+        return WayCheckEntry {
             name: name.to_string(),
-            status: Status::Info,
+            status: CheckStatus::Warn,
             message: format!("Missing critical files: {}", missing_critical.join(", ")),
             intent,
             success_criteria,
@@ -1791,9 +1793,9 @@ fn check_documentation(repo_root: &Path) -> CheckResult {
     }
 
     if suggestions.is_empty() {
-        CheckResult {
+        WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: format!(
                 "Complete (doc tool: {})",
                 doc_tool.as_deref().unwrap_or("detected")
@@ -1803,9 +1805,9 @@ fn check_documentation(repo_root: &Path) -> CheckResult {
             suggestion: None,
         }
     } else {
-        CheckResult {
+        WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: "Essential files present".to_string(),
             intent,
             success_criteria,
@@ -1814,7 +1816,7 @@ fn check_documentation(repo_root: &Path) -> CheckResult {
     }
 }
 
-fn check_docs_status_page(repo_root: &Path) -> CheckResult {
+fn check_docs_status_page(repo_root: &Path) -> WayCheckEntry {
     let name = "Implementation status page";
     let intent = Some(
         "An overview page showing what is implemented and how features relate to their specs."
@@ -1829,9 +1831,9 @@ fn check_docs_status_page(repo_root: &Path) -> CheckResult {
 
     // No docs directory at all — not applicable
     if !docs_dir.is_dir() {
-        return CheckResult {
+        return WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: "No docs directory — skipped".to_string(),
             intent,
             success_criteria,
@@ -1872,17 +1874,17 @@ fn check_docs_status_page(repo_root: &Path) -> CheckResult {
         });
 
         return match linked_status_file {
-            Some(path) if path.exists() => CheckResult {
+            Some(path) if path.exists() => WayCheckEntry {
                 name: name.to_string(),
-                status: Status::Pass,
+                status: CheckStatus::Pass,
                 message: "Status page linked in docs/src/SUMMARY.md and file exists".to_string(),
                 intent,
                 success_criteria,
                 suggestion: None,
             },
-            Some(path) => CheckResult {
+            Some(path) => WayCheckEntry {
                 name: name.to_string(),
-                status: Status::Info,
+                status: CheckStatus::Warn,
                 message: format!(
                     "SUMMARY.md links to {} but file is missing",
                     path.file_name().unwrap_or_default().to_string_lossy()
@@ -1893,9 +1895,9 @@ fn check_docs_status_page(repo_root: &Path) -> CheckResult {
                     "Create the status.md file that SUMMARY.md references".to_string(),
                 ),
             },
-            None => CheckResult {
+            None => WayCheckEntry {
                 name: name.to_string(),
-                status: Status::Info,
+                status: CheckStatus::Warn,
                 message: "No status page linked in docs".to_string(),
                 intent,
                 success_criteria,
@@ -1916,9 +1918,9 @@ fn check_docs_status_page(repo_root: &Path) -> CheckResult {
         docs_dir.join("src").join("status.md"),
     ];
     if candidates.iter().any(|p| p.exists()) {
-        return CheckResult {
+        return WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: "Status page found in docs/".to_string(),
             intent,
             success_criteria,
@@ -1926,9 +1928,9 @@ fn check_docs_status_page(repo_root: &Path) -> CheckResult {
         };
     }
 
-    CheckResult {
+    WayCheckEntry {
         name: name.to_string(),
-        status: Status::Info,
+        status: CheckStatus::Warn,
         message: "No status page in docs".to_string(),
         intent,
         success_criteria,
@@ -1940,7 +1942,7 @@ fn check_docs_status_page(repo_root: &Path) -> CheckResult {
     }
 }
 
-fn check_docs_openspec_inclusion(repo_root: &Path) -> CheckResult {
+fn check_docs_openspec_inclusion(repo_root: &Path) -> WayCheckEntry {
     let name = "Specs in deployed docs";
     let intent = Some(
         "Include openspec specifications in deployed documentation so users can discover \
@@ -1958,9 +1960,9 @@ fn check_docs_openspec_inclusion(repo_root: &Path) -> CheckResult {
 
     // Only relevant when both openspec and docs are present
     if !openspec_dir.is_dir() || !docs_dir.is_dir() {
-        return CheckResult {
+        return WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: "Not applicable (openspec or docs missing)".to_string(),
             intent,
             success_criteria,
@@ -1975,9 +1977,9 @@ fn check_docs_openspec_inclusion(repo_root: &Path) -> CheckResult {
     let workflow_includes_openspec = docs_workflow_includes_openspec(repo_root);
 
     if workflow_includes_openspec {
-        return CheckResult {
+        return WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: "Docs workflow includes openspec in build".to_string(),
             intent,
             success_criteria,
@@ -1992,9 +1994,9 @@ fn check_docs_openspec_inclusion(repo_root: &Path) -> CheckResult {
         || docs_dir.join("specs").is_dir();
 
     if specs_in_docs {
-        return CheckResult {
+        return WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: "Specs already in docs source tree".to_string(),
             intent,
             success_criteria,
@@ -2002,9 +2004,9 @@ fn check_docs_openspec_inclusion(repo_root: &Path) -> CheckResult {
         };
     }
 
-    CheckResult {
+    WayCheckEntry {
         name: name.to_string(),
-        status: Status::Info,
+        status: CheckStatus::Warn,
         message: "openspec not included in deployed docs".to_string(),
         intent,
         success_criteria,
@@ -2047,7 +2049,7 @@ fn docs_workflow_includes_openspec(repo_root: &Path) -> bool {
     false
 }
 
-fn check_ai_instructions(repo_root: &Path) -> CheckResult {
+fn check_ai_instructions(repo_root: &Path) -> WayCheckEntry {
     use crate::config::reflections_dir;
 
     let name = "AI-agent context";
@@ -2082,27 +2084,27 @@ fn check_ai_instructions(repo_root: &Path) -> CheckResult {
         } else {
             None
         };
-        CheckResult {
+        WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: "CLAUDE.md detected (recommended for Claude Code)".to_string(),
             intent,
             success_criteria,
             suggestion,
         }
     } else if agents_md.exists() {
-        CheckResult {
+        WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: "AGENTS.md detected".to_string(),
             intent,
             success_criteria,
             suggestion: Some("Consider adding CLAUDE.md for Claude Code compatibility".to_string()),
         }
     } else {
-        CheckResult {
+        WayCheckEntry {
             name: name.to_string(),
-            status: Status::Info,
+            status: CheckStatus::Warn,
             message: "No AI instruction files detected".to_string(),
             intent,
             success_criteria,
@@ -2111,7 +2113,7 @@ fn check_ai_instructions(repo_root: &Path) -> CheckResult {
     }
 }
 
-fn check_ci_cd(repo_root: &Path) -> CheckResult {
+fn check_ci_cd(repo_root: &Path) -> WayCheckEntry {
     let name = "Automated verification";
     let intent = Some(
         "Ensure code quality and correctness through automated builds and tests on every change."
@@ -2132,18 +2134,18 @@ fn check_ci_cd(repo_root: &Path) -> CheckResult {
             .unwrap_or(0);
 
         if workflow_count > 0 {
-            CheckResult {
+            WayCheckEntry {
                 name: name.to_string(),
-                status: Status::Pass,
+                status: CheckStatus::Pass,
                 message: format!("GitHub Actions configured ({} workflow(s))", workflow_count),
                 intent,
                 success_criteria,
                 suggestion: None,
             }
         } else {
-            CheckResult {
+            WayCheckEntry {
                 name: name.to_string(),
-                status: Status::Info,
+                status: CheckStatus::Warn,
                 message: "GitHub Actions directory present but empty".to_string(),
                 intent,
                 success_criteria,
@@ -2151,27 +2153,27 @@ fn check_ci_cd(repo_root: &Path) -> CheckResult {
             }
         }
     } else if gitlab_ci.exists() {
-        CheckResult {
+        WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: "GitLab CI configured".to_string(),
             intent,
             success_criteria,
             suggestion: None,
         }
     } else if circleci.exists() {
-        CheckResult {
+        WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: "CircleCI configured".to_string(),
             intent,
             success_criteria,
             suggestion: None,
         }
     } else {
-        CheckResult {
+        WayCheckEntry {
             name: name.to_string(),
-            status: Status::Info,
+            status: CheckStatus::Warn,
             message: "No CI/CD configuration detected".to_string(),
             intent,
             success_criteria,
@@ -2180,7 +2182,7 @@ fn check_ci_cd(repo_root: &Path) -> CheckResult {
     }
 }
 
-fn check_devcontainer(repo_root: &Path) -> CheckResult {
+fn check_devcontainer(repo_root: &Path) -> WayCheckEntry {
     let name = "Reproducible environments";
     let intent =
         Some("Provide a standardized, containerized environment for all contributors.".to_string());
@@ -2192,27 +2194,27 @@ fn check_devcontainer(repo_root: &Path) -> CheckResult {
     let devcontainer_json = repo_root.join(".devcontainer.json");
 
     if devcontainer_dir.exists() && devcontainer_dir.is_dir() {
-        CheckResult {
+        WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: ".devcontainer/ directory detected".to_string(),
             intent,
             success_criteria,
             suggestion: None,
         }
     } else if devcontainer_json.exists() {
-        CheckResult {
+        WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: ".devcontainer.json detected".to_string(),
             intent,
             success_criteria,
             suggestion: None,
         }
     } else {
-        CheckResult {
+        WayCheckEntry {
             name: name.to_string(),
-            status: Status::Info,
+            status: CheckStatus::Warn,
             message: "No dev container configuration detected".to_string(),
             intent,
             success_criteria,
@@ -2224,7 +2226,7 @@ fn check_devcontainer(repo_root: &Path) -> CheckResult {
     }
 }
 
-fn check_llm_txt(repo_root: &Path) -> CheckResult {
+fn check_llm_txt(repo_root: &Path) -> WayCheckEntry {
     let name = "LLM-friendly context";
     let intent =
         Some("Provide machine-readable project context and navigation for LLMs.".to_string());
@@ -2234,18 +2236,18 @@ fn check_llm_txt(repo_root: &Path) -> CheckResult {
     let llm_txt = repo_root.join("llm.txt");
 
     if llm_txt.exists() {
-        CheckResult {
+        WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: "llm.txt detected".to_string(),
             intent,
             success_criteria,
             suggestion: None,
         }
     } else {
-        CheckResult {
+        WayCheckEntry {
             name: name.to_string(),
-            status: Status::Info,
+            status: CheckStatus::Warn,
             message: "No llm.txt detected".to_string(),
             intent,
             success_criteria,
@@ -2257,7 +2259,7 @@ fn check_llm_txt(repo_root: &Path) -> CheckResult {
     }
 }
 
-fn check_ubiquitous_language(repo_root: &Path) -> CheckResult {
+fn check_ubiquitous_language(repo_root: &Path) -> WayCheckEntry {
     let name = "Ubiquitous language context";
     let intent = Some(
         "Provide a canonical, machine-readable source of domain terminology so humans and agents use the same language."
@@ -2283,9 +2285,9 @@ fn check_ubiquitous_language(repo_root: &Path) -> CheckResult {
         .unwrap_or(0);
 
     if readme.exists() && context_file_count > 0 {
-        return CheckResult {
+        return WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: format!(
                 "Ubiquitous-language tree fully configured with {} bounded-context file(s)",
                 context_file_count
@@ -2299,9 +2301,9 @@ fn check_ubiquitous_language(repo_root: &Path) -> CheckResult {
     let base_suggestion = "Create .wai/resources/ubiquitous-language/ with README.md as the root index and bounded-context files under contexts/".to_string();
 
     if readme.exists() && shared.exists() {
-        return CheckResult {
+        return WayCheckEntry {
             name: name.to_string(),
-            status: Status::Info,
+            status: CheckStatus::Warn,
             message: "Root index and shared terms exist — valid starting point, but bounded-context files are still missing".to_string(),
             intent,
             success_criteria,
@@ -2312,9 +2314,9 @@ fn check_ubiquitous_language(repo_root: &Path) -> CheckResult {
     }
 
     if readme.exists() {
-        return CheckResult {
+        return WayCheckEntry {
             name: name.to_string(),
-            status: Status::Info,
+            status: CheckStatus::Warn,
             message: "Root index exists, but bounded-context files are still missing".to_string(),
             intent,
             success_criteria,
@@ -2325,9 +2327,9 @@ fn check_ubiquitous_language(repo_root: &Path) -> CheckResult {
     }
 
     if root.exists() && context_file_count > 0 {
-        return CheckResult {
+        return WayCheckEntry {
             name: name.to_string(),
-            status: Status::Info,
+            status: CheckStatus::Warn,
             message: "README.md is required as the root index before bounded-context files can be loaded safely".to_string(),
             intent,
             success_criteria,
@@ -2335,9 +2337,9 @@ fn check_ubiquitous_language(repo_root: &Path) -> CheckResult {
         };
     }
 
-    CheckResult {
+    WayCheckEntry {
         name: name.to_string(),
-        status: Status::Info,
+        status: CheckStatus::Warn,
         message: "No ubiquitous-language resource tree detected".to_string(),
         intent,
         success_criteria,
@@ -2345,7 +2347,7 @@ fn check_ubiquitous_language(repo_root: &Path) -> CheckResult {
     }
 }
 
-fn check_agent_skills(repo_root: &Path) -> CheckResult {
+fn check_agent_skills(repo_root: &Path) -> WayCheckEntry {
     let name = "Extended agent capabilities";
     let intent = Some(
         "Enhance agent functionality with specialized iterative review and commit workflows."
@@ -2357,9 +2359,9 @@ fn check_agent_skills(repo_root: &Path) -> CheckResult {
     let skills_dir = agent_config_dir(repo_root).join(SKILLS_DIR);
 
     if !skills_dir.exists() {
-        return CheckResult {
+        return WayCheckEntry {
             name: name.to_string(),
-            status: Status::Info,
+            status: CheckStatus::Warn,
             message: "No skills configured".to_string(),
             intent,
             success_criteria,
@@ -2392,9 +2394,9 @@ fn check_agent_skills(repo_root: &Path) -> CheckResult {
     }
 
     if skill_count == 0 {
-        return CheckResult {
+        return WayCheckEntry {
             name: name.to_string(),
-            status: Status::Info,
+            status: CheckStatus::Warn,
             message: "Skills directory present but empty".to_string(),
             intent,
             success_criteria,
@@ -2417,9 +2419,9 @@ fn check_agent_skills(repo_root: &Path) -> CheckResult {
     .collect();
 
     if missing.is_empty() {
-        CheckResult {
+        WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: format!(
                 "{} skill(s) configured — includes rule-of-5-universal (ro5) and commit",
                 skill_count
@@ -2429,9 +2431,9 @@ fn check_agent_skills(repo_root: &Path) -> CheckResult {
             suggestion: None,
         }
     } else {
-        CheckResult {
+        WayCheckEntry {
             name: name.to_string(),
-            status: Status::Info,
+            status: CheckStatus::Warn,
             message: format!(
                 "{} skill(s) configured — missing recommended: {}",
                 skill_count,
@@ -2447,7 +2449,7 @@ fn check_agent_skills(repo_root: &Path) -> CheckResult {
     }
 }
 
-fn check_agent_config_sync(repo_root: &Path) -> CheckResult {
+fn check_agent_config_sync(repo_root: &Path) -> WayCheckEntry {
     let name = "Agent context sync";
     let intent = Some(
         "Project agent-specific configurations (skills, rules) to tool-specific locations."
@@ -2462,9 +2464,9 @@ fn check_agent_config_sync(repo_root: &Path) -> CheckResult {
     let projections_path = agent_config.join(".projections.yml");
 
     if !projections_path.exists() {
-        return CheckResult {
+        return WayCheckEntry {
             name: name.to_string(),
-            status: Status::Info,
+            status: CheckStatus::Warn,
             message: "No agent config projections found".to_string(),
             intent,
             success_criteria,
@@ -2475,9 +2477,9 @@ fn check_agent_config_sync(repo_root: &Path) -> CheckResult {
     // Check if any projections are defined
     let content = std::fs::read_to_string(&projections_path).unwrap_or_default();
     if content.contains("projections: []") || !content.contains("target:") {
-        return CheckResult {
+        return WayCheckEntry {
             name: name.to_string(),
-            status: Status::Info,
+            status: CheckStatus::Warn,
             message: "Projections file exists but no projections are configured".to_string(),
             intent,
             success_criteria,
@@ -2488,9 +2490,9 @@ fn check_agent_config_sync(repo_root: &Path) -> CheckResult {
         };
     }
 
-    CheckResult {
+    WayCheckEntry {
         name: name.to_string(),
-        status: Status::Pass,
+        status: CheckStatus::Pass,
         message: "Agent config projections configured".to_string(),
         intent,
         success_criteria,
@@ -2498,7 +2500,7 @@ fn check_agent_config_sync(repo_root: &Path) -> CheckResult {
     }
 }
 
-fn check_test_coverage(repo_root: &Path) -> CheckResult {
+fn check_test_coverage(repo_root: &Path) -> WayCheckEntry {
     let name = "Test coverage";
     let intent = Some(
         "Enforced coverage thresholds catch regressions automatically and keep quality high."
@@ -2514,18 +2516,18 @@ fn check_test_coverage(repo_root: &Path) -> CheckResult {
             .ok()
             .is_some_and(|c| c.contains("fail-under"));
         return if has_threshold {
-            CheckResult {
+            WayCheckEntry {
                 name: name.to_string(),
-                status: Status::Pass,
+                status: CheckStatus::Pass,
                 message: "tarpaulin configured (threshold enforced)".to_string(),
                 intent,
                 success_criteria,
                 suggestion: None,
             }
         } else {
-            CheckResult {
+            WayCheckEntry {
                 name: name.to_string(),
-                status: Status::Pass,
+                status: CheckStatus::Pass,
                 message: "tarpaulin configured".to_string(),
                 intent,
                 success_criteria,
@@ -2543,18 +2545,18 @@ fn check_test_coverage(repo_root: &Path) -> CheckResult {
         {
             let has_threshold = cargo_content.contains("fail-under");
             return if has_threshold {
-                CheckResult {
+                WayCheckEntry {
                     name: name.to_string(),
-                    status: Status::Pass,
+                    status: CheckStatus::Pass,
                     message: "tarpaulin configured (threshold enforced)".to_string(),
                     intent,
                     success_criteria,
                     suggestion: None,
                 }
             } else {
-                CheckResult {
+                WayCheckEntry {
                     name: name.to_string(),
-                    status: Status::Pass,
+                    status: CheckStatus::Pass,
                     message: "tarpaulin configured".to_string(),
                     intent,
                     success_criteria,
@@ -2566,9 +2568,9 @@ fn check_test_coverage(repo_root: &Path) -> CheckResult {
         }
         // Rust — cargo-llvm-cov via dev-dependencies
         if cargo_content.contains("cargo-llvm-cov") {
-            return CheckResult {
+            return WayCheckEntry {
                 name: name.to_string(),
-                status: Status::Pass,
+                status: CheckStatus::Pass,
                 message: "cargo-llvm-cov detected".to_string(),
                 intent,
                 success_criteria,
@@ -2586,18 +2588,18 @@ fn check_test_coverage(repo_root: &Path) -> CheckResult {
             .ok()
             .is_some_and(|c| c.contains("fail_under"));
         return if has_threshold {
-            CheckResult {
+            WayCheckEntry {
                 name: name.to_string(),
-                status: Status::Pass,
+                status: CheckStatus::Pass,
                 message: "coverage.py configured (threshold enforced)".to_string(),
                 intent,
                 success_criteria,
                 suggestion: None,
             }
         } else {
-            CheckResult {
+            WayCheckEntry {
                 name: name.to_string(),
-                status: Status::Pass,
+                status: CheckStatus::Pass,
                 message: "coverage.py configured".to_string(),
                 intent,
                 success_criteria,
@@ -2612,18 +2614,18 @@ fn check_test_coverage(repo_root: &Path) -> CheckResult {
     {
         let has_threshold = pyproject.contains("fail_under");
         return if has_threshold {
-            CheckResult {
+            WayCheckEntry {
                 name: name.to_string(),
-                status: Status::Pass,
+                status: CheckStatus::Pass,
                 message: "coverage.py configured (threshold enforced)".to_string(),
                 intent,
                 success_criteria,
                 suggestion: None,
             }
         } else {
-            CheckResult {
+            WayCheckEntry {
                 name: name.to_string(),
-                status: Status::Pass,
+                status: CheckStatus::Pass,
                 message: "coverage.py configured".to_string(),
                 intent,
                 success_criteria,
@@ -2642,18 +2644,18 @@ fn check_test_coverage(repo_root: &Path) -> CheckResult {
         {
             let has_threshold = content.contains("thresholds");
             return if has_threshold {
-                CheckResult {
+                WayCheckEntry {
                     name: name.to_string(),
-                    status: Status::Pass,
+                    status: CheckStatus::Pass,
                     message: "vitest coverage configured (threshold enforced)".to_string(),
                     intent,
                     success_criteria,
                     suggestion: None,
                 }
             } else {
-                CheckResult {
+                WayCheckEntry {
                     name: name.to_string(),
-                    status: Status::Pass,
+                    status: CheckStatus::Pass,
                     message: "vitest coverage configured".to_string(),
                     intent,
                     success_criteria,
@@ -2689,18 +2691,18 @@ fn check_test_coverage(repo_root: &Path) -> CheckResult {
             .unwrap_or_default();
         let has_threshold = content.contains("branches") || content.contains("lines");
         return if has_threshold {
-            CheckResult {
+            WayCheckEntry {
                 name: name.to_string(),
-                status: Status::Pass,
+                status: CheckStatus::Pass,
                 message: "nyc/c8 configured (threshold enforced)".to_string(),
                 intent,
                 success_criteria,
                 suggestion: None,
             }
         } else {
-            CheckResult {
+            WayCheckEntry {
                 name: name.to_string(),
-                status: Status::Pass,
+                status: CheckStatus::Pass,
                 message: "nyc/c8 configured".to_string(),
                 intent,
                 success_criteria,
@@ -2715,18 +2717,18 @@ fn check_test_coverage(repo_root: &Path) -> CheckResult {
     {
         let has_threshold = pkg.contains("branches") || pkg.contains("lines");
         return if has_threshold {
-            CheckResult {
+            WayCheckEntry {
                 name: name.to_string(),
-                status: Status::Pass,
+                status: CheckStatus::Pass,
                 message: "nyc/c8 configured (threshold enforced)".to_string(),
                 intent,
                 success_criteria,
                 suggestion: None,
             }
         } else {
-            CheckResult {
+            WayCheckEntry {
                 name: name.to_string(),
-                status: Status::Pass,
+                status: CheckStatus::Pass,
                 message: "nyc/c8 configured".to_string(),
                 intent,
                 success_criteria,
@@ -2742,9 +2744,9 @@ fn check_test_coverage(repo_root: &Path) -> CheckResult {
     let codecov_yaml = repo_root.join("codecov.yml");
     let coveralls_yml = repo_root.join(".coveralls.yml");
     if codecov_yml.exists() || codecov_yaml.exists() || coveralls_yml.exists() {
-        return CheckResult {
+        return WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: "Coverage reporting service detected (codecov/coveralls)".to_string(),
             intent,
             success_criteria,
@@ -2755,9 +2757,9 @@ fn check_test_coverage(repo_root: &Path) -> CheckResult {
     }
 
     // Nothing detected
-    CheckResult {
+    WayCheckEntry {
         name: name.to_string(),
-        status: Status::Info,
+        status: CheckStatus::Warn,
         message: "No coverage tool configured".to_string(),
         intent,
         success_criteria,
@@ -2767,7 +2769,7 @@ fn check_test_coverage(repo_root: &Path) -> CheckResult {
     }
 }
 
-fn check_beads(repo_root: &Path) -> CheckResult {
+fn check_beads(repo_root: &Path) -> WayCheckEntry {
     let name = "Issue tracking";
     let intent = Some(
         "Structured task tracking keeps work visible and prevents context loss across sessions."
@@ -2786,18 +2788,18 @@ fn check_beads(repo_root: &Path) -> CheckResult {
         } else {
             "beads detected".to_string()
         };
-        CheckResult {
+        WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message,
             intent,
             success_criteria,
             suggestion: None,
         }
     } else {
-        CheckResult {
+        WayCheckEntry {
             name: name.to_string(),
-            status: Status::Info,
+            status: CheckStatus::Warn,
             message: "No issue tracker detected".to_string(),
             intent,
             success_criteria,
@@ -2808,7 +2810,7 @@ fn check_beads(repo_root: &Path) -> CheckResult {
     }
 }
 
-fn check_openspec(repo_root: &Path) -> CheckResult {
+fn check_openspec(repo_root: &Path) -> WayCheckEntry {
     let name = "Change proposals";
     let intent = Some(
         "Formal change proposals prevent architectural drift and create a reviewable design record."
@@ -2819,18 +2821,18 @@ fn check_openspec(repo_root: &Path) -> CheckResult {
 
     let openspec_dir = repo_root.join("openspec");
     if openspec_dir.exists() && openspec_dir.is_dir() {
-        CheckResult {
+        WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: "openspec detected".to_string(),
             intent,
             success_criteria,
             suggestion: None,
         }
     } else {
-        CheckResult {
+        WayCheckEntry {
             name: name.to_string(),
-            status: Status::Info,
+            status: CheckStatus::Warn,
             message: "No change proposal system detected".to_string(),
             intent,
             success_criteria,
@@ -2842,7 +2844,7 @@ fn check_openspec(repo_root: &Path) -> CheckResult {
     }
 }
 
-fn check_pretender(repo_root: &Path) -> CheckResult {
+fn check_pretender(repo_root: &Path) -> WayCheckEntry {
     let name = "Code quality (pretender)";
     let intent = Some(
         "Enforce structural code quality thresholds (cyclomatic complexity, nesting, duplication) across multiple languages."
@@ -2854,18 +2856,18 @@ fn check_pretender(repo_root: &Path) -> CheckResult {
     let pretender_config = repo_root.join("pretender.toml");
 
     if pretender_config.exists() {
-        CheckResult {
+        WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: "pretender.toml detected".to_string(),
             intent,
             success_criteria,
             suggestion: None,
         }
     } else {
-        CheckResult {
+        WayCheckEntry {
             name: name.to_string(),
-            status: Status::Info,
+            status: CheckStatus::Warn,
             message: "No pretender.toml detected".to_string(),
             intent,
             success_criteria,
@@ -2877,7 +2879,7 @@ fn check_pretender(repo_root: &Path) -> CheckResult {
     }
 }
 
-fn check_gh_cli() -> CheckResult {
+fn check_gh_cli() -> WayCheckEntry {
     let name = "Integration & automation";
     let intent = Some(
         "Streamline repository interactions (PRs, issues, releases) from the CLI.".to_string(),
@@ -2892,9 +2894,9 @@ fn check_gh_cli() -> CheckResult {
         .is_ok();
 
     if !gh_installed {
-        return CheckResult {
+        return WayCheckEntry {
             name: name.to_string(),
-            status: Status::Info,
+            status: CheckStatus::Warn,
             message: "gh not installed".to_string(),
             intent,
             success_criteria,
@@ -2909,17 +2911,17 @@ fn check_gh_cli() -> CheckResult {
         .output();
 
     match auth_status {
-        Ok(output) if output.status.success() => CheckResult {
+        Ok(output) if output.status.success() => WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: "gh installed and authenticated".to_string(),
             intent,
             success_criteria,
             suggestion: None,
         },
-        _ => CheckResult {
+        _ => WayCheckEntry {
             name: name.to_string(),
-            status: Status::Info,
+            status: CheckStatus::Warn,
             message: "gh installed but not authenticated".to_string(),
             intent,
             success_criteria,
@@ -2939,7 +2941,7 @@ mod tests {
         fs::write(dir.path().join("mise.toml"), "[tools]\n").unwrap();
 
         let result = check_task_runner(dir.path());
-        assert_eq!(result.status, Status::Pass);
+        assert_eq!(result.status, CheckStatus::Pass);
         assert!(
             result.message.contains("mise.toml detected"),
             "expected mise.toml detected, got: {}",
@@ -2953,7 +2955,7 @@ mod tests {
         fs::write(dir.path().join(".mise.toml"), "[tools]\n").unwrap();
 
         let result = check_task_runner(dir.path());
-        assert_eq!(result.status, Status::Pass);
+        assert_eq!(result.status, CheckStatus::Pass);
         assert!(
             result.message.contains("mise.toml detected"),
             "expected mise.toml detected, got: {}",
@@ -2966,7 +2968,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
 
         let result = check_task_runner(dir.path());
-        assert_eq!(result.status, Status::Info);
+        assert_eq!(result.status, CheckStatus::Warn);
         assert!(
             result.message.contains("No task runner detected"),
             "expected No task runner detected, got: {}",

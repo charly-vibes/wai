@@ -1,8 +1,9 @@
 use std::path::Path;
 
-use super::{CheckResult, Status};
+use super::WayCheckEntry;
+use genesis::doctor::CheckStatus;
 
-pub(super) fn check_typos(repo_root: &Path) -> CheckResult {
+pub(super) fn check_typos(repo_root: &Path) -> WayCheckEntry {
     let name = "Spell checking";
     let intent = Some(
         "Catch typos in source code, comments, and documentation before they reach history."
@@ -18,9 +19,9 @@ pub(super) fn check_typos(repo_root: &Path) -> CheckResult {
     ];
 
     if let Some(found) = configs.iter().find(|p| p.exists()) {
-        return CheckResult {
+        return WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: format!(
                 "typos configured ({})",
                 found.file_name().unwrap_or_default().to_string_lossy()
@@ -35,9 +36,9 @@ pub(super) fn check_typos(repo_root: &Path) -> CheckResult {
     if let Ok(content) = std::fs::read_to_string(repo_root.join("pyproject.toml"))
         && content.contains("[tool.typos]")
     {
-        return CheckResult {
+        return WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: "typos configured (pyproject.toml)".to_string(),
             intent,
             success_criteria,
@@ -45,9 +46,9 @@ pub(super) fn check_typos(repo_root: &Path) -> CheckResult {
         };
     }
 
-    CheckResult {
+    WayCheckEntry {
         name: name.to_string(),
-        status: Status::Info,
+        status: CheckStatus::Warn,
         message: "No typos configuration detected".to_string(),
         intent,
         success_criteria,
@@ -58,7 +59,7 @@ pub(super) fn check_typos(repo_root: &Path) -> CheckResult {
     }
 }
 
-pub(super) fn check_vale(repo_root: &Path) -> CheckResult {
+pub(super) fn check_vale(repo_root: &Path) -> WayCheckEntry {
     let name = "Prose linting";
     let intent = Some(
         "Enforce writing style and consistency across documentation and markdown files."
@@ -70,9 +71,9 @@ pub(super) fn check_vale(repo_root: &Path) -> CheckResult {
     let configs = [repo_root.join(".vale.ini"), repo_root.join("vale.ini")];
 
     if let Some(found) = configs.iter().find(|p| p.exists()) {
-        return CheckResult {
+        return WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: format!(
                 "vale configured ({})",
                 found.file_name().unwrap_or_default().to_string_lossy()
@@ -83,9 +84,9 @@ pub(super) fn check_vale(repo_root: &Path) -> CheckResult {
         };
     }
 
-    CheckResult {
+    WayCheckEntry {
         name: name.to_string(),
-        status: Status::Info,
+        status: CheckStatus::Warn,
         message: "No vale configuration detected".to_string(),
         intent,
         success_criteria,
@@ -95,7 +96,7 @@ pub(super) fn check_vale(repo_root: &Path) -> CheckResult {
     }
 }
 
-pub(super) fn check_shell_linting(repo_root: &Path) -> CheckResult {
+pub(super) fn check_shell_linting(repo_root: &Path) -> WayCheckEntry {
     let name = "Shell linting";
     let intent = Some(
         "Catch bugs, portability issues, and bad practices in shell scripts and CI workflow run blocks."
@@ -139,9 +140,9 @@ pub(super) fn check_shell_linting(repo_root: &Path) -> CheckResult {
             .unwrap_or(false);
 
     if !has_workflows && !has_shell_scripts {
-        return CheckResult {
+        return WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: "No shell scripts or workflows to lint".to_string(),
             intent,
             success_criteria,
@@ -161,17 +162,17 @@ pub(super) fn check_shell_linting(repo_root: &Path) -> CheckResult {
         .is_ok_and(|o| o.status.success());
 
     match (has_actionlint, has_shellcheck, has_workflows) {
-        (true, true, _) => CheckResult {
+        (true, true, _) => WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: "actionlint and shellcheck available".to_string(),
             intent,
             success_criteria,
             suggestion: None,
         },
-        (true, false, _) => CheckResult {
+        (true, false, _) => WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: "actionlint available (install shellcheck for deeper run: block analysis)"
                 .to_string(),
             intent,
@@ -181,17 +182,17 @@ pub(super) fn check_shell_linting(repo_root: &Path) -> CheckResult {
                     .to_string(),
             ),
         },
-        (false, true, false) => CheckResult {
+        (false, true, false) => WayCheckEntry {
             name: name.to_string(),
-            status: Status::Pass,
+            status: CheckStatus::Pass,
             message: "shellcheck available".to_string(),
             intent,
             success_criteria,
             suggestion: None,
         },
-        (false, true, true) => CheckResult {
+        (false, true, true) => WayCheckEntry {
             name: name.to_string(),
-            status: Status::Info,
+            status: CheckStatus::Warn,
             message: "shellcheck available but actionlint missing for workflow linting".to_string(),
             intent,
             success_criteria,
@@ -200,9 +201,9 @@ pub(super) fn check_shell_linting(repo_root: &Path) -> CheckResult {
                     .to_string(),
             ),
         },
-        (false, false, true) => CheckResult {
+        (false, false, true) => WayCheckEntry {
             name: name.to_string(),
-            status: Status::Info,
+            status: CheckStatus::Warn,
             message: "No shell linter detected".to_string(),
             intent,
             success_criteria,
@@ -211,9 +212,9 @@ pub(super) fn check_shell_linting(repo_root: &Path) -> CheckResult {
                     .to_string(),
             ),
         },
-        (false, false, false) => CheckResult {
+        (false, false, false) => WayCheckEntry {
             name: name.to_string(),
-            status: Status::Info,
+            status: CheckStatus::Warn,
             message: "No shell linter detected".to_string(),
             intent,
             success_criteria,
@@ -246,7 +247,7 @@ mod tests {
         let dir = setup_git_repo();
         // No workflows, no .sh files → nothing to lint
         let result = check_shell_linting(dir.path());
-        assert_eq!(result.status, Status::Pass);
+        assert_eq!(result.status, CheckStatus::Pass);
         assert!(
             result.message.contains("No shell scripts or workflows"),
             "unexpected message: {}",
@@ -278,7 +279,7 @@ mod tests {
         fs::write(scripts.join("deploy.py"), "print('hi')\n").unwrap();
 
         let result = check_shell_linting(dir.path());
-        assert_eq!(result.status, Status::Pass);
+        assert_eq!(result.status, CheckStatus::Pass);
         assert!(
             result.message.contains("No shell scripts or workflows"),
             "should ignore scripts dir without .sh files, got: {}",
