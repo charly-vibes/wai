@@ -454,8 +454,9 @@ fn check_claude_session_hook() -> Vec<WaiCheckEntry> {
         None => {
             return vec![WaiCheckEntry {
                 name: "Claude Code session hook".to_string(),
-                status: CheckStatus::Warn,
-                message: "Could not determine home directory".to_string(),
+                status: CheckStatus::Pass,
+                message: "Could not determine home directory — skipping Claude Code hook check"
+                    .to_string(),
                 fix: None,
                 fix_fn: None,
             }];
@@ -465,9 +466,8 @@ fn check_claude_session_hook() -> Vec<WaiCheckEntry> {
     if !settings_path.exists() {
         return vec![WaiCheckEntry {
             name: "Claude Code session hook".to_string(),
-            status: CheckStatus::Warn,
-            message: "~/.claude/settings.json not found — Claude Code may not be installed"
-                .to_string(),
+            status: CheckStatus::Pass,
+            message: "Claude Code not installed — skipping hook check".to_string(),
             fix: None,
             fix_fn: None,
         }];
