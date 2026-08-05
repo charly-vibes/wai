@@ -318,3 +318,5 @@
 {"id":"int-fe2ff7c8","kind":"field_change","created_at":"2026-08-05T18:06:16.829804592Z","actor":"charly vibes","issue_id":"wai-0uvy","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
 {"id":"int-e02599da","kind":"field_change","created_at":"2026-08-05T18:19:02.567687923Z","actor":"charly vibes","issue_id":"wai-4guc","extra":{"field":"status","new_value":"open","old_value":"in_progress"}}
 {"id":"int-1dd3d1e6","kind":"field_change","created_at":"2026-08-05T18:19:02.567804279Z","actor":"charly vibes","issue_id":"wai-4guc","extra":{"field":"assignee","new_value":"","old_value":"charly vibes"}}
+{"id":"int-b3372f33","kind":"field_change","created_at":"2026-08-05T18:40:46.019914592Z","actor":"charly vibes","issue_id":"wai-4guc","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
+{"id":"int-6f08e01e","kind":"field_change","created_at":"2026-08-05T18:48:08.686461119Z","actor":"charly vibes","issue_id":"wai-91zm","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
