@@ -62,6 +62,7 @@ fmt-check:
 
 # Full CI pipeline
 ci: fmt-check lint test build-release
+    pretender check --diff-only
     @echo "✅ CI pipeline passed"
 
 # Pre-push checks (fast gate)

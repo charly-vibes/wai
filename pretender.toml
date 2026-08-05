@@ -1,0 +1,93 @@
+# ─────────────────────────────────────────────────────────────────────
+# pretender.toml — wai project configuration
+# ─────────────────────────────────────────────────────────────────────
+# Rust CLI tool: src/ (app), tests/ (flat, no subdirs), scripts/
+# File count: 65 source files, 28 test files (~6600 + ~13300 lines)
+
+[pretender]
+mode = "tiered"
+languages = ["auto"]
+exclude = [
+    "vendor/**",
+    "node_modules/**",
+    "**/*_generated.*",
+    "target/**",
+    "docs/book/**",
+    "*.min.js",
+]
+
+# ── Role matchers ───────────────────────────────────────────────────
+
+[roles]
+test = { paths = ["tests/**", "**/*_test.*"], classname_root = "tests" }
+script = { paths = ["scripts/**", "examples/**"] }
+
+# ── Thresholds — app role (src/) ────────────────────────────────────
+# Tuned to current codebase baseline. Tighten as refactoring progresses.
+
+[thresholds]
+cyclomatic_max        = 15     # Some command handlers are complex
+cognitive_max         = 20     # Moderate nesting in command dispatch
+function_lines_max    = 60     # A few handlers are long but well-structured
+file_lines_max        = 1000   # add.rs is 972 lines
+nesting_max           = 4
+params_max            = 4
+abc_max               = 40     # Moderate ABC for command handlers
+duplication_pct_max   = 10     # Some shared patterns in command modules
+mi_min                = 20     # Maintainability Index floor
+coverage_line_min     = 80     # Target line coverage
+coverage_branch_min   = 70     # Target branch coverage
+unwrap_max            = 0      # No unwrap()/.expect() in production code
+
+# ── Thresholds — test role (tests/) ─────────────────────────────────
+# Tests are flat in tests/; integration.rs is 9350 lines.
+
+[thresholds.test]
+cyclomatic_max      = 8
+cognitive_max       = 12
+function_lines_max  = 200     # Test bodies can be long
+file_lines_max      = 10000   # integration.rs is ~9350 lines
+nesting_max         = 3
+params_max          = 3
+duplication_pct_max = 30      # Shared setup is normal in tests
+min_assertions      = 1       # Each test must assert something
+abc_max             = 80
+duration_max_ms     = 5000    # Integration tests can be slow
+
+# ── Thresholds — script role (scripts/) ─────────────────────────────
+
+[thresholds.script]
+function_lines_max = 100
+file_lines_max     = 200
+
+# ── Severity bands ──────────────────────────────────────────────────
+
+[bands]
+cyclomatic = { green = 10, yellow = 15, red = 20 }
+cognitive  = { green = 15, yellow = 25, red = 40 }
+
+# ── Scope ───────────────────────────────────────────────────────────
+
+[scope]
+diff_only = true
+diff_base = "origin/main"
+
+# ── Execution ───────────────────────────────────────────────────────
+
+[execute]
+enabled = false
+
+# ── Plugins ─────────────────────────────────────────────────────────
+
+[plugins]
+languages = ["rust"]
+metrics   = ["clippy"]
+
+# ── Output ──────────────────────────────────────────────────────────
+
+[output]
+formats = ["human"]
+
+# ─────────────────────────────────────────────────────────────────────
+# End of wai pretender.toml
+# ─────────────────────────────────────────────────────────────────────

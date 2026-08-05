@@ -36,6 +36,9 @@ jobs:
       - name: Install just
         uses: extractions/setup-just@v2
 
+      - name: Install pretender
+        run: cargo install pretender
+
       # Run the exact same command as local development
       - name: Run CI pipeline
         run: just ci
