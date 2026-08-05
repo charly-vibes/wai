@@ -98,7 +98,11 @@ fn main() -> Result<()> {
                     }],
                 )
                 .expect("remediation must be non-empty");
-                let _ = print_json_line(&Envelope::error(err_result, vec![]));
+                let _ = print_json_line(&Envelope::error(
+                    env!("CARGO_PKG_VERSION"),
+                    err_result,
+                    vec![],
+                ));
             } else {
                 // Footer hook: when the error carries no self-healing help, offer
                 // the feedback subcommand so the user can file the issue.

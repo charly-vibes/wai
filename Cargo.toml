@@ -70,7 +70,7 @@ sha2 = "0.10"
 pathdiff = "0.2.3"
 
 # Shared infra crate (suggestions, managed_block, envelope, config, guide)
-genesis-vibes = "0.4"
+genesis-vibes = "0.6"
 
 [features]
 default = []

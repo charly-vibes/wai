@@ -9,7 +9,7 @@ pub fn print_envelope<T: Serialize>(
     warnings: Vec<Warning>,
     hints: Vec<HintEntry>,
 ) -> Result<()> {
-    let envelope = Envelope::success(kind, data, warnings, hints);
+    let envelope = Envelope::success(env!("CARGO_PKG_VERSION"), kind, data, warnings, hints);
     print_json(&envelope)
 }
 

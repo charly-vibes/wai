@@ -269,7 +269,7 @@ pub fn run(fix: bool) -> Result<()> {
             let report = runner
                 .run(&project_root, false)
                 .map_err(|e| miette::miette!("{}", e))?;
-            crate::output::print_json(&report.to_envelope())?;
+            crate::output::print_json(&report.to_envelope(env!("CARGO_PKG_VERSION")))?;
         } else {
             render_human(&checks, &summary)?;
         }
