@@ -467,7 +467,7 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
             ],
         }),
         "ls" => Some(HelpContent {
-            about: "List all wai projects across workspaces",
+            about: "List all wai projects across workspaces (default root: $HOME)",
             examples: &[
                 ("wai ls", "Scan $HOME for wai workspaces (default depth 3)"),
                 ("wai ls --root ~/dev", "Scan a custom root directory"),
@@ -580,14 +580,14 @@ pub fn render_main_help(verbose: u8) -> String {
 
     // COMMANDS: keep in alphabetical order
     out.push_str("COMMANDS:\n");
-    out.push_str("  add       Add artifacts (research, plans, designs) to a project\n");
+    out.push_str("  add       Add artifacts (research, plans, designs, reviews) to a project\n");
     out.push_str("  close     Wrap up a session and save handoff\n");
     out.push_str("  config    Manage agent configuration files\n");
     out.push_str("  doctor    Diagnose workspace health\n");
     out.push_str("  handoff   Generate handoff documents\n");
     out.push_str("  import    Import existing tool configurations\n");
     out.push_str("  init      Initialize wai in the current directory\n");
-    out.push_str("  ls        List all wai projects across workspaces\n");
+    out.push_str("  ls        List all wai projects across workspaces (default root: $HOME)\n");
     out.push_str("  move      Move items between PARA categories\n");
     out.push_str("  new       Create a new project, area, or resource\n");
     out.push_str("  phase     Show or change the current project phase\n");

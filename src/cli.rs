@@ -260,9 +260,9 @@ pub enum Commands {
     #[command(subcommand)]
     Project(ProjectCommands),
 
-    /// List all wai projects across workspaces
+    /// List all wai projects across workspaces (default root: $HOME)
     #[command(
-        about = "List all wai projects across workspaces",
+        about = "List all wai projects across workspaces (default root: $HOME)",
         long_about = "Scans for wai workspaces under a root directory (default: $HOME) and\n\
             prints a one-line summary per project showing its phase and beads issue counts.\n\n\
             EXAMPLES\n\

@@ -47,7 +47,7 @@ Commands for managing the wai workspace and checking repo hygiene.
 |---------|-------------|
 | `wai init [--name <name>]` | Initialize wai in current directory |
 | `wai tutorial` | Run interactive quickstart tutorial |
-| `wai ls [--root <dir>] [--depth <n>] [--timeout <sec>]` | List all wai workspaces under a root directory |
+| `wai ls [--root <dir>] [--depth <n>] [--timeout <sec>]` | List all wai workspaces under a root directory (default: `$HOME`) |
 | `wai doctor [--fix]` | Diagnose and repair **wai workspace** health (see [checks](#doctor-checks)) |
 | `wai way [--fix <CHECK>]` | Check and scaffold **repository best practices** |
 | `wai import <path>` | Import existing tool configs (.claude/, .cursorrules) |
