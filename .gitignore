@@ -19,6 +19,9 @@ target
 # VS Code
 .vscode/
 
+# Pretender generated data
+.pretender/
+
 # OS
 .DS_Store
 Thumbs.db
