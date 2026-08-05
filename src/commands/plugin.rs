@@ -163,5 +163,141 @@ pub fn run(cmd: PluginCommands) -> Result<()> {
             println!("  {} Plugin '{}' disabled", "○".dimmed(), name);
             Ok(())
         }
+        PluginCommands::Trust {
+            name,
+            list,
+            revoke,
+            hook,
+        } => {
+            use crate::plugin::{TrustEntry, TrustStore};
+
+            if list {
+                let store = TrustStore::load();
+                let entries = store.list();
+                if context.json {
+                    return print_envelope_list(entries);
+                }
+                println!();
+                println!("  {} Approved plugin hooks", "◆".cyan());
+                println!();
+                if entries.is_empty() {
+                    println!("    No approved hooks yet.");
+                    println!("    Approve a plugin with: `wai plugin trust <name>`");
+                } else {
+                    for e in entries {
+                        println!("    {} {}", "•".dimmed(), e.digest.dimmed());
+                        println!(
+                            "        {} plugin: {}  hook: {}  command: {}",
+                            "↳".dimmed(),
+                            e.plugin_name,
+                            e.hook_name,
+                            e.command.dimmed()
+                        );
+                    }
+                }
+                println!();
+                return Ok(());
+            }
+
+            if let Some(digest) = revoke {
+                let mut store = TrustStore::load();
+                let removed = store.revoke(&digest);
+                store
+                    .save()
+                    .map_err(|e| crate::error::WaiError::PluginTrustError { message: e })?;
+                if context.json {
+                    return print_envelope_list(serde_json::json!({
+                        "revoked": removed,
+                        "digest": digest,
+                    }));
+                }
+                if removed {
+                    println!(
+                        "  {} Revoked approval for digest {}",
+                        "✓".green(),
+                        digest.dimmed()
+                    );
+                } else {
+                    println!(
+                        "  {} No approval found for digest {}",
+                        "○".dimmed(),
+                        digest.dimmed()
+                    );
+                }
+                return Ok(());
+            }
+
+            // Approve path: require a plugin name
+            let Some(name) = name else {
+                return Err(crate::error::WaiError::PluginTrustError {
+                    message: "provide a plugin name to approve, or use --list/--revoke".to_string(),
+                }
+                .into());
+            };
+
+            let plugins = plugin::detect_plugins(&project_root);
+            let target = plugins.iter().find(|p| p.def.name == name);
+            let Some(target) = target else {
+                return Err(crate::error::WaiError::PluginNotFound { name }.into());
+            };
+            if target.source != plugin::PluginSource::Custom {
+                return Err(crate::error::WaiError::PluginTrustError {
+                    message: format!("'{name}' is a built-in plugin and is always trusted"),
+                }
+                .into());
+            }
+
+            let mut store = TrustStore::load();
+            let hook_names: Vec<String> = target.def.hooks.keys().cloned().collect();
+            if hook_names.is_empty() {
+                return Err(crate::error::WaiError::PluginTrustError {
+                    message: format!("plugin '{name}' defines no hooks"),
+                }
+                .into());
+            }
+
+            let mut approved = Vec::new();
+            for hook_name in &hook_names {
+                if let Some(h) = hook.as_ref()
+                    && h != hook_name
+                {
+                    continue;
+                }
+                if let Some(hook_def) = target.def.hooks.get(hook_name) {
+                    let digest = plugin::compute_hook_digest(&target.def, hook_name, hook_def);
+                    store.approve(TrustEntry {
+                        plugin_name: name.clone(),
+                        hook_name: hook_name.clone(),
+                        digest: digest.clone(),
+                        command: hook_def.command.clone(),
+                        approved_at: chrono::Utc::now().to_rfc3339(),
+                    });
+                    approved.push((hook_name.clone(), digest));
+                }
+            }
+            store
+                .save()
+                .map_err(|e| crate::error::WaiError::PluginTrustError { message: e })?;
+
+            if context.json {
+                return print_envelope_list(serde_json::json!({
+                    "plugin": name,
+                    "approved": approved
+                        .iter()
+                        .map(|(h, d)| serde_json::json!({"hook": h, "digest": d}))
+                        .collect::<Vec<_>>(),
+                }));
+            }
+            for (hook_name, digest) in &approved {
+                println!(
+                    "  {} Trusted hook '{}' of plugin '{}' (digest {})",
+                    "✓".green(),
+                    hook_name,
+                    name,
+                    &digest[..digest.len().min(16)]
+                );
+            }
+            Ok(())
+        }
     }
 }

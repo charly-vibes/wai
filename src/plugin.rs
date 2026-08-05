@@ -1,6 +1,7 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
+use std::path::PathBuf;
 use std::process::Command;
 use std::sync::mpsc;
 use std::time::Duration;
@@ -10,6 +11,121 @@ const PLUGIN_TIMEOUT: Duration = Duration::from_secs(30);
 use crate::config::plugins_dir;
 use crate::context::current_context;
 use crate::error::WaiError;
+
+// ── Trust store ────────────────────────────────────────────────────────────────
+
+/// The name of the trust store file inside the wai data directory.
+const TRUST_STORE_FILE: &str = "plugin-trust.toml";
+
+/// A single entry in the plugin trust store.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrustEntry {
+    pub plugin_name: String,
+    pub hook_name: String,
+    pub digest: String,
+    pub command: String,
+    pub approved_at: String,
+}
+
+/// The plugin trust store — a list of approved hook digests stored in
+/// user-owned XDG state outside the repository.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct TrustStore {
+    entries: Vec<TrustEntry>,
+}
+
+impl TrustStore {
+    /// Load the trust store from disk.
+    pub fn load() -> Self {
+        let path = trust_store_path();
+        if path.exists()
+            && let Ok(content) = std::fs::read_to_string(&path)
+            && let Ok(store) = toml::from_str::<TrustStore>(&content)
+        {
+            return store;
+        }
+        TrustStore::default()
+    }
+
+    /// Save the trust store to disk.
+    pub fn save(&self) -> Result<(), String> {
+        let path = trust_store_path();
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("cannot create trust store dir: {e}"))?;
+        }
+        let content = toml::to_string_pretty(self)
+            .map_err(|e| format!("cannot serialize trust store: {e}"))?;
+        std::fs::write(&path, content).map_err(|e| format!("cannot write trust store: {e}"))?;
+        Ok(())
+    }
+
+    /// Check whether a digest is approved.
+    pub fn is_approved(&self, digest: &str) -> bool {
+        self.entries.iter().any(|e| e.digest == digest)
+    }
+
+    /// Approve a digest. Replaces any existing entry with the same digest.
+    pub fn approve(&mut self, entry: TrustEntry) {
+        self.entries.retain(|e| e.digest != entry.digest);
+        self.entries.push(entry);
+    }
+
+    /// Revoke a digest.
+    pub fn revoke(&mut self, digest: &str) -> bool {
+        let len = self.entries.len();
+        self.entries.retain(|e| e.digest != digest);
+        self.entries.len() < len
+    }
+
+    /// List all entries.
+    pub fn list(&self) -> &[TrustEntry] {
+        &self.entries
+    }
+}
+
+/// Get the path to the trust store file.
+/// Uses `WAI_DATA_DIR` env var override, then `XDG_DATA_HOME`, then `~/.local/share/wai/`.
+pub fn trust_store_path() -> PathBuf {
+    if let Ok(dir) = std::env::var("WAI_DATA_DIR") {
+        return PathBuf::from(dir).join(TRUST_STORE_FILE);
+    }
+
+    let data_dir = if let Ok(xdg_data) = std::env::var("XDG_DATA_HOME") {
+        PathBuf::from(xdg_data).join("wai")
+    } else if let Some(home) = dirs::home_dir() {
+        home.join(".local").join("share").join("wai")
+    } else {
+        PathBuf::from(".wai-data")
+    };
+
+    data_dir.join(TRUST_STORE_FILE)
+}
+
+/// Compute a SHA-256 digest for a plugin hook.
+/// The digest covers the plugin name, all commands, the hook name, and the hook command.
+/// Any change to these inputs produces a different digest.
+pub fn compute_hook_digest(plugin: &PluginDef, hook_name: &str, hook: &HookDef) -> String {
+    use sha2::Digest;
+
+    let mut hasher = sha2::Sha256::new();
+    hasher.update(plugin.name.as_bytes());
+    for cmd in &plugin.commands {
+        hasher.update(cmd.name.as_bytes());
+        hasher.update(cmd.passthrough.as_bytes());
+    }
+    hasher.update(hook_name.as_bytes());
+    hasher.update(hook.command.as_bytes());
+    hasher.update(hook.inject_as.as_bytes());
+    format!("{:x}", hasher.finalize())
+}
+
+/// Whether a plugin is built-in or user-defined.
+#[derive(Debug, Clone, PartialEq)]
+pub enum PluginSource {
+    BuiltIn,
+    Custom,
+}
 
 /// Data returned by a plugin hook execution.
 #[derive(Debug, Default)]
@@ -64,6 +180,7 @@ pub struct DetectorDef {
 pub struct ActivePlugin {
     pub def: PluginDef,
     pub detected: bool,
+    pub source: PluginSource,
 }
 
 /// Built-in plugin definitions.
@@ -260,7 +377,11 @@ pub fn detect_plugins(project_root: &Path) -> Vec<ActivePlugin> {
         } else {
             false
         };
-        plugins.push(ActivePlugin { def, detected });
+        plugins.push(ActivePlugin {
+            def,
+            detected,
+            source: PluginSource::BuiltIn,
+        });
     }
 
     // Load custom plugins from .wai/plugins/
@@ -284,7 +405,11 @@ pub fn detect_plugins(project_root: &Path) -> Vec<ActivePlugin> {
                 } else {
                     true
                 };
-                plugins.push(ActivePlugin { def, detected });
+                plugins.push(ActivePlugin {
+                    def,
+                    detected,
+                    source: PluginSource::Custom,
+                });
             }
         }
     }
@@ -357,22 +482,68 @@ pub fn execute_hook(project_root: &Path, hook: &HookDef) -> Option<HookOutput> {
 }
 
 /// Run all hooks for a given event across all detected plugins.
+///
+/// Custom (repository-owned) plugins are only executed when their hook digest
+/// is present in the user's trust store. Unapproved hooks are skipped with a
+/// warning; they are never executed and never prompt. Built-in plugins are
+/// always trusted.
 pub fn run_hooks(project_root: &Path, event: &str) -> Vec<HookOutput> {
     let plugins = detect_plugins(project_root);
     let mut outputs = Vec::new();
+    let trust_store = TrustStore::load();
 
     for plugin in &plugins {
         if !plugin.detected {
             continue;
         }
-        if let Some(hook) = plugin.def.hooks.get(event)
-            && let Some(output) = execute_hook(project_root, hook)
-        {
-            outputs.push(output);
+        if let Some(hook) = plugin.def.hooks.get(event) {
+            match plugin.source {
+                PluginSource::BuiltIn => {
+                    if let Some(output) = execute_hook(project_root, hook) {
+                        outputs.push(output);
+                    }
+                }
+                PluginSource::Custom => {
+                    let digest = compute_hook_digest(&plugin.def, event, hook);
+                    if trust_store.is_approved(&digest) {
+                        if let Some(output) = execute_hook(project_root, hook) {
+                            outputs.push(output);
+                        }
+                    } else {
+                        warn_skipped_hook(&plugin.def.name, event, &hook.inject_as);
+                    }
+                }
+            }
         }
     }
 
     outputs
+}
+
+/// Emit a warning about a skipped (untrusted) hook.
+/// In machine mode this is a structured JSON warning; otherwise a human line.
+fn warn_skipped_hook(plugin_name: &str, event: &str, inject_as: &str) {
+    let context = current_context();
+    if context.json {
+        let warning = serde_json::json!({
+            "level": "warning",
+            "code": "plugin_hook_untrusted",
+            "plugin": plugin_name,
+            "event": event,
+            "inject_as": inject_as,
+            "message": format!("Plugin hook '{}' is not trusted and was skipped. Approve it with: wai plugin trust {}", inject_as, plugin_name),
+        });
+        println!("{}", warning);
+    } else {
+        use owo_colors::OwoColorize;
+        eprintln!(
+            "  {} Plugin '{}' hook '{}' skipped: not trusted (approve with `wai plugin trust {}`)",
+            "!".yellow(),
+            plugin_name,
+            inject_as,
+            plugin_name
+        );
+    }
 }
 
 /// Find a plugin command for pass-through execution.
@@ -611,5 +782,250 @@ mod tests {
         let result = store_memory(tmp.path(), "some insight");
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("beads not detected"));
+    }
+
+    // ── trust store ───────────────────────────────────────────────────────────
+
+    fn sample_plugin(name: &str) -> PluginDef {
+        PluginDef {
+            name: name.to_string(),
+            description: String::new(),
+            intent: None,
+            success_criteria: None,
+            detector: None,
+            commands: vec![],
+            hooks: HashMap::new(),
+        }
+    }
+
+    #[test]
+    fn compute_hook_digest_is_stable_and_content_sensitive() {
+        let def = sample_plugin("test");
+        let hook = HookDef {
+            command: "echo hi".to_string(),
+            inject_as: "greeting".to_string(),
+        };
+        let d1 = compute_hook_digest(&def, "on_status", &hook);
+        let d2 = compute_hook_digest(&def, "on_status", &hook);
+        assert_eq!(d1, d2, "digest must be deterministic");
+
+        // Changing the command changes the digest.
+        let hook2 = HookDef {
+            command: "echo bye".to_string(),
+            inject_as: "greeting".to_string(),
+        };
+        assert_ne!(d1, compute_hook_digest(&def, "on_status", &hook2));
+
+        // Changing the hook name changes the digest.
+        assert_ne!(d1, compute_hook_digest(&def, "on_other", &hook));
+
+        // Changing the plugin name changes the digest.
+        assert_ne!(
+            d1,
+            compute_hook_digest(&sample_plugin("other"), "on_status", &hook)
+        );
+    }
+
+    #[test]
+    fn trust_store_approve_list_revoke() {
+        let mut store = TrustStore::default();
+        let digest = "abc123".to_string();
+        store.approve(TrustEntry {
+            plugin_name: "evil".to_string(),
+            hook_name: "on_status".to_string(),
+            digest: digest.clone(),
+            command: "touch marker".to_string(),
+            approved_at: "2026-08-05T00:00:00Z".to_string(),
+        });
+
+        assert!(store.is_approved(&digest));
+        assert_eq!(store.list().len(), 1);
+        assert!(!store.is_approved("other"));
+
+        // Revoking removes the entry.
+        assert!(store.revoke(&digest));
+        assert!(!store.is_approved(&digest));
+        assert_eq!(store.list().len(), 0);
+
+        // Revoking a missing digest returns false.
+        assert!(!store.revoke(&digest));
+    }
+
+    #[test]
+    fn trust_store_approve_replaces_same_digest() {
+        let mut store = TrustStore::default();
+        store.approve(TrustEntry {
+            plugin_name: "evil".to_string(),
+            hook_name: "on_status".to_string(),
+            digest: "d1".to_string(),
+            command: "touch marker".to_string(),
+            approved_at: "t1".to_string(),
+        });
+        store.approve(TrustEntry {
+            plugin_name: "evil".to_string(),
+            hook_name: "on_status".to_string(),
+            digest: "d1".to_string(),
+            command: "touch marker".to_string(),
+            approved_at: "t2".to_string(),
+        });
+        assert_eq!(
+            store.list().len(),
+            1,
+            "same digest must not create duplicates"
+        );
+    }
+
+    #[serial_test::serial]
+    #[test]
+    fn trust_store_path_prefers_wai_data_dir() {
+        // trust_store_path uses WAI_DATA_DIR when set.
+        // SAFETY: test-only env var, single-threaded tests.
+        let saved = std::env::var_os("WAI_DATA_DIR");
+        unsafe {
+            std::env::set_var("WAI_DATA_DIR", "/tmp/wai-trust-test");
+        }
+        assert_eq!(
+            trust_store_path(),
+            PathBuf::from("/tmp/wai-trust-test").join(TRUST_STORE_FILE)
+        );
+        match saved {
+            Some(v) => unsafe { std::env::set_var("WAI_DATA_DIR", v) },
+            None => unsafe { std::env::remove_var("WAI_DATA_DIR") },
+        }
+    }
+
+    #[serial_test::serial]
+    #[test]
+    fn trust_store_load_save_roundtrip() {
+        let tmp = TempDir::new().unwrap();
+        // SAFETY: test-only env var, single-threaded tests.
+        let saved = std::env::var_os("WAI_DATA_DIR");
+        unsafe {
+            std::env::set_var("WAI_DATA_DIR", tmp.path().join("data"));
+        }
+
+        let digest = "roundtrip-digest".to_string();
+        {
+            let mut store = TrustStore::load();
+            store.approve(TrustEntry {
+                plugin_name: "test".to_string(),
+                hook_name: "on_status".to_string(),
+                digest: digest.clone(),
+                command: "echo hi".to_string(),
+                approved_at: "2026-08-05T00:00:00Z".to_string(),
+            });
+            store.save().unwrap();
+        }
+        // Load from a fresh store to verify persistence.
+        let store = TrustStore::load();
+        assert!(store.is_approved(&digest));
+        assert_eq!(store.list().len(), 1);
+        assert_eq!(store.list()[0].plugin_name, "test");
+
+        match saved {
+            Some(v) => unsafe { std::env::set_var("WAI_DATA_DIR", v) },
+            None => unsafe { std::env::remove_var("WAI_DATA_DIR") },
+        }
+    }
+
+    #[serial_test::serial]
+    #[test]
+    fn run_hooks_skips_untrusted_custom_hook() {
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+
+        // A repository-owned plugin with an on_status hook.
+        let plugin_dir = root.join(".wai/plugins");
+        std::fs::create_dir_all(&plugin_dir).unwrap();
+        std::fs::write(
+            plugin_dir.join("evil.toml"),
+            r#"
+name = "evil"
+description = "malicious"
+
+[hooks.on_status]
+command = "echo 'hook-ran'"
+inject_as = "evil_marker"
+"#,
+        )
+        .unwrap();
+
+        // SAFETY: test-only env var, single-threaded tests.
+        let saved = std::env::var_os("WAI_DATA_DIR");
+        unsafe {
+            std::env::set_var("WAI_DATA_DIR", tmp.path().join("wai-data"));
+        }
+
+        // Ensure no trust approval exists (fresh store).
+        let outputs = run_hooks(root, "on_status");
+
+        // The untrusted hook must NOT have executed.
+        assert!(
+            outputs.iter().all(|o| o.label != "evil_marker"),
+            "no output from untrusted hook"
+        );
+
+        match saved {
+            Some(v) => unsafe { std::env::set_var("WAI_DATA_DIR", v) },
+            None => unsafe { std::env::remove_var("WAI_DATA_DIR") },
+        }
+    }
+
+    #[serial_test::serial]
+    #[test]
+    fn run_hooks_executes_approved_custom_hook() {
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+
+        let plugin_dir = root.join(".wai/plugins");
+        std::fs::create_dir_all(&plugin_dir).unwrap();
+        let marker = root.join("hook-ran");
+        std::fs::write(
+            plugin_dir.join("evil.toml"),
+            format!(
+                r#"
+name = "evil"
+description = "malicious"
+
+[hooks.on_status]
+command = "echo 'hook-ran'"
+inject_as = "evil_marker"
+"#
+            ),
+        )
+        .unwrap();
+
+        // SAFETY: test-only env var, single-threaded tests.
+        let saved = std::env::var_os("WAI_DATA_DIR");
+        unsafe {
+            std::env::set_var("WAI_DATA_DIR", tmp.path().join("wai-data"));
+        }
+
+        // Approve the hook digest, then run hooks again.
+        let plugins = detect_plugins(root);
+        let evil = plugins.iter().find(|p| p.def.name == "evil").unwrap();
+        let hook = evil.def.hooks.get("on_status").unwrap();
+        let digest = compute_hook_digest(&evil.def, "on_status", hook);
+        let mut store = TrustStore::load();
+        store.approve(TrustEntry {
+            plugin_name: "evil".to_string(),
+            hook_name: "on_status".to_string(),
+            digest: digest.clone(),
+            command: hook.command.clone(),
+            approved_at: "2026-08-05T00:00:00Z".to_string(),
+        });
+        store.save().unwrap();
+        assert!(TrustStore::load().is_approved(&digest));
+
+        let outputs = run_hooks(root, "on_status");
+        assert!(
+            outputs.iter().any(|o| o.label == "evil_marker"),
+            "approved hook must produce output"
+        );
+
+        match saved {
+            Some(v) => unsafe { std::env::set_var("WAI_DATA_DIR", v) },
+            None => unsafe { std::env::remove_var("WAI_DATA_DIR") },
+        }
     }
 }

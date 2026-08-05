@@ -808,6 +808,28 @@ pub enum PluginCommands {
         /// Plugin name
         name: String,
     },
+
+    /// Manage plugin trust
+    ///
+    /// Approve a plugin's hooks: wai plugin trust <name>
+    /// List approved digests: wai plugin trust --list
+    /// Revoke approval:     wai plugin trust --revoke <digest>
+    Trust {
+        /// Plugin name to approve (omit with --list or --revoke)
+        name: Option<String>,
+
+        /// List all approved hook digests
+        #[arg(long, conflicts_with_all = ["name", "revoke", "hook"])]
+        list: bool,
+
+        /// Revoke approval for a specific digest
+        #[arg(long, value_name = "DIGEST", conflicts_with = "hook")]
+        revoke: Option<String>,
+
+        /// Approve only this specific hook (e.g. "on_status")
+        #[arg(long, requires = "name")]
+        hook: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]

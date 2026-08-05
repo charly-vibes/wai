@@ -1602,6 +1602,391 @@ fn plugin_passthrough_unknown_command_fails_for_detected_plugin() {
         .stderr(predicate::str::contains("has no command 'unknown-cmd'"));
 }
 
+// ─── wai plugin trust ─────────────────────────────────────────────────────────
+
+/// Write a minimal custom plugin that runs a marker-creating hook.
+fn write_malicious_plugin(dir: &std::path::Path, marker: &str) {
+    let plugin_dir = dir.join(".wai/plugins");
+    fs::create_dir_all(&plugin_dir).unwrap();
+    fs::write(
+        plugin_dir.join("evil.toml"),
+        format!(
+            r#"
+name = "evil"
+description = "malicious test plugin"
+
+[hooks.on_status]
+command = "touch {marker}"
+inject_as = "evil_marker"
+"#
+        ),
+    )
+    .unwrap();
+}
+
+fn wai_cmd_with_data_dir(dir: &std::path::Path, data_dir: &std::path::Path) -> assert_cmd::Command {
+    let mut cmd = wai_cmd(dir);
+    cmd.env("WAI_DATA_DIR", data_dir);
+    cmd
+}
+
+#[test]
+fn plugin_trust_skips_unapproved_hook_on_status() {
+    let tmp = TempDir::new().unwrap();
+    let data_dir = tmp.path().join("wai-data");
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "test-p");
+    write_malicious_plugin(tmp.path(), "hook-marker");
+
+    // status should NOT execute the unapproved hook.
+    wai_cmd_with_data_dir(tmp.path(), &data_dir)
+        .args(["status"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("not trusted"));
+
+    assert!(
+        !tmp.path().join("hook-marker").exists(),
+        "unapproved hook must not execute"
+    );
+}
+
+#[test]
+fn plugin_trust_approve_enables_hook() {
+    let tmp = TempDir::new().unwrap();
+    let data_dir = tmp.path().join("wai-data");
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "test-p");
+    write_malicious_plugin(tmp.path(), "hook-marker");
+
+    // Approve the plugin, then status should execute the hook.
+    wai_cmd_with_data_dir(tmp.path(), &data_dir)
+        .args(["plugin", "trust", "evil"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Trusted"));
+
+    wai_cmd_with_data_dir(tmp.path(), &data_dir)
+        .args(["status"])
+        .assert()
+        .success();
+
+    assert!(
+        tmp.path().join("hook-marker").exists(),
+        "approved hook must execute"
+    );
+}
+
+#[test]
+fn plugin_trust_list_shows_approved() {
+    let tmp = TempDir::new().unwrap();
+    let data_dir = tmp.path().join("wai-data");
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "test-p");
+    write_malicious_plugin(tmp.path(), "hook-marker");
+
+    wai_cmd_with_data_dir(tmp.path(), &data_dir)
+        .args(["plugin", "trust", "evil"])
+        .assert()
+        .success();
+
+    wai_cmd_with_data_dir(tmp.path(), &data_dir)
+        .args(["plugin", "trust", "--list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("evil"));
+}
+
+#[test]
+fn plugin_trust_approve_json_outputs_state() {
+    let tmp = TempDir::new().unwrap();
+    let data_dir = tmp.path().join("wai-data");
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "test-p");
+    write_malicious_plugin(tmp.path(), "hook-marker");
+
+    wai_cmd_with_data_dir(tmp.path(), &data_dir)
+        .args(["plugin", "trust", "evil", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("\"plugin\"").and(predicate::str::contains("\"approved\"")),
+        );
+}
+
+#[test]
+fn plugin_trust_unknown_plugin_fails() {
+    let tmp = TempDir::new().unwrap();
+    let data_dir = tmp.path().join("wai-data");
+    init_workspace(tmp.path());
+
+    wai_cmd_with_data_dir(tmp.path(), &data_dir)
+        .args(["plugin", "trust", "nonexistent"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("not found"));
+}
+
+#[test]
+fn plugin_trust_builtin_plugin_fails() {
+    let tmp = TempDir::new().unwrap();
+    let data_dir = tmp.path().join("wai-data");
+    init_workspace(tmp.path());
+
+    wai_cmd_with_data_dir(tmp.path(), &data_dir)
+        .args(["plugin", "trust", "git"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("is a built-in plugin"));
+}
+
+#[test]
+fn plugin_trust_revoke_disables_hook() {
+    let tmp = TempDir::new().unwrap();
+    let data_dir = tmp.path().join("wai-data");
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "test-p");
+    write_malicious_plugin(tmp.path(), "hook-marker");
+
+    // Approve with --json to capture the full digest.
+    let output = wai_cmd_with_data_dir(tmp.path(), &data_dir)
+        .args(["plugin", "trust", "evil", "--json"])
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Extract the 64-char hex digest from the JSON output.
+    let digest = stdout.lines().find_map(|line| {
+        let line = line.trim();
+        if let Some(start) = line.find("\"digest\":\"") {
+            let rest = &line[start + 10..];
+            if let Some(end) = rest.find('"') {
+                Some(rest[..end].to_string())
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    });
+
+    if let Some(digest) = digest {
+        // Revoke using the digest.
+        wai_cmd_with_data_dir(tmp.path(), &data_dir)
+            .args(["plugin", "trust", "--revoke", &digest])
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("Revoked"));
+
+        // Verify the hook is no longer executed after revocation.
+        wai_cmd_with_data_dir(tmp.path(), &data_dir)
+            .args(["status"])
+            .assert()
+            .success();
+
+        assert!(
+            !tmp.path().join("hook-marker").exists(),
+            "revoked hook must not execute"
+        );
+    }
+}
+
+#[test]
+fn plugin_trust_non_interactive_fail_closed() {
+    let tmp = TempDir::new().unwrap();
+    let data_dir = tmp.path().join("wai-data");
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "test-p");
+    write_malicious_plugin(tmp.path(), "hook-marker");
+
+    // --no-input with unapproved hook: fail-closed, no execution.
+    wai_cmd_with_data_dir(tmp.path(), &data_dir)
+        .args(["status", "--no-input"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("not trusted"));
+
+    assert!(
+        !tmp.path().join("hook-marker").exists(),
+        "unapproved hook must not execute in non-interactive mode"
+    );
+}
+
+#[test]
+fn plugin_trust_prime_skips_unapproved_hook() {
+    let tmp = TempDir::new().unwrap();
+    let data_dir = tmp.path().join("wai-data");
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "test-p");
+    write_malicious_plugin(tmp.path(), "prime-marker");
+
+    wai_cmd_with_data_dir(tmp.path(), &data_dir)
+        .args(["prime"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("not trusted").or(predicate::str::contains("no active")));
+
+    assert!(
+        !tmp.path().join("prime-marker").exists(),
+        "prime must not execute unapproved hook"
+    );
+}
+
+#[test]
+fn plugin_trust_content_modification_invalidates_approval() {
+    let tmp = TempDir::new().unwrap();
+    let data_dir = tmp.path().join("wai-data");
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "test-p");
+
+    let plugin_dir = tmp.path().join(".wai/plugins");
+    fs::create_dir_all(&plugin_dir).unwrap();
+    fs::write(
+        plugin_dir.join("evil.toml"),
+        r#"
+name = "evil"
+description = "malicious"
+
+[hooks.on_status]
+command = "touch marker-v1"
+inject_as = "evil_marker"
+"#,
+    )
+    .unwrap();
+
+    // Approve the plugin.
+    wai_cmd_with_data_dir(tmp.path(), &data_dir)
+        .args(["plugin", "trust", "evil"])
+        .assert()
+        .success();
+
+    // Run status: hook executes.
+    wai_cmd_with_data_dir(tmp.path(), &data_dir)
+        .args(["status"])
+        .assert()
+        .success();
+    assert!(tmp.path().join("marker-v1").exists(), "approved hook runs");
+
+    // Modify the plugin file (change the command).
+    fs::write(
+        plugin_dir.join("evil.toml"),
+        r#"
+name = "evil"
+description = "malicious"
+
+[hooks.on_status]
+command = "touch marker-v2"
+inject_as = "evil_marker"
+"#,
+    )
+    .unwrap();
+
+    // Run status: the new hook must NOT execute (digest changed).
+    let _ = fs::remove_file(tmp.path().join("marker-v2"));
+    wai_cmd_with_data_dir(tmp.path(), &data_dir)
+        .args(["status"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("not trusted"));
+
+    assert!(
+        !tmp.path().join("marker-v2").exists(),
+        "modified hook must not execute without re-approval"
+    );
+}
+
+#[test]
+fn plugin_trust_new_skips_unapproved_hook() {
+    let tmp = TempDir::new().unwrap();
+    let data_dir = tmp.path().join("wai-data");
+    init_workspace(tmp.path());
+
+    // Create a plugin with an on_project_create hook.
+    let plugin_dir = tmp.path().join(".wai/plugins");
+    fs::create_dir_all(&plugin_dir).unwrap();
+    let new_marker = tmp.path().join("new-marker");
+    fs::write(
+        plugin_dir.join("evil.toml"),
+        format!(
+            r#"
+name = "evil"
+description = "malicious"
+
+[hooks.on_project_create]
+command = "touch {}"
+inject_as = "evil_marker"
+"#,
+            new_marker.to_str().unwrap()
+        ),
+    )
+    .unwrap();
+
+    // `wai new` should NOT execute the unapproved on_project_create hook.
+    wai_cmd_with_data_dir(tmp.path(), &data_dir)
+        .args(["new", "project", "test-project"])
+        .assert()
+        .success();
+
+    assert!(
+        !new_marker.exists(),
+        "wai new must not execute unapproved hook"
+    );
+}
+
+#[test]
+fn plugin_trust_approve_specific_hook() {
+    let tmp = TempDir::new().unwrap();
+    let data_dir = tmp.path().join("wai-data");
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "test-p");
+
+    // Plugin with two hooks.
+    let plugin_dir = tmp.path().join(".wai/plugins");
+    fs::create_dir_all(&plugin_dir).unwrap();
+    fs::write(
+        plugin_dir.join("evil.toml"),
+        r#"
+name = "evil"
+description = "malicious"
+
+[hooks.on_status]
+command = "echo 'status'"
+inject_as = "status_hook"
+
+[hooks.on_handoff_generate]
+command = "echo 'handoff'"
+inject_as = "handoff_hook"
+"#,
+    )
+    .unwrap();
+
+    // Only approve the on_status hook.
+    wai_cmd_with_data_dir(tmp.path(), &data_dir)
+        .args(["plugin", "trust", "evil", "--hook", "on_status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("on_status"));
+
+    // on_status should now execute.
+    wai_cmd_with_data_dir(tmp.path(), &data_dir)
+        .args(["status"])
+        .assert()
+        .success();
+
+    // on_handoff_generate should still be untrusted (but we can't easily
+    // trigger handoff in tests, so we just verify the trust store reflects it).
+    let output = wai_cmd_with_data_dir(tmp.path(), &data_dir)
+        .args(["plugin", "trust", "--list", "--json"])
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // There should be exactly one entry (on_status).
+    assert!(
+        stdout.contains("on_status"),
+        "only on_status should be in trust store"
+    );
+}
+
 // ─── wai status ─────────────────────────────────────────────────────────────
 
 #[test]

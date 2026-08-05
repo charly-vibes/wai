@@ -86,6 +86,13 @@ pub enum WaiError {
     )]
     PluginNotFound { name: String },
 
+    #[error("Plugin trust error: {message}")]
+    #[diagnostic(
+        code(wai::plugin::trust),
+        help("See `wai plugin trust --help` for trust commands")
+    )]
+    PluginTrustError { message: String },
+
     #[error("Non-interactive mode: {message}")]
     #[diagnostic(
         code(wai::cli::non_interactive),
