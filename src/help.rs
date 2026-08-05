@@ -65,7 +65,7 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
             ],
         }),
         "add" => Some(HelpContent {
-            about: "Add artifacts (research, plans, designs) to a project",
+            about: "Add artifacts (research, plans, designs, reviews) to a project",
             examples: &[
                 (
                     "wai add research \"API design notes\"",
@@ -80,12 +80,20 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                     "wai add design \"auth system design\"",
                     "Add a design document",
                 ),
+                (
+                    "wai add review --reviews findings.md --verdict pass",
+                    "Add a review artifact for an existing artifact",
+                ),
             ],
             options: &[],
             advanced_options: &[
                 "-f, --file <PATH>       Import content from a file",
                 "-p, --project <NAME>    Associate with a specific project",
                 "-t, --tags <TAGS>       Comma-separated tags (merged with pipeline-run tag)",
+                "--reviews <FILENAME>    Target artifact this review covers (required for review)",
+                "--verdict <VERDICT>     Review verdict: pass, fail, or needs-work",
+                "--severity <COUNTS>     Severity counts (e.g. critical:0,high:1,medium:3,low:2)",
+                "--skill <NAME>          Skill that produced this review",
             ],
             env_vars: &[
                 ("NO_COLOR", "Disable colored output"),

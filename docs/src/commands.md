@@ -188,7 +188,7 @@ wai phase back
 | Command | Description |
 |---------|-------------|
 | `wai add research <content>` | Add research notes (also `plan`, `design`) |
-| `wai add review <content>` | Add a review artifact for an existing artifact |
+| `wai add review --reviews <filename>` | Add a review artifact for an existing artifact |
 | `wai add <type> --file <path>` | Import artifact from file |
 | `wai add <type> --tags <tags>` | Add tagged artifact (frontmatter-based) |
 | `wai add <type> --bead <id>` | Link artifact to a beads issue ID |
