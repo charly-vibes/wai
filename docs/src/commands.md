@@ -490,6 +490,38 @@ wai handoff create user-auth
 
 ---
 
+### Feedback
+
+File an issue against wai's upstream repository with environment context attached.
+
+| Command | Description |
+|---------|-------------|
+| `wai feedback bug [--title <title>]` | File a bug report with context |
+| `wai feedback --from-last-error` | Build report from the last wai error |
+| `wai feedback --dry-run` | Preview the issue without filing |
+
+#### `wai feedback`
+
+Automatically gathers environment context (OS, wai version, git remote, debug logs),
+redacts secrets and paths, then files a GitHub issue via `gh` (with a fallback ladder
+to `--web` or manual copy-paste).
+
+```bash
+# File a bug report (prompts for kind and title)
+wai feedback bug
+
+# File from the last error (derives title and body automatically)
+wai feedback --from-last-error
+
+# Preview what would be filed
+wai feedback friction --title "slow startup" --dry-run
+
+# Open a prefilled browser URL instead of using gh
+wai feedback bug --title "crash on init" --web
+```
+
+---
+
 ### Pipelines
 
 See [Pipelines](./concepts/pipelines.md) for conceptual background on pipeline structure and gates.

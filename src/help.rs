@@ -228,6 +228,37 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 "Validates project .state files",
             ],
         }),
+        "feedback" => Some(HelpContent {
+            about: "File an issue against wai's upstream repository",
+            examples: &[
+                ("wai feedback bug", "File a bug report"),
+                (
+                    "wai feedback --from-last-error",
+                    "Build report from the last error",
+                ),
+                ("wai feedback --dry-run", "Preview the issue without filing"),
+                (
+                    "wai feedback friction --title \"slow startup\"",
+                    "File a friction report with a custom title",
+                ),
+            ],
+            options: &[],
+            advanced_options: &[
+                "-t, --title <TITLE>       Issue title (required unless --from-last-error)",
+                "--body <BODY>             Issue body (defaults to error with --from-last-error)",
+                "--from-last-error         Build report from the most recent error-scratch",
+                "--dry-run                 Print the issue and gh line without filing",
+                "--web                     Open a prefilled browser URL",
+                "--no-context              Omit environment context from the body",
+                "--json                    Emit a JSON envelope",
+            ],
+            env_vars: &[],
+            internals: &[
+                "Gathers environment context, redacts secrets, files via gh",
+                "Fallback: --web then manual copy-paste if gh is unavailable",
+                "Kinds: bug, friction, docs-gap, aix-gap, idea",
+            ],
+        }),
         "handoff" => Some(HelpContent {
             about: "Generate handoff documents",
             examples: &[(
@@ -584,6 +615,7 @@ pub fn render_main_help(verbose: u8) -> String {
     out.push_str("  close     Wrap up a session and save handoff\n");
     out.push_str("  config    Manage agent configuration files\n");
     out.push_str("  doctor    Diagnose workspace health\n");
+    out.push_str("  feedback  File an issue against wai's upstream repository\n");
     out.push_str("  handoff   Generate handoff documents\n");
     out.push_str("  import    Import existing tool configurations\n");
     out.push_str("  init      Initialize wai in the current directory\n");
