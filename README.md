@@ -1,5 +1,7 @@
 # wai  /waɪ/
 
+**wai** will enable **AI-assisted software developers** to **recover** **the full context of a project not touched in 30+ days** by **reducing context-recovery time from >15 minutes to <2 minutes** within **6 months (by February 2027)**, as measured by **time from `wai prime` to correctly identifying the project's phase, purpose, and most recent decision**, compared to **reading git log, source comments, and README without wai**.
+
 **wai** — pronounced like *"why"* — is a command-line workflow manager for AI-driven development. It can also be read as *"way"*, and that's intentional: the tool's focus is capturing **why it was built that way**.
 
 Most specs define *what* to build. Wai extends the workflow to also *inform* — preserving the research, reasoning, and decisions that shaped the design. When you revisit a project months later, the spec tells you what exists; wai tells you why.

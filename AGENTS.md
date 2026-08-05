@@ -19,10 +19,14 @@ Tool tickets require Rust implementation and typically need an openspec change f
 
 ## PRIMARY OBJECTIVE
 
+**wai** will enable **AI-assisted software developers** to **recover** **the full context of a project not touched in 30+ days** by **reducing context-recovery time from >15 minutes to <2 minutes** within **6 months (by February 2027)**, as measured by **time from `wai prime` to correctly identifying the project's phase, purpose, and most recent decision**, compared to **reading git log, source comments, and README without wai**.
+
 Support and evolve **wai** — the workflow manager for AI-driven development —
 by shipping correct, well-tested, well-governed changes to the Rust CLI.
 Every action should trace back to: does this make wai more reliable,
 more capable, or better documented for its users?
+
+**wai** will enable **AI-assisted software developers** to **recover** **the full context of a project not touched in 30+ days** by **reducing context-recovery time from >15 minutes to <2 minutes** within **6 months (by February 2027)**, as measured by **time from `wai prime` to correctly identifying the project's phase, purpose, and most recent decision**, compared to **reading git log, source comments, and README without wai**.
 
 This project uses **wai** to track the *why* behind decisions — research,
 reasoning, and design choices that shaped the code. Run `wai status` first
@@ -76,14 +80,25 @@ Read it at the start of your first session or when you need detailed guidance.
 
 ## PRIMARY OBJECTIVE (echo)
 
+**wai** will enable **AI-assisted software developers** to **recover** **the full context of a project not touched in 30+ days** by **reducing context-recovery time from >15 minutes to <2 minutes** within **6 months (by February 2027)**, as measured by **time from `wai prime` to correctly identifying the project's phase, purpose, and most recent decision**, compared to **reading git log, source comments, and README without wai**.
+
 Support and evolve **wai** — the workflow manager for AI-driven development —
 by shipping correct, well-tested, well-governed changes to the Rust CLI.
 Every action should trace back to: does this make wai more reliable,
 more capable, or better documented for its users?
 
+**wai** will enable **AI-assisted software developers** to **recover** **the full context of a project not touched in 30+ days** by **reducing context-recovery time from >15 minutes to <2 minutes** within **6 months (by February 2027)**, as measured by **time from `wai prime` to correctly identifying the project's phase, purpose, and most recent decision**, compared to **reading git log, source comments, and README without wai**.
+
 Keep this managed block so `wai init` can refresh the instructions.
 
 <!-- WAI:END -->
+
+## Value Proposition
+
+**wai** will enable **AI-assisted software developers** to **recover** **the full context of a project not touched in 30+ days** by **reducing context-recovery time from >15 minutes to <2 minutes** within **6 months (by February 2027)**, as measured by **time from `wai prime` to correctly identifying the project's phase, purpose, and most recent decision**, compared to **reading git log, source comments, and README without wai**.
+
+**Kill criteria:** Context recovery >2 min for 30+ day old project by Feb 2027.
+**Owner:** charly vibes
 
 ## Behavioral Constraints
 

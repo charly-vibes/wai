@@ -2,6 +2,8 @@
 
 ## Purpose
 
+**wai** will enable **AI-assisted software developers** to **recover** **the full context of a project not touched in 30+ days** by **reducing context-recovery time from >15 minutes to <2 minutes** within **6 months (by February 2027)**, as measured by **time from `wai prime` to correctly identifying the project's phase, purpose, and most recent decision**, compared to **reading git log, source comments, and README without wai**.
+
 Wai is a workflow manager for AI-driven development. It organizes artifacts using the PARA method (Projects, Areas, Resources, Archives) with project phase tracking, agent config sync, handoff generation, and plugin integration. Beads (`.beads/`) is a separate external tool that wai detects and integrates with via its plugin system.
 
 ## Tech Stack
