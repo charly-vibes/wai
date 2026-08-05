@@ -452,7 +452,7 @@ fn get_content(content: Option<&str>, file: Option<&str>) -> Result<String> {
 ///
 /// Resolution order (first non-empty value wins):
 ///   1. `WAI_PIPELINE_RUN` environment variable (backwards-compatible).
-///   2. `.wai/.pipeline-run` state file (written by `wai pipeline run`).
+///   2. `.wai/resources/pipelines/.last-run` pointer file (written by `wai pipeline start`).
 #[cfg(test)]
 mod tests {
     #[test]
@@ -548,8 +548,13 @@ current_step: 0
         )
         .unwrap();
 
-        // Write .pipeline-run pointer
-        std::fs::write(wai.join(".pipeline-run"), "test-pipe-2026-04-02-qcd").unwrap();
+        // Write .last-run pointer
+        std::fs::create_dir_all(wai.join("resources/pipelines")).unwrap();
+        std::fs::write(
+            wai.join("resources/pipelines/.last-run"),
+            "test-pipe-2026-04-02-qcd",
+        )
+        .unwrap();
 
         let tags = super::build_tags(None, root);
         assert!(

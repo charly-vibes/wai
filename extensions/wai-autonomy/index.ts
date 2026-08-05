@@ -14,9 +14,8 @@ export function findWaiRoot(cwd: string): string | undefined {
 }
 
 export function hasActivePipeline(root: string): boolean {
-  return (
-    fs.existsSync(path.join(root, ".wai", ".pipeline-run")) ||
-    fs.existsSync(path.join(root, ".wai", "resources", "pipelines", ".last-run"))
+  return fs.existsSync(
+    path.join(root, ".wai", "resources", "pipelines", ".last-run"),
   );
 }
 

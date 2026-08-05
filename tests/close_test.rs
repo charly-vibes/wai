@@ -99,9 +99,8 @@ fn close_unknown_project_fails_with_diagnostic() {
 
 // ── clearing stale complete pipeline-run pointer (wai-pa3b) ──────────────────
 
-/// Write a pipeline definition (2 steps), a run state file, and both active-run
-/// pointers (`.wai/.pipeline-run` and `.wai/resources/pipelines/.last-run`).
-/// `current_step` == total means the run is complete.
+/// Write a pipeline definition (2 steps), a run state file, and the `.last-run`
+/// pointer. `current_step` == total means the run is complete.
 fn write_pipeline_run(dir: &std::path::Path, pipeline: &str, current_step: usize) {
     let pipelines_dir = dir.join(".wai/resources/pipelines");
     fs::create_dir_all(&pipelines_dir).unwrap();
@@ -123,8 +122,7 @@ fn write_pipeline_run(dir: &std::path::Path, pipeline: &str, current_step: usize
         ),
     )
     .unwrap();
-    // Both active-run pointers used by wai (file-based resolution).
-    fs::write(dir.join(".wai/.pipeline-run"), &run_id).unwrap();
+    // Single source of truth: .last-run pointer
     fs::write(pipelines_dir.join(".last-run"), &run_id).unwrap();
 }
 
@@ -137,11 +135,7 @@ fn close_clears_complete_pipeline_run_pointers() {
     write_pipeline_run(tmp.path(), "flow", 2);
 
     let last_run = tmp.path().join(".wai/resources/pipelines/.last-run");
-    let pipeline_run = tmp.path().join(".wai/.pipeline-run");
-    assert!(
-        last_run.exists() && pipeline_run.exists(),
-        "pointers exist before close"
-    );
+    assert!(last_run.exists(), "pointer exists before close");
 
     wai_cmd(tmp.path())
         .args(["close", "--project", "myproject"])
@@ -152,10 +146,6 @@ fn close_clears_complete_pipeline_run_pointers() {
     assert!(
         !last_run.exists(),
         ".last-run should be removed after close"
-    );
-    assert!(
-        !pipeline_run.exists(),
-        ".pipeline-run should be removed after close"
     );
 }
 
@@ -168,7 +158,6 @@ fn close_preserves_in_progress_pipeline_run() {
     write_pipeline_run(tmp.path(), "flow", 0);
 
     let last_run = tmp.path().join(".wai/resources/pipelines/.last-run");
-    let pipeline_run = tmp.path().join(".wai/.pipeline-run");
 
     wai_cmd(tmp.path())
         .args(["close", "--project", "myproject"])
@@ -179,10 +168,6 @@ fn close_preserves_in_progress_pipeline_run() {
     assert!(
         last_run.exists(),
         ".last-run must remain for an in-progress run"
-    );
-    assert!(
-        pipeline_run.exists(),
-        ".pipeline-run must remain for an in-progress run"
     );
 }
 

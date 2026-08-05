@@ -41,13 +41,6 @@ pub const PATTERNS_DIR: &str = "patterns";
 /// Reflection resource files within resources/
 pub const REFLECTIONS_DIR: &str = "reflections";
 
-/// Active pipeline run state file (`.wai/.pipeline-run`).
-///
-/// Written by `wai pipeline run` and removed by `wai pipeline advance` when
-/// the last stage completes. Similar to `.git/HEAD` — a single-line file
-/// containing just the run ID. Not committed (listed in `.wai/.gitignore`).
-pub const PIPELINE_RUN_FILE: &str = ".pipeline-run";
-
 /// Per-project subdirectories
 pub const RESEARCH_DIR: &str = "research";
 pub const PLANS_DIR: &str = "plans";
@@ -384,37 +377,22 @@ pub fn mark_tutorial_seen() -> Result<(), WaiError> {
     config.save()
 }
 
-/// Get the path to the active pipeline run state file (`.wai/.pipeline-run`).
-pub fn pipeline_run_file(project_root: &Path) -> PathBuf {
-    wai_dir(project_root).join(PIPELINE_RUN_FILE)
-}
-
 /// Get the path to the `.last-run` pointer file used by TOML-based pipelines.
 ///
-/// This file stores the most recently started run ID so that `wai pipeline next`
-/// and `wai pipeline current` can resolve the active run without requiring the
-/// user to set `WAI_PIPELINE_RUN` in their shell.
+/// This is the single source of truth for the active run ID. Previously
+/// `.wai/.pipeline-run` was an independent file that could diverge; now all
+/// readers and writers use this path.
 ///
 /// Stored at `.wai/resources/pipelines/.last-run`.
 pub fn last_run_path(workspace_root: &Path) -> PathBuf {
     pipelines_dir(workspace_root).join(".last-run")
 }
 
-/// Write a run ID to the active pipeline run state file.
+/// Read the active pipeline run ID from the `.last-run` pointer file.
 ///
-/// Creates or overwrites `.wai/.pipeline-run` with just the run ID (no trailing newline).
-/// This mirrors how `.git/HEAD` stores a simple reference string.
-pub fn write_pipeline_run_state(project_root: &Path, run_id: &str) -> Result<(), WaiError> {
-    let path = pipeline_run_file(project_root);
-    std::fs::write(&path, run_id)?;
-    Ok(())
-}
-
-/// Read the active pipeline run ID from the state file, if present.
-///
-/// Returns `None` when the file does not exist or its contents are empty.
+/// Returns `None` when the file is missing, empty, or unreadable.
 pub fn read_pipeline_run_state(project_root: &Path) -> Option<String> {
-    let path = pipeline_run_file(project_root);
+    let path = last_run_path(project_root);
     let content = std::fs::read_to_string(&path).ok()?;
     let trimmed = content.trim().to_string();
     if trimmed.is_empty() {

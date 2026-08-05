@@ -33,17 +33,16 @@ test("findWaiRoot returns undefined outside wai workspace", () => {
   assert.equal(findWaiRoot(path.join(root, "nested")), undefined);
 });
 
-test("hasActivePipeline detects current and last-run markers", () => {
+test("hasActivePipeline detects last-run marker", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "wai-autonomy-pipeline-"));
   fs.mkdirSync(path.join(root, ".wai"), { recursive: true });
   assert.equal(hasActivePipeline(root), false);
 
-  fs.writeFileSync(path.join(root, ".wai", ".pipeline-run"), "run-1");
-  assert.equal(hasActivePipeline(root), true);
-
-  fs.rmSync(path.join(root, ".wai", ".pipeline-run"));
   fs.mkdirSync(path.join(root, ".wai", "resources", "pipelines"), { recursive: true });
-  fs.writeFileSync(path.join(root, ".wai", "resources", "pipelines", ".last-run"), "run-2");
+  fs.writeFileSync(
+    path.join(root, ".wai", "resources", "pipelines", ".last-run"),
+    "run-1",
+  );
   assert.equal(hasActivePipeline(root), true);
 });
 

@@ -458,7 +458,7 @@ pub enum Commands {
               wai pipeline current\n\
               wai pipeline suggest \"auth login\"\n\n\
             STATE FILE\n\
-              `wai pipeline start` writes the active run ID to .wai/.pipeline-run so\n\
+              `wai pipeline start` writes the active run ID to .wai/resources/pipelines/.last-run so\n\
               `wai add` picks it up automatically — no export needed.\n\n\
             ENVIRONMENT (optional override)\n\
               WAI_PIPELINE_RUN  When set, overrides the state file. Useful for running\n\
@@ -968,7 +968,7 @@ pub enum PipelineCommands {
     ///
     /// ENVIRONMENT
     ///   Sets WAI_PIPELINE_RUN in your shell when you run the printed export line.
-    ///   `wai add` picks up the run ID automatically from `.wai/.pipeline-run`.
+    ///   `wai add` picks up the run ID automatically from `.wai/resources/pipelines/.last-run`.
     Start {
         /// Name of the pipeline to start (must be a .toml file in .wai/resources/pipelines/)
         name: String,

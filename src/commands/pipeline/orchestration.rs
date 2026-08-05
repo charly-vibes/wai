@@ -88,16 +88,12 @@ pub(super) fn cmd_start(name: &str, topic: Option<&str>) -> Result<()> {
         .map_err(|e| miette::miette!("Failed to serialize run state: {}", e))?;
     fs::write(&run_path, yaml).into_diagnostic()?;
 
-    // 5. Write .last-run pointer file
+    // 5. Write .last-run pointer file (single source of truth for active run ID)
     let last_run = crate::config::last_run_path(&project_root);
     fs::create_dir_all(last_run.parent().unwrap()).into_diagnostic()?;
     fs::write(&last_run, &run_id).into_diagnostic()?;
 
-    // 6. Write .wai/.pipeline-run so `wai add` picks up the run ID automatically
-    crate::config::write_pipeline_run_state(&project_root, &run_id)
-        .map_err(|e| miette::miette!("Failed to write pipeline run state: {}", e))?;
-
-    // 7. Print env export line + first step prompt block
+    // 6. Print env export line + first step prompt block
     println!("export WAI_PIPELINE_RUN={}", run_id);
     println!();
     print_step(&definition, 0, topic_str);
@@ -376,8 +372,8 @@ pub fn pipeline_current_status(project_root: &Path) -> Result<Option<PipelineCur
 /// progress — in both cases the pointers are left intact.
 ///
 /// The run state file itself (`.wai/pipeline-runs/<run>.yml`) is kept as a
-/// historical record; only the *active* pointers (`.wai/.pipeline-run` and
-/// `.wai/resources/pipelines/.last-run`) are removed. An active run resolved via
+/// historical record; only the `.last-run` pointer file at
+/// `.wai/resources/pipelines/.last-run` is removed. An active run resolved via
 /// the `WAI_PIPELINE_RUN` env var is left to the caller's environment.
 pub fn clear_complete_pipeline_run(project_root: &Path) -> Option<String> {
     let status = pipeline_current_status(project_root).ok().flatten()?;
@@ -386,7 +382,7 @@ pub fn clear_complete_pipeline_run(project_root: &Path) -> Option<String> {
         return None;
     }
     let name = status.pipeline.clone();
-    let _ = fs::remove_file(crate::config::pipeline_run_file(project_root));
+    let _ = fs::remove_file(crate::config::last_run_path(project_root));
     let _ = fs::remove_file(crate::config::last_run_path(project_root));
     name
 }
