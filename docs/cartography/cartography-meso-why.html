@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cartography — commands/why (meso)</title>
+<link rel="stylesheet" href="assets/cartography.css">
+</head>
+<body>
+<nav><a href="index.html">← Index</a> | Parent: <a href="cartography-macro-wai.html">macro — wai src/</a> | Micro trace: <a href="cartography-micro-why.html">wai why</a></nav>
+
+<h1>Cartography — <code>commands/why/</code> (wai)</h1>
+<p class="meta"><strong>Entry zoom level:</strong> meso (module wiring)<br>
+<strong>Scope covered:</strong> <code>src/commands/why/</code> — <code>mod.rs</code> (1,163), <code>context.rs</code> (623), <code>parsing.rs</code> (387)</p>
+
+<h2>Parent context</h2>
+<p><code>why/</code> is a submodule of the <code>commands</code> district. It is the primary consumer of the <code>llm</code> service — together with <code>reflect/</code>, the only path to network/subprocess LLM backends in wai.</p>
+
+<h2>Component table</h2>
+<table>
+<thead><tr><th>Component</th><th>Path</th><th>Role</th><th>Talks to (internal)</th><th>External ports</th></tr></thead>
+<tbody>
+<tr><td>entry / backend selection</td><td><code>mod.rs</code> <code>run(query, no_llm, json, verbose)</code> (<code>mod.rs:438</code>)</td><td>Context → backend → prompt → complete → parse → format; fallbacks to search</td><td><code>context.rs</code>, <code>parsing.rs</code>, <code>llm</code>, <code>config</code>, <code>search::run</code> fallback</td><td>—</td></tr>
+<tr><td>context gathering</td><td><code>context.rs</code> <code>gather_context()</code> (<code>context.rs:117</code>)</td><td>Reads <code>.wai/</code> artifacts (recent-first), truncates to budget, git file context, meta, memories</td><td>config</td><td>filesystem walk, git subprocess</td></tr>
+<tr><td>response parsing</td><td><code>parsing.rs</code></td><td>Parse LLM response into structured answer</td><td>—</td><td>— (pure)</td></tr>
+<tr><td>backend abstraction</td><td><code>llm.rs</code> (service layer, outside district)</td><td><code>LlmClient</code> trait; detect_backend chooses claude-cli / ollama / external API</td><td>config</td><td>subprocess (<code>Command::new</code>), <code>reqwest::blocking</code> (<code>llm.rs:134</code>)</td></tr>
+</tbody>
+</table>
+
+<h2>Wiring graph</h2>
+<pre class="mermaid">
+graph LR
+  run["why::run()"] --> ctx["context.rs gather_context"]
+  ctx -- "fs walk + git" --> io[(".wai/ artifacts")]
+  run --> detect["llm::detect_backend"]
+  detect --> cli["claude-cli subprocess"]
+  detect --> ollama["ollama subprocess"]
+  detect --> api["reqwest::blocking API"]
+  run -- "prompt" --> backend["LlmClient.complete()"]
+  run --> parse["parsing.rs (pure)"]
+  run -- "fallback" --> search["search::run()"]
+</pre>
+<details><summary>Mermaid source</summary>
+<pre class="mermaid-source">graph LR
+  run["why::run()"] --> ctx["context.rs gather_context"]
+  ctx -- "fs walk + git" --> io[(".wai/ artifacts")]
+  run --> detect["llm::detect_backend"]
+  detect --> cli["claude-cli subprocess"]
+  detect --> ollama["ollama subprocess"]
+  detect --> api["reqwest::blocking API"]
+  run -- "prompt" --> backend["LlmClient.complete()"]
+  run --> parse["parsing.rs (pure)"]
+  run -- "fallback" --> search["search::run()"]
+</pre>
+</details>
+
+<h2>Structural observations</h2>
+<ul>
+  <li>Three-tier fallback ladder: no backend → <code>search::run</code>; backend error → <code>search::run</code> (unless <code>FallbackMode::Error</code>); empty context → early exit — all three fallback sites call the same <code>SearchArgs</code> construction (<code>mod.rs:445,529,585</code>)</li>
+  <li>Backend I/O is fully confined to <code>llm.rs</code>; <code>why/</code> itself touches only filesystem + git</li>
+  <li>One-time privacy notice before external API calls (<code>privacy_notice_needed</code> / <code>mark_privacy_notice_shown</code>, <code>mod.rs:546-548</code>)</li>
+  <li>Agent-session sentinel: when running inside an agent, the response sentinel short-circuits output (<code>mod.rs:549-554</code>)</li>
+</ul>
+
+<h2>Key Relationships</h2>
+<ul>
+  <li><code>why → llm.rs</code> — backend selection + completion; the district never sees HTTP or subprocess details</li>
+  <li><code>why → search</code> (3 fallback sites) — degraded mode reuses the search command wholesale</li>
+  <li><code>context.rs → .wai/ artifacts</code> — same artifact store that <code>add</code>/<code>import</code> populate</li>
+</ul>
+
+<h2>Open Questions</h2>
+<ul>
+  <li>The repeated <code>SearchArgs { … context_size: 0 … }</code> construction at 3 fallback sites — is a shared fallback helper intentional to avoid?</li>
+</ul>
+
+<h2>Adjacent levels offered</h2>
+<p>Micro trace of the full <code>wai why</code> path: <a href="cartography-micro-why.html">cartography-micro-why</a>.</p>
+
+<footer>Artifact of record: <code>cartography-meso-why.md</code> (same directory).</footer>
+<script src="assets/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true });</script>
+</body>
+</html>

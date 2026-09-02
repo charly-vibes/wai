@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cartography — commands/way (meso)</title>
+<link rel="stylesheet" href="assets/cartography.css">
+</head>
+<body>
+<nav><a href="index.html">← Index</a> | Parent: <a href="cartography-macro-wai.html">macro — wai src/</a></nav>
+
+<h1>Cartography — <code>commands/way/</code> (wai)</h1>
+<p class="meta"><strong>Entry zoom level:</strong> meso (module wiring)<br>
+<strong>Scope covered:</strong> <code>src/commands/way/</code> — <code>mod.rs</code> (2,975), <code>hooks.rs</code> (516), <code>linting.rs</code> (317), <code>release.rs</code> (144), plus 2 embedded skill markdown templates</p>
+
+<h2>Parent context</h2>
+<p><code>way/</code> is a submodule of the <code>commands</code> district. It enforces repo workflow quality (linting, hooks, docs, CI) on any directory — it does not require <code>.wai/</code> initialization (<code>mod.rs:47</code> comment).</p>
+
+<h2>Component table</h2>
+<table>
+<thead><tr><th>Component</th><th>Path</th><th>Role</th><th>Talks to (internal)</th><th>External ports</th></tr></thead>
+<tbody>
+<tr><td>entry</td><td><code>mod.rs</code> <code>run(topic, fix)</code> (<code>mod.rs:46</code>)</td><td>22 inline checks + topic guides + <code>fix skills</code></td><td><code>hooks.rs</code>, <code>linting.rs</code>, <code>release.rs</code>, <code>current_context</code>, genesis CheckStatus</td><td>filesystem, git repo</td></tr>
+<tr><td>check functions (22)</td><td><code>mod.rs</code> inline</td><td>task runner, editorconfig, docs status page, openspec inclusion, AI instructions, llms.txt, ubiquitous language, skills, config sync, gh CLI, pretender, CI/CD, devcontainer, test coverage, beads, openspec, …</td><td>genesis CheckStatus</td><td>external binaries (gh, etc.)</td></tr>
+<tr><td>git hooks</td><td><code>hooks.rs</code></td><td><code>check_git_hooks</code></td><td>genesis CheckStatus</td><td><code>.git/hooks</code>, lefthook config</td></tr>
+<tr><td>linting</td><td><code>linting.rs</code></td><td><code>check_typos</code>, <code>check_vale</code>, <code>check_shell_linting</code></td><td>genesis CheckStatus</td><td>external binaries (typos, vale, shellcheck)</td></tr>
+<tr><td>release</td><td><code>release.rs</code></td><td><code>check_release_pipeline</code></td><td>genesis CheckStatus</td><td>CI config files</td></tr>
+<tr><td>fix target</td><td><code>mod.rs</code> <code>fix_skills</code></td><td>repairs skill files using embedded <code>.md</code> templates</td><td>—</td><td>filesystem (write)</td></tr>
+</tbody>
+</table>
+
+<h2>Wiring graph</h2>
+<pre class="mermaid">
+graph LR
+  run["way::run()"] --> checks["22 inline checks (mod.rs)"]
+  run --> hooks["hooks.rs"]
+  run --> lint["linting.rs"]
+  run --> release["release.rs"]
+  lint -- "spawns" --> bins["typos / vale / shellcheck"]
+  hooks -- "reads" --> git[".git/hooks"]
+  run -- "CheckStatus model" --> genesis["genesis-vibes"]
+  run -- "fix skills" --> tmpl["embedded .md templates"]
+</pre>
+<details><summary>Mermaid source</summary>
+<pre class="mermaid-source">graph LR
+  run["way::run()"] --> checks["22 inline checks (mod.rs)"]
+  run --> hooks["hooks.rs"]
+  run --> lint["linting.rs"]
+  run --> release["release.rs"]
+  lint -- "spawns" --> bins["typos / vale / shellcheck"]
+  hooks -- "reads" --> git[".git/hooks"]
+  run -- "CheckStatus model" --> genesis["genesis-vibes"]
+  run -- "fix skills" --> tmpl["embedded .md templates"]
+</pre>
+</details>
+
+<h2>Structural observations</h2>
+<ul>
+  <li><code>way/mod.rs</code> at 2,975 lines is the largest file in <code>src/</code> — ~9× the file-size median (328, n=65) and ~3× the next-largest module file</li>
+  <li>All 22 checks return the shared <code>CheckStatus</code> from genesis; the district adds no check model of its own</li>
+  <li>Exit-code discipline: <code>run</code> always exits 0 (<code>mod.rs</code> comment) — recommendations, not requirements, unlike <code>doctor</code></li>
+  <li>External binary probes (typos, vale, shellcheck, gh) are executed from <code>linting.rs</code>/<code>mod.rs</code> — the only subprocess linters in the district</li>
+</ul>
+
+<h2>Key Relationships</h2>
+<ul>
+  <li><code>way → genesis CheckStatus</code> — check model fully delegated to shared crate</li>
+  <li><code>way/mod.rs → external binaries</code> — quality gates evaluated by spawning tools, not reimplementing them</li>
+  <li><code>way → repo root</code> — operates on any git repo (no <code>.wai/</code> requirement), unlike every other command</li>
+</ul>
+
+<h2>Open Questions</h2>
+<ul>
+  <li>Is the 2,975-line <code>mod.rs</code> (22 inline checks) a deliberate single-file-per-check convention, or accumulated growth?</li>
+</ul>
+
+<h2>Adjacent levels offered</h2>
+<p>Micro trace of one check (e.g., <code>check_agent_config_sync</code> reuse vs <code>doctor</code>'s version) available on request.</p>
+
+<footer>Artifact of record: <code>cartography-meso-way.md</code> (same directory).</footer>
+<script src="assets/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true });</script>
+</body>
+</html>

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cartography — wai sync (micro)</title>
+<link rel="stylesheet" href="assets/cartography.css">
+</head>
+<body>
+<nav><a href="index.html">← Index</a> | Parent: <a href="cartography-macro-wai.html">macro — wai src/</a> · <a href="cartography-meso-commands.html">meso — commands district</a></nav>
+
+<h1>Cartography — micro trace: <code>wai sync</code></h1>
+<p class="meta"><strong>Entry zoom level:</strong> micro (functionality trace)<br>
+<strong>Scope covered:</strong> <code>src/commands/sync.rs</code> (344) + <code>src/sync_core.rs</code> (1,102)</p>
+
+<h2>Entry point</h2>
+<p><code>pub fn run(status_only: bool, dry_run: bool, from_main: bool)</code> — <code>src/commands/sync.rs:94</code></p>
+
+<h2>Call chain</h2>
+<pre><code> 1. sync::run(...)                   commands/sync.rs:94
+ 2. require_project()                config                     [I/O: fs]
+ 3. ── from_main? ── run_from_main() commands/sync.rs:235       [I/O: git checkout main first]
+ 4. read .projections.yml            commands/sync.rs:101-110   [I/O: fs; serde_yml parse]
+ 5. empty-config early exit          commands/sync.rs:116-127
+ 6. ── status_only? ── claude_code_needs_sync()  commands/sync.rs:25  [I/O: fs mtime compare]
+ 7. dispatch per projection target:
+      claude-code     → sync_core::execute_claude_code()        [I/O: fs symlink/write]
+      agents-projection → sync_core::execute_agents_projection() [I/O: fs symlink/write]
+      strategy match  → sync_core::execute_symlink / inline /
+                        reference / copy   sync.rs:212-215      [I/O: fs symlink/write]
+</code></pre>
+
+<h2>Data flow</h2>
+<pre><code>.wai/resources/agent-config/.projections.yml (declarative: target, strategy, sources)
+  → ProjectionsConfig (parsed in sync.rs itself)
+  → per-projection: source files under agent-config dir
+  → sync_core strategies create/refresh symlinks or write inlined/referenced copies
+  → projected artifacts land in .claude/commands/ (claude-code) or AGENTS.md targets
+</code></pre>
+
+<h2>Structural observations</h2>
+<ul>
+  <li><code>sync.rs</code> defines its own <code>ProjectionsConfig</code> struct (<code>sync.rs:14</code>) while <code>doctor/checks_sync.rs</code> defines a second, parallel one (<code>checks_sync.rs:13</code>) — the projection schema has 2 parsers + 3 modeling sites (with <code>sync_core::Projection</code>)</li>
+  <li><code>claude_code_needs_sync</code> (<code>sync.rs:21</code> doc) deliberately mirrors <code>sync_core::execute_claude_code</code> traversal logic — a documented, hand-maintained parallel implementation</li>
+  <li><code>doctor/checks_sync.rs</code> verifies health by re-issuing <code>sync_core::execute_*</code> calls as dry-run probes (<code>checks_sync.rs:130-140</code>) — sync core doubles as the check oracle</li>
+  <li>Strategy set is closed: symlink | inline | reference | copy, matched in both <code>sync.rs</code> and <code>checks_sync.rs</code></li>
+  <li>Core helpers are private (<code>check_unmanaged_dir</code>, <code>symlink_file_up_to_date</code>, <code>sync_core.rs:42-113</code>); public surface is the <code>execute_*</code> family</li>
+</ul>
+
+<h2>Adjacent levels offered</h2>
+<p>Micro trace of a single strategy (<code>execute_symlink</code> up-to-date checks) or the doctor check that dry-runs it.</p>
+
+<footer>Artifact of record: <code>cartography-micro-sync.md</code> (same directory).</footer>
+</body>
+</html>

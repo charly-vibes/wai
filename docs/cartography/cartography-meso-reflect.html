@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cartography — commands/reflect (meso)</title>
+<link rel="stylesheet" href="assets/cartography.css">
+</head>
+<body>
+<nav><a href="index.html">← Index</a> | Parent: <a href="cartography-macro-wai.html">macro — wai src/</a></nav>
+
+<h1>Cartography — <code>commands/reflect/</code> (wai)</h1>
+<p class="meta"><strong>Entry zoom level:</strong> meso (module wiring)<br>
+<strong>Scope covered:</strong> <code>src/commands/reflect/</code> — <code>mod.rs</code> (855), <code>context.rs</code> (612), <code>meta.rs</code> (315)</p>
+
+<h2>Parent context</h2>
+<p><code>reflect/</code> is a submodule of the <code>commands</code> district. Like <code>why/</code>, it consumes the <code>llm</code> service (one of only two network-capable command paths) and writes new artifacts back into the <code>.wai/</code> store.</p>
+
+<h2>Component table</h2>
+<table>
+<thead><tr><th>Component</th><th>Path</th><th>Role</th><th>Talks to (internal)</th><th>External ports</th></tr></thead>
+<tbody>
+<tr><td>entry</td><td><code>mod.rs</code> <code>run(ReflectArgs)</code></td><td>Gather context → LLM reflection → persist meta/resource; <code>AGENT_SENTINEL</code> passthrough (<code>mod.rs:17</code> imports)</td><td><code>context.rs</code>, <code>meta.rs</code>, <code>llm</code>, <code>config</code></td><td>—</td></tr>
+<tr><td>context</td><td><code>context.rs</code> <code>gather_reflect_context()</code> (<code>context.rs:296</code>)</td><td>Conversation transcript (budgeted), handoffs, secondary artifacts, previous reflections</td><td>config</td><td>filesystem, conversation file</td></tr>
+<tr><td>budget helpers</td><td><code>context.rs</code></td><td><code>truncate_from_top</code>, <code>read_handoffs</code>, <code>read_secondary_artifacts</code>, <code>read_previous_reflections</code>, <code>count_handoffs_since</code></td><td>—</td><td>filesystem (read)</td></tr>
+<tr><td>meta</td><td><code>meta.rs</code></td><td><code>read/write_reflect_meta</code>, <code>write_reflect_resource</code>, <code>predict_reflect_resource_path</code></td><td>config</td><td>filesystem (write)</td></tr>
+</tbody>
+</table>
+
+<h2>Wiring graph</h2>
+<pre class="mermaid">
+graph LR
+  run["reflect::run()"] --> ctx["context.rs gather_reflect_context"]
+  ctx -- "reads" --> fs1[("conversation + .wai/ handoffs, reflections")]
+  run --> llm["llm.rs detect_backend / complete"]
+  run --> meta["meta.rs write_reflect_meta"]
+  meta -- "writes" --> fs2[(".wai/ reflection artifacts")]
+</pre>
+<details><summary>Mermaid source</summary>
+<pre class="mermaid-source">graph LR
+  run["reflect::run()"] --> ctx["context.rs gather_reflect_context"]
+  ctx -- "reads" --> fs1[("conversation + .wai/ handoffs, reflections")]
+  run --> llm["llm.rs detect_backend / complete"]
+  run --> meta["meta.rs write_reflect_meta"]
+  meta -- "writes" --> fs2[(".wai/ reflection artifacts")]
+</pre>
+</details>
+
+<h2>Structural observations</h2>
+<ul>
+  <li>Budget-driven context assembly: every input source (conversation, handoffs, artifacts, previous reflections) is truncated to a character budget before prompt assembly — pure functions on strings (<code>context.rs:66</code>)</li>
+  <li>Mirrors <code>why/</code> structure (entry + context + persistence split) but adds the write-back path via <code>meta.rs</code> — <code>why/</code> only reads</li>
+  <li><code>run</code> tolerates a missing project (falls back to <code>None</code> rather than erroring, <code>mod.rs</code> comment) — unlike most commands which <code>require_project()</code></li>
+  <li>Writes go through <code>predict_reflect_resource_path</code> — output location computed, not discovered</li>
+</ul>
+
+<h2>Key Relationships</h2>
+<ul>
+  <li><code>reflect → llm.rs</code> — same backend abstraction as <code>why/</code> (claude-cli / ollama / API)</li>
+  <li><code>reflect → .wai/ artifacts</code> — reads prior reflections and handoffs, writes new reflection artifacts (feedback loop into its own future context)</li>
+  <li><code>reflect/meta → config</code> — path resolution through the shared project model</li>
+</ul>
+
+<h2>Open Questions</h2>
+<ul>
+  <li><code>why/</code> and <code>reflect/</code> share the gather-context → backend → format shape — is a shared prompt-assembly helper deliberately avoided?</li>
+</ul>
+
+<h2>Adjacent levels offered</h2>
+<p>Micro trace of <code>wai reflect</code> (context budgets → LLM call → meta write) available on request.</p>
+
+<footer>Artifact of record: <code>cartography-meso-reflect.md</code> (same directory).</footer>
+<script src="assets/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true });</script>
+</body>
+</html>

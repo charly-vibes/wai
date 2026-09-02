@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cartography — wai (macro)</title>
+<link rel="stylesheet" href="assets/cartography.css">
+</head>
+<body>
+<nav><a href="index.html">← Index</a> | Adjacent level: <a href="cartography-meso-commands.html">meso — commands district</a></nav>
+
+<h1>Cartography — wai (<code>src/</code>)</h1>
+<p class="meta"><strong>Entry zoom level:</strong> macro (whole-system topology)<br>
+<strong>Scope covered:</strong> <code>src/*.rs</code> (22 top-level modules, ~9.6k lines), <code>src/commands/</code> (19 flat command modules + 7 submodules, ~6.6k lines, ~29 dispatched CLI commands), <code>Cargo.toml</code>, <code>tests/</code> layout</p>
+
+<h2>Module inventory</h2>
+<table>
+<thead><tr><th>Module</th><th>Path</th><th>Responsibility (from evidence)</th><th>Deps out →</th><th>Fan-in (≈)</th></tr></thead>
+<tbody>
+<tr><td>config</td><td><code>src/config.rs</code></td><td>User/project config, project root discovery</td><td>error, genesis</td><td>58</td></tr>
+<tr><td>context</td><td><code>src/context.rs</code></td><td>Thread-local CLI flags (json, no_input, yes, safe, quiet)</td><td>error</td><td>45</td></tr>
+<tr><td>plugin</td><td><code>src/plugin.rs</code></td><td>Plugin model shared by sync/doctor/commands</td><td>error, context, config</td><td>30</td></tr>
+<tr><td>error</td><td><code>src/error.rs</code></td><td><code>WaiError</code> + miette diagnostics</td><td>—</td><td>19</td></tr>
+<tr><td>state</td><td><code>src/state.rs</code></td><td>Phase enum (Research→Archive), project state files</td><td>error</td><td>22</td></tr>
+<tr><td>json</td><td><code>src/json.rs</code></td><td>JSON output envelope helpers</td><td>config</td><td>21</td></tr>
+<tr><td>output</td><td><code>src/output.rs</code></td><td>Output rendering (genesis envelope)</td><td>genesis</td><td>17</td></tr>
+<tr><td>managed_block</td><td><code>src/managed_block.rs</code></td><td>Managed marker blocks in AGENTS.md</td><td>genesis</td><td>12</td></tr>
+<tr><td>workspace</td><td><code>src/workspace.rs</code></td><td><code>.wai/</code> workspace layout ops</td><td>plugin, managed_block, config, genesis</td><td>8</td></tr>
+<tr><td>workflows</td><td><code>src/workflows.rs</code></td><td>Workflow definitions</td><td>state, json, config</td><td>4</td></tr>
+<tr><td>openspec</td><td><code>src/openspec.rs</code></td><td>OpenSpec integration</td><td>config</td><td>4</td></tr>
+<tr><td>freshness</td><td><code>src/freshness.rs</code></td><td>Project freshness/staleness signals</td><td>—</td><td>1</td></tr>
+<tr><td>sync_core</td><td><code>src/sync_core.rs</code></td><td>Core sync logic (agent-tool projection)</td><td>error, context</td><td>2</td></tr>
+<tr><td>llm</td><td><code>src/llm.rs</code></td><td>LLM calls — <strong>only network I/O (reqwest+tokio)</strong></td><td>config</td><td>2</td></tr>
+<tr><td>guided_flows</td><td><code>src/guided_flows.rs</code></td><td>Interactive guided flows</td><td>—</td><td>1</td></tr>
+<tr><td>tutorial / help</td><td><code>src/tutorial.rs</code>, <code>src/help.rs</code></td><td>Onboarding + help rendering</td><td>config</td><td>low</td></tr>
+<tr><td>commands</td><td><code>src/commands/</code></td><td>CLI command handlers (19 flat modules + 7 submodules)</td><td>(see meso)</td><td>entry</td></tr>
+<tr><td>cli / main</td><td><code>src/cli.rs</code>, <code>src/main.rs</code></td><td>Clap arg model; binary entry</td><td>genesis</td><td>13 (all in commands)</td></tr>
+<tr><td>lib</td><td><code>src/lib.rs</code></td><td>Public API for tests/external crates; re-exports <code>genesis::suggestions</code></td><td>—</td><td>—</td></tr>
+</tbody>
+</table>
+
+<h2>Dependency matrix (DSM)</h2>
+<p>Rows depend on columns. Inferred layering: <strong>core</strong> (error, config, context, state, json, plugin) ← <strong>services</strong> (workspace, sync_core, llm, workflows, openspec, freshness, managed_block, output…) ← <strong>commands</strong> ← <strong>cli/main</strong>. Inference labeled: derived from majority direction; no declared ARCHITECTURE doc found.</p>
+<pre><code>            error  config  context  state  json  plugin  services  commands  cli
+error         —
+config        ✦       —
+context       ✦               —
+state/json/   ✦       ✦                              —
+plugin
+services      ✦       ✦       ✦       ✦      ✦     ✦        —
+commands      ✦       ✦       ✦       ✦      ✦     ✦        ✦        —      ✦
+cli/main                      ✦                     ✦        ✦       ✦      —</code></pre>
+<p>No <span class="up">↑</span> layer-skips observed: no core module imports services or commands; <code>cli</code> is imported only by <code>commands/*</code> (13 files).</p>
+
+<h2>Module graph</h2>
+<pre class="mermaid">
+graph TD
+  subgraph core
+    error
+    config
+    context
+    state
+    json
+    plugin
+  end
+  subgraph services
+    workspace
+    sync_core
+    llm
+    managed_block
+    output
+    workflows
+    openspec
+    freshness
+  end
+  commands -->|"config 33, context 26, plugin 17, cli 13"| core
+  commands -->|"state 11, json 11, output 10, managed_block 11, workspace 6"| services
+  commands -->|"sync_core 1, llm 2, workflows 2, openspec 2, freshness 1"| services
+  workspace --> plugin
+  main --> commands
+  main -. "genesis-vibes (external, 20 files)" .-> genesis
+</pre>
+<details><summary>Mermaid source</summary>
+<pre class="mermaid-source">graph TD
+  subgraph core
+    error
+    config
+    context
+    state
+    json
+    plugin
+  end
+  subgraph services
+    workspace
+    sync_core
+    llm
+    managed_block
+    output
+    workflows
+    openspec
+    freshness
+  end
+  commands -->|"config 33, context 26, plugin 17, cli 13"| core
+  commands -->|"state 11, json 11, output 10, managed_block 11, workspace 6"| services
+  commands -->|"sync_core 1, llm 2, workflows 2, openspec 2, freshness 1"| services
+  workspace --> plugin
+  main --> commands
+  main -. "genesis-vibes (external, 20 files)" .-> genesis
+</pre>
+</details>
+
+<h2>Child detail (meso): the <code>commands</code> district</h2>
+<ul>
+  <li><strong>Dispatcher:</strong> <code>commands/mod.rs</code> maps <code>Commands</code> enum variants → <code>run()</code> handlers (<code>src/commands/mod.rs:41</code>).</li>
+  <li><strong>Command groups:</strong> flat files (init, status, new, add, sync, prime, …) plus 7 submodules: <code>doctor/</code> (3 files), <code>pipeline/</code> (6 files), <code>why/</code> (3), <code>way/</code> (6), <code>reflect/</code> (3), <code>resource/</code> (5), <code>artifacts/</code> (1).</li>
+  <li><strong>Horizontal wiring:</strong> 8 <code>use crate::commands</code> imports: 6 are shared-helper reuse (<code>require_project</code> by <code>pipeline/queries.rs:18</code>, <code>pipeline/orchestration.rs:16</code>, <code>pipeline/setup.rs:10</code>, <code>resource/skills.rs:12</code>, <code>resource/archive.rs:15</code>, plus <code>commands/mod.rs</code> internals); 2 are cross-feature logic reuse (<code>doctor/checks_basic.rs:519,560 → why</code> badge fns; <code>way/mod.rs:13 → resource::parse_skill_frontmatter</code>). No bypass of <code>mod.rs</code> dispatch observed.</li>
+  <li><strong>Heaviest handlers:</strong> <code>prime.rs</code> and <code>status.rs</code> (9 crate-imports each), <code>doctor/mod.rs</code> (17), <code>new.rs</code> (8).</li>
+</ul>
+
+<h2>Key Relationships</h2>
+<ul>
+  <li><code>commands → config</code> (33 call sites) — every command resolves project root/config first</li>
+  <li><code>commands → context</code> (26) — global CLI-flag access via thread-local (<code>src/context.rs:17</code>)</li>
+  <li><code>commands → plugin</code> (30) — plugin model is the shared vocabulary of doctor/sync/way</li>
+  <li><code>wai → genesis-vibes</code> (external crate, 20 files) — suggestions, envelope, managed_block, doctor checks come from the shared genesis library</li>
+  <li><code>llm.rs</code> is the sole network I/O surface (reqwest/tokio); everything else is filesystem + process I/O</li>
+</ul>
+
+<h2>Structural Observations</h2>
+<ul>
+  <li>Clean layering: dependencies point strictly downward (core ← services ← commands ← cli); no cycles detected among top-level modules</li>
+  <li>Hub modules by fan-in: <code>config</code> (≈58), <code>context</code> (≈45), <code>plugin</code> (≈30)</li>
+  <li>Near-orphans (fan-in ≤2): <code>freshness</code>, <code>guided_flows</code>, <code>sync_core</code>, <code>llm</code> — each serves one or two commands</li>
+  <li>Dual entry: <code>main.rs</code> (binary) vs <code>lib.rs</code> (library for tests/external crates), with <code>lib.rs</code> re-exporting <code>genesis::suggestions</code> verbatim</li>
+  <li><code>templates/</code> (TOML pipeline templates: <code>scientific-research</code>, <code>tdd-ro5</code>) ships as data alongside code; <code>tests/</code> has 24 per-command <code>*_test.rs</code> integration files plus <code>integration.rs</code></li>
+  <li><code>crate::cli</code> is imported only by <code>commands/*</code> (13 files) — verified by targeted scan; an earlier bulk-scan discrepancy was a faulty <code>!commands/**</code> exclusion glob, since resolved</li>
+</ul>
+
+<h2>Open Questions</h2>
+<ul>
+  <li>Is <code>freshness.rs</code> (fan-in 1) intended to grow into a shared service, or is it status-specific?</li>
+</ul>
+
+<h2>Adjacent levels offered</h2>
+<p>Meso maps of each <code>commands/</code> submodule available (see index); micro traces of <code>wai prime</code>, <code>wai sync</code>, <code>wai why</code> available.</p>
+
+<footer>Artifact of record: <code>cartography-macro-wai.md</code> (same directory). Diagrams render locally via vendored Mermaid; source is preserved in the collapsible block above.</footer>
+<script src="assets/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true });</script>
+</body>
+</html>

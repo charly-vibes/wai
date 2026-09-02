@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cartography — commands/resource (meso)</title>
+<link rel="stylesheet" href="assets/cartography.css">
+</head>
+<body>
+<nav><a href="index.html">← Index</a> | Parent: <a href="cartography-macro-wai.html">macro — wai src/</a></nav>
+
+<h1>Cartography — <code>commands/resource/</code> (wai)</h1>
+<p class="meta"><strong>Entry zoom level:</strong> meso (module wiring)<br>
+<strong>Scope covered:</strong> <code>src/commands/resource/</code> — <code>skills.rs</code> (814), <code>archive.rs</code> (470), <code>metadata.rs</code> (248), <code>validation.rs</code> (242), <code>mod.rs</code> (72)</p>
+
+<h2>Parent context</h2>
+<p><code>resource/</code> is a submodule of the <code>commands</code> district implementing the <code>wai resource</code> / <code>wai add skill</code> surface: CRUD for <code>.wai/</code> resources (research, skills, memories) with import/export.</p>
+
+<h2>Component table</h2>
+<table>
+<thead><tr><th>Component</th><th>Path</th><th>Role</th><th>Talks to (internal)</th><th>External ports</th></tr></thead>
+<tbody>
+<tr><td>dispatcher</td><td><code>mod.rs</code></td><td>Thin: <code>run_add</code>, <code>run_list</code>, <code>run_import</code>, <code>run_install</code>, <code>run_export</code> (<code>mod.rs:21-70</code>)</td><td>skills, archive, validation</td><td>—</td></tr>
+<tr><td>skills</td><td><code>skills.rs</code></td><td><code>add_skill(name, template)</code> and skill management; largest file</td><td>metadata, validation</td><td>filesystem (<code>.wai/resources/</code>), embedded templates</td></tr>
+<tr><td>archive</td><td><code>archive.rs</code></td><td>Archive/restore resources</td><td>metadata</td><td>filesystem (archive dirs)</td></tr>
+<tr><td>metadata</td><td><code>metadata.rs</code></td><td><code>parse_skill_frontmatter</code> — skill YAML frontmatter model</td><td>—</td><td>filesystem (read)</td></tr>
+<tr><td>validation</td><td><code>validation.rs</code></td><td><code>validate_skill_name</code> (slug rules)</td><td>—</td><td>— (pure-ish)</td></tr>
+<tr><td>import/export</td><td><code>mod.rs</code> + <code>archive.rs</code></td><td>tar-based packaging (cargo <code>tar</code>, <code>pathdiff</code>)</td><td>metadata</td><td>tar archives, filesystem</td></tr>
+</tbody>
+</table>
+
+<h2>Wiring graph</h2>
+<pre class="mermaid">
+graph LR
+  dispatcher["mod.rs (thin)"] --> skills
+  dispatcher --> archive
+  skills --> metadata["metadata.rs frontmatter"]
+  skills --> validation["validation.rs"]
+  archive --> metadata
+  skills -- "reads templates" --> tmpl["skill templates"]
+  archive -- "tar in/out" --> io[("archives")]
+</pre>
+<details><summary>Mermaid source</summary>
+<pre class="mermaid-source">graph LR
+  dispatcher["mod.rs (thin)"] --> skills
+  dispatcher --> archive
+  skills --> metadata["metadata.rs frontmatter"]
+  skills --> validation["validation.rs"]
+  archive --> metadata
+  skills -- "reads templates" --> tmpl["skill templates"]
+  archive -- "tar in/out" --> io[("archives")]
+</pre>
+</details>
+
+<h2>Structural observations</h2>
+<ul>
+  <li>Thinnest dispatcher in the district (72 lines) — entry logic lives in the feature files, inverse of <code>doctor</code>/<code>way</code>/<code>pipeline</code></li>
+  <li><code>skills.rs</code> at 814 lines is ~2.5× the file-size median (328, n=65) — the district's weight center</li>
+  <li>Validation is isolated as a pure function with its own file — the only validation logic separated from I/O in <code>commands/</code></li>
+  <li>Import/export is the only use of the <code>tar</code>/<code>pathdiff</code> dependencies outside <code>sync_core</code></li>
+</ul>
+
+<h2>Key Relationships</h2>
+<ul>
+  <li><code>resource → .wai/resources/</code> — the same artifact store that <code>why</code>/<code>reflect</code> read for context</li>
+  <li><code>skills → metadata</code> — frontmatter parsing is the shared contract between add, list, import, export</li>
+  <li><code>archive ↔ metadata</code> — archive round-trips validate through the same frontmatter model</li>
+</ul>
+
+<h2>Open Questions</h2>
+<ul>
+  <li>Is <code>add_skill</code> in <code>skills.rs</code> (also reachable as <code>wai add skill</code>) the same handler invoked by <code>commands/add.rs</code>, or a duplicated path?</li>
+</ul>
+
+<h2>Adjacent levels offered</h2>
+<p>Micro trace of <code>wai resource import</code> (tar → frontmatter validation → resource write) available on request.</p>
+
+<footer>Artifact of record: <code>cartography-meso-resource.md</code> (same directory).</footer>
+<script src="assets/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true });</script>
+</body>
+</html>

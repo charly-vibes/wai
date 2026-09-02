@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cartography — structural health check: wai src/</title>
+<link rel="stylesheet" href="assets/cartography.css">
+</head>
+<body>
+<nav><a href="index.html">← Index</a> | Additive to: <a href="cartography-macro-wai.html">macro — wai src/</a></nav>
+
+<h1>Cartography — structural health check: wai <code>src/</code></h1>
+<p class="meta"><strong>Entry zoom level:</strong> health check (additive to macro)<br>
+<strong>Scope covered:</strong> all 65 <code>.rs</code> files under <code>src/</code> (cycles, God Object, Shotgun Surgery, Feature Envy, Deep Inheritance, Pure/Impure Entanglement, Broken Composition)</p>
+<p><strong>Baseline used:</strong> n=65 files, median size <strong>328 lines</strong>, p90=1,101, max=2,975. Repo is small-to-medium; thresholds applied relative to this baseline.</p>
+
+<h2>Findings</h2>
+<pre><code>[SHOTGUN SURGERY] severity: medium
+Evidence: projection-config concept modeled in 3 files, parsed in 2:
+  - commands/sync.rs:14        (own ProjectionsConfig + serde_yml parse)
+  - commands/doctor/checks_sync.rs:13-21  (own ProjectionsConfig/ProjectionEntry)
+  - sync_core.rs:17            (pub(crate) Projection)
+  sync.rs:212-215 and checks_sync.rs:130-140 both match the same closed
+  strategy set (symlink|inline|reference|copy).
+Quantity: 3 modeling sites / 2 parsers / 2 strategy matches
+</code></pre>
+<pre><code>[GOD OBJECT] severity: medium (weak-baseline caveat: small repo)
+Evidence + quantity (lines, ×median=328):
+  - commands/way/mod.rs       2,975  (9.1× median; 22 inline check fns)
+  - commands/doctor/mod.rs    1,959  (6.0×; ~10 inline check fns + entry/fix/render)
+  - commands/pipeline/mod.rs  1,920  (5.9×; dispatcher + 2 inline commands)
+  - commands/why/mod.rs       1,163  (3.5×)
+Importers: these are command entries (fan-in from dispatcher only), so the
+size signal is not compounded by fan-in — severity capped at medium.
+</code></pre>
+<pre><code>[PURE/IMPURE ENTANGLEMENT] severity: low (idiomatic for CLI handlers)
+Evidence: run() handlers mix parsing, I/O, and println rendering directly
+  (e.g., commands/prime.rs:25-193, commands/sync.rs:94-233).
+Counter-evidence: pure cores exist where tested — why/parsing.rs (pure),
+  prime.rs:574-603 phase/pipeline matching (pure), resource/validation.rs.
+Quantity: pervasive at entry level only; service layer (sync_core, llm, state)
+  keeps I/O concentrated.
+</code></pre>
+
+<h2>Patterns checked, no findings</h2>
+<ul>
+  <li><strong>Circular dependencies</strong> — mutual-import scan across all files: none. Dependency direction is strictly downward (core ← services ← commands).</li>
+  <li><strong>Deep inheritance</strong> — no <code>extends</code>-style chains; trait usage is shallow (<code>LlmClient</code> single-impl dispatch).</li>
+  <li><strong>Broken composition (layer-skipping)</strong> — no <span class="up">↑</span> marks in the macro DSM; <code>cli</code> imported only by <code>commands/*</code> (13 files); no core module imports services/commands.</li>
+  <li><strong>Feature Envy</strong> — none exceeding 2× threshold; command files import several core modules roughly evenly (config/context/state/json), consistent with dispatcher-style handlers.</li>
+  <li><strong>Orphan modules</strong> — near-orphans (<code>freshness</code>, <code>guided_flows</code>, fan-in 1) noted in macro report; low severity, single-consumer by design.</li>
+</ul>
+
+<h2>Notes</h2>
+<ul>
+  <li>The two God-Object candidates (<code>way/mod.rs</code>, <code>doctor/mod.rs</code>) share a shape: N inline check functions in the module's <code>mod.rs</code>. The 22-check inline list in <code>way/mod.rs:74-97</code> is the structural pattern's clearest instance.</li>
+  <li>Findings are facts about structure; no fixes proposed per skill scope.</li>
+</ul>
+
+<footer>Artifact of record: <code>cartography-health-wai.md</code> (same directory).</footer>
+</body>
+</html>

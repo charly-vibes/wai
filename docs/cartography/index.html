@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cartography — wai (index)</title>
+<link rel="stylesheet" href="assets/cartography.css">
+</head>
+<body>
+<h1>Cartography — wai</h1>
+<p class="meta">Reports in <code>docs/cartography/</code> — self-contained, offline-safe. Markdown files are the artifacts of record; HTML pages are the shareable view. Open via <code>file://</code> — no server needed; diagrams render via the vendored Mermaid asset.</p>
+
+<h2>Macro</h2>
+<ul>
+  <li><a href="cartography-macro-wai.html">wai src/</a> — whole-system topology: <code>src/*.rs</code> (22 top-level modules, ~9.6k lines), <code>src/commands/</code> (19 flat command modules + 7 submodules, ~6.6k lines, ~29 dispatched CLI commands)</li>
+</ul>
+
+<h2>Meso</h2>
+<ul>
+  <li><a href="cartography-meso-commands.html">commands district</a> — <code>src/commands/</code> — <code>mod.rs</code>, 19 flat command modules, 7 submodules (~6.6k lines, ~29 dispatched CLI commands)</li>
+  <li><a href="cartography-meso-doctor.html">commands/doctor</a> — <code>src/commands/doctor/</code> — <code>mod.rs</code> (1,959), <code>checks_basic.rs</code> (727), <code>checks_sync.rs</code> (489)</li>
+  <li><a href="cartography-meso-pipeline.html">commands/pipeline</a> — <code>src/commands/pipeline/</code> — <code>mod.rs</code> (1,920), <code>gates.rs</code> (758), <code>queries.rs</code> (596), <code>orchestration.rs</code> (415), <code>definition.rs</code> (157), <code>setup.rs</code> (146)</li>
+  <li><a href="cartography-meso-reflect.html">commands/reflect</a> — <code>src/commands/reflect/</code> — <code>mod.rs</code> (855), <code>context.rs</code> (612), <code>meta.rs</code> (315)</li>
+  <li><a href="cartography-meso-resource.html">commands/resource</a> — <code>src/commands/resource/</code> — <code>skills.rs</code> (814), <code>archive.rs</code> (470), <code>metadata.rs</code> (248), <code>validation.rs</code> (242), <code>mod.rs</code> (72)</li>
+  <li><a href="cartography-meso-way.html">commands/way</a> — <code>src/commands/way/</code> — <code>mod.rs</code> (2,975), <code>hooks.rs</code> (516), <code>linting.rs</code> (317), <code>release.rs</code> (144), plus 2 embedded skill markdown templates</li>
+  <li><a href="cartography-meso-why.html">commands/why</a> — <code>src/commands/why/</code> — <code>mod.rs</code> (1,163), <code>context.rs</code> (623), <code>parsing.rs</code> (387)</li>
+</ul>
+
+<h2>Micro</h2>
+<ul>
+  <li><a href="cartography-micro-prime.html">wai prime</a> — <code>src/commands/prime.rs</code> (621 lines) + services it calls</li>
+  <li><a href="cartography-micro-sync.html">wai sync</a> — <code>src/commands/sync.rs</code> (344) + <code>src/sync_core.rs</code> (1,102)</li>
+  <li><a href="cartography-micro-why.html">wai why (network path)</a> — <code>src/commands/why/{mod,context}.rs</code> + <code>src/llm.rs</code> — wai's only network I/O path</li>
+</ul>
+
+<h2>Health check</h2>
+<ul>
+  <li><a href="cartography-health-wai.html">wai src/ (health)</a> — all 65 <code>.rs</code> files under <code>src/</code> (cycles, God Object, Shotgun Surgery, Feature Envy, Deep Inheritance, Pure/Impure Entanglement, Broken Composition)</li>
+</ul>
+
+<h2>Markdown reports (artifacts of record)</h2>
+<ul>
+  <li><a href="cartography-macro-wai.md">cartography-macro-wai.md</a></li>
+  <li><a href="cartography-meso-commands.md">cartography-meso-commands.md</a></li>
+  <li><a href="cartography-meso-doctor.md">cartography-meso-doctor.md</a></li>
+  <li><a href="cartography-meso-pipeline.md">cartography-meso-pipeline.md</a></li>
+  <li><a href="cartography-meso-reflect.md">cartography-meso-reflect.md</a></li>
+  <li><a href="cartography-meso-resource.md">cartography-meso-resource.md</a></li>
+  <li><a href="cartography-meso-way.md">cartography-meso-way.md</a></li>
+  <li><a href="cartography-meso-why.md">cartography-meso-why.md</a></li>
+  <li><a href="cartography-micro-prime.md">cartography-micro-prime.md</a></li>
+  <li><a href="cartography-micro-sync.md">cartography-micro-sync.md</a></li>
+  <li><a href="cartography-micro-why.md">cartography-micro-why.md</a></li>
+  <li><a href="cartography-health-wai.md">cartography-health-wai.md</a></li>
+</ul>
+
+<footer>Regeneration path: re-run the codebase-cartography skill — there is no build pipeline by design. Reports are evidence snapshots; re-verify counts before relying on them.</footer>
+</body>
+</html>

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cartography — commands/pipeline (meso)</title>
+<link rel="stylesheet" href="assets/cartography.css">
+</head>
+<body>
+<nav><a href="index.html">← Index</a> | Parent: <a href="cartography-macro-wai.html">macro — wai src/</a></nav>
+
+<h1>Cartography — <code>commands/pipeline/</code> (wai)</h1>
+<p class="meta"><strong>Entry zoom level:</strong> meso (module wiring)<br>
+<strong>Scope covered:</strong> <code>src/commands/pipeline/</code> — <code>mod.rs</code> (1,920), <code>gates.rs</code> (758), <code>queries.rs</code> (596), <code>orchestration.rs</code> (415), <code>definition.rs</code> (157), <code>setup.rs</code> (146)</p>
+
+<h2>Parent context</h2>
+<p><code>pipeline/</code> is a submodule of the <code>commands</code> district, dispatched through <code>commands/mod.rs</code>. It implements the pipeline lifecycle (<code>wai pipeline start/gates/…</code>) backed by TOML templates shipped in <code>src/templates/</code>.</p>
+
+<h2>Component table</h2>
+<table>
+<thead><tr><th>Component</th><th>Path</th><th>Role</th><th>Talks to (internal)</th><th>External ports</th></tr></thead>
+<tbody>
+<tr><td>dispatcher</td><td><code>mod.rs</code> <code>run(PipelineCommands)</code></td><td>14 subcommands → cmd fns (<code>mod.rs:187</code>)</td><td>queries, orchestration, setup, definition</td><td>—</td></tr>
+<tr><td><code>cmd_status</code> / <code>cmd_verify</code></td><td><code>mod.rs</code></td><td>status delegates to <code>queries::cmd_current</code>; verify walks <code>.lock</code> files with walkdir</td><td>queries</td><td>filesystem (<code>.wai/projects/**/*.lock</code>)</td></tr>
+<tr><td>definitions</td><td><code>definition.rs</code></td><td>TOML pipeline definition model</td><td>—</td><td><code>src/templates/*.toml</code> (tdd-ro5, scientific-research)</td></tr>
+<tr><td>gates</td><td><code>gates.rs</code></td><td>Gate enforcement logic (largest submodule file)</td><td>definition</td><td>filesystem</td></tr>
+<tr><td>orchestration</td><td><code>orchestration.rs</code></td><td><code>start</code>, <code>next</code>, <code>approve</code>, <code>lock</code> lifecycle transitions</td><td>definition, cli, state</td><td>filesystem (state writes)</td></tr>
+<tr><td>queries</td><td><code>queries.rs</code></td><td><code>list</code>, <code>current</code>, <code>suggest</code>, <code>show</code>, <code>gates</code>, <code>check</code>, <code>validate</code> read paths</td><td>definition, state, json</td><td>filesystem (read)</td></tr>
+<tr><td>setup</td><td><code>setup.rs</code></td><td><code>init &lt;name&gt;</code> scaffolding</td><td>definition</td><td>filesystem (write)</td></tr>
+</tbody>
+</table>
+
+<h2>Wiring graph</h2>
+<pre class="mermaid">
+graph LR
+  dispatcher["mod.rs run()"] --> queries
+  dispatcher --> orch["orchestration.rs"]
+  dispatcher --> setup
+  dispatcher --> verify["cmd_verify (walkdir .lock)"]
+  queries --> def["definition.rs"]
+  orch --> def
+  setup --> def
+  def -- "reads" --> tmpl["src/templates/*.toml"]
+  orch -- "writes state" --> fs[(".wai/projects/")]
+</pre>
+<details><summary>Mermaid source</summary>
+<pre class="mermaid-source">graph LR
+  dispatcher["mod.rs run()"] --> queries
+  dispatcher --> orch["orchestration.rs"]
+  dispatcher --> setup
+  dispatcher --> verify["cmd_verify (walkdir .lock)"]
+  queries --> def["definition.rs"]
+  orch --> def
+  setup --> def
+  def -- "reads" --> tmpl["src/templates/*.toml"]
+  orch -- "writes state" --> fs[(".wai/projects/")]
+</pre>
+</details>
+
+<h2>Structural observations</h2>
+<ul>
+  <li><code>mod.rs</code> (1,920) is ~6× the file-size median (328, n=65) yet is a dispatcher plus only 2 inline commands — bulk likely gates/support code worth confirming</li>
+  <li>Clean split: orchestration mutates, queries read, setup scaffolds, definition models — no observed query→orchestration calls</li>
+  <li>Templates are compiled-in data (<code>include</code> in Cargo.toml covers <code>src/**</code>), read via <code>definition.rs</code></li>
+</ul>
+
+<h2>Key Relationships</h2>
+<ul>
+  <li><code>orchestration → definition</code> — every lifecycle transition validates against the TOML pipeline definition</li>
+  <li><code>queries → state/json</code> — read-only reporting shares the state model with the rest of wai</li>
+  <li><code>pipeline → templates/</code> — pipeline kinds are data, not code; adding a pipeline needs no Rust change</li>
+</ul>
+
+<h2>Open Questions</h2>
+<ul>
+  <li>Why does <code>mod.rs</code> hold 1,920 lines when it dispatches to 4 submodules — is <code>gates</code> logic partially inlined there?</li>
+</ul>
+
+<h2>Adjacent levels offered</h2>
+<p>Micro trace of <code>pipeline start</code> (orchestration start → gate checks → state write) available on request.</p>
+
+<footer>Artifact of record: <code>cartography-meso-pipeline.md</code> (same directory).</footer>
+<script src="assets/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true });</script>
+</body>
+</html>

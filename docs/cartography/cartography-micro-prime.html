@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cartography — wai prime (micro)</title>
+<link rel="stylesheet" href="assets/cartography.css">
+</head>
+<body>
+<nav><a href="index.html">← Index</a> | Parent: <a href="cartography-macro-wai.html">macro — wai src/</a> · <a href="cartography-meso-commands.html">meso — commands district</a></nav>
+
+<h1>Cartography — micro trace: <code>wai prime</code></h1>
+<p class="meta"><strong>Entry zoom level:</strong> micro (functionality trace)<br>
+<strong>Scope covered:</strong> <code>src/commands/prime.rs</code> (621 lines) + services it calls</p>
+
+<h2>Entry point</h2>
+<p><code>pub fn run(project: Option&lt;String&gt;)</code> — <code>src/commands/prime.rs:25</code></p>
+
+<h2>Call chain</h2>
+<pre><code> 1. prime::run(project)              commands/prime.rs:25
+ 2. require_project()                config (via commands::require_project)  [I/O: fs]
+ 3. list_projects / resolve_project  config                                  [I/O: fs]
+ 4. empty-state check                commands/prime.rs:30-51  [pure; early envelope return]
+ 5. ProjectState::load(state_path)   state.rs (Phase enum)                   [I/O: fs]
+ 6. check_pending_resume()           commands/prime.rs:305                   [I/O: fs, clock — 12h TTL]
+ 7. plugin::run_hooks("on_status")   plugin.rs                               [I/O: subprocess (beads, openspec hooks)]
+ 8. openspec::read_status()          openspec.rs                             [I/O: fs]
+ 9. ── branch: json ──  render_json()      commands/prime.rs:195
+10. ── branch: tty  ──── date/phase/resume printing
+11. find_latest_handoff()            commands/prime.rs:378                   [I/O: fs walk]
+12. read_handoff_summary()           commands/prime.rs:401                   [I/O: fs; frontmatter parse]
+13. extract_next_steps()             commands/prime.rs:352                   [pure on read string]
+14. read_recent_plans()              commands/prime.rs:471                   [I/O: fs]
+15. render_pipelines()               commands/prime.rs:518                   [I/O: fs; phase↔pipeline matching (pure, :594)]
+16. render_health_summary()          commands/prime.rs:604 → doctor::health_summary  [I/O: full doctor check suite]
+17. print_envelope(...)              output.rs → genesis envelope
+</code></pre>
+
+<h2>Data flow</h2>
+<pre><code>optional project name arg → resolved project root+name
+  → phase string (state file)
+  → resume info (.pending-resume file, 12h validity, auto-deleted when stale)
+  → plugin hook outputs (beads/openspec summaries)
+  → handoff date+snippet+next steps (latest handoff doc)
+  → recent plans, matching pipelines (by phase keywords)
+  → doctor health summary
+→ PrimePayload → genesis Envelope (JSON) or terminal rendering
+</code></pre>
+
+<h2>Structural observations</h2>
+<ul>
+  <li>Purity ends at hop 2 (<code>require_project</code>); prime is read-only — its only writes are the stale <code>.pending-resume</code> deletion (hop 6)</li>
+  <li>Steps 5–8 run unconditionally for both output modes (comment at <code>prime.rs:55</code>); rendering branches after hop 8</li>
+  <li><code>render_health_summary</code> pulls the entire doctor check suite into prime — prime is doctor's heaviest external consumer</li>
+  <li>Pipeline suggestion logic (<code>phase_keywords</code>, <code>pipeline_matches_phase</code>, <code>prime.rs:574-603</code>) is pure string matching over template TOML — an isolated, testable core inside the handler</li>
+  <li><code>read_pending_resume</code>/<code>extract_next_steps</code>/<code>find_latest_handoff</code>/<code>read_handoff_summary</code> are <code>pub</code> — unit-tested from outside the module (visible in <code>tests/</code> layout)</li>
+</ul>
+
+<h2>Adjacent levels offered</h2>
+<p>Meso map of the whole <code>commands</code> district (<a href="cartography-meso-commands.html">cartography-meso-commands</a>) or micro traces of <code>wai sync</code> / <code>wai why</code>.</p>
+
+<footer>Artifact of record: <code>cartography-micro-prime.md</code> (same directory).</footer>
+</body>
+</html>

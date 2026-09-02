@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cartography — commands/doctor (meso)</title>
+<link rel="stylesheet" href="assets/cartography.css">
+</head>
+<body>
+<nav><a href="index.html">← Index</a> | Parent: <a href="cartography-macro-wai.html">macro — wai src/</a></nav>
+
+<h1>Cartography — <code>commands/doctor/</code> (wai)</h1>
+<p class="meta"><strong>Entry zoom level:</strong> meso (module wiring)<br>
+<strong>Scope covered:</strong> <code>src/commands/doctor/</code> — <code>mod.rs</code> (1,959), <code>checks_basic.rs</code> (727), <code>checks_sync.rs</code> (489)</p>
+
+<h2>Parent context</h2>
+<p><code>doctor/</code> is a submodule of the <code>commands</code> district in wai's inferred layering (core ← services ← commands). It is dispatched via <code>commands/mod.rs</code> and is the district's heaviest component (17 crate-imports in <code>mod.rs</code>). It is consumed both by its own CLI command and by <code>status</code>/<code>prime</code> via <code>health_summary()</code> (<code>doctor/mod.rs</code>, doc comment above <code>health_summary</code>).</p>
+
+<h2>Component table</h2>
+<table>
+<thead><tr><th>Component</th><th>Path</th><th>Role</th><th>Talks to (internal)</th><th>External ports</th></tr></thead>
+<tbody>
+<tr><td>entry / fix</td><td><code>doctor/mod.rs</code> <code>run(fix)</code></td><td>Diagnostic vs fix mode; renders via genesis DoctorRunner</td><td><code>collect_checks</code>, <code>checks_basic</code>, <code>checks_sync</code>, <code>workspace</code>, <code>managed_block</code> (8 imports), <code>config</code></td><td>genesis DoctorRunner/CheckStatus</td></tr>
+<tr><td><code>collect_checks()</code></td><td><code>doctor/mod.rs</code></td><td>Aggregates ~21 checks from both check files + 10 local check fns</td><td>all check fns</td><td>filesystem</td></tr>
+<tr><td><code>health_summary()</code></td><td><code>doctor/mod.rs</code></td><td>Compact warn/fail report reused by <code>status.rs</code>, <code>prime.rs</code></td><td><code>build_doctor_runner</code></td><td>—</td></tr>
+<tr><td><code>apply_fixes()</code></td><td><code>doctor/mod.rs</code></td><td>Fix mode writes (managed blocks, config)</td><td><code>managed_block</code>, <code>workspace</code></td><td>filesystem (write)</td></tr>
+<tr><td>basic checks</td><td><code>checks_basic.rs</code></td><td>directories, config, version, plugin tools, project state, custom plugins, wai-project env, README badge, badge/managed-block consistency, suite gates</td><td><code>commands</code> (2 imports)</td><td>filesystem</td></tr>
+<tr><td>sync checks</td><td><code>checks_sync.rs</code></td><td><code>check_agent_config_sync</code>: verifies projections are up to date</td><td>re-parses <code>.projections.yml</code> with own <code>ProjectionsConfig</code> structs; calls <code>sync_core::execute_symlink/inline/reference</code> as dry-run probes</td><td>filesystem</td></tr>
+</tbody>
+</table>
+
+<h2>Wiring graph</h2>
+<pre class="mermaid">
+graph LR
+  dispatcher["commands/mod.rs"] --> run["doctor::run(fix)"]
+  run --> collect["collect_checks()"]
+  collect --> basic["checks_basic.rs (10 check fns)"]
+  collect --> sync["checks_sync.rs"]
+  collect --> local["10 local check fns in mod.rs"]
+  sync -- "dry-run probes" --> sync_core["sync_core::execute_*"]
+  run -- "render/fix" --> genesis["genesis DoctorRunner"]
+  run -- "fixes" --> mb["managed_block.rs x8"]
+  status["status.rs / prime.rs"] -- "health_summary()" --> run
+</pre>
+<details><summary>Mermaid source</summary>
+<pre class="mermaid-source">graph LR
+  dispatcher["commands/mod.rs"] --> run["doctor::run(fix)"]
+  run --> collect["collect_checks()"]
+  collect --> basic["checks_basic.rs (10 check fns)"]
+  collect --> sync["checks_sync.rs"]
+  collect --> local["10 local check fns in mod.rs"]
+  sync -- "dry-run probes" --> sync_core["sync_core::execute_*"]
+  run -- "render/fix" --> genesis["genesis DoctorRunner"]
+  run -- "fixes" --> mb["managed_block.rs x8"]
+  status["status.rs / prime.rs"] -- "health_summary()" --> run
+</pre>
+</details>
+
+<h2>Structural observations</h2>
+<ul>
+  <li><code>checks_sync.rs</code> defines its own <code>ProjectionsConfig</code>/<code>ProjectionEntry</code> structs (<code>checks_sync.rs:13-21</code>) instead of importing from <code>sync.rs</code>/<code>sync_core</code> — the projection concept is parsed in 2 places and modeled in 3</li>
+  <li><code>doctor/mod.rs</code> at 1,959 lines is ~6× the repo file-size median (328, n=65); it hosts ~10 check functions inline in addition to entry/fix/render logic</li>
+  <li><code>health_summary()</code> gives doctor a second fan-in surface beyond the CLI (used by <code>status</code>, <code>prime</code>)</li>
+  <li>Fix mode writes via <code>managed_block</code> — the same blocks <code>check_managed_block_staleness</code> validates</li>
+</ul>
+
+<h2>Key Relationships</h2>
+<ul>
+  <li><code>doctor → managed_block</code> (8 sites) — validation and repair of AGENTS.md marker blocks</li>
+  <li><code>doctor → sync_core</code> (dry-run) — health check replays sync execution without writing</li>
+  <li><code>status/prime → doctor::health_summary</code> — one-line health summary reused across commands</li>
+  <li><code>doctor → genesis</code> — check status model and runner delegated to shared crate</li>
+</ul>
+
+<h2>Open Questions</h2>
+<ul>
+  <li>Should <code>checks_sync.rs</code> share the <code>ProjectionsConfig</code> type with <code>sync.rs</code> rather than re-defining it?</li>
+</ul>
+
+<h2>Adjacent levels offered</h2>
+<p>Micro trace of a single check (e.g., <code>check_agent_config_sync</code> through <code>sync_core::execute_*</code> dry-runs) available on request.</p>
+
+<footer>Artifact of record: <code>cartography-meso-doctor.md</code> (same directory).</footer>
+<script src="assets/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true });</script>
+</body>
+</html>

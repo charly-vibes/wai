@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cartography — wai why network path (micro)</title>
+<link rel="stylesheet" href="assets/cartography.css">
+</head>
+<body>
+<nav><a href="index.html">← Index</a> | Parent: <a href="cartography-macro-wai.html">macro — wai src/</a> · <a href="cartography-meso-why.html">meso — commands/why</a></nav>
+
+<h1>Cartography — micro trace: <code>wai why</code> (network path)</h1>
+<p class="meta"><strong>Entry zoom level:</strong> micro (functionality trace)<br>
+<strong>Scope covered:</strong> <code>src/commands/why/{mod,context}.rs</code> + <code>src/llm.rs</code> — wai's only network I/O path</p>
+
+<h2>Entry point</h2>
+<p><code>pub fn run(query: String, no_llm: bool, json: bool, verbose: u8)</code> — <code>src/commands/why/mod.rs:438</code></p>
+
+<h2>Call chain</h2>
+<pre><code> 1. why::run(query)                    commands/why/mod.rs:438
+ 2. json = json || current_context().json   [pure]
+ 3. no_llm? → search::run(SearchArgs)  commands/search.rs        [degraded path, no network]
+ 4. gather_context()                   why/context.rs:117
+      read_artifacts + sort by mtime                              [I/O: fs walk]
+      truncate_context (MAX_CONTEXT_CHARS)                        [pure]
+      gather_git_file_context (file queries)                      [I/O: git subprocess]
+      gather_meta / fetch_memories                                [I/O: fs]
+ 5. ProjectConfig::load → llm_config()                            [I/O: fs]
+ 6. detect_backend(&amp;why_cfg)            llm.rs:448
+      ClaudeCliClient   → std::process::Command::new("claude")    [llm.rs:225]
+      OllamaClient      → Command::new("ollama")                  [llm.rs:314]
+      ExternalApiClient → reqwest::blocking::Client               [llm.rs:134]  ← network
+ 7. privacy_notice_needed → show_privacy_notice (once)            [I/O: fs marker write, mod.rs:546]
+ 8. build_prompt(&amp;ctx)                                            [pure]
+ 9. backend.complete(&amp;prompt)                                     [I/O: network or subprocess — PURITY ENDS]
+10. AGENT_SENTINEL short-circuit (agent session)                  [mod.rs:549]
+11. parse_response()                    why/parsing.rs            [pure]
+12. format_json / format_terminal; verbose stats (cost estimate llm.rs:522)
+13. error path → llm_error_hint → fallback to search::run         [mod.rs:565-583]
+</code></pre>
+
+<h2>Data flow</h2>
+<pre><code>query string
+  → GatheredContext{ artifacts (recent-first, truncated), git_context, meta, memories }
+  → prompt (built from context)
+  → LLM backend (claude-cli subprocess | ollama subprocess | external API via reqwest::blocking)
+  → raw_response
+  → parsed answer (parsing.rs)
+  → JSON envelope or terminal text (+cost/time stats on verbose)
+fallback: any backend absence/failure → search::run over the same artifact store
+</code></pre>
+
+<h2>Structural observations</h2>
+<ul>
+  <li>Single purity boundary: steps 2–8 are fs/pure; step 9 is the only network/subprocess hop; parsing after it is pure again</li>
+  <li>All I/O mechanisms live in <code>llm.rs</code> — <code>why/</code> never imports reqwest; <code>llm.rs</code> is the sole <code>reqwest</code> importer in <code>src/</code></li>
+  <li>Three distinct degradation ladders: no backend (→search), backend error (→search or error by <code>FallbackMode</code>), empty context (early exit)</li>
+  <li>Backend selection is config-driven (<code>[llm]</code> in <code>.wai/config.toml</code>) with alias resolution (<code>resolve_model_alias</code>, <code>llm.rs:56</code>)</li>
+  <li>Cost accounting is local estimation (<code>estimate_cost</code>, <code>llm.rs:522</code>) — no billing API calls</li>
+</ul>
+
+<h2>Adjacent levels offered</h2>
+<p>Meso map of <code>why/</code>: <a href="cartography-meso-why.html">cartography-meso-why</a>; or micro trace of the agent-session sentinel path on request.</p>
+
+<footer>Artifact of record: <code>cartography-micro-why.md</code> (same directory).</footer>
+</body>
+</html>

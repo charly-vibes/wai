@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cartography — commands district (meso)</title>
+<link rel="stylesheet" href="assets/cartography.css">
+</head>
+<body>
+<nav><a href="index.html">← Index</a> | Parent: <a href="cartography-macro-wai.html">macro — wai src/</a></nav>
+
+<h1>Cartography — <code>commands</code> district (wai)</h1>
+<p class="meta"><strong>Entry zoom level:</strong> meso (module wiring)<br>
+<strong>Scope covered:</strong> <code>src/commands/</code> — <code>mod.rs</code>, 19 flat command modules, 7 submodules (~6.6k lines, ~29 dispatched CLI commands)</p>
+
+<h2>Parent context</h2>
+<p><code>commands</code> is the top layer of wai's inferred layering (core ← services ← commands ← cli/main). It contains every CLI command handler; <code>src/main.rs</code> dispatches into it via <code>commands::run()</code>. Its dependencies reach down into core modules (<code>config</code>, <code>context</code>, <code>plugin</code>) and services (<code>sync_core</code>, <code>llm</code>, <code>workspace</code>, …); <code>cli</code> is imported only by this district (13 files).</p>
+
+<h2>Component table</h2>
+<table>
+<thead><tr><th>Component</th><th>Path</th><th>Role</th><th>Talks to (internal)</th><th>External ports</th></tr></thead>
+<tbody>
+<tr><td>dispatcher</td><td><code>commands/mod.rs</code></td><td>Maps <code>Commands</code> enum variants → <code>run()</code> handlers (<code>src/commands/mod.rs:41</code>)</td><td>all command files; genesis Guide/SuggestionEngine</td><td>genesis</td></tr>
+<tr><td>init / new / add</td><td><code>init.rs</code>, <code>new.rs</code>, <code>add.rs</code></td><td>Project creation, artifact creation, capture</td><td>workspace, state, json, cli, guided_flows, workflows</td><td>filesystem (<code>.wai/</code>)</td></tr>
+<tr><td>read/report commands</td><td><code>status.rs</code>, <code>show.rs</code>, <code>ls.rs</code>, <code>timeline.rs</code>, <code>project.rs</code>, <code>phase.rs</code>, <code>move_cmd.rs</code>, <code>close.rs</code>, <code>search.rs</code></td><td>Read/report project state</td><td>state, json, output, context, config</td><td>filesystem (read)</td></tr>
+<tr><td>sync</td><td><code>sync.rs</code></td><td>Sync agent tools</td><td>sync_core, plugin, context, config</td><td>filesystem</td></tr>
+<tr><td>prime</td><td><code>prime.rs</code></td><td>Context priming (9 crate-imports)</td><td>workspace, context, state, json, workflows, openspec, freshness, genesis</td><td>filesystem</td></tr>
+<tr><td>doctor/</td><td><code>doctor/{mod,checks_basic,checks_sync}.rs</code></td><td>Health checks (17 crate-imports in <code>mod.rs</code>)</td><td>managed_block (8), workspace (3), config (2), sync_core</td><td>filesystem</td></tr>
+<tr><td>pipeline/</td><td><code>pipeline/{mod,definition,gates,orchestration,queries,setup}.rs</code></td><td>Pipeline lifecycle + gates</td><td>cli, config, commands, state</td><td>filesystem (<code>templates/</code> TOML)</td></tr>
+<tr><td>why/</td><td><code>why/{mod,context,parsing}.rs</code></td><td>Why-capture</td><td>llm, config, context, plugin, error</td><td><strong>network (via <code>llm.rs</code>)</strong></td></tr>
+<tr><td>way/</td><td><code>way/{mod,hooks,linting,release}.rs</code> + 2 skill .md</td><td>Repo workflow enforcement</td><td>genesis CheckStatus, config, output, commands</td><td>genesis, external binaries</td></tr>
+<tr><td>reflect/</td><td><code>reflect/{mod,context,meta}.rs</code></td><td>Reflection capture</td><td>llm, context, config</td><td>network (via <code>llm.rs</code>)</td></tr>
+<tr><td>resource/</td><td><code>resource/{mod,archive,metadata,skills,validation}.rs</code></td><td>Resource CRUD + skills</td><td>commands, config</td><td>filesystem, tar</td></tr>
+<tr><td>artifacts/</td><td><code>artifacts/mod.rs</code></td><td>Artifact listing</td><td>commands, state, openspec</td><td>filesystem</td></tr>
+<tr><td>plugin cmd</td><td><code>plugin.rs</code></td><td>Plugin management CLI</td><td>plugin, cli, context</td><td>filesystem</td></tr>
+<tr><td>config cmd</td><td><code>config_cmd.rs</code></td><td>Config get/set</td><td>config, cli, context</td><td>filesystem</td></tr>
+<tr><td>feedback / import / handoff</td><td><code>feedback.rs</code>, <code>import.rs</code>, <code>handoff.rs</code></td><td>Feedback, import, handoff docs</td><td>cli, config, genesis, state</td><td>filesystem</td></tr>
+</tbody>
+</table>
+
+<h2>Wiring graph</h2>
+<pre class="mermaid">
+graph LR
+  main --> mod["commands/mod.rs (dispatcher)"]
+  mod --> flat["flat command modules (19)"]
+  mod --> doctor
+  mod --> pipeline
+  mod --> why
+  mod --> way
+  mod --> reflect
+  mod --> resource
+  mod --> artifacts
+  why -- "calls" --> llm["llm.rs (reqwest/tokio)"]
+  reflect -- "calls" --> llm
+  sync_cmd["sync.rs"] -- "calls" --> sync_core
+  doctor -- "checks_sync" --> sync_core
+  way -- "CheckStatus" --> genesis["genesis-vibes"]
+  pipeline -- "reads" --> tmpl["templates/*.toml"]
+  doctor -- "managed_block x8" --> mb["managed_block.rs"]
+</pre>
+<details><summary>Mermaid source</summary>
+<pre class="mermaid-source">graph LR
+  main --> mod["commands/mod.rs (dispatcher)"]
+  mod --> flat["flat command modules (19)"]
+  mod --> doctor
+  mod --> pipeline
+  mod --> why
+  mod --> way
+  mod --> reflect
+  mod --> resource
+  mod --> artifacts
+  why -- "calls" --> llm["llm.rs (reqwest/tokio)"]
+  reflect -- "calls" --> llm
+  sync_cmd["sync.rs"] -- "calls" --> sync_core
+  doctor -- "checks_sync" --> sync_core
+  way -- "CheckStatus" --> genesis["genesis-vibes"]
+  pipeline -- "reads" --> tmpl["templates/*.toml"]
+  doctor -- "managed_block x8" --> mb["managed_block.rs"]
+</pre>
+</details>
+
+<h2>Structural observations</h2>
+<ul>
+  <li>Single fan-in point: everything is dispatched through <code>mod.rs</code>; only <code>cli</code> (13 importers) rivals <code>config</code>/<code>context</code> as shared infrastructure</li>
+  <li>Horizontal wiring: 8 <code>use crate::commands</code> imports — 6 are shared-helper reuse (<code>require_project</code> by pipeline/ and resource/ submodules), 2 are cross-feature logic reuse (<code>doctor/checks_basic.rs:519,560 → why</code> badge fns; <code>way/mod.rs:13 → resource::parse_skill_frontmatter</code>); no observed bypass of the <code>mod.rs</code> dispatch for entry</li>
+  <li>Heaviest handlers by crate-imports: <code>doctor/mod.rs</code> (17), <code>prime.rs</code> (9), <code>status.rs</code> (9), <code>new.rs</code> (8), <code>pipeline/queries.rs</code> (5)</li>
+  <li>Network I/O is confined to <code>why/</code> and <code>reflect/</code>, both mediated by the single <code>llm.rs</code> service</li>
+  <li>No caller-less components found within the district; every submodule is reached from the dispatcher</li>
+</ul>
+
+<h2>Key Relationships</h2>
+<ul>
+  <li><code>mod.rs → all handlers</code> — the enum-match dispatch is the district's only entry</li>
+  <li><code>why/ → llm.rs → network</code> — the only path to external LLM services</li>
+  <li><code>sync.rs / doctor → sync_core</code> — sync logic shared between command and health check</li>
+  <li><code>doctor → managed_block</code> (8 sites) — doctor validates the same marker blocks the service layer writes</li>
+  <li><code>way/* → genesis doctor checks</code> — enforcement logic delegated to the shared genesis crate</li>
+</ul>
+
+<h2>Open Questions</h2>
+<ul>
+  <li>Are the 8 sibling-to-sibling imports (e.g., <code>checks_basic.rs → commands</code>) intentional reuse or candidates for promotion into the services layer?</li>
+  <li><code>pipeline/queries.rs</code> has the most crate-imports in its submodule (5) — is query logic accumulating responsibilities beyond reading?</li>
+</ul>
+
+<h2>Adjacent levels offered</h2>
+<p>Micro traces of <code>wai prime</code>, <code>wai sync</code>, <code>wai why</code> available; per-submodule meso maps in the index.</p>
+
+<footer>Artifact of record: <code>cartography-meso-commands.md</code> (same directory). Diagrams render locally via vendored Mermaid; source is preserved in the collapsible block above.</footer>
+<script src="assets/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true });</script>
+</body>
+</html>
