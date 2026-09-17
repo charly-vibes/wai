@@ -71,6 +71,53 @@ fn write_pipeline_no_metadata(dir: &std::path::Path, name: &str) {
 // ── session orientation ───────────────────────────────────────────────────────
 
 #[test]
+fn prime_lists_prior_research_docs() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "demo");
+    let research = tmp.path().join(".wai/projects/demo/research");
+    fs::create_dir_all(&research).unwrap();
+    fs::write(
+        research.join("2026-09-17-cache-eviction-investigation.md"),
+        "---\ntags: []\n---\n\nline one\nline two\nline three\nline four\nline five\nline six\n",
+    )
+    .unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["prime"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Prior context").and(predicate::str::contains(
+                "2026-09-17-cache-eviction-investigation.md",
+            )),
+        );
+}
+
+#[test]
+fn prime_plans_render_body_title_not_frontmatter() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "demo");
+    let plans = tmp.path().join(".wai/projects/demo/plans");
+    fs::create_dir_all(&plans).unwrap();
+    fs::write(
+        plans.join("2026-09-17-my-plan.md"),
+        "---\ntags: []\n---\n\nMy plan title: evict caches in two phases\n\nmore detail\n",
+    )
+    .unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["prime"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("My plan title: evict caches in two phases")
+                .and(predicate::str::contains("• ---").not()),
+        );
+}
+
+#[test]
 fn prime_single_project_shows_orientation_output() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
