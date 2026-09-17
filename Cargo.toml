@@ -81,7 +81,7 @@ assert_cmd = "2"
 chrono = "0.4"
 predicates = "3"
 tempfile = "3"
-serial_test = "3"
+serial_test = "4"
 
 [[bin]]
 name = "wai"
