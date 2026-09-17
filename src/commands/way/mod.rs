@@ -75,6 +75,7 @@ pub fn run(topic: Option<String>, fix: Option<String>) -> Result<()> {
         check_docs_status_page(&repo_root),
         check_docs_openspec_inclusion(&repo_root),
         check_ai_instructions(&repo_root),
+        check_artifact_stubs(&repo_root),
         check_llm_txt(&repo_root),
         check_ubiquitous_language(&repo_root),
         check_agent_skills(&repo_root),
@@ -2046,6 +2047,145 @@ fn docs_workflow_includes_openspec(repo_root: &Path) -> bool {
     false
 }
 
+/// Minimum number of non-empty body lines for an artifact to count as substantive.
+const ARTIFACT_BODY_LINE_THRESHOLD: usize = 5;
+
+/// Directories under each project whose markdown artifacts are checked for stubs.
+const ARTIFACT_SCAN_DIRS: [&str; 5] = ["research", "handoffs", "designs", "plans", "reviews"];
+
+fn markdown_body_lines(path: &Path) -> Option<Vec<String>> {
+    let content = std::fs::read_to_string(path).ok()?;
+    let mut lines = content.lines();
+    let mut in_frontmatter = false;
+
+    if lines.clone().next() == Some("---") {
+        in_frontmatter = true;
+        lines.next();
+        for line in lines.by_ref() {
+            if line.trim() == "---" {
+                in_frontmatter = false;
+                break;
+            }
+        }
+    }
+
+    let body: Vec<String> = if in_frontmatter {
+        // Unterminated frontmatter — treat entire file (minus opening delimiter) as body.
+        content.lines().skip(1).map(|l| l.to_string()).collect()
+    } else {
+        lines.map(|l| l.to_string()).collect()
+    };
+
+    Some(body.into_iter().filter(|l| !l.trim().is_empty()).collect())
+}
+
+/// A single body line in the pipeline-step record convention, e.g.
+/// `RO5U: wai-fvhv.28; verdict=SHIP; ...` — intentionally terse, not a stub.
+fn is_structured_record(line: &str) -> bool {
+    let mut chars = line.chars();
+    match chars.next() {
+        Some(c) if c.is_ascii_uppercase() => {}
+        _ => return false,
+    }
+    for c in chars {
+        if c == ':' {
+            return true;
+        }
+        if !(c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | ' ')) {
+            return false;
+        }
+    }
+    false
+}
+
+fn check_artifact_stubs(repo_root: &Path) -> WayCheckEntry {
+    let name = "Project artifact completeness";
+    let intent = Some(
+        "Research and handoff docs must capture their findings so context survives across sessions."
+            .to_string(),
+    );
+    let success_criteria = Some(
+        "No research/handoff markdown artifacts are empty or stub-only (frontmatter with fewer than 5 body lines)."
+            .to_string(),
+    );
+
+    let projects_dir = repo_root.join(".wai").join("projects");
+    if !projects_dir.is_dir() {
+        return WayCheckEntry {
+            name: name.to_string(),
+            status: CheckStatus::Pass,
+            message: "No project artifacts found".to_string(),
+            intent,
+            success_criteria,
+            suggestion: None,
+        };
+    }
+
+    let mut stubs: Vec<String> = Vec::new();
+    if let Ok(projects) = std::fs::read_dir(&projects_dir) {
+        for project in projects.filter_map(|e| e.ok()) {
+            for subdir in ARTIFACT_SCAN_DIRS {
+                let dir = project.path().join(subdir);
+                if !dir.is_dir() {
+                    continue;
+                }
+                if let Ok(files) = std::fs::read_dir(&dir) {
+                    for file in files.filter_map(|e| e.ok()) {
+                        let path = file.path();
+                        if path.extension().is_none_or(|e| e != "md") {
+                            continue;
+                        }
+                        let is_stub = markdown_body_lines(&path).is_some_and(|body| {
+                            if body.len() >= ARTIFACT_BODY_LINE_THRESHOLD {
+                                return false;
+                            }
+                            // Short bodies are substantive when they follow the
+                            // pipeline record convention (UPPERCASE-KEY: ...).
+                            body.first()
+                                .map(|l| !is_structured_record(l))
+                                .unwrap_or(true)
+                        });
+                        if is_stub
+                            && let Some(name) = path
+                                .strip_prefix(&projects_dir)
+                                .ok()
+                                .and_then(|p| p.to_str())
+                        {
+                            stubs.push(name.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if stubs.is_empty() {
+        WayCheckEntry {
+            name: name.to_string(),
+            status: CheckStatus::Pass,
+            message: "Research and handoff artifacts contain substantive content".to_string(),
+            intent,
+            success_criteria,
+            suggestion: None,
+        }
+    } else {
+        WayCheckEntry {
+            name: name.to_string(),
+            status: CheckStatus::Warn,
+            message: format!(
+                "{} empty/stub artifact(s) detected: {}",
+                stubs.len(),
+                stubs.join(", ")
+            ),
+            intent,
+            success_criteria,
+            suggestion: Some(
+                "Fill in the findings for these artifacts, or delete them if the work was abandoned".to_string(),
+            ),
+        }
+    }
+}
+
 fn check_ai_instructions(repo_root: &Path) -> WayCheckEntry {
     use crate::config::reflections_dir;
 
@@ -2958,6 +3098,137 @@ mod tests {
             "expected mise.toml detected, got: {}",
             result.message
         );
+    }
+
+    #[test]
+    fn artifact_stubs_flags_empty_research_doc() {
+        let dir = tempfile::tempdir().unwrap();
+        let research = dir.path().join(".wai/projects/demo/research");
+        fs::create_dir_all(&research).unwrap();
+        fs::write(
+            research.join("2026-07-29-investigation.md"),
+            "---\ntags: [x]\n---\n\ninvestigation: findings from 2026-07-29\n",
+        )
+        .unwrap();
+
+        let result = check_artifact_stubs(dir.path());
+        assert_eq!(result.status, CheckStatus::Warn);
+        assert!(
+            result.message.contains("2026-07-29-investigation.md"),
+            "expected stub filename in message, got: {}",
+            result.message
+        );
+    }
+
+    #[test]
+    fn artifact_stubs_accepts_structured_single_line_records() {
+        let dir = tempfile::tempdir().unwrap();
+        let research = dir.path().join(".wai/projects/demo/research");
+        fs::create_dir_all(&research).unwrap();
+        // Pipeline-step record convention: "KEY: issue; field=value; ..."
+        for (name, line) in [
+            (
+                "2026-05-13-ro5u-fixes-wai-fvhv-109-fixed-none-required-beca.md",
+                "RO5U-FIXES: wai-fvhv.109; fixed=none required because RO5 review reported 0 critical; verified=cargo test, 60 passed.",
+            ),
+            (
+                "2026-05-13-analysis-start-wai-fvhv-64.md",
+                "ANALYSIS START: wai-fvhv.64; artifact=bead notes; validation=compare output; non-code review only.",
+            ),
+        ] {
+            fs::write(
+                research.join(name),
+                format!("---\ntags: [pipeline]\n---\n\n{}\n", line),
+            )
+            .unwrap();
+        }
+
+        let result = check_artifact_stubs(dir.path());
+        assert_eq!(result.status, CheckStatus::Pass);
+    }
+
+    #[test]
+    fn artifact_stubs_flags_title_only_doc() {
+        let dir = tempfile::tempdir().unwrap();
+        let research = dir.path().join(".wai/projects/demo/research");
+        fs::create_dir_all(&research).unwrap();
+        // Title-only line starting lowercase: a promise of findings with none captured.
+        fs::write(
+            research.join("2026-07-29-pipeline-utilization-investigation-findings-from.md"),
+            "---\ntags: [x]\n---\n\npipeline-utilization-investigation: findings from 2026-07-29\n",
+        )
+        .unwrap();
+
+        let result = check_artifact_stubs(dir.path());
+        assert_eq!(result.status, CheckStatus::Warn);
+    }
+
+    #[test]
+    fn artifact_stubs_passes_on_substantive_docs() {
+        let dir = tempfile::tempdir().unwrap();
+        let research = dir.path().join(".wai/projects/demo/handoffs");
+        fs::create_dir_all(&research).unwrap();
+        let body = "line one\nline two\nline three\nline four\nline five\nline six";
+        fs::write(research.join("2026-09-17-session-end.md"), body).unwrap();
+
+        let result = check_artifact_stubs(dir.path());
+        assert_eq!(result.status, CheckStatus::Pass);
+    }
+
+    #[test]
+    fn artifact_stubs_scans_all_artifact_dirs() {
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path().join(".wai/projects/demo");
+        for subdir in ["research", "handoffs", "designs", "plans", "reviews"] {
+            let d = base.join(subdir);
+            fs::create_dir_all(&d).unwrap();
+            // Substantive doc so only an intentionally planted stub gets flagged.
+            fs::write(
+                d.join("substantive.md"),
+                "---\ntags: []\n---\n\nline one\nline two\nline three\nline four\nline five\nline six\n",
+            )
+            .unwrap();
+        }
+        // One true stub in designs/ — the dir a research+handoffs-only scan misses.
+        fs::write(
+            base.join("designs/2026-05-13-forgotten-findings.md"),
+            "---\ntags: []\n---\n\nforgotten-findings: details to follow\n",
+        )
+        .unwrap();
+
+        let result = check_artifact_stubs(dir.path());
+        assert_eq!(result.status, CheckStatus::Warn);
+        assert!(
+            result
+                .message
+                .contains("designs/2026-05-13-forgotten-findings.md"),
+            "expected designs/ stub flagged, got: {}",
+            result.message
+        );
+    }
+
+    #[test]
+    fn artifact_stubs_accepts_multiline_structured_records() {
+        let dir = tempfile::tempdir().unwrap();
+        let designs = dir.path().join(".wai/projects/demo/designs");
+        fs::create_dir_all(&designs).unwrap();
+        // Structured record header plus a verification paragraph (2 body lines).
+        fs::write(
+            designs.join("2026-05-13-tidy-wai-fvhv-108.md"),
+            "---\ntags: []\n---\n\nTIDY: wai-fvhv.108; no refactoring needed — helper is distinct\n\nVerification: non-code work, no refactoring applied. Tests pass.\n",
+        )
+        .unwrap();
+
+        let result = check_artifact_stubs(dir.path());
+        assert_eq!(result.status, CheckStatus::Pass);
+    }
+
+    #[test]
+    fn artifact_stubs_passes_when_no_project_artifacts() {
+        let dir = tempfile::tempdir().unwrap();
+
+        let result = check_artifact_stubs(dir.path());
+        assert_eq!(result.status, CheckStatus::Pass);
     }
 
     #[test]
