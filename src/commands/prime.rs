@@ -37,6 +37,7 @@ pub fn run(project: Option<String>) -> Result<()> {
                 handoff_summary: None,
                 next_steps: Vec::new(),
                 plans: Vec::new(),
+                prior_context: Vec::new(),
                 beads: None,
                 openspec: Vec::new(),
             };
@@ -125,6 +126,16 @@ pub fn run(project: Option<String>) -> Result<()> {
             && let Some(summary) = beads_summary(&output.content)
         {
             println!("{} Beads:   {}", "•".dimmed(), summary);
+        }
+    }
+
+    // Prior context — existing research/design/review docs so the agent does
+    // not repeat investigations that already happened.
+    let prior = read_prior_context(&project_root, &project_name, 5);
+    if !prior.is_empty() {
+        println!("{} Prior context:", "◆".cyan());
+        for doc in &prior {
+            println!("  {} {}", "•".dimmed(), doc);
         }
     }
 
@@ -247,6 +258,7 @@ fn render_json(
     };
 
     let plans = read_recent_plans(project_root, project_name, 3);
+    let prior_context = read_prior_context(project_root, project_name, 5);
 
     let payload = PrimePayload {
         project: Some(project_name.to_string()),
@@ -255,6 +267,7 @@ fn render_json(
         handoff_summary,
         next_steps,
         plans,
+        prior_context,
         beads,
         openspec,
     };
@@ -466,8 +479,23 @@ fn find_first_paragraph(body: &str) -> String {
     "no summary yet".to_string()
 }
 
-/// Read the most recent `limit` plan files for a project, returning their trimmed text content.
-/// Files are sorted descending by filename so newest plans come first.
+/// Strip leading frontmatter (--- ... ---) from a markdown document, returning the body.
+fn strip_frontmatter(content: &str) -> &str {
+    let body = content.trim_start();
+    if !body.starts_with("---") {
+        return body;
+    }
+    let after_open = &body[3..];
+    match after_open.find("\n---") {
+        Some(close_pos) => after_open[close_pos + 4..].trim_start_matches('\n'),
+        // Unterminated frontmatter — treat everything after the opening as body.
+        None => after_open,
+    }
+}
+
+/// Read the most recent `limit` plan files for a project, returning their first
+/// body line (frontmatter skipped). Files are sorted descending by filename so
+/// newest plans come first.
 fn read_recent_plans(project_root: &Path, project: &str, limit: usize) -> Vec<String> {
     let plans_dir = projects_dir(project_root).join(project).join(PLANS_DIR);
     let Ok(rd) = std::fs::read_dir(&plans_dir) else {
@@ -484,9 +512,43 @@ fn read_recent_plans(project_root: &Path, project: &str, limit: usize) -> Vec<St
         .take(limit)
         .filter_map(|p| {
             let text = std::fs::read_to_string(&p).ok()?;
-            let line = text.trim().lines().next()?.trim().to_string();
-            if line.is_empty() { None } else { Some(line) }
+            let line = find_first_paragraph(strip_frontmatter(&text));
+            if line.is_empty() || line == "no summary yet" {
+                None
+            } else {
+                Some(line)
+            }
         })
+        .collect()
+}
+
+/// Artifact subdirectories surfaced as prior context in prime output.
+const PRIOR_CONTEXT_DIRS: [&str; 3] = ["research", "designs", "reviews"];
+
+/// Read the newest `limit` artifact paths (relative to the project dir) across
+/// research/designs/reviews so prime can point the agent at existing context.
+fn read_prior_context(project_root: &Path, project: &str, limit: usize) -> Vec<String> {
+    let project_dir = projects_dir(project_root).join(project);
+    let mut entries: Vec<(PathBuf, String)> = Vec::new();
+    for subdir in PRIOR_CONTEXT_DIRS {
+        let dir = project_dir.join(subdir);
+        let Ok(rd) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        for e in rd.filter_map(|e| e.ok()) {
+            if e.path().extension().and_then(|x| x.to_str()) == Some("md")
+                && let Some(name) = e.file_name().to_str()
+            {
+                entries.push((e.path(), format!("{}/{}", subdir, name)));
+            }
+        }
+    }
+    // Sort by filename (artifact dates are embedded in filenames), newest first.
+    entries.sort_by(|a, b| b.0.file_name().cmp(&a.0.file_name()));
+    entries
+        .into_iter()
+        .take(limit)
+        .map(|(_, rel)| rel)
         .collect()
 }
 
