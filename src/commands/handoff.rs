@@ -96,6 +96,13 @@ pub fn create_handoff(project_root: &Path, project: &str) -> Result<PathBuf> {
         },
     );
 
+    // 6.3 — decision matrix context: the reasoning, not just the conclusion.
+    let mut content = content;
+    let matrix_dir = crate::matrix::matrix_dir(project_root, project);
+    if let Some(section) = crate::matrix::handoff_section(&matrix_dir, project) {
+        content.push_str(&section);
+    }
+
     let path = handoffs_dir.join(&final_filename);
     std::fs::write(&path, &content).into_diagnostic()?;
     Ok(path)

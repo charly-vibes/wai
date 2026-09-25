@@ -73,6 +73,22 @@ pub fn run(args: PhaseArgs) -> Result<()> {
         PhaseCommands::Next => {
             require_safe_mode("advance phase")?;
             let mut state = ProjectState::load(&state_path)?;
+
+            // Design → plan matrix gate (openspec add-decision-matrix 6.1):
+            // a project with a matrix must have a current decision before
+            // leaving the design phase. Projects without a matrix are never
+            // gated.
+            if state.current == Phase::Design {
+                let matrix_dir = crate::matrix::matrix_dir(&project_root, project_name);
+                match crate::matrix::design_gate(&matrix_dir) {
+                    Some(crate::matrix::GateCheck::Block(msg)) => miette::bail!("{msg}"),
+                    Some(crate::matrix::GateCheck::Warn(msg)) => {
+                        log::warning(msg).into_diagnostic()?;
+                    }
+                    Some(crate::matrix::GateCheck::Pass) | None => {}
+                }
+            }
+
             let new_phase = state.advance()?;
             state.save(&state_path)?;
 

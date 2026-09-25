@@ -357,6 +357,45 @@ pub fn run(verbose: u8) -> Result<()> {
                 if let Some(name) = entry.file_name().to_str()
                     && let Some(ctx) = workflows::scan_project(&project_root, name)
                 {
+                    // Matrix awareness (6.2): during the design phase, surface
+                    // the problem statement, completion count, and the next
+                    // unfilled cell.
+                    if ctx.phase == Phase::Design {
+                        let matrix_dir = crate::matrix::matrix_dir(&project_root, name);
+                        if let Some(progress) = crate::matrix::progress(&matrix_dir) {
+                            println!();
+                            println!(
+                                "    {} Matrix: {}",
+                                "◆".magenta(),
+                                progress.problem.dimmed()
+                            );
+                            println!(
+                                "      Matrix: {}/{} cells filled",
+                                progress.filled, progress.total
+                            );
+                            match progress.next_cell {
+                                Some(cell) => {
+                                    println!("      {} Next unfilled cell: {}", "→".dimmed(), cell);
+                                    let s = Suggestion {
+                                        label: "Fill the next matrix cell".to_string(),
+                                        command: format!(
+                                            "# write {cell}/fact.md + a judgment marker"
+                                        ),
+                                    };
+                                    suggestions.push(s);
+                                }
+                                None => {
+                                    let s = Suggestion {
+                                        label: "Record the matrix decision".to_string(),
+                                        command: "wai matrix decide <approach> <rationale>"
+                                            .to_string(),
+                                    };
+                                    suggestions.push(s);
+                                }
+                            }
+                        }
+                    }
+
                     let detections = workflows::detect_patterns(&ctx);
                     for detection in detections {
                         for s in detection.suggestions {

@@ -605,6 +605,273 @@ fn lint_stale_decision_warns() {
         .stderr(predicate::str::contains("newer than the decision"));
 }
 
+// ── 6.1 design → plan phase gate ─────────────────────────────────────────
+
+fn set_phase_design(dir: &Path, project: &str) {
+    wai_cmd(dir)
+        .args(["phase", "set", "design"])
+        .assert()
+        .success();
+    let _ = project;
+}
+
+#[test]
+fn gate_no_matrix_passes() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+    set_phase_design(tmp.path(), "my-app");
+
+    wai_cmd(tmp.path())
+        .args(["phase", "next"])
+        .assert()
+        .success();
+}
+
+#[test]
+fn gate_scaffolded_decision_blocks() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+    set_phase_design(tmp.path(), "my-app");
+    wai_cmd(tmp.path())
+        .args(["matrix", "init", "problem"])
+        .assert()
+        .success();
+
+    wai_cmd(tmp.path())
+        .args(["phase", "next"])
+        .assert()
+        .failure()
+        .stderr(
+            predicate::str::contains("no decision")
+                .and(predicate::str::contains("wai matrix decide")),
+        );
+}
+
+#[test]
+fn gate_current_decision_passes() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+    set_phase_design(tmp.path(), "my-app");
+    wai_cmd(tmp.path())
+        .args(["matrix", "init", "problem"])
+        .assert()
+        .success();
+    wai_cmd(tmp.path())
+        .args(["matrix", "criterion", "add", "c"])
+        .assert()
+        .success();
+    fill_cell(
+        &matrix_dir(tmp.path(), "my-app"),
+        "01-status-quo",
+        "01-c",
+        "fact",
+        Some("red"),
+    );
+    wai_cmd(tmp.path())
+        .args(["matrix", "decide", "01-status-quo", "keep"])
+        .assert()
+        .success();
+
+    wai_cmd(tmp.path())
+        .args(["phase", "next"])
+        .assert()
+        .success();
+}
+
+#[test]
+fn gate_edited_after_decision_blocks() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+    set_phase_design(tmp.path(), "my-app");
+    let m = matrix_dir(tmp.path(), "my-app");
+    wai_cmd(tmp.path())
+        .args(["matrix", "init", "problem"])
+        .assert()
+        .success();
+    wai_cmd(tmp.path())
+        .args(["matrix", "criterion", "add", "c"])
+        .assert()
+        .success();
+    fill_cell(&m, "01-status-quo", "01-c", "fact", Some("red"));
+    wai_cmd(tmp.path())
+        .args(["matrix", "decide", "01-status-quo", "keep"])
+        .assert()
+        .success();
+
+    // Edit after the decision, then force the edit's mtime well past the
+    // recorded decision timestamp so the comparison is unambiguous.
+    fill_cell(&m, "01-status-quo", "01-c", "edited", Some("red"));
+    let later = filetime::FileTime::from_unix_time(1_800_000_000, 0);
+    for entry in walkdir::WalkDir::new(m.join("approaches")) {
+        let path = entry.unwrap().into_path();
+        if path.is_file() {
+            filetime::set_file_mtime(&path, later).unwrap();
+        }
+    }
+
+    wai_cmd(tmp.path())
+        .args(["phase", "next"])
+        .assert()
+        .failure()
+        .stderr(
+            predicate::str::contains("newer than the decision")
+                .and(predicate::str::contains("wai matrix decide")),
+        );
+}
+
+#[test]
+fn gate_fresh_clone_equal_timestamps_warns_but_proceeds() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+    set_phase_design(tmp.path(), "my-app");
+    let m = matrix_dir(tmp.path(), "my-app");
+    wai_cmd(tmp.path())
+        .args(["matrix", "init", "problem"])
+        .assert()
+        .success();
+    wai_cmd(tmp.path())
+        .args(["matrix", "criterion", "add", "c"])
+        .assert()
+        .success();
+    fill_cell(&m, "01-status-quo", "01-c", "fact", Some("red"));
+    wai_cmd(tmp.path())
+        .args(["matrix", "decide", "01-status-quo", "keep"])
+        .assert()
+        .success();
+
+    // Simulate a fresh clone: all matrix files share one checkout timestamp,
+    // and the recorded decision timestamp equals it (decided before commit).
+    let checkout = filetime::FileTime::from_unix_time(1_700_000_000, 0); // 2023-11-14T22:13:20Z
+    for entry in walkdir::WalkDir::new(&m) {
+        let path = entry.unwrap().into_path();
+        if path.is_file() {
+            filetime::set_file_mtime(&path, checkout).unwrap();
+        }
+    }
+    let decision = fs::read_to_string(m.join("decision.md")).unwrap();
+    let rewritten: String = decision
+        .lines()
+        .map(|l| {
+            if l.starts_with("Decided at:") {
+                "Decided at: 2023-11-14T22:13:20Z".to_string()
+            } else {
+                l.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    fs::write(m.join("decision.md"), rewritten).unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["phase", "next"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("stale"));
+}
+
+// ── 6.2 status awareness ─────────────────────────────────────────────────
+
+#[test]
+fn status_design_phase_shows_matrix_progress() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+    set_phase_design(tmp.path(), "my-app");
+    let m = matrix_dir(tmp.path(), "my-app");
+    wai_cmd(tmp.path())
+        .args(["matrix", "init", "Which storage engine?"])
+        .assert()
+        .success();
+    wai_cmd(tmp.path())
+        .args(["matrix", "approach", "add", "es"])
+        .assert()
+        .success();
+    wai_cmd(tmp.path())
+        .args(["matrix", "criterion", "add", "impact"])
+        .assert()
+        .success();
+    wai_cmd(tmp.path())
+        .args(["matrix", "criterion", "add", "risk"])
+        .assert()
+        .success();
+    fill_cell(
+        &m,
+        "01-status-quo",
+        "01-impact",
+        "Manual audits.",
+        Some("red"),
+    );
+
+    wai_cmd(tmp.path())
+        .args(["status"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Which storage engine?")
+                .and(predicate::str::contains("1/4 cells filled"))
+                .and(predicate::str::contains("01-status-quo/02-risk")),
+        );
+}
+
+// ── 6.3 close handoff ────────────────────────────────────────────────────
+
+#[test]
+fn close_handoff_includes_matrix_context() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+    let m = matrix_dir(tmp.path(), "my-app");
+    wai_cmd(tmp.path())
+        .args(["matrix", "init", "Which storage engine?"])
+        .assert()
+        .success();
+    wai_cmd(tmp.path())
+        .args(["matrix", "criterion", "add", "c"])
+        .assert()
+        .success();
+    fill_cell(&m, "01-status-quo", "01-c", "fact", Some("red"));
+    wai_cmd(tmp.path())
+        .args([
+            "matrix",
+            "decide",
+            "01-status-quo",
+            "Keep the current engine.",
+        ])
+        .assert()
+        .success();
+
+    wai_cmd(tmp.path())
+        .args(["close", "--project", "my-app"])
+        .assert()
+        .success();
+
+    let handoffs = tmp.path().join(".wai/projects/my-app/handoffs");
+    let body: String = fs::read_dir(&handoffs)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .map(|e| fs::read_to_string(e.path()).unwrap_or_default())
+        .find(|s| s.contains("Decision Matrix"))
+        .expect("handoff must include a Decision Matrix section");
+    assert!(
+        body.contains("Which storage engine?"),
+        "problem statement in handoff"
+    );
+    assert!(
+        body.contains("01-status-quo"),
+        "selected approach in handoff"
+    );
+    assert!(
+        body.contains("Keep the current engine."),
+        "rationale in handoff"
+    );
+    assert!(body.contains("designs/matrix"), "matrix link in handoff");
+}
+
 // ── 4.1–4.6 render ──────────────────────────────────────────────────────────
 
 fn fill_cell(m: &Path, approach: &str, criterion: &str, fact: &str, marker: Option<&str>) {
