@@ -52,9 +52,19 @@ wai phase next
 
 # Add a design artifact
 wai add design "New API will use standard REST patterns."
+
+# Optionally: deliberate the design with a decision matrix (opt-in)
+wai matrix init "Which storage engine should we adopt?"
+wai matrix approach add event-sourcing
+wai matrix criterion add operational-cost
+# fill cells by writing files directly:
+#   echo "Full audit trail." > .wai/projects/myproj/designs/matrix/approaches/02-event-sourcing/01-operational-cost/fact.md
+#   touch .wai/projects/myproj/designs/matrix/approaches/02-event-sourcing/01-operational-cost/green
+wai matrix decide "02-event-sourcing" "Best audit story at acceptable ops cost."
+wai phase next   # gate checks the matrix is decided and current
 ```
 
-Phases (research → design → plan → implement → review → archive) guide what kind of work and artifacts are expected at each stage. They're flexible — skip forward or go back as needed.
+Phases (research → design → plan → implement → review → archive) guide what kind of work and artifacts are expected at each stage. They're flexible — skip forward or go back as needed. Projects without a decision matrix skip the gate entirely — see [Decision Matrix](./concepts/decision-matrix.md).
 
 ## 6. Check Your Progress
 

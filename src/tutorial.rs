@@ -57,6 +57,7 @@ pub fn run() -> Result<()> {
          • wai new project       Create a new project\n\
          • wai status            Check project status\n\
          • wai add research      Capture research notes\n\
+         • wai matrix init       Deliberate a design decision (decision matrix)\n\
          • wai phase next        Advance to next phase\n\
          • wai why \"<question>\"  Ask why a decision was made (LLM oracle)\n\
            Examples:\n\

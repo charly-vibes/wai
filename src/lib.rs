@@ -8,6 +8,7 @@ pub mod help;
 pub mod json;
 pub mod llm;
 pub mod managed_block;
+pub mod matrix;
 pub mod openspec;
 pub mod output;
 pub mod plugin;

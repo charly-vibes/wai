@@ -465,6 +465,16 @@ pub enum Commands {
     #[command(subcommand)]
     Pipeline(PipelineCommands),
 
+    /// Manage the decision matrix (Design in Practice) for a project
+    ///
+    /// A plain directory tree under .wai/projects/<project>/designs/matrix/
+    /// where approaches are directories, criteria are subdirectories, each
+    /// cell is a fact.md plus one judgment marker, and problem.md anchors
+    /// the matrix to the decision being made. The filesystem is the source
+    /// of truth — fill cells by writing files directly.
+    #[command(subcommand)]
+    Matrix(MatrixCommands),
+
     /// Inspect and manage decision artifacts
     #[command(subcommand)]
     Artifacts(ArtifactsCommands),
@@ -487,6 +497,116 @@ pub enum ArtifactsCommands {
         /// Output machine-readable JSON
         #[arg(long)]
         json: bool,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum MatrixCommands {
+    /// Initialize the decision matrix for a project
+    ///
+    /// Scaffolds problem.md (the decision being deliberated), criteria/,
+    /// approaches/01-status-quo/, and an empty decision.md template.
+    Init {
+        /// The problem statement (A1): what decision are you trying to make?
+        problem: String,
+
+        /// Project name (overrides WAI_PROJECT; auto-detects when one project exists)
+        #[arg(short, long)]
+        project: Option<String>,
+    },
+
+    /// Manage matrix criteria (rows)
+    #[command(subcommand)]
+    Criterion(MatrixCriterionCommands),
+
+    /// Manage matrix approaches (columns)
+    #[command(subcommand)]
+    Approach(MatrixApproachCommands),
+
+    /// Record the decision: write decision.md + scaffold a design doc
+    ///
+    /// Validates the approach directory exists, writes decision.md (selected
+    /// approach, rationale, UTC timestamp, design doc pointer), and scaffolds
+    /// designs/<date>-<slug>.md with a decision-time snapshot of the winning
+    /// column's facts.
+    Decide {
+        /// Approach to select (e.g. "02-event-sourcing" or "event-sourcing")
+        approach: String,
+
+        /// Why this approach won — recorded verbatim
+        rationale: String,
+
+        /// Project name (overrides WAI_PROJECT; auto-detects when one project exists)
+        #[arg(short, long)]
+        project: Option<String>,
+    },
+
+    /// Render the matrix as self-contained matrix.html (on demand)
+    ///
+    /// Pure function of the directory state: problem.md banner, criteria as
+    /// rows, approaches as columns, judgment chips, assessment key. Never
+    /// committed — regenerate any time.
+    Render {
+        /// Project name (overrides WAI_PROJECT; auto-detects when one project exists)
+        #[arg(short, long)]
+        project: Option<String>,
+    },
+
+    /// Lint the matrix: structural errors + methodology warnings
+    ///
+    /// Structural (non-zero exit): rectangularity, one marker per filled
+    /// cell, no empty fact.md, status-quo first. Methodology warnings (never
+    /// block): all-green column, undistinguished columns, judgment-in-text,
+    /// link-only cells, criteria-as-questions, status-quo-without-red,
+    /// decided-with-unfilled-cells, empty problem.md, stale decision.
+    Lint {
+        /// Project name (overrides WAI_PROJECT; auto-detects when one project exists)
+        #[arg(short, long)]
+        project: Option<String>,
+    },
+}
+
+impl MatrixCommands {
+    /// `--project` flag shared by every leaf subcommand.
+    pub fn project(&self) -> Option<&str> {
+        match self {
+            MatrixCommands::Init { project, .. } => project.as_deref(),
+            MatrixCommands::Criterion(cmds) => match cmds {
+                MatrixCriterionCommands::Add { project, .. } => project.as_deref(),
+            },
+            MatrixCommands::Approach(cmds) => match cmds {
+                MatrixApproachCommands::Add { project, .. } => project.as_deref(),
+            },
+            MatrixCommands::Decide { project, .. } => project.as_deref(),
+            MatrixCommands::Render { project } => project.as_deref(),
+            MatrixCommands::Lint { project } => project.as_deref(),
+        }
+    }
+}
+
+#[derive(Subcommand)]
+pub enum MatrixCriterionCommands {
+    /// Add a criterion: definition file + an empty cell in every approach
+    Add {
+        /// Criterion name (e.g. "operational-cost")
+        name: String,
+
+        /// Project name (overrides WAI_PROJECT; auto-detects when one project exists)
+        #[arg(short, long)]
+        project: Option<String>,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum MatrixApproachCommands {
+    /// Add an approach: directory with _description.md + a cell for every criterion
+    Add {
+        /// Approach name (e.g. "event-sourcing")
+        name: String,
+
+        /// Project name (overrides WAI_PROJECT; auto-detects when one project exists)
+        #[arg(short, long)]
+        project: Option<String>,
     },
 }
 
