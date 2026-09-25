@@ -830,6 +830,25 @@ fn gate_fresh_clone_equal_timestamps_warns_but_proceeds() {
         .stderr(predicate::str::contains("stale"));
 }
 
+#[test]
+fn gate_set_plan_bypass_blocked() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+    set_phase_design(tmp.path(), "my-app");
+    wai_cmd(tmp.path())
+        .args(["matrix", "init", "problem"])
+        .assert()
+        .success();
+
+    // `wai phase set plan` must not bypass the design gate.
+    wai_cmd(tmp.path())
+        .args(["phase", "set", "plan"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("no decision"));
+}
+
 // ── 6.2 status awareness ─────────────────────────────────────────────────
 
 #[test]

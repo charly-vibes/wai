@@ -141,6 +141,20 @@ pub fn run(args: PhaseArgs) -> Result<()> {
             })?;
 
             let mut state = ProjectState::load(&state_path)?;
+
+            // Same matrix gate as `phase next` — `wai phase set plan` must not
+            // bypass the design → plan requirement (6.1).
+            if state.current == Phase::Design && target == Phase::Plan {
+                let matrix_dir = crate::matrix::matrix_dir(&project_root, project_name);
+                match crate::matrix::design_gate(&matrix_dir) {
+                    Some(crate::matrix::GateCheck::Block(msg)) => miette::bail!("{msg}"),
+                    Some(crate::matrix::GateCheck::Warn(msg)) => {
+                        log::warning(msg).into_diagnostic()?;
+                    }
+                    Some(crate::matrix::GateCheck::Pass) | None => {}
+                }
+            }
+
             state.transition_to(target)?;
             state.save(&state_path)?;
 
