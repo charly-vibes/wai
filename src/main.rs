@@ -14,6 +14,7 @@ mod help;
 mod json;
 mod llm;
 pub mod managed_block;
+pub mod matrix;
 pub mod openspec;
 mod output;
 pub mod plugin;
