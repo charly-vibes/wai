@@ -88,5 +88,23 @@ pub fn run(cmd: MatrixCommands) -> Result<()> {
             }
             Ok(())
         }
+        MatrixCommands::Lint { .. } => {
+            let report = matrix::lint(&dir)?;
+            for warning in &report.warnings {
+                log::warning(warning).into_diagnostic()?;
+            }
+            if !current_context().quiet && report.errors.is_empty() && report.warnings.is_empty() {
+                log::success("Matrix lint: all clear").into_diagnostic()?;
+            }
+            if report.errors.is_empty() {
+                Ok(())
+            } else {
+                miette::bail!(
+                    "Matrix lint failed with {} structural error(s):\n  {}",
+                    report.errors.len(),
+                    report.errors.join("\n  ")
+                );
+            }
+        }
     }
 }

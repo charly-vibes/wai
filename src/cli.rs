@@ -551,6 +551,19 @@ pub enum MatrixCommands {
         #[arg(short, long)]
         project: Option<String>,
     },
+
+    /// Lint the matrix: structural errors + methodology warnings
+    ///
+    /// Structural (non-zero exit): rectangularity, one marker per filled
+    /// cell, no empty fact.md, status-quo first. Methodology warnings (never
+    /// block): all-green column, undistinguished columns, judgment-in-text,
+    /// link-only cells, criteria-as-questions, status-quo-without-red,
+    /// decided-with-unfilled-cells, empty problem.md, stale decision.
+    Lint {
+        /// Project name (overrides WAI_PROJECT; auto-detects when one project exists)
+        #[arg(short, long)]
+        project: Option<String>,
+    },
 }
 
 impl MatrixCommands {
@@ -566,6 +579,7 @@ impl MatrixCommands {
             },
             MatrixCommands::Decide { project, .. } => project.as_deref(),
             MatrixCommands::Render { project } => project.as_deref(),
+            MatrixCommands::Lint { project } => project.as_deref(),
         }
     }
 }

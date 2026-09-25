@@ -283,10 +283,333 @@ fn matrix_decide_snapshot_includes_winning_column_facts() {
     );
 }
 
+// ── 5.1–5.11 lint ─────────────────────────────────────────────────────────
+
+fn setup_matrix() -> (TempDir, std::path::PathBuf) {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+    wai_cmd(tmp.path())
+        .args(["matrix", "init", "problem"])
+        .assert()
+        .success();
+    let m = matrix_dir(tmp.path(), "my-app");
+    (tmp, m)
+}
+
+fn lint_cmd(dir: &Path) -> Command {
+    let mut cmd = wai_cmd(dir);
+    cmd.args(["matrix", "lint"]);
+    cmd
+}
+
+#[test]
+fn lint_valid_matrix_passes() {
+    let (tmp, m) = setup_matrix();
+    fill_cell(&m, "01-status-quo", "x", "fact", Some("red"));
+    lint_cmd(tmp.path()).assert().success();
+}
+
+// 5.1 rectangularity
+
+#[test]
+fn lint_missing_cell_fails_naming_path() {
+    let (tmp, m) = setup_matrix();
+    wai_cmd(tmp.path())
+        .args(["matrix", "criterion", "add", "impact"])
+        .assert()
+        .success();
+    wai_cmd(tmp.path())
+        .args(["matrix", "approach", "add", "es"])
+        .assert()
+        .success();
+    // remove the cell dir from one approach → non-rectangular
+    fs::remove_dir_all(m.join("approaches/02-es/01-impact")).unwrap();
+
+    lint_cmd(tmp.path())
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("02-es/01-impact"));
+}
+
+// 5.2 markers
+
+#[test]
+fn lint_multiple_markers_fails_naming_cell() {
+    let (tmp, m) = setup_matrix();
+    wai_cmd(tmp.path())
+        .args(["matrix", "criterion", "add", "c"])
+        .assert()
+        .success();
+    let cell = m.join("approaches/01-status-quo/01-c");
+    fs::write(cell.join("fact.md"), "fact").unwrap();
+    fs::write(cell.join("green"), "").unwrap();
+    fs::write(cell.join("red"), "").unwrap();
+
+    lint_cmd(tmp.path())
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("01-c"));
+}
+
+#[test]
+fn lint_unknown_marker_fails() {
+    let (tmp, m) = setup_matrix();
+    wai_cmd(tmp.path())
+        .args(["matrix", "criterion", "add", "c"])
+        .assert()
+        .success();
+    let cell = m.join("approaches/01-status-quo/01-c");
+    fs::write(cell.join("fact.md"), "fact").unwrap();
+    fs::write(cell.join("chartreuse"), "").unwrap();
+
+    lint_cmd(tmp.path()).assert().failure();
+}
+
+// 5.3 empty/missing fact
+
+#[test]
+fn lint_empty_fact_md_fails() {
+    let (tmp, m) = setup_matrix();
+    wai_cmd(tmp.path())
+        .args(["matrix", "criterion", "add", "c"])
+        .assert()
+        .success();
+    fs::write(m.join("approaches/01-status-quo/01-c/fact.md"), "   \n").unwrap();
+
+    lint_cmd(tmp.path()).assert().failure();
+}
+
+#[test]
+fn lint_marker_without_fact_reports_incomplete() {
+    let (tmp, m) = setup_matrix();
+    wai_cmd(tmp.path())
+        .args(["matrix", "criterion", "add", "c"])
+        .assert()
+        .success();
+    fs::write(m.join("approaches/01-status-quo/01-c/red"), "").unwrap();
+
+    lint_cmd(tmp.path())
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("missing or empty fact.md"));
+}
+
+// 5.4 status quo first
+
+#[test]
+fn lint_missing_status_quo_fails() {
+    let (tmp, m) = setup_matrix();
+    fs::remove_dir_all(m.join("approaches/01-status-quo")).unwrap();
+    lint_cmd(tmp.path()).assert().failure();
+}
+
+// 5.5 all-green column
+
+#[test]
+fn lint_all_green_column_warns_but_passes() {
+    let (tmp, m) = setup_matrix();
+    wai_cmd(tmp.path())
+        .args(["matrix", "approach", "add", "es"])
+        .assert()
+        .success();
+    wai_cmd(tmp.path())
+        .args(["matrix", "criterion", "add", "c"])
+        .assert()
+        .success();
+    fill_cell(&m, "02-es", "01-c", "Perfect in every way.", Some("green"));
+
+    lint_cmd(tmp.path())
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("02-es"));
+}
+
+// 5.6 undistinguished columns
+
+#[test]
+fn lint_undistinguished_columns_warn() {
+    let (tmp, m) = setup_matrix();
+    wai_cmd(tmp.path())
+        .args(["matrix", "approach", "add", "es"])
+        .assert()
+        .success();
+    wai_cmd(tmp.path())
+        .args(["matrix", "criterion", "add", "c"])
+        .assert()
+        .success();
+    fill_cell(&m, "01-status-quo", "01-c", "Same text.", Some("neutral"));
+    fill_cell(&m, "02-es", "01-c", "Same text.", Some("neutral"));
+
+    lint_cmd(tmp.path())
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("indistinguish"));
+}
+
+// 5.7/5.8/5.9 text lints
+
+#[test]
+fn lint_judgment_words_in_fact_warn() {
+    let (tmp, m) = setup_matrix();
+    wai_cmd(tmp.path())
+        .args(["matrix", "criterion", "add", "c"])
+        .assert()
+        .success();
+    fill_cell(
+        &m,
+        "01-status-quo",
+        "01-c",
+        "This is good and better than before.",
+        Some("neutral"),
+    );
+
+    lint_cmd(tmp.path())
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("judgment"));
+}
+
+#[test]
+fn lint_link_only_cell_warns() {
+    let (tmp, m) = setup_matrix();
+    wai_cmd(tmp.path())
+        .args(["matrix", "criterion", "add", "c"])
+        .assert()
+        .success();
+    fill_cell(
+        &m,
+        "01-status-quo",
+        "01-c",
+        "https://example.com/docs/very-long-path",
+        Some("neutral"),
+    );
+
+    lint_cmd(tmp.path())
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("link"));
+}
+
+#[test]
+fn lint_criterion_phrased_as_question_warns() {
+    let (tmp, _m) = setup_matrix();
+    wai_cmd(tmp.path())
+        .args(["matrix", "criterion", "add", "c"])
+        .assert()
+        .success();
+    fs::write(
+        matrix_dir(tmp.path(), "my-app").join("criteria/01-c.md"),
+        "# c\n\nHow cheap is it?\n",
+    )
+    .unwrap();
+
+    lint_cmd(tmp.path())
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("question"));
+}
+
+// status-quo without red
+
+#[test]
+fn lint_status_quo_without_red_warns() {
+    let (tmp, m) = setup_matrix();
+    wai_cmd(tmp.path())
+        .args(["matrix", "criterion", "add", "c"])
+        .assert()
+        .success();
+    fill_cell(
+        &m,
+        "01-status-quo",
+        "01-c",
+        "Works fine, nothing wrong.",
+        Some("green"),
+    );
+
+    lint_cmd(tmp.path())
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("status quo"));
+}
+
+// decided with unfilled cells
+
+#[test]
+fn lint_decided_with_unfilled_cells_warns() {
+    let (tmp, _m) = setup_matrix();
+    wai_cmd(tmp.path())
+        .args(["matrix", "approach", "add", "es"])
+        .assert()
+        .success();
+    wai_cmd(tmp.path())
+        .args(["matrix", "criterion", "add", "c"])
+        .assert()
+        .success();
+    wai_cmd(tmp.path())
+        .args(["matrix", "decide", "02-es", "because"])
+        .assert()
+        .success();
+
+    lint_cmd(tmp.path())
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("unfilled"));
+}
+
+// 5.10 empty problem
+
+#[test]
+fn lint_empty_problem_md_warns() {
+    let (tmp, m) = setup_matrix();
+    fs::write(m.join("problem.md"), "# Problem\n\n").unwrap();
+    lint_cmd(tmp.path())
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("problem"));
+}
+
+// 5.11 stale decision
+
+#[test]
+fn lint_stale_decision_warns() {
+    let (tmp, m) = setup_matrix();
+    wai_cmd(tmp.path())
+        .args(["matrix", "criterion", "add", "c"])
+        .assert()
+        .success();
+    fill_cell(&m, "01-status-quo", "01-c", "fact", Some("red"));
+    wai_cmd(tmp.path())
+        .args(["matrix", "decide", "01-status-quo", "keep"])
+        .assert()
+        .success();
+    // simulate an edit after the decision, with a decision timestamp in the past
+    fill_cell(&m, "01-status-quo", "01-c", "edited fact", Some("red"));
+    let decision = fs::read_to_string(m.join("decision.md")).unwrap();
+    let rewritten: String = decision
+        .lines()
+        .map(|l| {
+            if l.starts_with("Decided at:") {
+                "Decided at: 2020-01-01T00:00:00Z".to_string()
+            } else {
+                l.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    fs::write(m.join("decision.md"), rewritten).unwrap();
+
+    lint_cmd(tmp.path())
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("newer than the decision"));
+}
+
 // ── 4.1–4.6 render ──────────────────────────────────────────────────────────
 
 fn fill_cell(m: &Path, approach: &str, criterion: &str, fact: &str, marker: Option<&str>) {
     let cell = m.join("approaches").join(approach).join(criterion);
+    fs::create_dir_all(&cell).unwrap();
     fs::write(cell.join("fact.md"), fact).unwrap();
     if let Some(marker) = marker {
         fs::write(cell.join(marker), "").unwrap();
