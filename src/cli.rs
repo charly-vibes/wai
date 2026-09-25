@@ -540,6 +540,17 @@ pub enum MatrixCommands {
         #[arg(short, long)]
         project: Option<String>,
     },
+
+    /// Render the matrix as self-contained matrix.html (on demand)
+    ///
+    /// Pure function of the directory state: problem.md banner, criteria as
+    /// rows, approaches as columns, judgment chips, assessment key. Never
+    /// committed — regenerate any time.
+    Render {
+        /// Project name (overrides WAI_PROJECT; auto-detects when one project exists)
+        #[arg(short, long)]
+        project: Option<String>,
+    },
 }
 
 impl MatrixCommands {
@@ -554,6 +565,7 @@ impl MatrixCommands {
                 MatrixApproachCommands::Add { project, .. } => project.as_deref(),
             },
             MatrixCommands::Decide { project, .. } => project.as_deref(),
+            MatrixCommands::Render { project } => project.as_deref(),
         }
     }
 }

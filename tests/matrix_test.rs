@@ -283,6 +283,163 @@ fn matrix_decide_snapshot_includes_winning_column_facts() {
     );
 }
 
+// ── 4.1–4.6 render ──────────────────────────────────────────────────────────
+
+fn fill_cell(m: &Path, approach: &str, criterion: &str, fact: &str, marker: Option<&str>) {
+    let cell = m.join("approaches").join(approach).join(criterion);
+    fs::write(cell.join("fact.md"), fact).unwrap();
+    if let Some(marker) = marker {
+        fs::write(cell.join(marker), "").unwrap();
+    }
+}
+
+#[test]
+fn matrix_render_produces_banner_rows_columns_and_key() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+    wai_cmd(tmp.path())
+        .args(["matrix", "init", "Which storage engine?"])
+        .assert()
+        .success();
+    wai_cmd(tmp.path())
+        .args(["matrix", "approach", "add", "event-sourcing"])
+        .assert()
+        .success();
+    wai_cmd(tmp.path())
+        .args(["matrix", "criterion", "add", "impact"])
+        .assert()
+        .success();
+    let m = matrix_dir(tmp.path(), "my-app");
+    fill_cell(
+        &m,
+        "01-status-quo",
+        "01-impact",
+        "Manual audit scripts.",
+        Some("red"),
+    );
+    fill_cell(
+        &m,
+        "02-event-sourcing",
+        "01-impact",
+        "Audit trail by construction.",
+        Some("green"),
+    );
+
+    wai_cmd(tmp.path())
+        .args(["matrix", "render"])
+        .assert()
+        .success();
+
+    let html = fs::read_to_string(m.join("matrix.html")).unwrap();
+    assert!(html.contains("Which storage engine?"), "problem banner");
+    assert!(html.contains("01-impact"), "criterion row");
+    assert!(html.contains("01-status-quo"), "approach column");
+    assert!(html.contains("02-event-sourcing"), "approach column");
+    assert!(html.contains("Manual audit scripts."), "cell fact");
+    assert!(html.contains("red"), "judgment chip");
+    assert!(html.contains("Assessment key"), "assessment key baked in");
+}
+
+#[test]
+fn matrix_render_is_deterministic_byte_identical() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+    wai_cmd(tmp.path())
+        .args(["matrix", "init", "problem"])
+        .assert()
+        .success();
+    wai_cmd(tmp.path())
+        .args(["matrix", "approach", "add", "a"])
+        .assert()
+        .success();
+    wai_cmd(tmp.path())
+        .args(["matrix", "criterion", "add", "c"])
+        .assert()
+        .success();
+    let m = matrix_dir(tmp.path(), "my-app");
+    fill_cell(&m, "01-status-quo", "01-c", "fact", Some("yellow"));
+
+    wai_cmd(tmp.path())
+        .args(["matrix", "render"])
+        .assert()
+        .success();
+    let first = fs::read(m.join("matrix.html")).unwrap();
+    wai_cmd(tmp.path())
+        .args(["matrix", "render"])
+        .assert()
+        .success();
+    let second = fs::read(m.join("matrix.html")).unwrap();
+    assert_eq!(first, second, "same state must produce byte-identical HTML");
+}
+
+#[test]
+fn matrix_render_empty_cell_is_not_a_judgment_color() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+    wai_cmd(tmp.path())
+        .args(["matrix", "init", "problem"])
+        .assert()
+        .success();
+    wai_cmd(tmp.path())
+        .args(["matrix", "approach", "add", "a"])
+        .assert()
+        .success();
+    wai_cmd(tmp.path())
+        .args(["matrix", "criterion", "add", "c"])
+        .assert()
+        .success();
+
+    wai_cmd(tmp.path())
+        .args(["matrix", "render"])
+        .assert()
+        .success();
+
+    let html = fs::read_to_string(matrix_dir(tmp.path(), "my-app").join("matrix.html")).unwrap();
+    assert!(
+        html.contains("not yet assessed"),
+        "empty cell must show the placeholder"
+    );
+}
+
+#[test]
+fn matrix_render_neutral_is_a_judgment_not_incomplete() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+    wai_cmd(tmp.path())
+        .args(["matrix", "init", "problem"])
+        .assert()
+        .success();
+    wai_cmd(tmp.path())
+        .args(["matrix", "approach", "add", "a"])
+        .assert()
+        .success();
+    wai_cmd(tmp.path())
+        .args(["matrix", "criterion", "add", "c"])
+        .assert()
+        .success();
+    let m = matrix_dir(tmp.path(), "my-app");
+    fill_cell(
+        &m,
+        "01-status-quo",
+        "01-c",
+        "Clear, nothing special.",
+        Some("neutral"),
+    );
+
+    wai_cmd(tmp.path())
+        .args(["matrix", "render"])
+        .assert()
+        .success();
+
+    let html = fs::read_to_string(m.join("matrix.html")).unwrap();
+    assert!(html.contains("Clear, nothing special."));
+    assert!(html.contains("neutral"));
+}
+
 // ── numbering ─────────────────────────────────────────────────────────────────
 
 #[test]

@@ -81,5 +81,12 @@ pub fn run(cmd: MatrixCommands) -> Result<()> {
             }
             Ok(())
         }
+        MatrixCommands::Render { .. } => {
+            let path = matrix::render(&dir)?;
+            if !current_context().quiet {
+                log::success(format!("Rendered matrix to {}", path.display())).into_diagnostic()?;
+            }
+            Ok(())
+        }
     }
 }
