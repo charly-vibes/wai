@@ -522,6 +522,24 @@ pub enum MatrixCommands {
     /// Manage matrix approaches (columns)
     #[command(subcommand)]
     Approach(MatrixApproachCommands),
+
+    /// Record the decision: write decision.md + scaffold a design doc
+    ///
+    /// Validates the approach directory exists, writes decision.md (selected
+    /// approach, rationale, UTC timestamp, design doc pointer), and scaffolds
+    /// designs/<date>-<slug>.md with a decision-time snapshot of the winning
+    /// column's facts.
+    Decide {
+        /// Approach to select (e.g. "02-event-sourcing" or "event-sourcing")
+        approach: String,
+
+        /// Why this approach won — recorded verbatim
+        rationale: String,
+
+        /// Project name (overrides WAI_PROJECT; auto-detects when one project exists)
+        #[arg(short, long)]
+        project: Option<String>,
+    },
 }
 
 impl MatrixCommands {
@@ -535,6 +553,7 @@ impl MatrixCommands {
             MatrixCommands::Approach(cmds) => match cmds {
                 MatrixApproachCommands::Add { project, .. } => project.as_deref(),
             },
+            MatrixCommands::Decide { project, .. } => project.as_deref(),
         }
     }
 }

@@ -170,6 +170,119 @@ fn matrix_approach_add_creates_empty_cells_for_all_criteria() {
     assert!(approach.join("02-risk").is_dir());
 }
 
+// ── 3.1/3.2 decide ─────────────────────────────────────────────────────────
+
+#[test]
+fn matrix_decide_writes_decision_and_design_doc() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+    wai_cmd(tmp.path())
+        .args(["matrix", "init", "problem"])
+        .assert()
+        .success();
+    wai_cmd(tmp.path())
+        .args(["matrix", "approach", "add", "event-sourcing"])
+        .assert()
+        .success();
+
+    wai_cmd(tmp.path())
+        .args([
+            "matrix",
+            "decide",
+            "02-event-sourcing",
+            "Best audit story at acceptable ops cost.",
+        ])
+        .assert()
+        .success();
+
+    let m = matrix_dir(tmp.path(), "my-app");
+    let decision = fs::read_to_string(m.join("decision.md")).unwrap();
+    assert!(
+        decision.contains("02-event-sourcing"),
+        "decision must name the approach"
+    );
+    assert!(decision.contains("Best audit story at acceptable ops cost."));
+    assert!(
+        decision.contains("Decided at: 2"),
+        "must record a UTC timestamp"
+    );
+
+    let designs = tmp.path().join(".wai/projects/my-app/designs");
+    let entries: Vec<_> = fs::read_dir(&designs).unwrap().collect();
+    let doc = entries.iter().find_map(|e| {
+        let name = e.as_ref().unwrap().file_name().into_string().unwrap();
+        name.starts_with("2026-")
+            .then(|| e.as_ref().unwrap().path())
+    });
+    let doc = doc.expect("design doc must be scaffolded in designs/");
+    let body = fs::read_to_string(&doc).unwrap();
+    assert!(
+        body.contains("tracks:"),
+        "design doc needs frontmatter tracks"
+    );
+    assert!(
+        body.contains("Best audit story at acceptable ops cost."),
+        "rationale in doc"
+    );
+}
+
+#[test]
+fn matrix_decide_rejects_unknown_approach_listing_valid() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+    wai_cmd(tmp.path())
+        .args(["matrix", "init", "problem"])
+        .assert()
+        .success();
+
+    wai_cmd(tmp.path())
+        .args(["matrix", "decide", "02-nope", "because"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("01-status-quo"));
+}
+
+#[test]
+fn matrix_decide_snapshot_includes_winning_column_facts() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+    wai_cmd(tmp.path())
+        .args(["matrix", "init", "problem"])
+        .assert()
+        .success();
+    wai_cmd(tmp.path())
+        .args(["matrix", "approach", "add", "event-sourcing"])
+        .assert()
+        .success();
+    wai_cmd(tmp.path())
+        .args(["matrix", "criterion", "add", "impact"])
+        .assert()
+        .success();
+
+    let cell = matrix_dir(tmp.path(), "my-app").join("approaches/02-event-sourcing/01-impact");
+    fs::write(cell.join("fact.md"), "Full audit trail by construction.").unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["matrix", "decide", "02-event-sourcing", "because"])
+        .assert()
+        .success();
+
+    let designs = tmp.path().join(".wai/projects/my-app/designs");
+    let entries: Vec<_> = fs::read_dir(&designs).unwrap().collect();
+    let body = entries
+        .iter()
+        .map(|e| fs::read_to_string(e.as_ref().unwrap().path()).unwrap())
+        .find(|s| s.contains("# Design"))
+        .unwrap();
+    assert!(
+        body.contains("Full audit trail by construction."),
+        "design doc must snapshot the winning column's facts"
+    );
+}
+
 // ── numbering ─────────────────────────────────────────────────────────────────
 
 #[test]

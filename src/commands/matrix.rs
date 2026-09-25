@@ -63,5 +63,23 @@ pub fn run(cmd: MatrixCommands) -> Result<()> {
             }
             Ok(())
         }
+        MatrixCommands::Decide {
+            approach,
+            rationale,
+            ..
+        } => {
+            require_safe_mode("record matrix decision")?;
+            let (decision_path, doc_path) =
+                matrix::decide(&dir, &approach, &rationale, &resolved.name)?;
+            if !current_context().quiet {
+                log::success(format!(
+                    "Decision recorded: {} — design doc scaffolded at {}",
+                    decision_path.display(),
+                    doc_path.display()
+                ))
+                .into_diagnostic()?;
+            }
+            Ok(())
+        }
     }
 }

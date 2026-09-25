@@ -206,6 +206,179 @@ fn require_matrix(dir: &Path) -> Result<()> {
     Ok(())
 }
 
+// ── Deciding ─────────────────────────────────────────────────────────────────
+
+/// A parsed `decision.md`. `approach` is the raw `Selected approach:` value
+/// (before validity checking); a freshly-scaffolded template yields `(none)`.
+#[derive(Debug, Clone, Default)]
+pub struct Decision {
+    pub approach: Option<String>,
+    pub rationale: Option<String>,
+    /// RFC 3339 UTC timestamp written by `decide`; `(none)` until then.
+    pub decided_at: Option<String>,
+    pub design_doc: Option<String>,
+}
+
+impl Decision {
+    /// The recorded-approach name, when present and not the template marker.
+    pub fn approach_name(&self) -> Option<&str> {
+        self.approach
+            .as_deref()
+            .filter(|s| !s.is_empty() && !s.starts_with("(none"))
+    }
+}
+
+/// Parse `decision.md`. Line-oriented: `Key: value` under `# Decision`.
+/// A missing or unparseable file yields the default (never decided).
+pub fn read_decision(dir: &Path) -> Decision {
+    let mut decision = Decision::default();
+    let Ok(content) = std::fs::read_to_string(dir.join("decision.md")) else {
+        return decision;
+    };
+    for line in content.lines() {
+        let Some((key, value)) = line.split_once(':') else {
+            continue;
+        };
+        let value = value.trim();
+        match key.trim() {
+            "Selected approach" => decision.approach = Some(value.to_string()),
+            "Rationale" => decision.rationale = Some(value.to_string()),
+            "Decided at" => decision.decided_at = Some(value.to_string()),
+            "Design doc" => decision.design_doc = Some(value.to_string()),
+            _ => {}
+        }
+    }
+    decision
+}
+
+/// `true` when the decision names an approach directory that exists under
+/// `approaches/`. A scaffolded template names `(none)` → not decided.
+pub fn is_decided(dir: &Path, decision: &Decision) -> bool {
+    let Some(name) = decision.approach_name() else {
+        return false;
+    };
+    dir.join("approaches").join(name).is_dir()
+}
+
+/// Record a decision: validate the approach exists, write `decision.md`, and
+/// scaffold a design doc in `designs/` with a decision-time snapshot of the
+/// winning column's facts. Returns `(decision path, design doc path)`.
+pub fn decide(
+    dir: &Path,
+    approach_arg: &str,
+    rationale: &str,
+    project_rel: &str,
+) -> Result<(PathBuf, PathBuf)> {
+    require_matrix(dir)?;
+    let approaches = list_approaches(dir)?;
+    let wanted = slugify(approach_arg);
+    let match_name = approaches.iter().find_map(|a| {
+        let name = a.file_name()?.to_str()?;
+        let stem = name.split_once('-').map(|x| x.1).unwrap_or(name);
+        (stem == wanted || name == approach_arg).then(|| name.to_string())
+    });
+    let Some(approach_name) = match_name else {
+        let valid: Vec<&str> = approaches
+            .iter()
+            .filter_map(|a| a.file_name().and_then(|s| s.to_str()))
+            .collect();
+        miette::bail!(
+            "No approach '{}' in the matrix. Valid approaches: {}. \
+             Add one first with `wai matrix approach add {}`.",
+            approach_arg,
+            valid.join(", "),
+            slugify(approach_arg)
+        );
+    };
+
+    let now = now_utc();
+    let today = &now[..10];
+    let doc_slug = approach_name
+        .split_once('-')
+        .map(|x| x.1)
+        .unwrap_or(approach_name.as_str());
+    let designs_dir = dir
+        .parent()
+        .ok_or_else(|| miette::miette!("Matrix directory '{}' has no parent", dir.display()))?;
+
+    // Unique design doc: designs/<date>-<slug>.md, numbered on re-decide.
+    let mut doc = designs_dir.join(format!("{today}-{doc_slug}.md"));
+    let mut counter = 2;
+    while doc.exists() {
+        doc = designs_dir.join(format!("{today}-{doc_slug}-{counter}.md"));
+        counter += 1;
+    }
+
+    let doc_rel = format!(
+        ".wai/projects/{project_rel}/designs/{}",
+        doc.file_name().and_then(|s| s.to_str()).unwrap_or_default()
+    );
+
+    std::fs::write(
+        dir.join("decision.md"),
+        format!(
+            "# Decision\n\n\
+             Selected approach: {approach_name}\n\
+             Rationale: {rationale}\n\
+             Decided at: {now}\n\
+             Design doc: {doc_rel}\n"
+        ),
+    )
+    .into_diagnostic()?;
+
+    let snapshot = winning_column_snapshot(dir, &approach_name)?;
+    std::fs::write(
+        &doc,
+        format!(
+            "---\n\
+             tags: [design]\n\
+             tracks:\n\
+               - .wai/projects/{project_rel}/designs/matrix\n\
+             ---\n\n\
+             # Design: {doc_slug}\n\n\
+             Decision: {approach_name}\n\
+             Date: {now}\n\
+             Matrix: .wai/projects/{project_rel}/designs/matrix/\n\n\
+             ## Rationale\n\n\
+             {rationale}\n\n\
+             ## Trade-offs\n\n\
+             (describe the trade-offs accepted)\n\n\
+             ## Decision-time snapshot — winning column\n\n\
+             {snapshot}"
+        ),
+    )
+    .into_diagnostic()?;
+
+    Ok((dir.join("decision.md"), doc))
+}
+
+/// The winning column's non-empty facts at decision time, as markdown
+/// sections. The matrix keeps growing; the design doc records what was true
+/// when decided.
+fn winning_column_snapshot(dir: &Path, approach_name: &str) -> Result<String> {
+    let mut out = String::new();
+    for criterion in list_criteria(dir)? {
+        let id = criterion
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or_default();
+        let fact_path = dir
+            .join("approaches")
+            .join(approach_name)
+            .join(id)
+            .join("fact.md");
+        if let Ok(fact) = std::fs::read_to_string(&fact_path)
+            && !fact.trim().is_empty()
+        {
+            out.push_str(&format!("### {id}\n\n{}\n\n", fact.trim()));
+        }
+    }
+    if out.is_empty() {
+        out.push_str("(no cells filled at decision time)\n");
+    }
+    Ok(out)
+}
+
 /// UTC timestamp written inside `decision.md` by `decide`. Rendered in RFC
 /// 3339 with second precision so gate comparisons are deterministic.
 pub fn now_utc() -> String {
