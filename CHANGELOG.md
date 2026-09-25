@@ -5,6 +5,19 @@ All notable changes to wai will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Calendar Versioning](https://calver.org/) (YYYY.M.MICRO).
 
+## [Unreleased]
+
+### Added
+
+- **Decision matrix** (openspec `add-decision-matrix`): first-class
+  representation of the Design in Practice deliberation artifact at
+  `.wai/projects/<project>/designs/matrix/`. New `wai matrix` command group:
+  `init`, `criterion add`, `approach add`, `decide`, `lint`, `render`.
+  Design → plan phase gate requires a decided, current matrix (opt-in —
+  projects without a matrix are never gated). `wai status` shows matrix
+  progress during the design phase; `wai close` handoffs include the
+  decision, rationale, and links. See [Decision Matrix](docs/src/concepts/decision-matrix.md).
+
 ## [2026.7.31] - 2026-07-31
 
 ### Added

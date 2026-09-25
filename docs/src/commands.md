@@ -15,6 +15,7 @@ Complete CLI reference for wai.
   - [Reasoning & Reflection](#reasoning--reflection)
   - [Session Management](#session-management)
   - [Pipelines](#pipelines)
+- [Decision Matrix](#decision-matrix)
 - [Plugin System](#plugin-system)
 - [Doctor & Health Checks](#doctor-checks)
 
@@ -561,6 +562,76 @@ wai pipeline lock
 ```
 
 ---
+
+## Decision Matrix
+
+Manage the project's decision matrix (Design in Practice methodology). See
+[Decision Matrix](./concepts/decision-matrix.md) for the full model.
+
+### `wai matrix init`
+
+```bash
+wai matrix init "Which storage engine should we adopt?"
+```
+
+Scaffolds `.wai/projects/<project>/designs/matrix/`: `problem.md` (the A1),
+`criteria/`, `approaches/01-status-quo/` with `_description.md`, and an empty
+`decision.md` template (never counts as decided). One matrix per project —
+re-init fails and names the existing matrix.
+
+### `wai matrix criterion add`
+
+```bash
+wai matrix criterion add operational-cost
+```
+
+Creates `criteria/NN-<name>.md` and an empty cell directory in **every**
+existing approach (rectangular by construction).
+
+### `wai matrix approach add`
+
+```bash
+wai matrix approach add event-sourcing
+```
+
+Creates `approaches/NN-<name>/` with `_description.md` and an empty cell
+directory for every existing criterion.
+
+### `wai matrix decide`
+
+```bash
+wai matrix decide "02-event-sourcing" "Best audit story at acceptable ops cost."
+```
+
+Validates the approach exists (errors list valid names), writes `decision.md`
+(approach, rationale, UTC timestamp, design-doc pointer), and scaffolds
+`designs/<date>-<slug>.md` with frontmatter and a decision-time snapshot of
+the winning column's facts.
+
+### `wai matrix lint`
+
+```bash
+wai matrix lint
+```
+
+Structural errors (non-zero exit): rectangularity, one marker per filled
+cell, no empty `fact.md`, status-quo first. Methodology warnings (never
+block): all-green column, undistinguished columns, judgment-in-text,
+link-only cells, criteria-as-questions, status-quo-without-red,
+decided-with-unfilled-cells, empty `problem.md`, stale decision.
+
+### `wai matrix render`
+
+```bash
+wai matrix render && open .wai/projects/<project>/designs/matrix/matrix.html
+```
+
+Generates a self-contained `matrix.html` (inline CSS, no JS) as a pure
+function of the directory state — byte-identical for equal state. It is a
+generated view: never committed, always regenerable.
+
+All subcommands accept `--project <name>` (otherwise resolved via
+`WAI_PROJECT` or auto-detection).
 
 ## Plugin System
 

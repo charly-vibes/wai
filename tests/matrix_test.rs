@@ -605,6 +605,62 @@ fn lint_stale_decision_warns() {
         .stderr(predicate::str::contains("newer than the decision"));
 }
 
+// ── 8.1 agent-style direct file I/O ────────────────────────────────────
+
+#[test]
+fn agent_flow_direct_file_io_lint_render_gate() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+    set_phase_design(tmp.path(), "my-app");
+
+    // 1. Only `init` uses the CLI (scaffolding spans many directories).
+    wai_cmd(tmp.path())
+        .args(["matrix", "init", "Which storage engine?"])
+        .assert()
+        .success();
+    let m = matrix_dir(tmp.path(), "my-app");
+
+    // 2. Everything else is direct file I/O — no CLI sugar for cells.
+    fs::write(
+        m.join("criteria/01-impact.md"),
+        "# impact\n\nBlast radius of failure.\n",
+    )
+    .unwrap();
+    let es = m.join("approaches/02-event-sourcing");
+    fs::create_dir_all(es.join("01-impact")).unwrap();
+    fs::write(
+        es.join("_description.md"),
+        "# event-sourcing\n\nAppend-only events.\n",
+    )
+    .unwrap();
+    fs::write(es.join("01-impact/fact.md"), "Audit trail by construction.").unwrap();
+    fs::write(es.join("01-impact/green"), "").unwrap();
+    let sq = m.join("approaches/01-status-quo/01-impact");
+    fs::create_dir_all(&sq).unwrap();
+    fs::write(sq.join("fact.md"), "Manual audit scripts, drift-prone.").unwrap();
+    fs::write(sq.join("red"), "").unwrap();
+
+    // 3. Lint passes (status quo has red — no methodology warning expected).
+    lint_cmd(tmp.path()).assert().success();
+
+    // 4. Decide (multi-artifact op) + render + gate.
+    wai_cmd(tmp.path())
+        .args(["matrix", "decide", "02-event-sourcing", "Audit story wins."])
+        .assert()
+        .success();
+    wai_cmd(tmp.path())
+        .args(["matrix", "render"])
+        .assert()
+        .success();
+    let html = fs::read_to_string(m.join("matrix.html")).unwrap();
+    assert!(html.contains("Audit trail by construction."));
+    wai_cmd(tmp.path())
+        .args(["phase", "next"])
+        .assert()
+        .success();
+}
+
 // ── 6.1 design → plan phase gate ─────────────────────────────────────────
 
 fn set_phase_design(dir: &Path, project: &str) {

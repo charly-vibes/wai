@@ -15,6 +15,7 @@
 - [Project Phases](./concepts/phases.md)
 - [Sessions](./concepts/sessions.md)
 - [Reasoning](./concepts/reasoning.md)
+- [Decision Matrix](./concepts/decision-matrix.md)
 - [Plugin System](./concepts/plugins.md)
 - [Pipelines](./concepts/pipelines.md)
 - [Agent Config Sync](./concepts/agent-config-sync.md)
