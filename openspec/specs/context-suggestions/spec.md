@@ -32,7 +32,11 @@ This spec defines the logic for generating suggestions within the `wai status` c
 ## Requirements
 ### Requirement: Phase-Based Suggestions
 
-The status command SHALL provide contextual next-step suggestions based on the current project phase.
+The status command SHALL provide contextual next-step suggestions based on the
+current project phase. When the project is in the design phase **and** has a
+decision matrix, `wai status` SHALL additionally show the matrix's current
+problem statement, its cell completion count, and a suggestion for the next
+unfilled cell.
 
 #### Scenario: Research phase
 
@@ -46,28 +50,19 @@ The status command SHALL provide contextual next-step suggestions based on the c
 - **THEN** suggest adding a plan: `wai add plan "..."`
 - **AND** suggest advancing to design: `wai phase next`
 
-#### Scenario: Design phase
+#### Scenario: Design phase with a matrix
 
-- **WHEN** project is in "design" phase
-- **THEN** suggest adding designs: `wai add design "..."`
-- **AND** suggest advancing to implementation: `wai phase next`
+- **GIVEN** a project in the design phase with a matrix having 5 of 6 cells
+  filled
+- **WHEN** `wai status` runs
+- **THEN** suggestions include the problem statement, `5/6 cells filled`,
+  and a pointer to the unfilled cell
 
-#### Scenario: Implement phase
+#### Scenario: Design phase without a matrix
 
-- **WHEN** project is in "implement" phase
-- **THEN** suggest creating a handoff when pausing: `wai handoff create`
-- **AND** suggest advancing to review: `wai phase next`
-
-#### Scenario: Review phase
-
-- **WHEN** project is in "review" phase
-- **THEN** suggest completing and archiving: `wai phase next`
-- **AND** suggest going back if issues found: `wai phase back`
-
-#### Scenario: Archive phase
-
-- **WHEN** project is in "archive" phase
-- **THEN** suggest starting a new project: `wai new project`
+- **GIVEN** a project in the design phase that never initialized a matrix
+- **WHEN** `wai status` runs
+- **THEN** no matrix information or suggestion is shown
 
 ### Requirement: Plugin-Enhanced Suggestions
 
