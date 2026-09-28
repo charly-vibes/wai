@@ -18,6 +18,60 @@ and this project adheres to [Calendar Versioning](https://calver.org/) (YYYY.M.M
   progress during the design phase; `wai close` handoffs include the
   decision, rationale, and links. See [Decision Matrix](docs/src/concepts/decision-matrix.md).
 
+### Added
+
+- **Project artifact completeness check** — `wai way` now scans
+  `.wai/projects/<project>/{research,handoffs,designs,plans,reviews}/` for
+  stub documents (frontmatter plus <5 body lines), except single-line
+  structured records (`UPPERCASE-KEY: ...`). Surfaces findings that would
+  otherwise evaporate between sessions (wai-vdg6).
+- **Prior context on prime** — `wai prime` now lists the 5 newest
+  research/design/review docs of the active project (text and `--json`
+  payload parity), sorted chronologically by filename. Stops agents from
+  re-running identical investigations (wai-xt9o).
+
+### Fixed
+
+- **16 clippy errors** resolved across source and tests; CI clippy check
+  now includes test targets.
+
+### Changed
+
+- **Dependabot** enabled for cargo and GitHub Actions dependencies.
+
+## [2026.8.5] - 2026-08-05
+
+### Added
+
+- **Plugin trust model** — repository plugin hooks are now gated by
+  explicit approval with SHA-256 digest verification (SEC-1 RCE fix).
+  New commands: `wai plugin trust`, `wai plugin trust --list`,
+  `wai plugin trust --revoke`.
+- **genesis CLI ergonomics** — adopted `CliVerbosity`/`CliFormat` from
+  genesis v0.6; `--human` flag for machine-readable commands.
+- **pretender.toml integration** — `wai doctor` detects and validates
+  `pretender.toml`; integrated into lefthook and CI (doctor check runs
+  outside CI, `pretender check --diff-only` is the CI gate).
+
+### Changed
+
+- **genesis v0.6.0 envelope API** — local doctor types
+  (`CheckResult`/`DoctorHealthSummary`/`Status`) replaced by
+  `genesis::doctor` types; all `--json` output uses the shared envelope.
+
+### Fixed
+
+- **doctor `--fix`** now resolves managed-block staleness automatically.
+- **Pipeline run tracking** consolidated to a single `.last-run` pointer
+  (`.pipeline-run` dual-file removed).
+- **plugin hook timeout deadlock** — `execute_hook` uses `try_wait()`
+  instead of blocking `wait()` (wai-qqlt).
+- **Help/docs**: documented `--reviews` flag for `wai add review`,
+  default search root (`$HOME`) for `wai ls`, removed phantom
+  `wai init --update` references.
+- **crates.io publish** — skill templates embedded in `src/` so
+  `cargo publish` verifies the packaged tarball.
+
 ## [2026.7.31] - 2026-07-31
 
 ### Added

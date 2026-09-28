@@ -83,6 +83,12 @@ wai import .cursorrules
 
 Audits your repository against AI-friendliness best practices: checks for `CLAUDE.md`, `.editorconfig`, skill files, and similar scaffolding. Unlike `wai doctor`, which focuses on the `.wai/` workspace, `wai way` focuses on the repository as a whole.
 
+It also runs a **project artifact completeness** check: scans
+`.wai/projects/<project>/{research,handoffs,designs,plans,reviews}/` for
+stub documents (frontmatter plus fewer than 5 body lines), so
+session-mined findings don't silently evaporate. Single-line structured
+records (`UPPERCASE-KEY: ...`) are exempt.
+
 ```bash
 # Check which best practices are missing
 wai way
@@ -456,7 +462,7 @@ See [Sessions](./concepts/sessions.md) for the session lifecycle and how handoff
 
 #### `wai prime`
 
-Runs at the start of a session to orient you: reads the last handoff, reports the current phase, and surfaces the next suggested step. Most Claude Code setups call this automatically via a startup hook.
+Runs at the start of a session to orient you: reads the last handoff, reports the current phase, and surfaces the next suggested step. It also lists the **Prior context** — the 5 newest research/design/review docs of the active project — so you don't re-run investigations that already happened. Most Claude Code setups call this automatically via a startup hook.
 
 ```bash
 # Orient for the active project
