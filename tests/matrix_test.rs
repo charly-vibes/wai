@@ -271,12 +271,18 @@ fn matrix_decide_snapshot_includes_winning_column_facts() {
         .success();
 
     let designs = tmp.path().join(".wai/projects/my-app/designs");
-    let entries: Vec<_> = fs::read_dir(&designs).unwrap().collect();
-    let body = entries
-        .iter()
-        .map(|e| fs::read_to_string(e.as_ref().unwrap().path()).unwrap())
-        .find(|s| s.contains("# Design"))
-        .unwrap();
+    let body = fs::read_dir(&designs)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .filter(|p| p.is_file())
+        .find(|p| {
+            fs::read_to_string(p)
+                .map(|s| s.contains("# Design"))
+                .unwrap_or(false)
+        })
+        .map(|p| fs::read_to_string(p).unwrap())
+        .unwrap_or_else(|| panic!("design doc not found under designs/"));
     assert!(
         body.contains("Full audit trail by construction."),
         "design doc must snapshot the winning column's facts"
