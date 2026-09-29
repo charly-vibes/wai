@@ -1,5 +1,4 @@
-sync:
-    mode: dolt-native
+# sync mode removed — embedded + no-db (JSONL source of truth)
 
 # sync.remote: "git+ssh://git@cv/charly-vibes/wai.git"
 
