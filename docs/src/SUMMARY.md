@@ -42,3 +42,27 @@
 
 - [Development](./development.md)
 - [Architecture](./architecture.md)
+
+# Design Specs
+
+- [`agent-config-sync`](./specs/agent-config-sync.md)
+- [`agnostic-capabilities`](./specs/agnostic-capabilities.md)
+- [`cli-core`](./specs/cli-core.md)
+- [`context-suggestions`](./specs/context-suggestions.md)
+- [`decision-matrix`](./specs/decision-matrix.md)
+- [`doctor-auto-fix`](./specs/doctor-auto-fix.md)
+- [`error-recovery`](./specs/error-recovery.md)
+- [`handoff-system`](./specs/handoff-system.md)
+- [`help-system`](./specs/help-system.md)
+- [`managed-block`](./specs/managed-block.md)
+- [`onboarding`](./specs/onboarding.md)
+- [`para-structure`](./specs/para-structure.md)
+- [`pipeline-resource`](./specs/pipeline-resource.md)
+- [`plugin-system`](./specs/plugin-system.md)
+- [`project-reflection`](./specs/project-reflection.md)
+- [`project-state-machine`](./specs/project-state-machine.md)
+- [`reasoning-oracle`](./specs/reasoning-oracle.md)
+- [`repository-best-practices`](./specs/repository-best-practices.md)
+- [`research-management`](./specs/research-management.md)
+- [`skill-sharing`](./specs/skill-sharing.md)
+- [`timeline-search`](./specs/timeline-search.md)

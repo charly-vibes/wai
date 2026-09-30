@@ -35,3 +35,4 @@ Thumbs.db
 .vscode/
 # VS Code
 # will have compiled files and executables
+docs/src/specs/
