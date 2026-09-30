@@ -1,7 +1,7 @@
 [book]
 authors = ["charly vibes"]
 language = "en"
-src = "docs"
+src = "docs/src"
 title = "wai"
 description = "Workflow management for PARA-style project tracking in agent sessions."
 
@@ -9,9 +9,10 @@ description = "Workflow management for PARA-style project tracking in agent sess
 build-dir = "docs/_book"
 
 [output.html]
-default-theme = "navy"
+default-theme = "coal"
+preferred-dark-theme = "coal"
 git-repository-url = "https://github.com/charly-vibes/wai"
 edit-url-template = "https://github.com/charly-vibes/wai/edit/main/{path}"
 site-url = "/wai/"
 no-section-label = true
-additional-css = []
+additional-css = ["theme/charly.css"]
