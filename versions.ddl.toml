@@ -1,0 +1,13 @@
+# Pinned ecosystem tool versions for this repo's CI and dev setup.
+# Standardization §4: installs are pinned, never `latest` — a broken release
+# of any tool must not break CI of the whole fleet.
+# Update deliberately; the conformance test (dulce-de-leche
+# tests/standard_conformance.rs) requires this file to exist.
+#
+# §4 matrix row (wai): pretender ✅ · wai (self) · bd ✅ · openspec ✅ · ddl ✅
+
+[tools]
+pretender = "0.6.0"        # crates.io; CI currently installs unpinned — align (DDL-1a0)
+dulce-de-leche = "0.7.0"   # crates.io (bin: ddl) — planned install
+openspec = "0.19.0"        # npm: @fission-ai/openspec — planned install
+# bd = "1.3.0"             # beads — install mechanism TBD (see DDL-1a0)
