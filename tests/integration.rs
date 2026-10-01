@@ -35,6 +35,9 @@ fn wai_cmd(dir: &std::path::Path) -> Command {
     cmd.current_dir(dir);
     // Disable color output for predictable assertions
     cmd.env("NO_COLOR", "1");
+    // Update notice off in tests: existing assertions expect quiet stderr and
+    // must not depend on real ~/.cache state (wai-r3p0 tidy).
+    cmd.env("GENESIS_NO_UPDATE_CHECK", "1");
     cmd
 }
 

@@ -117,6 +117,9 @@ fn test_wai_sync_injects_managed_block() {
     let mut cmd = Command::cargo_bin("wai").unwrap();
     cmd.current_dir(dir.path());
     cmd.env("NO_COLOR", "1");
+    // Update notice off in tests: existing assertions expect quiet stderr and
+    // must not depend on real ~/.cache state (wai-r3p0 tidy).
+    cmd.env("GENESIS_NO_UPDATE_CHECK", "1");
     cmd.args(["init", "--name", "regression-test"]);
     cmd.assert().success();
 
@@ -147,6 +150,9 @@ fn test_wai_sync_injects_managed_block() {
     let mut cmd = Command::cargo_bin("wai").unwrap();
     cmd.current_dir(dir.path());
     cmd.env("NO_COLOR", "1");
+    // Update notice off in tests: existing assertions expect quiet stderr and
+    // must not depend on real ~/.cache state (wai-r3p0 tidy).
+    cmd.env("GENESIS_NO_UPDATE_CHECK", "1");
     cmd.args(["sync"]);
     cmd.assert().success();
 

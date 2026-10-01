@@ -96,6 +96,9 @@ fn test_wai_statos_regression() {
 
     let mut cmd = Command::cargo_bin("wai").unwrap();
     cmd.env("NO_COLOR", "1");
+    // Update notice off in tests: existing assertions expect quiet stderr and
+    // must not depend on real ~/.cache state (wai-r3p0 tidy).
+    cmd.env("GENESIS_NO_UPDATE_CHECK", "1");
     cmd.arg("statos");
 
     cmd.assert()
