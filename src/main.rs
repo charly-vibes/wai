@@ -67,7 +67,10 @@ fn main() -> Result<()> {
     guide.set_verbosity(cli.verbose.verbosity());
     let argv: Vec<String> = std::env::args().collect();
     match commands::run(cli, &guide) {
-        Ok(_) => Ok(()),
+        Ok(_) => {
+            maybe_notify_update();
+            Ok(())
+        }
         Err(err) => {
             // Error-scratch: persist the last error so `wai feedback --from-last-error`
             // can rebuild a well-contexted issue. Best-effort — never shadows the
@@ -114,6 +117,17 @@ fn main() -> Result<()> {
             }
             Err(err)
         }
+    }
+}
+
+/// Best-effort update notice (genesis-2ex): check crates.io for a newer `wai`
+/// release and print one line to stderr AFTER command output. Fail-silent by
+/// contract — `check` never panics and skips on CI / GENESIS_NO_UPDATE_CHECK.
+fn maybe_notify_update() {
+    if let Some(info) =
+        genesis::update_check::check(env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
+    {
+        eprintln!("{}", genesis::update_check::notice(&info));
     }
 }
 
