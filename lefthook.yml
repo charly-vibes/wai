@@ -15,6 +15,8 @@ pre-commit:
 
   parallel: true
   commands:
+    bd:
+      run: bd hooks run pre-commit
     format-check:
       glob: "*.rs"
       run: just fmt-check
@@ -26,6 +28,8 @@ pre-commit:
 
 pre-push:
   commands:
+    bd:
+      run: bd hooks run pre-push
     test:
       # Run only affected tests via testaruda (falls back to full cargo test)
       # Run only affected tests via testaruda --safe (falls back to cargo test)
