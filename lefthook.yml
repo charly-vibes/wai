@@ -24,7 +24,9 @@ pre-commit:
       glob: "*.rs"
       run: just lint
     pretender-check:
-      run: pretender check --staged
+      # §9: gate on staged files — blocks NEW violations (testaruda pattern);
+      # thresholds come from pretender.toml, tuned to the baseline.
+      run: pretender check --staged --mode gate
 
 pre-push:
   commands:
