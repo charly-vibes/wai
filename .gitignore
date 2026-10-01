@@ -36,3 +36,5 @@ Thumbs.db
 # VS Code
 # will have compiled files and executables
 docs/src/specs/
+# §6: generated from Cargo.toml by docs.yml — never committed
+docs/src/release.md
