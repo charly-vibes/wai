@@ -40,7 +40,7 @@ jobs:
         uses: extractions/setup-just@v2
 
       - name: Install pretender (§4, pinned)
-        run: cargo install --locked pretender@0.6.0
+        run: cargo install --locked pretender@0.7.0
 
       - name: Install ecosystem tools (§4 dogfood matrix, pinned)
         run: |
