@@ -7,6 +7,7 @@ mod cli;
 mod commands;
 mod config;
 mod context;
+mod detailed_agents;
 mod error;
 pub mod freshness;
 mod guided_flows;
@@ -18,6 +19,7 @@ pub mod matrix;
 pub mod openspec;
 mod output;
 pub mod plugin;
+mod reflect_block;
 mod state;
 mod sync_core;
 mod tutorial;
@@ -30,16 +32,7 @@ use context::{CliContext, set_context};
 use output::print_json_line;
 
 fn main() -> Result<()> {
-    miette::set_hook(Box::new(|_| {
-        Box::new(
-            miette::MietteHandlerOpts::new()
-                .terminal_links(true)
-                .unicode(true)
-                .context_lines(2)
-                .build(),
-        )
-    }))
-    .ok();
+    init_miette_hook();
 
     // Handle --version --json before clap processes it (clap's built-in --version
     // doesn't participate in the global --json flag)
@@ -71,53 +64,73 @@ fn main() -> Result<()> {
             maybe_notify_update();
             Ok(())
         }
-        Err(err) => {
-            // Error-scratch: persist the last error so `wai feedback --from-last-error`
-            // can rebuild a well-contexted issue. Best-effort — never shadows the
-            // real error, never changes the exit code.
-            let footer = err.help().map(|h| h.to_string());
-            genesis::feedback::scratch::write_scratch_best_effort(
-                "wai",
-                &genesis::feedback::scratch::ErrorRecord {
-                    ts: scratch_timestamp(),
-                    argv: argv.clone(),
-                    exit: 1,
-                    footer,
-                    kind: "error".to_string(),
-                },
-            );
-
-            let context = context::current_context();
-            if context.json {
-                use genesis::envelope::{Envelope, ErrorResult, RemediationEntry};
-                let err_result = ErrorResult::new(
-                    "E000",
-                    &err.to_string(),
-                    None,
-                    None,
-                    None,
-                    vec![],
-                    vec![RemediationEntry {
-                        command: "wai doctor".into(),
-                        description: "run workspace health check".into(),
-                    }],
-                )
-                .expect("remediation must be non-empty");
-                let _ = print_json_line(&Envelope::error(
-                    env!("CARGO_PKG_VERSION"),
-                    err_result,
-                    vec![],
-                ));
-            } else {
-                // Footer hook: when the error carries no self-healing help, offer
-                // the feedback subcommand so the user can file the issue.
-                if err.help().is_none() {
-                    eprintln!("Feedback: wai feedback bug --from-last-error");
-                }
-            }
-            Err(err)
-        }
+        Err(err) => handle_command_error(err, &argv),
     }
+}
+
+/// Install the miette diagnostic renderer (best-effort — never fatal).
+fn init_miette_hook() {
+    miette::set_hook(Box::new(|_| {
+        Box::new(
+            miette::MietteHandlerOpts::new()
+                .terminal_links(true)
+                .unicode(true)
+                .context_lines(2)
+                .build(),
+        )
+    }))
+    .ok();
+}
+
+/// Handle a command error: persist the error scratch (so `wai feedback
+/// --from-last-error` can rebuild a well-contexted issue), render the error
+/// in the active output mode, and offer the feedback subcommand when the
+/// error carries no self-healing help. Never shadows the real error.
+fn handle_command_error(err: miette::Report, argv: &[String]) -> Result<()> {
+    let footer = err.help().map(|h| h.to_string());
+    genesis::feedback::scratch::write_scratch_best_effort(
+        "wai",
+        &genesis::feedback::scratch::ErrorRecord {
+            ts: scratch_timestamp(),
+            argv: argv.to_vec(),
+            exit: 1,
+            footer,
+            kind: "error".to_string(),
+        },
+    );
+
+    let context = context::current_context();
+    if context.json {
+        print_json_error(&err);
+    } else if err.help().is_none() {
+        // Footer hook: when the error carries no self-healing help, offer
+        // the feedback subcommand so the user can file the issue.
+        eprintln!("Feedback: wai feedback bug --from-last-error");
+    }
+    Err(err)
+}
+
+/// Emit a JSON error envelope for a failed command.
+fn print_json_error(err: &miette::Report) {
+    use genesis::envelope::{Envelope, ErrorResult, RemediationEntry};
+    let err_result = ErrorResult::new(
+        "E000",
+        &err.to_string(),
+        None,
+        None,
+        None,
+        vec![],
+        vec![RemediationEntry {
+            command: "wai doctor".into(),
+            description: "run workspace health check".into(),
+        }],
+    )
+    .expect("remediation must be non-empty");
+    let _ = print_json_line(&Envelope::error(
+        env!("CARGO_PKG_VERSION"),
+        err_result,
+        vec![],
+    ));
 }
 
 /// Best-effort update notice (genesis-2ex): check crates.io for a newer `wai`

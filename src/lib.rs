@@ -2,6 +2,7 @@
 
 pub mod config;
 pub mod context;
+pub mod detailed_agents;
 pub mod error;
 pub mod guided_flows;
 pub mod help;
@@ -12,6 +13,7 @@ pub mod matrix;
 pub mod openspec;
 pub mod output;
 pub mod plugin;
+pub mod reflect_block;
 pub mod state;
 pub mod suggestions {
     //! Re-exported from genesis shared crate.
