@@ -708,4 +708,103 @@ export default function (pi: ExtensionAPI) {
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].status, CheckStatus::Pass);
     }
+
+    // ── provenance footer drift ──────────────────────────────────────
+
+    use crate::managed_block::inject_managed_block;
+
+    /// Inject the managed block and return the path + the inner text
+    /// between the WAI markers.
+    fn setup_injected_block() -> (TempDir, std::path::PathBuf, String) {
+        let tmp = setup_workspace();
+        let path = tmp.path().join("AGENTS.md");
+        inject_managed_block(&path, &[], &[], &[]).unwrap();
+        let content = std::fs::read_to_string(&path).unwrap();
+        let start = content.find("<!-- WAI:START -->").unwrap() + "<!-- WAI:START -->".len();
+        let end = content.find("<!-- WAI:END -->").unwrap();
+        (tmp, path, content[start..end].to_string())
+    }
+
+    fn staleness_entries(path: &std::path::Path, filename: &str) -> Vec<WaiCheckEntry> {
+        check_managed_block_staleness(path.parent().unwrap())
+            .into_iter()
+            .filter(|e| e.name == format!("Managed block staleness: {}", filename))
+            .collect()
+    }
+
+    #[test]
+    fn footer_version_change_does_not_flag_stale() {
+        let (tmp, path, inner) = setup_injected_block();
+        // Hand-edit the footer's version field only (simulates a wai release
+        // that bumps the footer text without changing content).
+        let footer_line = inner
+            .lines()
+            .find(|l| l.contains("<!-- provenance: "))
+            .expect("footer present");
+        let version_start = footer_line.find("version=").unwrap() + "version=".len();
+        let version_end = footer_line[version_start..]
+            .find(|c: char| c.is_whitespace())
+            .map(|i| version_start + i)
+            .unwrap_or(footer_line.len());
+        let edited = inner.replace(&footer_line[version_start..version_end], "99.99.99");
+        let content = std::fs::read_to_string(&path)
+            .unwrap()
+            .replace(&inner, &edited);
+        std::fs::write(&path, content).unwrap();
+
+        let entries = staleness_entries(&path, "AGENTS.md");
+        assert!(
+            entries.is_empty(),
+            "version-only footer change must not flag staleness, got: {:?}",
+            entries.iter().map(|e| &e.message).collect::<Vec<_>>()
+        );
+        drop(tmp);
+    }
+
+    #[test]
+    fn footer_sha_corruption_flags_drift() {
+        let (tmp, path, inner) = setup_injected_block();
+        // Corrupt only the sha field — body untouched. The footer hash no
+        // longer matches the body: post-init tampering signal.
+        let corrupted = inner.replace("sha=", "sha=deadbeef");
+        let content = std::fs::read_to_string(&path)
+            .unwrap()
+            .replace(&inner, &corrupted);
+        std::fs::write(&path, content).unwrap();
+
+        let entries = staleness_entries(&path, "AGENTS.md");
+        assert_eq!(entries.len(), 1, "corrupted footer sha must flag drift");
+        assert_eq!(entries[0].status, CheckStatus::Warn);
+        assert!(entries[0].message.contains("drift"));
+        drop(tmp);
+    }
+
+    #[test]
+    fn edited_block_body_flags_stale() {
+        let (tmp, path, inner) = setup_injected_block();
+        // Edit the body content (keep footer intact).
+        let edited = inner.replace("wai sync", "wai sync EDITED");
+        assert_ne!(edited, inner, "edit target must exist in block");
+        let content = std::fs::read_to_string(&path)
+            .unwrap()
+            .replace(&inner, &edited);
+        std::fs::write(&path, content).unwrap();
+
+        let entries = staleness_entries(&path, "AGENTS.md");
+        assert_eq!(entries.len(), 1, "edited body must flag staleness");
+        assert_eq!(entries[0].status, CheckStatus::Warn);
+        drop(tmp);
+    }
+
+    #[test]
+    fn freshly_injected_block_is_not_stale() {
+        let (tmp, path, _inner) = setup_injected_block();
+        let entries = staleness_entries(&path, "AGENTS.md");
+        assert!(
+            entries.is_empty(),
+            "fresh injection must not be stale, got: {:?}",
+            entries.iter().map(|e| &e.message).collect::<Vec<_>>()
+        );
+        drop(tmp);
+    }
 }

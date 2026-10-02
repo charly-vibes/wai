@@ -28,15 +28,19 @@ pub struct InstalledPipeline {
 ///
 /// This is Layer 1 of progressive disclosure: orient the agent, surface
 /// pipelines, and point to `.wai/AGENTS.md` for the full reference.
+///
+/// Footer-free generator content: the on-disk block additionally carries a
+/// provenance footer inside the markers (genesis `with_provenance`), which
+/// the doctor staleness check strips before comparing.
 pub fn wai_block_content(
     repo_root: &Path,
     detected_plugins: &[&str],
     installed_skills: &[&str],
     installed_pipelines: &[InstalledPipeline],
 ) -> String {
-    // Match the on-disk form produced by `inject_managed_block` (genesis
-    // `BlockInjector::inject` writes `start_marker + inner + end_marker` with no
-    // extra newline), so the doctor staleness check compares like-for-like.
+    // Footer-free generator form: on-disk blocks written by inject_managed_block
+    // carry a provenance footer inside the markers; read_managed_block strips it
+    // so the doctor staleness check compares like-for-like.
     let mut block = String::from(WAI_START);
     block.push_str(&wai_block_inner(
         repo_root,
@@ -248,7 +252,11 @@ pub fn inject_managed_block(
         REFLECT_REF_START,
         REFLECT_REF_END,
     ));
-    let injector = BlockInjector::new(reg);
+    // Opt-in provenance footer (genesis 0.11 add-artifact-provenance): the
+    // footer records generator/version/source plus a content hash covering
+    // only the block content, so version bumps never move the hash and
+    // doctor can detect post-init edits via the footer-sha fast path.
+    let injector = BlockInjector::new(reg).with_provenance("wai");
 
     let wai_result = injector.inject(path, "WAI", &wai_content)?;
 
@@ -276,11 +284,83 @@ pub fn inject_managed_block(
 
 /// Extract the actual WAI block content (between WAI:START and WAI:END, inclusive).
 /// Returns `None` if the file does not exist or has no block.
+///
+/// A trailing provenance footer (genesis 0.11 `add-artifact-provenance`) is
+/// stripped so the result compares byte-identically to the footer-free
+/// generator content ([`wai_block_content`]).
 pub fn read_managed_block(path: &Path) -> Option<String> {
+    read_managed_block_parts(path).map(|parts| parts.content)
+}
+
+/// Provenance-aware read of the WAI managed block.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ManagedBlockRead {
+    /// Footer-free block content (markers inclusive).
+    pub content: String,
+    /// Footer-free inner body (between the markers).
+    pub body: String,
+    /// Recorded footer `sha=` value when a provenance footer is present.
+    pub footer_sha: Option<String>,
+}
+
+/// Read the WAI managed block, splitting the provenance footer off the
+/// inner content. Mirrors genesis 0.11 `split_provenance_footer` semantics:
+/// the footer is recognized as the last line inside the markers matching
+/// `<!-- provenance: ... -->`, and the separating newline is dropped so the
+/// body hashes byte-identically to the generator's content.
+pub fn read_managed_block_parts(path: &Path) -> Option<ManagedBlockRead> {
     let mut reg = BlockRegistry::new();
     reg.register(BlockDef::new("WAI"));
     let injector = BlockInjector::new(reg);
-    injector.read_block(path, "WAI")
+    let block = injector.read_block(path, "WAI")?;
+    let start = block.find(WAI_START)? + WAI_START.len();
+    let end = block.rfind(WAI_END)?;
+    if start > end {
+        return None;
+    }
+    let inner = &block[start..end];
+    let (body, footer_sha) = split_provenance_footer(inner);
+    let mut content = String::with_capacity(block.len());
+    content.push_str(&block[..start]);
+    content.push_str(body);
+    content.push_str(&block[end..]);
+    Some(ManagedBlockRead {
+        content,
+        body: body.to_string(),
+        footer_sha: footer_sha.map(str::to_string),
+    })
+}
+
+/// Split a trailing provenance footer off managed-block inner content.
+///
+/// Returns the footer-free body and, when the last line is a provenance
+/// footer, its `sha=` value. Matches the genesis inject format
+/// `{content}\n{footer}\n` — the separating newline is dropped too, so the
+/// body hashes byte-identically to the generator's content.
+pub fn split_provenance_footer(inner: &str) -> (&str, Option<&str>) {
+    let trimmed = inner.trim_end_matches('\n');
+    let last_line = match trimmed.rfind('\n') {
+        Some(idx) => &trimmed[idx + 1..],
+        None if !trimmed.is_empty() => trimmed,
+        None => return (inner, None),
+    };
+    match parse_footer_sha(last_line) {
+        Some(sha) => {
+            let cut = trimmed.len() - last_line.len();
+            (&trimmed[..cut.saturating_sub(1)], Some(sha))
+        }
+        None => (inner, None),
+    }
+}
+
+/// Extract `sha=<value>` from a provenance footer line, if it is one.
+fn parse_footer_sha(line: &str) -> Option<&str> {
+    let rest = line
+        .strip_prefix("<!-- provenance: ")?
+        .strip_suffix(" -->")?;
+    let idx = rest.find("sha=")?;
+    let sha = &rest[idx + 4..];
+    Some(sha.split_whitespace().next().unwrap_or(sha))
 }
 
 pub fn has_managed_block(path: &Path) -> bool {
@@ -596,5 +676,89 @@ mod wai_block_tests {
             policy_pos < detailed_pos,
             "Autonomous Work Policy should appear before Detailed Instructions"
         );
+    }
+}
+
+#[cfg(test)]
+mod provenance_tests {
+    use super::*;
+    use genesis::managed_block::content_sha8;
+    use tempfile::TempDir;
+
+    fn tmp() -> TempDir {
+        tempfile::tempdir().expect("tempdir")
+    }
+
+    /// Extract the text between the WAI markers of a file.
+    fn wai_inner(path: &Path) -> String {
+        let content = std::fs::read_to_string(path).unwrap();
+        let start = content.find(WAI_START).unwrap() + WAI_START.len();
+        let end = content.find(WAI_END).unwrap();
+        content[start..end].to_string()
+    }
+
+    #[test]
+    fn inject_writes_provenance_footer_inside_markers() {
+        let dir = tmp();
+        let path = dir.path().join("AGENTS.md");
+        inject_managed_block(&path, &[], &[], &[]).unwrap();
+        let inner = wai_inner(&path);
+        let footer_line = inner
+            .lines()
+            .find(|l| l.contains("<!-- provenance: "))
+            .expect("provenance footer present inside WAI markers");
+        assert!(footer_line.starts_with("<!-- provenance: "));
+        assert!(footer_line.ends_with(" -->"));
+        assert!(footer_line.contains("generator=wai"));
+        assert!(footer_line.contains("source=WAI"));
+        assert!(footer_line.contains("sha="));
+    }
+
+    #[test]
+    fn footer_sha_covers_content_excluding_footer_line() {
+        let dir = tmp();
+        let path = dir.path().join("AGENTS.md");
+        inject_managed_block(&path, &[], &[], &[]).unwrap();
+        let inner = wai_inner(&path);
+        let (body, sha) = split_provenance_footer(&inner);
+        let recorded = sha.expect("footer sha present");
+        assert_eq!(recorded, content_sha8(body));
+        // Body is byte-identical to the generator content.
+        assert_eq!(body, wai_block_inner(path.parent().unwrap(), &[], &[], &[]));
+    }
+
+    #[test]
+    fn read_managed_block_strips_provenance_footer() {
+        let dir = tmp();
+        let path = dir.path().join("AGENTS.md");
+        inject_managed_block(&path, &[], &[], &[]).unwrap();
+        let actual = read_managed_block(&path).unwrap();
+        let expected = wai_block_content(path.parent().unwrap(), &[], &[], &[]);
+        assert_eq!(
+            actual, expected,
+            "footer-stripped read must equal footer-free generator content"
+        );
+    }
+
+    #[test]
+    fn split_provenance_footer_leaves_footer_less_content_untouched() {
+        let inner = "\n# Content\n";
+        let (body, sha) = split_provenance_footer(inner);
+        assert_eq!(body, inner);
+        assert!(sha.is_none());
+    }
+
+    #[test]
+    fn footer_survives_reinject_with_updated_hash() {
+        let dir = tmp();
+        let path = dir.path().join("AGENTS.md");
+        inject_managed_block(&path, &[], &[], &[]).unwrap();
+        inject_managed_block(&path, &[], &["ro5"], &[]).unwrap();
+        let inner = wai_inner(&path);
+        assert_eq!(inner.matches("<!-- provenance: ").count(), 1);
+        let (_, sha) = split_provenance_footer(&inner);
+        let expected_sha =
+            content_sha8(&wai_block_inner(path.parent().unwrap(), &[], &["ro5"], &[]));
+        assert_eq!(sha.unwrap(), expected_sha);
     }
 }

@@ -2,6 +2,7 @@
 // managed-block staleness.
 
 use genesis::doctor::CheckStatus;
+use genesis::managed_block::content_sha8;
 
 use super::WaiCheckEntry;
 use crate::managed_block::InstalledPipeline;
@@ -161,8 +162,13 @@ fn inject_block_fix_named(filename: &str) -> FixFn {
 }
 
 /// Check managed block staleness by comparing generated vs actual content.
+///
+/// Provenance-aware (genesis 0.11 add-artifact-provenance): the footer is
+/// stripped before the full-text compare, so footer version-text changes
+/// never flag staleness; the footer's recorded sha is then verified against
+/// the footer-free body to catch post-init edits.
 pub(super) fn check_managed_block_staleness(project_root: &Path) -> Vec<WaiCheckEntry> {
-    use crate::managed_block::{read_managed_block, wai_block_content, wai_detailed_content};
+    use crate::managed_block::{read_managed_block_parts, wai_block_content, wai_detailed_content};
 
     let root = project_root.to_path_buf();
     let state = WorkspaceState::detect(project_root);
@@ -177,9 +183,14 @@ pub(super) fn check_managed_block_staleness(project_root: &Path) -> Vec<WaiCheck
     let mut results: Vec<WaiCheckEntry> = ["CLAUDE.md", "AGENTS.md"]
         .iter()
         .filter_map(|filename| {
-            let path = root.join(filename);
-            let actual = read_managed_block(&path)?;
-            (actual != expected).then(|| root_block_stale_entry(filename))
+            let read = read_managed_block_parts(&root.join(filename))?;
+            let stale = read.content != expected;
+            let drifted = !stale
+                && read
+                    .footer_sha
+                    .as_deref()
+                    .is_some_and(|sha| sha != content_sha8(&read.body));
+            (stale || drifted).then(|| root_block_stale_entry(filename, drifted))
         })
         .collect();
 
@@ -195,12 +206,19 @@ pub(super) fn check_managed_block_staleness(project_root: &Path) -> Vec<WaiCheck
 }
 
 /// Staleness entry for an outdated CLAUDE.md / AGENTS.md managed block.
-fn root_block_stale_entry(filename: &str) -> WaiCheckEntry {
+fn root_block_stale_entry(filename: &str, drifted: bool) -> WaiCheckEntry {
     let target = filename.to_string();
+    let message = if drifted {
+        format!(
+            "{filename} managed block provenance drift — footer hash does not match block content (edited after last init?) — run 'wai init' to refresh"
+        )
+    } else {
+        format!("{filename} managed block outdated — run 'wai init' to refresh")
+    };
     WaiCheckEntry {
         name: format!("Managed block staleness: {filename}"),
         status: CheckStatus::Warn,
-        message: format!("{filename} managed block outdated — run 'wai init' to refresh"),
+        message,
         fix: Some("Run: wai init".to_string()),
         fix_fn: Some(inject_block_fix_owned(
             target,
