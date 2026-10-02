@@ -17,17 +17,6 @@ Tool tickets require Rust implementation and typically need an openspec change f
 
 <!-- WAI:START --># Workflow Tools
 
-## PRIMARY OBJECTIVE
-
-**wai** will enable **AI-assisted software developers** to **recover** **the full context of a project not touched in 30+ days** by **reducing context-recovery time from >15 minutes to <2 minutes** within **6 months (by February 2027)**, as measured by **time from `wai prime` to correctly identifying the project's phase, purpose, and most recent decision**, compared to **reading git log, source comments, and README without wai**.
-
-Support and evolve **wai** — the workflow manager for AI-driven development —
-by shipping correct, well-tested, well-governed changes to the Rust CLI.
-Every action should trace back to: does this make wai more reliable,
-more capable, or better documented for its users?
-
-**wai** will enable **AI-assisted software developers** to **recover** **the full context of a project not touched in 30+ days** by **reducing context-recovery time from >15 minutes to <2 minutes** within **6 months (by February 2027)**, as measured by **time from `wai prime` to correctly identifying the project's phase, purpose, and most recent decision**, compared to **reading git log, source comments, and README without wai**.
-
 This project uses **wai** to track the *why* behind decisions — research,
 reasoning, and design choices that shaped the code. Run `wai status` first
 to orient yourself.
@@ -70,7 +59,18 @@ If `.wai/resources/ubiquitous-language/README.md` exists, read it first as the
 navigation index, then open only the bounded-context files relevant to the task.
 Avoid loading every terminology file unless the work truly spans multiple contexts.
 
+## Autonomous Work Policy
 
+Proceed without routine confirmation when the next step is clear.
+Do not ask to continue, fix, or commit — just do it.
+
+**Stop and ask** only when:
+- Conflicting requirements or ambiguous intent
+- Destructive actions (data loss, force-push, drop table)
+- Credentials, secrets, or external services not yet authorized
+- Unresolved test failures after two attempts
+- Push, deploy, or release — always get explicit authorization
+- Context approaching 40% — recommend `wai close` then `/clear`
 
 ## Detailed Instructions
 
@@ -78,19 +78,10 @@ Full workflow reference — session lifecycle, capturing work, command cheat
 sheets, cross-tool sync, and PARA structure — lives in **`.wai/AGENTS.md`**.
 Read it at the start of your first session or when you need detailed guidance.
 
-## PRIMARY OBJECTIVE (echo)
-
-**wai** will enable **AI-assisted software developers** to **recover** **the full context of a project not touched in 30+ days** by **reducing context-recovery time from >15 minutes to <2 minutes** within **6 months (by February 2027)**, as measured by **time from `wai prime` to correctly identifying the project's phase, purpose, and most recent decision**, compared to **reading git log, source comments, and README without wai**.
-
-Support and evolve **wai** — the workflow manager for AI-driven development —
-by shipping correct, well-tested, well-governed changes to the Rust CLI.
-Every action should trace back to: does this make wai more reliable,
-more capable, or better documented for its users?
-
-**wai** will enable **AI-assisted software developers** to **recover** **the full context of a project not touched in 30+ days** by **reducing context-recovery time from >15 minutes to <2 minutes** within **6 months (by February 2027)**, as measured by **time from `wai prime` to correctly identifying the project's phase, purpose, and most recent decision**, compared to **reading git log, source comments, and README without wai**.
-
 Keep this managed block so `wai init` can refresh the instructions.
 
+
+<!-- provenance: generator=wai version=0.11.1 source=WAI sha=40ec675f -->
 <!-- WAI:END -->
 
 ## Value Proposition
@@ -158,6 +149,8 @@ context before starting research or creating tickets.
 > **Before research or ticket creation**: always run `wai search "<topic>"` to
 > check for known patterns. Do not rediscover what is already documented.
 
+
+<!-- provenance: generator=wai version=0.11.1 source=WAI:REFLECT:REF sha=73879972 -->
 <!-- WAI:REFLECT:REF:END -->
 
 
