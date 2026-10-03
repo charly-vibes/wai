@@ -24,17 +24,55 @@ const TARGET_REPO: &str = "charly-vibes/wai";
 /// The tool name used for error-scratch and context-gathering.
 const TOOL_NAME: &str = "wai";
 
-/// Arguments bound from the `Feedback` CLI variant.
+/// CLI surface for `wai feedback` (clap derive).
+#[derive(Debug, Clone, clap::Args)]
 pub struct FeedbackArgs {
+    /// Kind of feedback to file.
+    #[arg(value_enum)]
     pub kind: Option<FeedbackKind>,
+
+    /// Issue title.
+    ///
+    /// Required unless --from-last-error is used (which derives a title).
+    #[arg(short, long)]
     pub title: Option<String>,
+
+    /// Issue body (markdown). Defaults to the error message with --from-last-error.
+    #[arg(long)]
     pub body: Option<String>,
+
+    /// Build the report from the most recent error-scratch entry.
+    #[arg(long = "from-last-error")]
     pub from_last_error: bool,
+
+    /// Print the title/body/labels + exact `gh` line and exit 0.
+    #[arg(long)]
     pub dry_run: bool,
+
+    /// Open a prefilled browser URL instead of using `gh`.
+    #[arg(long)]
     pub web: bool,
+
+    /// Emit a JSON envelope.
+    #[arg(long)]
     pub json: bool,
+
+    /// Skip interactive prompts (e.g. kind selection).
+    #[arg(short = 'y', long)]
     pub yes: bool,
+
+    /// Omit the environment context bundle from the issue body.
+    #[arg(long)]
     pub no_context: bool,
+
+    /// Reduce the git remote to host/path in the context bundle (default: on).
+    #[arg(
+        long,
+        action = clap::ArgAction::Set,
+        num_args = 0..=1,
+        default_missing_value = "true",
+        default_value = "true",
+    )]
     pub redact_remote: bool,
 }
 
@@ -253,71 +291,90 @@ fn live_file(title: &str, body: &str, labels: &[&str], args: &FeedbackArgs) -> R
         return Ok(());
     }
 
-    match genesis::feedback::gh::create_issue(&opts) {
-        Ok(genesis::feedback::gh::GhResult::Created { url, number }) => {
-            if args.json {
-                let payload = serde_json::json!({
-                    "filed": true,
-                    "url": url,
-                    "number": number,
-                    "repo": TARGET_REPO,
-                });
-                print_envelope(genesis::envelope::EnvelopeKind::Ok, payload, vec![], vec![])?;
-            } else {
-                println!("Filed issue #{}: {}", number, url);
-            }
-            Ok(())
-        }
-        Ok(genesis::feedback::gh::GhResult::FallbackUrl(url)) => {
-            if args.json {
-                let payload = serde_json::json!({
-                    "filed": false,
-                    "fallback": "url",
-                    "url": url,
-                    "repo": TARGET_REPO,
-                });
-                print_envelope(genesis::envelope::EnvelopeKind::Ok, payload, vec![], vec![])?;
-            } else {
+    report_create_result(genesis::feedback::gh::create_issue(&opts), args)
+}
+
+/// Render the gh filing outcome: JSON envelope in json mode, human text
+/// otherwise. The Err arm keeps the fallback ladder's actionable message.
+fn report_create_result(
+    result: Result<genesis::feedback::gh::GhResult, String>,
+    args: &FeedbackArgs,
+) -> Result<()> {
+    match result {
+        Ok(genesis::feedback::gh::GhResult::Created { url, number }) => emit_feedback_result(
+            serde_json::json!({
+                "filed": true,
+                "url": url,
+                "number": number,
+                "repo": TARGET_REPO,
+            }),
+            || println!("Filed issue #{}: {}", number, url),
+            args,
+        ),
+        Ok(genesis::feedback::gh::GhResult::FallbackUrl(url)) => emit_feedback_result(
+            serde_json::json!({
+                "filed": false,
+                "fallback": "url",
+                "url": url,
+                "repo": TARGET_REPO,
+            }),
+            || {
                 println!("Could not file via gh. Open this URL instead:");
                 println!("{}", url);
-            }
-            Ok(())
-        }
-        Ok(genesis::feedback::gh::GhResult::LocalFile(path)) => {
-            if args.json {
-                let payload = serde_json::json!({
-                    "filed": false,
-                    "fallback": "local_file",
-                    "path": path.to_string_lossy(),
-                    "repo": TARGET_REPO,
-                });
-                print_envelope(genesis::envelope::EnvelopeKind::Ok, payload, vec![], vec![])?;
-            } else {
+            },
+            args,
+        ),
+        Ok(genesis::feedback::gh::GhResult::LocalFile(path)) => emit_feedback_result(
+            serde_json::json!({
+                "filed": false,
+                "fallback": "local_file",
+                "path": path.to_string_lossy(),
+                "repo": TARGET_REPO,
+            }),
+            || {
                 println!(
                     "Network unavailable. Report written to:\n  {}",
                     path.display()
                 );
                 println!("Retry later with `gh issue create` once you're back online.");
-            }
-            Ok(())
-        }
-        Err(message) => {
-            // The fallback ladder already produced an actionable message
-            // (install hint, auth hint, prefilled URL, etc.).
-            if args.json {
-                let payload = serde_json::json!({
-                    "filed": false,
-                    "fallback": "error",
-                    "message": message,
-                    "repo": TARGET_REPO,
-                });
-                print_envelope(genesis::envelope::EnvelopeKind::Ok, payload, vec![], vec![])?;
-                Ok(())
-            } else {
-                Err(miette::Report::msg(message).wrap_err("feedback filing failed"))
-            }
-        }
+            },
+            args,
+        ),
+        Err(message) => report_create_error(message, args),
     }
+}
+
+/// The fallback ladder already produced an actionable message (install hint,
+/// auth hint, prefilled URL, etc.).
+fn report_create_error(message: String, args: &FeedbackArgs) -> Result<()> {
+    emit_feedback_result(
+        serde_json::json!({
+            "filed": false,
+            "fallback": "error",
+            "message": message,
+            "repo": TARGET_REPO,
+        }),
+        || (),
+        args,
+    )
+    .and(Err(
+        miette::Report::msg(message).wrap_err("feedback filing failed")
+    ))
+}
+
+/// Print a feedback-filing outcome: JSON envelope in json mode, human text
+/// otherwise (the `human` closure performs the human-mode rendering).
+fn emit_feedback_result(
+    payload: serde_json::Value,
+    human: impl FnOnce(),
+    args: &FeedbackArgs,
+) -> Result<()> {
+    if args.json {
+        print_envelope(genesis::envelope::EnvelopeKind::Ok, payload, vec![], vec![])?;
+    } else {
+        human();
+    }
+    Ok(())
 }
 
 /// Build a prefilled GitHub issue URL (mirrors genesis's private helper, kept
