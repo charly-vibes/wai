@@ -73,9 +73,7 @@ jobs:
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # book.toml sets build-dir = "docs/_book" (mdbook-0.5 fallout; the
-          # default ./book/ dir is gitignored fallout territory).
-          path: docs/_book
+          path: book
 
   deploy:
     name: Deploy to GitHub Pages
