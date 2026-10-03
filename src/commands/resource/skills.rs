@@ -11,6 +11,44 @@ use super::metadata::{SkillEntry, SkillListPayload, SkillSource, parse_skill_fro
 use super::validation::validate_skill_name;
 use crate::commands::require_project;
 
+/// Reject skill names that would collide with an existing flat skill or
+/// category directory (hierarchical `category/skill` names supported).
+fn ensure_no_name_conflicts(skills_dir: &Path, name: &str) -> Result<()> {
+    if skill_dir_exists(skills_dir, name) {
+        miette::bail!(
+            "Skill '{}' already exists at {}",
+            name,
+            skills_dir.join(name).display()
+        );
+    }
+    if name.contains('/') {
+        // Hierarchical: check that the category segment isn't already a flat skill
+        let category = name.split('/').next().unwrap();
+        if skills_dir.join(category).join("SKILL.md").exists() {
+            miette::bail!(
+                "Cannot create '{}': '{}' already exists as a flat skill",
+                name,
+                category
+            );
+        }
+    } else {
+        // Flat: check that the name isn't already used as a category directory
+        let candidate = skills_dir.join(name);
+        if candidate.is_dir() && !candidate.join("SKILL.md").exists() {
+            miette::bail!(
+                "Cannot create '{}': it is already used as a category. Use a hierarchical name like '{}/...' instead.",
+                name,
+                name
+            );
+        }
+    }
+    Ok(())
+}
+
+fn skill_dir_exists(skills_dir: &Path, name: &str) -> bool {
+    skills_dir.join(name).join("SKILL.md").exists()
+}
+
 pub(super) fn add_skill(name: &str, template_name: Option<&str>) -> Result<()> {
     let project_root = require_project()?;
     require_safe_mode("add skill")?;
@@ -34,29 +72,7 @@ pub(super) fn add_skill(name: &str, template_name: Option<&str>) -> Result<()> {
         miette::bail!("Skill '{}' already exists at {}", name, skill_dir.display());
     }
 
-    // Conflict detection for hierarchical names
-    if name.contains('/') {
-        // Hierarchical: check that the category segment isn't already a flat skill
-        let category = name.split('/').next().unwrap();
-        let category_dir = skills_dir.join(category);
-        if category_dir.join("SKILL.md").exists() {
-            miette::bail!(
-                "Cannot create '{}': '{}' already exists as a flat skill",
-                name,
-                category
-            );
-        }
-    } else {
-        // Flat: check that the name isn't already used as a category directory
-        let candidate = skills_dir.join(name);
-        if candidate.is_dir() && !candidate.join("SKILL.md").exists() {
-            miette::bail!(
-                "Cannot create '{}': it is already used as a category. Use a hierarchical name like '{}/...' instead.",
-                name,
-                name
-            );
-        }
-    }
+    ensure_no_name_conflicts(&skills_dir, name)?;
 
     // Create skill directory (create_dir_all handles intermediate category dirs)
     fs::create_dir_all(&skill_dir).into_diagnostic()?;
@@ -85,9 +101,7 @@ const VALID_TEMPLATES: &[&str] = &[
     "ubiquitous-language",
 ];
 
-fn skill_template_body(name: &str) -> Result<String> {
-    match name {
-        "gather" => Ok(r#"## Instructions
+const TEMPLATE_GATHER: &str = r#"## Instructions
 
 Use this skill to research $ARGUMENTS in the $PROJECT project.
 Repository root: $REPO_ROOT
@@ -102,10 +116,8 @@ Repository root: $REPO_ROOT
    wai add research "findings about $ARGUMENTS"
    ```
 4. Summary: list key facts, open questions, and recommended next steps.
-"#
-        .to_string()),
-
-        "create" => Ok(r#"## Instructions
+"#;
+const TEMPLATE_CREATE: &str = r#"## Instructions
 
 Use this skill to create items for $ARGUMENTS in the $PROJECT project.
 Repository root: $REPO_ROOT
@@ -121,10 +133,8 @@ Repository root: $REPO_ROOT
      ```
    - Wire dependencies with `bd dep add <blocked> <blocker>` as needed.
 3. Confirm all items are created and visible with `bd ready`.
-"#
-        .to_string()),
-
-        "tdd" => Ok(r#"## Instructions
+"#;
+const TEMPLATE_TDD: &str = r#"## Instructions
 
 Use this skill to implement $ARGUMENTS in the $PROJECT project using TDD.
 Repository root: $REPO_ROOT
@@ -149,10 +159,8 @@ Commit after each GREEN/REFACTOR cycle:
 git add <files>
 git commit -m "..."
 ```
-"#
-        .to_string()),
-
-        "rule-of-5" => Ok(r#"## Instructions
+"#;
+const TEMPLATE_RULE_OF_5: &str = r#"## Instructions
 
 Use this skill to review $ARGUMENTS in the $PROJECT project using 5 passes.
 Repository root: $REPO_ROOT
@@ -172,10 +180,8 @@ After all passes, output one of:
 - **APPROVED** — ready to merge/deploy
 - **NEEDS_CHANGES** — list specific required changes
 - **NEEDS_HUMAN** — ambiguous or high-risk; escalate to a human reviewer
-"#
-        .to_string()),
-
-        "ubiquitous-language" => Ok(r#"## Instructions
+"#;
+const TEMPLATE_UBIQUITOUS_LANGUAGE: &str = r#"## Instructions
 
 Use this skill to curate ubiquitous language for $ARGUMENTS in the $PROJECT project.
 Repository root: $REPO_ROOT
@@ -190,16 +196,20 @@ Repository root: $REPO_ROOT
 4. If a term truly spans contexts, update `shared.md` and link back from the relevant context files.
 5. Preserve progressive disclosure: do not collapse all terminology into one giant glossary file.
 6. Summarize what changed, open questions, and any terms that still need human confirmation.
-"#
-        .to_string()),
+"#;
 
-        other => {
-            miette::bail!(
-                "Unknown template '{}'. Valid templates: {}",
-                other,
-                VALID_TEMPLATES.join(", ")
-            )
-        }
+fn skill_template_body(name: &str) -> Result<String> {
+    match name {
+        "gather" => Ok(TEMPLATE_GATHER.to_string()),
+        "create" => Ok(TEMPLATE_CREATE.to_string()),
+        "tdd" => Ok(TEMPLATE_TDD.to_string()),
+        "rule-of-5" => Ok(TEMPLATE_RULE_OF_5.to_string()),
+        "ubiquitous-language" => Ok(TEMPLATE_UBIQUITOUS_LANGUAGE.to_string()),
+        other => Err(miette::miette!(
+            "Unknown template '{}'. Valid templates: {}",
+            other,
+            VALID_TEMPLATES.join(", ")
+        )),
     }
 }
 
@@ -234,34 +244,31 @@ pub(super) fn list_skills(json: bool) -> Result<()> {
     let local_skills_dir = agent_config_dir(&project_root).join(SKILLS_DIR);
     let global_dir = global_skills_dir();
 
-    // Collect local skills (keyed by canonical name for deduplication)
-    let mut seen_names: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let entries = collect_skill_entries(&local_skills_dir, &global_dir);
+    print_skill_list(&entries, json)
+}
+
+/// Collect local skills plus unshadowed global ones, sorted by name.
+fn collect_skill_entries(local_dir: &Path, global_dir: &Path) -> Vec<SkillEntry> {
     let mut entries = Vec::new();
 
-    if local_skills_dir.exists() {
-        scan_skills_dir(
-            &local_skills_dir,
-            &local_skills_dir,
-            SkillSource::Local,
-            &mut entries,
-        );
+    if local_dir.exists() {
+        scan_skills_dir(local_dir, local_dir, SkillSource::Local, &mut entries);
     }
     // Track names from local skills to suppress global duplicates
-    for e in &entries {
-        seen_names.insert(e.name.clone());
-    }
+    let seen: std::collections::HashSet<String> = entries.iter().map(|e| e.name.clone()).collect();
 
     // Also collect global skills that aren't shadowed by local ones
     if global_dir.exists() {
         let mut global_entries = Vec::new();
         scan_skills_dir(
-            &global_dir,
-            &global_dir,
+            global_dir,
+            global_dir,
             SkillSource::Global,
             &mut global_entries,
         );
         for e in global_entries {
-            if !seen_names.contains(&e.name) {
+            if !seen.contains(&e.name) {
                 entries.push(e);
             }
         }
@@ -269,63 +276,65 @@ pub(super) fn list_skills(json: bool) -> Result<()> {
 
     // Sort alphabetically by name
     entries.sort_by(|a, b| a.name.cmp(&b.name));
+    entries
+}
 
-    // Output
+fn print_skill_list(entries: &[SkillEntry], json: bool) -> Result<()> {
     if json {
-        let payload = SkillListPayload { skills: entries };
-        crate::output::print_envelope_ok(&payload)?;
-    } else if entries.is_empty() {
-        println!();
+        let payload = SkillListPayload {
+            skills: entries.to_vec(),
+        };
+        return crate::output::print_envelope_ok(&payload);
+    }
+    println!();
+    if entries.is_empty() {
         println!("  {} No skills found", "○".dimmed());
         println!(
             "  {} Run 'wai resource add skill <name>' to create one",
             "→".cyan()
         );
         println!();
-    } else {
-        println!();
-        println!("  {} Skills", "◆".cyan());
-        println!();
-        for entry in entries {
-            let desc = if entry.description.len() > 60 {
-                format!("{}...", &entry.description[..57])
-            } else {
-                entry.description.clone()
-            };
-            let global_tag = if entry.source == SkillSource::Global {
-                " [global]".dimmed().to_string()
-            } else {
-                String::new()
-            };
-
-            if entry.description == "(no metadata)" {
-                println!(
-                    "    {} {}{}  {}",
-                    "•".dimmed(),
-                    entry.name,
-                    global_tag,
-                    desc.dimmed()
-                );
-            } else {
-                println!(
-                    "    {} {}{}  {}",
-                    "•".dimmed(),
-                    entry.name.bold(),
-                    global_tag,
-                    desc.dimmed()
-                );
-            }
-        }
-        println!();
+        return Ok(());
     }
-
+    println!("  {} Skills", "◆".cyan());
+    println!();
+    for entry in entries {
+        print_skill_entry(entry);
+    }
+    println!();
     Ok(())
 }
 
-/// Scan a skills directory and collect SkillEntry records.
-///
-/// Handles both flat skills (skills_dir/<name>/SKILL.md) and hierarchical
-/// skills (skills_dir/<category>/<name>/SKILL.md).
+fn print_skill_entry(entry: &SkillEntry) {
+    let desc = if entry.description.len() > 60 {
+        format!("{}...", &entry.description[..57])
+    } else {
+        entry.description.clone()
+    };
+    let global_tag = if entry.source == SkillSource::Global {
+        " [global]".dimmed().to_string()
+    } else {
+        String::new()
+    };
+    if entry.description == "(no metadata)" {
+        println!(
+            "    {} {}{}  {}",
+            "•".dimmed(),
+            entry.name,
+            global_tag,
+            desc.dimmed()
+        );
+    } else {
+        println!(
+            "    {} {}{}  {}",
+            "•".dimmed(),
+            entry.name.bold(),
+            global_tag,
+            desc.dimmed()
+        );
+    }
+}
+
 pub(super) fn scan_skills_dir(
     skills_dir: &Path,
     display_root: &Path,
@@ -349,74 +358,94 @@ pub(super) fn scan_skills_dir(
             .to_string();
 
         let skill_file = path.join("SKILL.md");
-
         if skill_file.exists() {
-            // Flat skill
-            let relative_path = path
-                .strip_prefix(display_root)
-                .unwrap_or(&path)
-                .display()
-                .to_string();
-            if let Some(metadata) = parse_skill_frontmatter(&skill_file) {
-                entries.push(SkillEntry {
-                    name: metadata.name,
-                    category: None,
-                    description: metadata.description,
-                    path: relative_path,
-                    source: source.clone(),
-                });
-            } else {
-                entries.push(SkillEntry {
-                    name: dir_name,
-                    category: None,
-                    description: "(no metadata)".to_string(),
-                    path: relative_path,
-                    source: source.clone(),
-                });
-            }
+            push_flat_skill(&path, &dir_name, display_root, source.clone(), entries);
         } else {
-            // Category directory: recurse one level
-            let Ok(sub_read) = fs::read_dir(&path) else {
-                continue;
-            };
-            for sub_entry in sub_read.flatten() {
-                let sub_path = sub_entry.path();
-                if !sub_path.is_dir() {
-                    continue;
-                }
+            push_hierarchical_skills(&path, &dir_name, display_root, source.clone(), entries);
+        }
+    }
+}
 
-                let sub_name = sub_path
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("unknown")
-                    .to_string();
+fn push_flat_skill(
+    path: &Path,
+    dir_name: &str,
+    display_root: &Path,
+    source: SkillSource,
+    entries: &mut Vec<SkillEntry>,
+) {
+    // Flat skill
+    let relative_path = path
+        .strip_prefix(display_root)
+        .unwrap_or(path)
+        .display()
+        .to_string();
+    let skill_file = path.join("SKILL.md");
+    if let Some(metadata) = parse_skill_frontmatter(&skill_file) {
+        entries.push(SkillEntry {
+            name: metadata.name,
+            category: None,
+            description: metadata.description,
+            path: relative_path,
+            source,
+        });
+    } else {
+        entries.push(SkillEntry {
+            name: dir_name.to_string(),
+            category: None,
+            description: "(no metadata)".to_string(),
+            path: relative_path,
+            source,
+        });
+    }
+}
 
-                let sub_skill_file = sub_path.join("SKILL.md");
-                let hierarchical_name = format!("{}/{}", dir_name, sub_name);
-                let relative_path = sub_path
-                    .strip_prefix(display_root)
-                    .unwrap_or(&sub_path)
-                    .display()
-                    .to_string();
+/// Category directory: recurse one level for `category/name` skills.
+fn push_hierarchical_skills(
+    path: &Path,
+    dir_name: &str,
+    display_root: &Path,
+    source: SkillSource,
+    entries: &mut Vec<SkillEntry>,
+) {
+    let Ok(sub_read) = fs::read_dir(path) else {
+        return;
+    };
+    for sub_entry in sub_read.flatten() {
+        let sub_path = sub_entry.path();
+        if !sub_path.is_dir() {
+            continue;
+        }
 
-                if let Some(metadata) = parse_skill_frontmatter(&sub_skill_file) {
-                    entries.push(SkillEntry {
-                        name: metadata.name,
-                        category: Some(dir_name.clone()),
-                        description: metadata.description,
-                        path: relative_path,
-                        source: source.clone(),
-                    });
-                } else {
-                    entries.push(SkillEntry {
-                        name: hierarchical_name,
-                        category: Some(dir_name.clone()),
-                        description: "(no metadata)".to_string(),
-                        path: relative_path,
-                        source: source.clone(),
-                    });
-                }
-            }
+        let sub_name = sub_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("unknown")
+            .to_string();
+
+        let sub_skill_file = sub_path.join("SKILL.md");
+        let hierarchical_name = format!("{}/{}", dir_name, sub_name);
+        let relative_path = sub_path
+            .strip_prefix(display_root)
+            .unwrap_or(&sub_path)
+            .display()
+            .to_string();
+
+        if let Some(metadata) = parse_skill_frontmatter(&sub_skill_file) {
+            entries.push(SkillEntry {
+                name: metadata.name,
+                category: Some(dir_name.to_string()),
+                description: metadata.description,
+                path: relative_path,
+                source: source.clone(),
+            });
+        } else {
+            entries.push(SkillEntry {
+                name: hierarchical_name,
+                category: Some(dir_name.to_string()),
+                description: "(no metadata)".to_string(),
+                path: relative_path,
+                source: source.clone(),
+            });
         }
     }
 }
@@ -432,14 +461,12 @@ pub(super) fn import_skills(from: Option<String>) -> Result<()> {
         project_root.join(".agents").join("skills")
     };
 
-    // Check if source exists
     if !source_path.exists() {
         miette::bail!(
             "Source path not found: {}\n  Specify a different path with --from <path>",
             source_path.display()
         );
     }
-
     if !source_path.is_dir() {
         miette::bail!("Source path is not a directory: {}", source_path.display());
     }
@@ -447,45 +474,51 @@ pub(super) fn import_skills(from: Option<String>) -> Result<()> {
     let target_dir = agent_config_dir(&project_root).join(SKILLS_DIR);
     fs::create_dir_all(&target_dir).into_diagnostic()?;
 
-    let mut imported = 0;
-    let mut skipped = 0;
-
-    // Scan source directory
+    let mut imported = 0u32;
+    let mut skipped = 0u32;
     for entry in fs::read_dir(&source_path).into_diagnostic()? {
-        let entry = entry.into_diagnostic()?;
-        let source_skill_dir = entry.path();
-
-        // Only process directories
-        if !source_skill_dir.is_dir() {
-            continue;
+        match import_one_skill(&entry.into_diagnostic()?.path(), &target_dir)? {
+            ImportOutcome::Imported => imported += 1,
+            ImportOutcome::Skipped => skipped += 1,
+            ImportOutcome::NotASkill => {}
         }
+    }
+    report_import_results(&source_path, imported, skipped)
+}
 
-        // Check if SKILL.md exists
-        let skill_md = source_skill_dir.join("SKILL.md");
-        if !skill_md.exists() {
-            continue;
-        }
+enum ImportOutcome {
+    Imported,
+    Skipped,
+    NotASkill,
+}
 
-        let skill_name = source_skill_dir
-            .file_name()
-            .and_then(|n| n.to_str())
-            .ok_or_else(|| miette::miette!("Invalid skill directory name"))?;
+/// Copy one source skill directory into `target_dir`. Non-directories and
+/// dirs without SKILL.md are ignored; existing targets are skipped.
+fn import_one_skill(source_skill_dir: &Path, target_dir: &Path) -> Result<ImportOutcome> {
+    if !source_skill_dir.is_dir() {
+        return Ok(ImportOutcome::NotASkill);
+    }
+    let skill_md = source_skill_dir.join("SKILL.md");
+    if !skill_md.exists() {
+        return Ok(ImportOutcome::NotASkill);
+    }
+    let skill_name = source_skill_dir
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or_else(|| miette::miette!("Invalid skill directory name"))?;
 
-        let target_skill_dir = target_dir.join(skill_name);
-
-        // Skip if target already exists
-        if target_skill_dir.exists() {
-            log::warning(format!("Skipped '{}' (already exists)", skill_name)).into_diagnostic()?;
-            skipped += 1;
-            continue;
-        }
-
-        // Copy entire directory tree
-        copy_dir_all(&source_skill_dir, &target_skill_dir).into_diagnostic()?;
-        imported += 1;
+    let target_skill_dir = target_dir.join(skill_name);
+    if target_skill_dir.exists() {
+        log::warning(format!("Skipped '{}' (already exists)", skill_name)).into_diagnostic()?;
+        return Ok(ImportOutcome::Skipped);
     }
 
-    // Report results
+    // Copy entire directory tree
+    copy_dir_all(source_skill_dir, &target_skill_dir).into_diagnostic()?;
+    Ok(ImportOutcome::Imported)
+}
+
+fn report_import_results(source_path: &Path, imported: u32, skipped: u32) -> Result<()> {
     if imported == 0 && skipped == 0 {
         println!();
         println!(
@@ -494,33 +527,31 @@ pub(super) fn import_skills(from: Option<String>) -> Result<()> {
             source_path.display()
         );
         println!();
-    } else {
-        println!();
-        if imported > 0 {
-            log::success(format!(
-                "Imported {} skill{}",
-                imported,
-                if imported == 1 { "" } else { "s" }
-            ))
-            .into_diagnostic()?;
-        }
-        if skipped > 0 {
-            log::info(format!(
-                "Skipped {} skill{} (already exist{})",
-                skipped,
-                if skipped == 1 { "" } else { "s" },
-                if skipped == 1 { "s" } else { "" }
-            ))
-            .into_diagnostic()?;
-        }
-        log::info("Remember to run `wai sync` to update agent config").into_diagnostic()?;
-        println!();
+        return Ok(());
     }
-
+    println!();
+    if imported > 0 {
+        log::success(format!(
+            "Imported {} skill{}",
+            imported,
+            if imported == 1 { "" } else { "s" }
+        ))
+        .into_diagnostic()?;
+    }
+    if skipped > 0 {
+        log::info(format!(
+            "Skipped {} skill{} (already exist{})",
+            skipped,
+            if skipped == 1 { "" } else { "s" },
+            if skipped == 1 { "s" } else { "" }
+        ))
+        .into_diagnostic()?;
+    }
+    log::info("Remember to run `wai sync` to update agent config").into_diagnostic()?;
+    println!();
     Ok(())
 }
 
-/// Recursively copy a directory and all its contents
 pub(super) fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
     fs::create_dir_all(dst)?;
     for entry in fs::read_dir(src)? {
