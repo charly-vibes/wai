@@ -71,7 +71,7 @@ jobs:
         run: mdbook build
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           # book.toml sets build-dir = "docs/_book" (mdbook-0.5 fallout; the
           # default ./book/ dir is gitignored fallout territory).
