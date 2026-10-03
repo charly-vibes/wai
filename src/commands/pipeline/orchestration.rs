@@ -1,3 +1,6 @@
+use std::path::PathBuf;
+
+use crate::commands::pipeline::PipelineDefinition;
 use cliclack::log;
 use miette::{IntoDiagnostic, Result};
 use owo_colors::OwoColorize;
@@ -21,8 +24,28 @@ pub(super) fn cmd_start(name: &str, topic: Option<&str>) -> Result<()> {
     let project_root = require_project()?;
     require_safe_mode("pipeline start")?;
 
-    // 1. Find and load the pipeline TOML definition
-    let def_path = crate::config::pipelines_dir(&project_root).join(format!("{}.toml", name));
+    // 1. Find, load and validate the pipeline TOML definition
+    let definition = load_validated_pipeline(&project_root, name)?;
+
+    // 2. Generate a unique run ID: <name>-<YYYY-MM-DD>-<topic-slug>
+    let run_id = new_run_id(name, topic);
+    let topic_str = topic.unwrap_or("");
+
+    // 3-5. Create run state, persist it, and point .last-run at it
+    write_run_state(&project_root, &run_id, name, topic_str)?;
+
+    // 6. Print env export line + first step prompt block
+    println!("export WAI_PIPELINE_RUN={}", run_id);
+    println!();
+    print_step(&definition, 0, topic_str);
+
+    Ok(())
+}
+
+/// Load `<name>.toml` from the pipelines dir and validate it, failing on
+/// validation errors and printing warnings.
+fn load_validated_pipeline(project_root: &Path, name: &str) -> Result<PipelineDefinition> {
+    let def_path = crate::config::pipelines_dir(project_root).join(format!("{}.toml", name));
     if !def_path.exists() {
         miette::bail!(
             "Pipeline '{}' not found. Create it with: wai pipeline init {}",
@@ -31,13 +54,20 @@ pub(super) fn cmd_start(name: &str, topic: Option<&str>) -> Result<()> {
         );
     }
     let definition = load_pipeline_toml(&def_path)?;
-
     if definition.steps.is_empty() {
         miette::bail!("Pipeline '{}' has no steps defined", name);
     }
+    report_validation_issues(&definition, project_root, name)?;
+    Ok(definition)
+}
 
-    // 1b. Validate the pipeline definition
-    let issues = validate_pipeline(&definition, &project_root);
+/// Fail on validation errors, surface warnings otherwise.
+fn report_validation_issues(
+    definition: &PipelineDefinition,
+    project_root: &Path,
+    name: &str,
+) -> Result<()> {
+    let issues = validate_pipeline(definition, project_root);
     let errors: Vec<_> = issues
         .iter()
         .filter(|i| i.level == ValidationLevel::Error)
@@ -59,8 +89,11 @@ pub(super) fn cmd_start(name: &str, topic: Option<&str>) -> Result<()> {
     for w in &warnings {
         log::warning(&w.message).into_diagnostic()?;
     }
+    Ok(())
+}
 
-    // 2. Generate a unique run ID: <name>-<YYYY-MM-DD>-<topic-slug>
+/// `<name>-<YYYY-MM-DD>-<topic-slug>` ("run" slug when no topic given).
+fn new_run_id(name: &str, topic: Option<&str>) -> String {
     let date = chrono::Utc::now().format("%Y-%m-%d");
     let topic_str = topic.unwrap_or("");
     let topic_slug = if topic_str.is_empty() {
@@ -68,36 +101,31 @@ pub(super) fn cmd_start(name: &str, topic: Option<&str>) -> Result<()> {
     } else {
         slug::slugify(topic_str)
     };
-    let run_id = format!("{}-{}-{}", name, date, topic_slug);
+    format!("{}-{}-{}", name, date, topic_slug)
+}
 
-    // 3. Create run state
+/// Create the run state, write it to `.wai/pipeline-runs/<run-id>.yml`, and
+/// write the `.last-run` pointer (single source of truth for the active run).
+fn write_run_state(project_root: &Path, run_id: &str, name: &str, topic: &str) -> Result<()> {
     let run = PipelineRun {
-        run_id: run_id.clone(),
+        run_id: run_id.to_string(),
         pipeline: name.to_string(),
-        topic: topic_str.to_string(),
+        topic: topic.to_string(),
         created_at: chrono::Utc::now().to_rfc3339(),
         current_step: 0,
         approvals: HashMap::new(),
     };
 
-    // 4. Write run state to .wai/pipeline-runs/<run-id>.yml
-    let runs_dir = crate::config::wai_dir(&project_root).join("pipeline-runs");
+    let runs_dir = crate::config::wai_dir(project_root).join("pipeline-runs");
     fs::create_dir_all(&runs_dir).into_diagnostic()?;
     let run_path = runs_dir.join(format!("{}.yml", run_id));
     let yaml = serde_yml::to_string(&run)
         .map_err(|e| miette::miette!("Failed to serialize run state: {}", e))?;
     fs::write(&run_path, yaml).into_diagnostic()?;
 
-    // 5. Write .last-run pointer file (single source of truth for active run ID)
-    let last_run = crate::config::last_run_path(&project_root);
+    let last_run = crate::config::last_run_path(project_root);
     fs::create_dir_all(last_run.parent().unwrap()).into_diagnostic()?;
-    fs::write(&last_run, &run_id).into_diagnostic()?;
-
-    // 6. Print env export line + first step prompt block
-    println!("export WAI_PIPELINE_RUN={}", run_id);
-    println!();
-    print_step(&definition, 0, topic_str);
-
+    fs::write(&last_run, run_id).into_diagnostic()?;
     Ok(())
 }
 
@@ -107,23 +135,10 @@ pub(super) fn cmd_next() -> Result<()> {
     let project_root = require_project()?;
     require_safe_mode("pipeline next")?;
 
-    // 1. Resolve run ID (env var → .last-run)
+    // 1-3. Resolve run ID, load run state and pipeline definition
     let run_id = resolve_active_run_id(&project_root)?;
-
-    // 2. Load run state
-    let runs_dir = crate::config::wai_dir(&project_root).join("pipeline-runs");
-    let run_path = runs_dir.join(format!("{}.yml", run_id));
-    if !run_path.exists() {
-        miette::bail!(
-            "Run state file not found for run '{}'. The run may have been deleted or the ID is stale.",
-            run_id
-        );
-    }
-    let run: PipelineRun =
-        serde_yml::from_str(&fs::read_to_string(&run_path).into_diagnostic()?)
-            .map_err(|e| miette::miette!("Failed to parse run state for '{}': {}", run_id, e))?;
-
-    // 3. Load pipeline definition
+    let run_path = run_state_path(&project_root, &run_id)?;
+    let run = load_run_state(&run_path, &run_id)?;
     let def_path =
         crate::config::pipelines_dir(&project_root).join(format!("{}.toml", run.pipeline));
     let definition = load_pipeline_toml(&def_path)?;
@@ -142,40 +157,14 @@ pub(super) fn cmd_next() -> Result<()> {
     if let Some(ref gate) = current_step.gate {
         let failures = evaluate_gates(gate, current_step, &run, &definition, &project_root)?;
         if !failures.is_empty() {
-            println!();
-            println!(
-                "  {} Gate check failed for step '{}':",
-                "✗".red(),
-                current_step.id
-            );
-            println!();
-            for f in &failures {
-                println!("    {} {}", "✗".red(), f);
-            }
-            println!();
-            println!(
-                "  {} Resolve the above before running `wai pipeline next`",
-                "→".cyan()
-            );
+            report_gate_failures(&failures, &current_step.id);
             return Ok(());
         }
     }
 
     // 5b. Lock artifacts if step has lock = true
     if current_step.lock {
-        let artifact_paths = find_step_artifact_paths(&project_root, &run.run_id, &current_step.id);
-        if artifact_paths.is_empty() {
-            miette::bail!("Cannot lock step '{}' with no artifacts.", current_step.id);
-        }
-        for path in &artifact_paths {
-            write_artifact_lock(path, &run.run_id, &current_step.id)?;
-        }
-        log::info(format!(
-            "Locked {} artifact(s) for step '{}'",
-            artifact_paths.len(),
-            current_step.id
-        ))
-        .into_diagnostic()?;
+        lock_step_artifacts(&project_root, &run.run_id, &current_step.id)?;
     }
 
     // 6. Advance step
@@ -190,16 +179,69 @@ pub(super) fn cmd_next() -> Result<()> {
 
     // 7. Print next step or completion block
     if next_step >= definition.steps.len() {
-        println!("──────────────────────────────────────────────");
-        println!("Pipeline '{}' complete!", definition.name);
-        println!();
-        println!("Next: wai close");
-        println!("      wai pipeline suggest   # start another pipeline");
+        print_pipeline_complete(&definition.name);
     } else {
         print_step(&definition, next_step, &updated.topic);
     }
 
     Ok(())
+}
+
+/// `.wai/pipeline-runs/<run-id>.yml`.
+fn run_state_path(project_root: &Path, run_id: &str) -> Result<PathBuf> {
+    let runs_dir = crate::config::wai_dir(project_root).join("pipeline-runs");
+    let run_path = runs_dir.join(format!("{}.yml", run_id));
+    if !run_path.exists() {
+        miette::bail!(
+            "Run state file not found for run '{}'. The run may have been deleted or the ID is stale.",
+            run_id
+        );
+    }
+    Ok(run_path)
+}
+
+fn load_run_state(run_path: &Path, run_id: &str) -> Result<PipelineRun> {
+    serde_yml::from_str(&fs::read_to_string(run_path).into_diagnostic()?)
+        .map_err(|e| miette::miette!("Failed to parse run state for '{}': {}", run_id, e))
+}
+
+fn report_gate_failures(failures: &[String], step_id: &str) {
+    println!();
+    println!("  {} Gate check failed for step '{}':", "✗".red(), step_id);
+    println!();
+    for f in failures {
+        println!("    {} {}", "✗".red(), f);
+    }
+    println!();
+    println!(
+        "  {} Resolve the above before running `wai pipeline next`",
+        "→".cyan()
+    );
+}
+
+fn lock_step_artifacts(project_root: &Path, run_id: &str, step_id: &str) -> Result<()> {
+    let artifact_paths = find_step_artifact_paths(project_root, run_id, step_id);
+    if artifact_paths.is_empty() {
+        miette::bail!("Cannot lock step '{}' with no artifacts.", step_id);
+    }
+    for path in &artifact_paths {
+        write_artifact_lock(path, run_id, step_id)?;
+    }
+    log::info(format!(
+        "Locked {} artifact(s) for step '{}'",
+        artifact_paths.len(),
+        step_id
+    ))
+    .into_diagnostic()?;
+    Ok(())
+}
+
+fn print_pipeline_complete(name: &str) {
+    println!("──────────────────────────────────────────────");
+    println!("Pipeline '{}' complete!", name);
+    println!();
+    println!("Next: wai close");
+    println!("      wai pipeline suggest   # start another pipeline");
 }
 
 // ─── approve ─────────────────────────────────────────────────────────────────
@@ -409,7 +451,7 @@ pub(super) fn resolve_active_run_id(project_root: &Path) -> Result<String> {
             return Ok(run_id);
         }
     }
-    miette::bail!(
+    Err(miette::miette!(
         "No active pipeline run. Start one with: wai pipeline start <name> --topic=<topic>"
-    )
+    ))
 }
