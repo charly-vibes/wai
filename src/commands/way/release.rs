@@ -86,59 +86,47 @@ pub(super) fn check_release_pipeline(repo_root: &Path) -> WayCheckEntry {
     let success_criteria = Some(
         "Software releases and distribution (packages, binaries) are fully automated.".to_string(),
     );
-
-    if !has_binary_target(repo_root) {
-        return WayCheckEntry {
+    let mk = |status: CheckStatus, message: String, suggestion: Option<String>| -> WayCheckEntry {
+        WayCheckEntry {
             name: name.to_string(),
-            status: CheckStatus::Pass,
-            message: "Library project — release pipeline not required".to_string(),
+            status,
+            message,
             intent,
             success_criteria,
-            suggestion: None,
-        };
+            suggestion,
+        }
+    };
+
+    if !has_binary_target(repo_root) {
+        return mk(
+            CheckStatus::Pass,
+            "Library project — release pipeline not required".to_string(),
+            None,
+        );
     }
 
     if repo_root.join(".goreleaser.yml").exists() || repo_root.join(".goreleaser.yaml").exists() {
-        return WayCheckEntry {
-            name: name.to_string(),
-            status: CheckStatus::Pass,
-            message: "goreleaser detected".to_string(),
-            intent,
-            success_criteria,
-            suggestion: None,
-        };
+        return mk(CheckStatus::Pass, "goreleaser detected".to_string(), None);
     }
 
     if repo_root.join("dist.toml").exists() || has_cargo_dist_in_toml(repo_root) {
-        return WayCheckEntry {
-            name: name.to_string(),
-            status: CheckStatus::Pass,
-            message: "cargo-dist detected".to_string(),
-            intent,
-            success_criteria,
-            suggestion: None,
-        };
+        return mk(CheckStatus::Pass, "cargo-dist detected".to_string(), None);
     }
 
     if has_release_workflow(repo_root) {
-        return WayCheckEntry {
-            name: name.to_string(),
-            status: CheckStatus::Pass,
-            message: "GitHub Actions release workflow detected".to_string(),
-            intent,
-            success_criteria,
-            suggestion: None,
-        };
+        return mk(
+            CheckStatus::Pass,
+            "GitHub Actions release workflow detected".to_string(),
+            None,
+        );
     }
 
-    WayCheckEntry {
-        name: name.to_string(),
-        status: CheckStatus::Warn,
-        message: "No release pipeline found".to_string(),
-        intent,
-        success_criteria,
-        suggestion: Some(
-            "Consider goreleaser (Go/Rust/any) or cargo-dist (Rust) to automate GitHub releases and publish to Homebrew/Scoop".to_string(),
+    mk(
+        CheckStatus::Warn,
+        "No release pipeline found".to_string(),
+        Some(
+            "Consider goreleaser (Go/Rust/any) or cargo-dist (Rust) to automate GitHub releases and publish to Homebrew/Scoop"
+                .to_string(),
         ),
-    }
+    )
 }
