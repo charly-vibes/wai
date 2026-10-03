@@ -2,7 +2,7 @@ plugins = []
 
 [project]
 name = "wai"
-version = "2026.9.28"
+version = "2026.10.3"
 description = ""
 tool_commit = "e96315f"
 
