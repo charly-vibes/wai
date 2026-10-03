@@ -96,6 +96,97 @@ pub(super) fn check_vale(repo_root: &Path) -> WayCheckEntry {
     }
 }
 
+fn is_shell_path(p: &std::path::Path) -> bool {
+    p.extension()
+        .and_then(|ext| ext.to_str())
+        .is_some_and(|ext| ext == "sh" || ext == "bash")
+}
+
+fn dir_has_shell_files(dir: &std::path::Path) -> bool {
+    dir.is_dir()
+        && std::fs::read_dir(dir)
+            .ok()
+            .map(|entries| {
+                entries
+                    .filter_map(|e| e.ok())
+                    .any(|e| is_shell_path(&e.path()))
+            })
+            .unwrap_or(false)
+}
+
+/// Whether the repo contains shell scripts worth linting.
+fn has_shell_scripts(repo_root: &Path) -> bool {
+    ["scripts", "bin", "script"]
+        .iter()
+        .any(|d| dir_has_shell_files(&repo_root.join(d)))
+        || std::fs::read_dir(repo_root)
+            .ok()
+            .map(|entries| {
+                entries
+                    .filter_map(|e| e.ok())
+                    .any(|e| is_shell_path(&e.path()))
+            })
+            .unwrap_or(false)
+}
+
+fn tool_available(bin: &str) -> bool {
+    std::process::Command::new(bin)
+        .arg("--version")
+        .output()
+        .is_ok_and(|o| o.status.success())
+}
+
+/// Outcome for the actionlint/shellcheck/workflows matrix.
+fn linter_outcome(
+    has_actionlint: bool,
+    has_shellcheck: bool,
+    has_workflows: bool,
+) -> (CheckStatus, String, Option<String>) {
+    match (has_actionlint, has_shellcheck, has_workflows) {
+        (true, true, _) => (
+            CheckStatus::Pass,
+            "actionlint and shellcheck available".to_string(),
+            None,
+        ),
+        (true, false, _) => (
+            CheckStatus::Pass,
+            "actionlint available (install shellcheck for deeper run: block analysis)".to_string(),
+            Some(
+                "Install shellcheck so actionlint can lint embedded run: blocks — https://www.shellcheck.net"
+                    .to_string(),
+            ),
+        ),
+        (false, true, false) => (
+            CheckStatus::Pass,
+            "shellcheck available".to_string(),
+            None,
+        ),
+        (false, true, true) => (
+            CheckStatus::Warn,
+            "shellcheck available but actionlint missing for workflow linting".to_string(),
+            Some(
+                "Install actionlint to lint GitHub Actions workflows (it uses shellcheck for run: blocks) — https://github.com/rhysd/actionlint"
+                    .to_string(),
+            ),
+        ),
+        (false, false, true) => (
+            CheckStatus::Warn,
+            "No shell linter detected".to_string(),
+            Some(
+                "Install actionlint + shellcheck to lint workflows and shell scripts — https://github.com/rhysd/actionlint"
+                    .to_string(),
+            ),
+        ),
+        (false, false, false) => (
+            CheckStatus::Warn,
+            "No shell linter detected".to_string(),
+            Some(
+                "Install shellcheck to lint shell scripts — https://www.shellcheck.net".to_string(),
+            ),
+        ),
+    }
+}
+
 pub(super) fn check_shell_linting(repo_root: &Path) -> WayCheckEntry {
     let name = "Shell linting";
     let intent = Some(
@@ -106,123 +197,36 @@ pub(super) fn check_shell_linting(repo_root: &Path) -> WayCheckEntry {
         "Shell scripts and CI run blocks are validated by a linter (actionlint or shellcheck)."
             .to_string(),
     );
+    let mk = |status: CheckStatus, message: String, suggestion: Option<String>| -> WayCheckEntry {
+        WayCheckEntry {
+            name: name.to_string(),
+            status,
+            message,
+            intent,
+            success_criteria,
+            suggestion,
+        }
+    };
 
     // Detect shell-containing files
     let has_workflows = repo_root.join(".github/workflows").is_dir();
+    let has_scripts = has_shell_scripts(repo_root);
 
-    let is_shell_ext = |p: &std::path::Path| {
-        p.extension()
-            .and_then(|ext| ext.to_str())
-            .is_some_and(|ext| ext == "sh" || ext == "bash")
-    };
-    let dir_has_shell_files = |dir: &std::path::Path| {
-        dir.is_dir()
-            && std::fs::read_dir(dir)
-                .ok()
-                .map(|entries| {
-                    entries
-                        .filter_map(|e| e.ok())
-                        .any(|e| is_shell_ext(&e.path()))
-                })
-                .unwrap_or(false)
-    };
-
-    let has_shell_scripts = ["scripts", "bin", "script"]
-        .iter()
-        .any(|d| dir_has_shell_files(&repo_root.join(d)))
-        || std::fs::read_dir(repo_root)
-            .ok()
-            .map(|entries| {
-                entries
-                    .filter_map(|e| e.ok())
-                    .any(|e| is_shell_ext(&e.path()))
-            })
-            .unwrap_or(false);
-
-    if !has_workflows && !has_shell_scripts {
-        return WayCheckEntry {
-            name: name.to_string(),
-            status: CheckStatus::Pass,
-            message: "No shell scripts or workflows to lint".to_string(),
-            intent,
-            success_criteria,
-            suggestion: None,
-        };
+    if !has_workflows && !has_scripts {
+        return mk(
+            CheckStatus::Pass,
+            "No shell scripts or workflows to lint".to_string(),
+            None,
+        );
     }
 
     // Check for actionlint (covers both workflow YAML and embedded shell via shellcheck)
-    let has_actionlint = std::process::Command::new("actionlint")
-        .arg("--version")
-        .output()
-        .is_ok_and(|o| o.status.success());
+    let has_actionlint = tool_available("actionlint");
+    let has_shellcheck = tool_available("shellcheck");
 
-    let has_shellcheck = std::process::Command::new("shellcheck")
-        .arg("--version")
-        .output()
-        .is_ok_and(|o| o.status.success());
-
-    match (has_actionlint, has_shellcheck, has_workflows) {
-        (true, true, _) => WayCheckEntry {
-            name: name.to_string(),
-            status: CheckStatus::Pass,
-            message: "actionlint and shellcheck available".to_string(),
-            intent,
-            success_criteria,
-            suggestion: None,
-        },
-        (true, false, _) => WayCheckEntry {
-            name: name.to_string(),
-            status: CheckStatus::Pass,
-            message: "actionlint available (install shellcheck for deeper run: block analysis)"
-                .to_string(),
-            intent,
-            success_criteria,
-            suggestion: Some(
-                "Install shellcheck so actionlint can lint embedded run: blocks — https://www.shellcheck.net"
-                    .to_string(),
-            ),
-        },
-        (false, true, false) => WayCheckEntry {
-            name: name.to_string(),
-            status: CheckStatus::Pass,
-            message: "shellcheck available".to_string(),
-            intent,
-            success_criteria,
-            suggestion: None,
-        },
-        (false, true, true) => WayCheckEntry {
-            name: name.to_string(),
-            status: CheckStatus::Warn,
-            message: "shellcheck available but actionlint missing for workflow linting".to_string(),
-            intent,
-            success_criteria,
-            suggestion: Some(
-                "Install actionlint to lint GitHub Actions workflows (it uses shellcheck for run: blocks) — https://github.com/rhysd/actionlint"
-                    .to_string(),
-            ),
-        },
-        (false, false, true) => WayCheckEntry {
-            name: name.to_string(),
-            status: CheckStatus::Warn,
-            message: "No shell linter detected".to_string(),
-            intent,
-            success_criteria,
-            suggestion: Some(
-                "Install actionlint + shellcheck to lint workflows and shell scripts — https://github.com/rhysd/actionlint"
-                    .to_string(),
-            ),
-        },
-        (false, false, false) => WayCheckEntry {
-            name: name.to_string(),
-            status: CheckStatus::Warn,
-            message: "No shell linter detected".to_string(),
-            intent,
-            success_criteria,
-            suggestion: Some(
-                "Install shellcheck to lint shell scripts — https://www.shellcheck.net".to_string(),
-            ),
-        },
-    }
+    let (status, message, suggestion) =
+        linter_outcome(has_actionlint, has_shellcheck, has_workflows);
+    mk(status, message, suggestion)
 }
 
 #[cfg(test)]

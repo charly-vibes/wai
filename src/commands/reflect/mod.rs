@@ -42,21 +42,19 @@ pub fn detect_output_targets(
         Some("claude.md") => Ok(vec![claude_md]),
         Some("agents.md") => Ok(vec![agents_md]),
         Some("both") => Ok(vec![claude_md, agents_md]),
-        Some(other) => {
-            miette::bail!(
-                "Unknown output target '{}'. Use 'claude.md', 'agents.md', or 'both'.",
-                other
-            )
-        }
+        Some(other) => Err(miette::miette!(
+            "Unknown output target '{}'. Use 'claude.md', 'agents.md', or 'both'.",
+            other
+        )),
         None => {
             let has_claude = claude_md.exists();
             let has_agents = agents_md.exists();
             if !has_claude && !has_agents {
-                miette::bail!(
+                return Err(miette::miette!(
                     "No CLAUDE.md or AGENTS.md found in '{}'. \
                      Run `wai init` first or create the target file manually.",
                     repo_root.display()
-                )
+                ));
             }
             let mut targets = Vec::new();
             if has_claude {
@@ -84,101 +82,145 @@ fn escape_fences(content: &str) -> String {
 pub fn build_reflect_prompt(ctx: &ReflectContext, today: &str) -> String {
     let mut parts: Vec<String> = Vec::new();
 
-    parts.push(
-        "You are synthesizing project-specific AI assistant guidance.\n\
-         Your goal: read the session context below and extract patterns, conventions, \
-         gotchas, and architectural notes that AI assistants should know when working on \
-         this project. Focus on information that is NOT already in the 'Already Documented' \
-         section below.\n"
-            .to_string(),
-    );
-
-    parts.push(
-        "# Input Hierarchy\n\
-         The context below comes from three tiers, ranked by richness:\n\
-         1. **Conversation transcript** — raw session detail; failed attempts, surprises, \
-            step-by-step struggles (most information-dense)\n\
-         2. **Handoff artifacts** — session summaries; intent, next steps, and gotchas\n\
-         3. **Research/design/plan artifacts** — explicit decisions and domain knowledge\n\
-         When referencing patterns, note the artifact date. If an artifact is older than \
-         6 months, flag it as potentially stale.\n"
-            .to_string(),
-    );
-
-    if !ctx.existing_blocks.is_empty() {
-        let mut already = String::from("# Already Documented\n");
-        already.push_str(
-            "The following content is already in the REFLECT block. Do NOT repeat it — \
-             only add new, distinct learnings:\n\n",
-        );
-        for (path, block) in &ctx.existing_blocks {
-            already.push_str(&format!(
-                "## Existing block in {}\n```\n{}\n```\n\n",
-                path.file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("unknown"),
-                escape_fences(block)
-            ));
-        }
-        parts.push(already);
+    parts.push(role_intro());
+    parts.push(input_hierarchy());
+    if let Some(section) = existing_blocks_section(ctx) {
+        parts.push(section);
     }
+    if let Some(section) = memories_section(ctx) {
+        parts.push(section);
+    }
+    if let Some(section) = conversation_section(ctx) {
+        parts.push(section);
+    }
+    if let Some(section) = handoffs_section(ctx) {
+        parts.push(section);
+    }
+    if let Some(section) = secondary_section(ctx) {
+        parts.push(section);
+    }
+    if let Some(section) = previous_reflections_section(ctx) {
+        parts.push(section);
+    }
+    parts.push(output_instructions(today));
 
-    if let Some(ref memories) = ctx.memories {
-        parts.push(format!(
+    parts.join("\n")
+}
+
+fn role_intro() -> String {
+    "You are synthesizing project-specific AI assistant guidance.\n\
+     Your goal: read the session context below and extract patterns, conventions, \
+     gotchas, and architectural notes that AI assistants should know when working on \
+     this project. Focus on information that is NOT already in the 'Already Documented' \
+     section below.\n"
+        .to_string()
+}
+
+fn input_hierarchy() -> String {
+    "# Input Hierarchy\n\
+     The context below comes from three tiers, ranked by richness:\n\
+     1. **Conversation transcript** — raw session detail; failed attempts, surprises, \
+        step-by-step struggles (most information-dense)\n\
+     2. **Handoff artifacts** — session summaries; intent, next steps, and gotchas\n\
+     3. **Research/design/plan artifacts** — explicit decisions and domain knowledge\n\
+     When referencing patterns, note the artifact date. If an artifact is older than \
+     6 months, flag it as potentially stale.\n"
+        .to_string()
+}
+
+/// Content already present in the REFLECT block, so the LLM doesn't repeat it.
+fn existing_blocks_section(ctx: &ReflectContext) -> Option<String> {
+    if ctx.existing_blocks.is_empty() {
+        return None;
+    }
+    let mut already = String::from("# Already Documented\n");
+    already.push_str(
+        "The following content is already in the REFLECT block. Do NOT repeat it — \
+         only add new, distinct learnings:\n\n",
+    );
+    for (path, block) in &ctx.existing_blocks {
+        already.push_str(&format!(
+            "## Existing block in {}\n```\n{}\n```\n\n",
+            path.file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("unknown"),
+            escape_fences(block)
+        ));
+    }
+    Some(already)
+}
+
+/// Insights already captured as persistent bd memories.
+fn memories_section(ctx: &ReflectContext) -> Option<String> {
+    ctx.memories.as_ref().map(|memories| {
+        format!(
             "# Already in Global Memories\n\
              The following insights are already captured as persistent memories in bd. \
              Do NOT re-derive or repeat them:\n\n{}\n",
             memories
-        ));
-    }
+        )
+    })
+}
 
-    if let Some(ref transcript) = ctx.conversation {
-        parts.push(format!(
+fn conversation_section(ctx: &ReflectContext) -> Option<String> {
+    ctx.conversation.as_ref().map(|transcript| {
+        format!(
             "# Conversation Transcript\n```\n{}\n```\n",
             escape_fences(transcript)
+        )
+    })
+}
+
+fn handoffs_section(ctx: &ReflectContext) -> Option<String> {
+    if ctx.handoffs.is_empty() {
+        return None;
+    }
+    let mut section = String::from("# Handoff Artifacts\n");
+    for h in &ctx.handoffs {
+        section.push_str(&format!(
+            "\n## {}\n```\n{}\n```\n",
+            h.rel_path,
+            escape_fences(&h.content)
         ));
     }
+    Some(section)
+}
 
-    if !ctx.handoffs.is_empty() {
-        let mut section = String::from("# Handoff Artifacts\n");
-        for h in &ctx.handoffs {
-            section.push_str(&format!(
-                "\n## {}\n```\n{}\n```\n",
-                h.rel_path,
-                escape_fences(&h.content)
-            ));
-        }
-        parts.push(section);
+fn secondary_section(ctx: &ReflectContext) -> Option<String> {
+    if ctx.secondary.is_empty() {
+        return None;
     }
-
-    if !ctx.secondary.is_empty() {
-        let mut section = String::from("# Research / Design / Plan Artifacts\n");
-        for s in &ctx.secondary {
-            section.push_str(&format!(
-                "\n## {} ({})\n```\n{}\n```\n",
-                s.rel_path,
-                s.kind,
-                escape_fences(&s.content)
-            ));
-        }
-        parts.push(section);
+    let mut section = String::from("# Research / Design / Plan Artifacts\n");
+    for s in &ctx.secondary {
+        section.push_str(&format!(
+            "\n## {} ({})\n```\n{}\n```\n",
+            s.rel_path,
+            s.kind,
+            escape_fences(&s.content)
+        ));
     }
+    Some(section)
+}
 
-    if !ctx.previous_reflections.is_empty() {
-        let mut section = String::from(
-            "# Previous Reflections\n\nExtend and correct these — do not repeat them verbatim:\n",
-        );
-        for r in &ctx.previous_reflections {
-            section.push_str(&format!(
-                "\n## {}\n```\n{}\n```\n",
-                r.rel_path,
-                escape_fences(&r.content)
-            ));
-        }
-        parts.push(section);
+fn previous_reflections_section(ctx: &ReflectContext) -> Option<String> {
+    if ctx.previous_reflections.is_empty() {
+        return None;
     }
+    let mut section = String::from(
+        "# Previous Reflections\n\nExtend and correct these — do not repeat them verbatim:\n",
+    );
+    for r in &ctx.previous_reflections {
+        section.push_str(&format!(
+            "\n## {}\n```\n{}\n```\n",
+            r.rel_path,
+            escape_fences(&r.content)
+        ));
+    }
+    Some(section)
+}
 
-    parts.push(format!(
+fn output_instructions(today: &str) -> String {
+    format!(
         "# Output Instructions\n\
          Today's date: {today}\n\n\
          Produce ONLY the inner content for a WAI:REFLECT block — no extra commentary. \
@@ -194,9 +236,7 @@ pub fn build_reflect_prompt(ctx: &ReflectContext, today: &str) -> String {
          ### Architecture Notes\n\n\
          Be concise and actionable. Each bullet should help an AI assistant avoid \
          repeating a past mistake or discovering a known pattern from scratch."
-    ));
-
-    parts.join("\n")
+    )
 }
 
 /// Extract the inner content of a WAI:REFLECT block from an LLM response.
@@ -294,239 +334,306 @@ pub fn extract_top_level_bullets(content: &str) -> Vec<String> {
         .collect()
 }
 
+/// CLI surface for `wai reflect` (clap derive); `verbose` comes from the
+/// global `-v` counter, not a per-subcommand flag.
+#[derive(Debug, Clone, clap::Args)]
 pub struct ReflectArgs {
+    /// Project name (auto-detected when only one project exists)
+    #[arg(short, long)]
     pub project: Option<String>,
+
+    /// Path to a plain-text conversation transcript (highest-priority context)
+    #[arg(short, long, value_name = "FILE")]
     pub conversation: Option<PathBuf>,
+
+    /// Output target: claude.md, agents.md, or both (default: auto-detect)
+    #[arg(short, long, value_name = "TARGET")]
     pub output: Option<String>,
+
+    /// Show what would change without writing
+    #[arg(long)]
     pub dry_run: bool,
+
+    /// Skip the confirmation prompt and write directly
+    #[arg(short, long)]
     pub yes: bool,
+
+    /// Inject pre-generated content directly (skips LLM call).
+    /// Used in agent mode: the agent calls `wai reflect --inject-content "..."` after
+    /// receiving the context block from an initial `wai reflect` run.
+    #[arg(long, value_name = "CONTENT")]
     pub inject_content: Option<String>,
+
+    /// Global verbosity counter, wired from the top-level `-v` flags.
+    #[arg(skip)]
     pub verbose: u8,
+
+    /// Store top-level bullet points from the generated reflection as bd memories
+    #[arg(long)]
     pub save_memories: bool,
 }
 
 pub fn run(args: ReflectArgs) -> Result<()> {
-    let ReflectArgs {
-        project,
-        conversation,
-        output,
-        dry_run,
-        yes: _yes,
-        inject_content,
-        verbose: _verbose,
-        save_memories,
-    } = args;
     let project_root = super::require_project()?;
-
     let today = chrono::Local::now().format("%Y-%m-%d").to_string();
 
-    // Resolve project_name early as Option<String>.
-    // Uses unified resolution but falls back to None rather than erroring,
-    // since reflect can operate without a specific project.
-    let project_name: Option<String> = super::resolve_project(&project_root, project.as_deref())
+    // Resolve early as Option<String>: unified resolution, but fall back to
+    // None rather than erroring — reflect can operate without a project.
+    let project_name = super::resolve_project(&project_root, args.project.as_deref())
         .ok()
         .map(|r| r.name);
 
     // Detect output targets (CLAUDE.md / AGENTS.md).
-    let targets = detect_output_targets(&project_root, output.as_deref())?;
+    let targets = detect_output_targets(&project_root, args.output.as_deref())?;
 
-    // ── Migration step (3.1–3.2) ──────────────────────────────────────────────
-    // Scan target files for old WAI:REFLECT:START/END blocks.
-    // If any exist, migrate once and replace with slim REF blocks.
-    {
-        let refl_dir = crate::config::reflections_dir(&project_root);
-        // Check whether a *-migrated.md already exists.
-        let migrated_exists = if refl_dir.exists() {
-            std::fs::read_dir(&refl_dir)
-                .ok()
-                .map(|entries| {
-                    entries
-                        .filter_map(|e| e.ok())
-                        .any(|e| e.file_name().to_string_lossy().contains("-migrated"))
-                })
-                .unwrap_or(false)
-        } else {
-            false
-        };
-
-        let ref_block = format!(
-            "{}\n{}{}\n",
-            REFLECT_REF_START,
-            wai_reflect_ref_content(),
-            REFLECT_REF_END
-        );
-
-        let mut migration_notice_printed = false;
-        let mut first_content: Option<String> = None;
-
-        for target in &targets {
-            if !has_reflect_block(target) {
-                continue;
-            }
-
-            // Extract content from the first file that has the block for migration.
-            if first_content.is_none() {
-                first_content = read_reflect_block(target);
-            }
-
-            // Replace old WAI:REFLECT block with WAI:REFLECT:REF block.
-            let existing = std::fs::read_to_string(target).into_diagnostic()?;
-            // Find and replace the REFLECT:START/END block with the REF block.
-            let reflect_start_marker = "<!-- WAI:REFLECT:START -->";
-            let reflect_end_marker = "<!-- WAI:REFLECT:END -->";
-            if let (Some(s), Some(e)) = (
-                existing.find(reflect_start_marker),
-                existing.find(reflect_end_marker),
-            ) && s < e
-            {
-                let end_pos = e + reflect_end_marker.len();
-                // Check if a REF block already exists after the old block.
-                let tail = &existing[end_pos..];
-                let already_has_ref = tail.contains(REFLECT_REF_START);
-                let mut new_content = String::with_capacity(existing.len());
-                new_content.push_str(&existing[..s]);
-                if !already_has_ref {
-                    new_content.push_str(&ref_block);
-                }
-                new_content.push_str(&existing[end_pos..]);
-                std::fs::write(target, new_content).into_diagnostic()?;
-            }
-
-            if !migration_notice_printed {
-                migration_notice_printed = true;
-            }
-        }
-
-        // Write migrated resource file if we found content and no migrated file exists.
-        if let Some(content) = first_content
-            && !migrated_exists
-        {
-            std::fs::create_dir_all(&refl_dir).into_diagnostic()?;
-            let project_slug = project_name
-                .as_deref()
-                .map(slug::slugify)
-                .unwrap_or_else(|| "project".to_string());
-            let migrated_filename = format!("{}-{}-migrated.md", today, project_slug);
-            let migrated_path = refl_dir.join(&migrated_filename);
-            let front_matter = format!(
-                "---\ndate: \"{}\"\nproject: \"{}\"\ntype: reflection-migrated\n---\n\n{}",
-                today,
-                project_name.as_deref().unwrap_or("unknown"),
-                content.trim()
-            );
-            std::fs::write(&migrated_path, front_matter).into_diagnostic()?;
-        }
-
-        if migration_notice_printed {
-            println!();
-            println!(
-                "  {} Migrated WAI:REFLECT block(s) to resource file.",
-                "◆".cyan()
-            );
-        }
-    }
+    migrate_legacy_reflect_blocks(&project_root, &targets, project_name.as_deref(), &today)?;
 
     // Gather context.
     println!();
     println!("  {} Gathering context …", "◆".cyan());
-    let ctx = gather_reflect_context(&project_root, conversation.as_deref(), &targets)?;
+    let ctx = gather_reflect_context(&project_root, args.conversation.as_deref(), &targets)?;
 
     // Call LLM (or use injected content / agent-mode sentinel path).
-    let raw_response = if let Some(content) = inject_content {
-        // Agent provided the content directly via --inject-content.
-        content
-    } else {
-        println!("  {} Calling LLM …", "○".dimmed());
-        let prompt = build_reflect_prompt(&ctx, &today);
-        let raw = call_llm(&project_root, &prompt)?;
-        if raw == AGENT_SENTINEL {
-            // AgentBackend already printed [AGENT CONTEXT]...[/AGENT CONTEXT] to stdout.
-            // The enclosing agent will read the context and generate the REFLECT block.
-            // Instruct it to feed the result back via --inject-content.
-            println!();
-            println!("  {} Agent mode — context sent to agent.", "◆".cyan());
-            println!(
-                "  {} Once the agent provides the REFLECT content, run:",
-                "○".dimmed()
-            );
-            println!(
-                "  {}   wai reflect --inject-content '<content>'",
-                "○".dimmed()
-            );
-            return Ok(());
-        }
-        raw
+    let Some(raw_response) =
+        resolve_raw_response(&project_root, &ctx, args.inject_content, &today)?
+    else {
+        // Agent mode: context already sent; the agent feeds back via --inject-content.
+        return Ok(());
     };
 
     // Extract REFLECT content from LLM response.
     let new_content = extract_reflect_content(&raw_response);
 
     // --dry-run: show the resource file path that would be written, then exit.
-    if dry_run {
-        let project_str = project_name.as_deref().unwrap_or("project");
-        let would_write = predict_reflect_resource_path(&project_root, project_str);
-        println!();
-        println!("  {} Dry run — would write:", "○".dimmed());
-        println!("  {}", would_write.display());
-        println!();
-        return Ok(());
+    if args.dry_run {
+        return print_dry_run(&project_root, project_name.as_deref());
     }
 
     // Write resource file.
-    let project_str = project_name.as_deref().unwrap_or("project");
-    let resource_path =
-        write_reflect_resource(&project_root, project_str, &new_content, ctx.handoff_count)?;
+    let project_str = project_name.as_deref();
+    let resource_path = write_reflect_resource(
+        &project_root,
+        project_str.unwrap_or("project"),
+        &new_content,
+        ctx.handoff_count,
+    )?;
 
     // Update .reflect-meta for the resolved project.
-    if let Some(ref name) = project_name {
-        let project_dir = crate::config::projects_dir(&project_root).join(name);
+    update_reflect_meta(&project_root, project_name.as_deref(), &today)?;
+
+    // Print success with the resource file path.
+    println!();
+    println!("  {} Wrote {}", "✓".green(), resource_path.display().bold());
+    println!();
+
+    if args.save_memories {
+        save_reflect_memories(&project_root, &new_content);
+    }
+
+    Ok(())
+}
+
+/// Migration step (3.1–3.2): scan target files for legacy
+/// WAI:REFLECT:START/END blocks; if any exist, migrate once and replace
+/// with slim REF blocks.
+fn migrate_legacy_reflect_blocks(
+    project_root: &Path,
+    targets: &[PathBuf],
+    project_name: Option<&str>,
+    today: &str,
+) -> Result<()> {
+    let refl_dir = crate::config::reflections_dir(project_root);
+    // Check whether a *-migrated.md already exists.
+    let migrated_exists = migrated_reflection_exists(&refl_dir);
+    let ref_block = format!(
+        "{}\n{}{}\n",
+        REFLECT_REF_START,
+        wai_reflect_ref_content(),
+        REFLECT_REF_END
+    );
+
+    let mut migrated = false;
+    let mut first_content: Option<String> = None;
+    for target in targets {
+        if has_reflect_block(target) {
+            // Extract content from the first file that has the block for migration.
+            if first_content.is_none() {
+                first_content = read_reflect_block(target);
+            }
+            replace_legacy_reflect_block(target, &ref_block)?;
+            migrated = true;
+        }
+    }
+
+    // Write migrated resource file if we found content and no migrated file exists.
+    if let Some(content) = first_content
+        && !migrated_exists
+    {
+        write_migrated_reflection(&refl_dir, &content, project_name, today)?;
+    }
+
+    if migrated {
+        println!();
+        println!(
+            "  {} Migrated WAI:REFLECT block(s) to resource file.",
+            "◆".cyan()
+        );
+    }
+    Ok(())
+}
+
+/// Whether a `*-migrated.md` reflection resource already exists.
+fn migrated_reflection_exists(refl_dir: &Path) -> bool {
+    if !refl_dir.exists() {
+        return false;
+    }
+    std::fs::read_dir(refl_dir)
+        .ok()
+        .map(|entries| {
+            entries
+                .filter_map(|e| e.ok())
+                .any(|e| e.file_name().to_string_lossy().contains("-migrated"))
+        })
+        .unwrap_or(false)
+}
+
+/// Replace a legacy WAI:REFLECT:START/END block in `target` with the slim
+/// REF block (idempotent: skips if a REF block already follows).
+fn replace_legacy_reflect_block(target: &Path, ref_block: &str) -> Result<()> {
+    let existing = std::fs::read_to_string(target).into_diagnostic()?;
+    let reflect_start_marker = "<!-- WAI:REFLECT:START -->";
+    let reflect_end_marker = "<!-- WAI:REFLECT:END -->";
+    if let (Some(s), Some(e)) = (
+        existing.find(reflect_start_marker),
+        existing.find(reflect_end_marker),
+    ) && s < e
+    {
+        let end_pos = e + reflect_end_marker.len();
+        // Check if a REF block already exists after the old block.
+        let already_has_ref = existing[end_pos..].contains(REFLECT_REF_START);
+        let mut new_content = String::with_capacity(existing.len());
+        new_content.push_str(&existing[..s]);
+        if !already_has_ref {
+            new_content.push_str(ref_block);
+        }
+        new_content.push_str(&existing[end_pos..]);
+        std::fs::write(target, new_content).into_diagnostic()?;
+    }
+    Ok(())
+}
+
+/// Persist the migrated legacy REFLECT content as a dated resource file.
+fn write_migrated_reflection(
+    refl_dir: &Path,
+    content: &str,
+    project_name: Option<&str>,
+    today: &str,
+) -> Result<()> {
+    std::fs::create_dir_all(refl_dir).into_diagnostic()?;
+    let project_slug = project_name
+        .map(slug::slugify)
+        .unwrap_or_else(|| "project".to_string());
+    let migrated_filename = format!("{}-{}-migrated.md", today, project_slug);
+    let migrated_path = refl_dir.join(&migrated_filename);
+    let front_matter = format!(
+        "---\ndate: \"{}\"\nproject: \"{}\"\ntype: reflection-migrated\n---\n\n{}",
+        today,
+        project_name.unwrap_or("unknown"),
+        content.trim()
+    );
+    std::fs::write(&migrated_path, front_matter).into_diagnostic()?;
+    Ok(())
+}
+
+/// Call the LLM (or honor --inject-content directly). `None` means the
+/// agent-mode sentinel path fired: the context was printed for the enclosing
+/// agent, which will feed the REFLECT content back via --inject-content.
+fn resolve_raw_response(
+    project_root: &Path,
+    ctx: &ReflectContext,
+    inject_content: Option<String>,
+    today: &str,
+) -> Result<Option<String>> {
+    if let Some(content) = inject_content {
+        // Agent provided the content directly via --inject-content.
+        return Ok(Some(content));
+    }
+    println!("  {} Calling LLM …", "○".dimmed());
+    let prompt = build_reflect_prompt(ctx, today);
+    let raw = call_llm(project_root, &prompt)?;
+    if raw == AGENT_SENTINEL {
+        // AgentBackend already printed [AGENT CONTEXT]...[/AGENT CONTEXT] to stdout.
+        // The enclosing agent will read the context and generate the REFLECT block.
+        // Instruct it to feed the result back via --inject-content.
+        println!();
+        println!("  {} Agent mode — context sent to agent.", "◆".cyan());
+        println!(
+            "  {} Once the agent provides the REFLECT content, run:",
+            "○".dimmed()
+        );
+        println!(
+            "  {}   wai reflect --inject-content '<content>'",
+            "○".dimmed()
+        );
+        return Ok(None);
+    }
+    Ok(Some(raw))
+}
+
+/// --dry-run: show the resource file path that would be written.
+fn print_dry_run(project_root: &Path, project_name: Option<&str>) -> Result<()> {
+    let project_str = project_name.unwrap_or("project");
+    let would_write = predict_reflect_resource_path(project_root, project_str);
+    println!();
+    println!("  {} Dry run — would write:", "○".dimmed());
+    println!("  {}", would_write.display());
+    println!();
+    Ok(())
+}
+
+/// Update `.reflect-meta` (last_reflected date, session count) for the
+/// resolved project.
+fn update_reflect_meta(project_root: &Path, project_name: Option<&str>, today: &str) -> Result<()> {
+    if let Some(name) = project_name {
+        let project_dir = crate::config::projects_dir(project_root).join(name);
         if project_dir.exists() {
             let existing_meta = read_reflect_meta(&project_dir)?.unwrap_or(ReflectMeta {
-                last_reflected: today.clone(),
+                last_reflected: today.to_string(),
                 session_count: 0,
             });
             let new_meta = ReflectMeta {
-                last_reflected: today.clone(),
+                last_reflected: today.to_string(),
                 session_count: existing_meta.session_count + 1,
             };
             write_reflect_meta(&project_dir, &new_meta)?;
         }
     }
-
-    // Print success with the resource file path.
-    println!();
-    println!(
-        "  {} Wrote {}",
-        "✓".green(),
-        resource_path.display().to_string().bold()
-    );
-    println!();
-
-    if save_memories {
-        let bullets = extract_top_level_bullets(&new_content);
-        if bullets.is_empty() {
-            println!(
-                "  {} --save-memories: no top-level bullets found in reflection",
-                "○".dimmed()
-            );
-        } else {
-            println!(
-                "  {} Saving {} bullet(s) to bd memories …",
-                "◆".cyan(),
-                bullets.len()
-            );
-            let mut saved = 0u32;
-            for bullet in &bullets {
-                match store_memory(&project_root, bullet) {
-                    Ok(()) => saved += 1,
-                    Err(e) => eprintln!("! Could not save memory: {}", e),
-                }
-            }
-            println!("  {} Saved {} memories", "✓".green(), saved);
-        }
-    }
-
     Ok(())
+}
+
+/// Save top-level bullets from the reflection as bd memories.
+fn save_reflect_memories(project_root: &Path, new_content: &str) {
+    let bullets = extract_top_level_bullets(new_content);
+    if bullets.is_empty() {
+        println!(
+            "  {} --save-memories: no top-level bullets found in reflection",
+            "○".dimmed()
+        );
+    } else {
+        println!(
+            "  {} Saving {} bullet(s) to bd memories …",
+            "◆".cyan(),
+            bullets.len()
+        );
+        let mut saved = 0u32;
+        for bullet in &bullets {
+            match store_memory(project_root, bullet) {
+                Ok(()) => saved += 1,
+                Err(e) => eprintln!("! Could not save memory: {}", e),
+            }
+        }
+        println!("  {} Saved {} memories", "✓".green(), saved);
+    }
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -787,48 +894,47 @@ mod tests {
         // Restore working directory before asserting, so failures don't break
         // other serial tests.
         std::env::set_current_dir(&original_dir).unwrap();
-
         result.expect("run() should succeed");
 
-        // 1. A resource file was created in .wai/resources/reflections/ with
-        //    a filename matching *-migrated.md.
+        let migrated_files = find_migrated_files(&dir);
+        assert_migrated_resource(&migrated_files);
+        assert_migration_replaced_claude_block(&dir);
+    }
+
+    /// Exactly one `*-migrated.md` in .wai/resources/reflections/.
+    fn find_migrated_files(dir: &tempfile::TempDir) -> Vec<std::fs::DirEntry> {
         let refl_dir = crate::config::reflections_dir(dir.path());
-        assert!(
-            refl_dir.exists(),
-            "reflections dir should have been created"
-        );
-        let migrated_files: Vec<_> = fs::read_dir(&refl_dir)
+        let files: Vec<_> = fs::read_dir(&refl_dir)
             .unwrap()
             .filter_map(|e| e.ok())
             .filter(|e| e.file_name().to_string_lossy().contains("-migrated"))
             .collect();
         assert_eq!(
-            migrated_files.len(),
+            files.len(),
             1,
             "expected exactly one *-migrated.md file, found: {:?}",
-            migrated_files
-                .iter()
-                .map(|e| e.file_name())
-                .collect::<Vec<_>>()
+            files.iter().map(|e| e.file_name()).collect::<Vec<_>>()
         );
+        files
+    }
 
-        // 2. The resource file contains `type: reflection-migrated` in its
-        //    YAML front-matter.
+    /// Resource file carries `type: reflection-migrated` front-matter.
+    fn assert_migrated_resource(migrated_files: &[std::fs::DirEntry]) {
         let migrated_content = fs::read_to_string(migrated_files[0].path()).unwrap();
         assert!(
             migrated_content.contains("type: reflection-migrated"),
             "migrated file should have type: reflection-migrated in front-matter, got:\n{}",
             migrated_content
         );
+    }
 
-        // 3. CLAUDE.md no longer contains WAI:REFLECT:START (old block replaced).
+    /// CLAUDE.md lost the legacy WAI:REFLECT block and gained the slim REF block.
+    fn assert_migration_replaced_claude_block(dir: &tempfile::TempDir) {
         let claude_content = fs::read_to_string(dir.path().join("CLAUDE.md")).unwrap();
         assert!(
             !claude_content.contains("WAI:REFLECT:START"),
             "CLAUDE.md should no longer have WAI:REFLECT:START after migration"
         );
-
-        // 4. CLAUDE.md contains WAI:REFLECT:REF:START (slim replacement block).
         assert!(
             claude_content.contains("WAI:REFLECT:REF:START"),
             "CLAUDE.md should contain WAI:REFLECT:REF:START after migration"

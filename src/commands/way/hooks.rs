@@ -75,6 +75,123 @@ pub(super) fn hook_owner(repo_root: &Path) -> Option<&'static str> {
     None
 }
 
+/// Outcome for the prek branch of `check_git_hooks`.
+fn prek_outcome(repo_root: &Path) -> (CheckStatus, String, Option<String>) {
+    // core.hooksPath being set means prek refuses to install — report this first.
+    if let Some(hooks_path) = git_core_hooks_path(repo_root) {
+        return (
+            CheckStatus::Warn,
+            format!(
+                "prek.toml found but core.hooksPath is set ('{}') — prek cannot install",
+                hooks_path
+            ),
+            Some("Unset it first: git config --local --unset core.hooksPath".to_string()),
+        );
+    }
+    // Check both pre-commit and pre-push for prek signature.
+    if hook_contains(repo_root, "prek") {
+        return (
+            CheckStatus::Pass,
+            "prek detected and installed".to_string(),
+            None,
+        );
+    }
+    // Another tool owns the hook — name it rather than suggest a re-install.
+    if let Some(owner) = hook_owner(repo_root) {
+        return (
+            CheckStatus::Warn,
+            format!(
+                "prek.toml found but hook is owned by {} — chain prek or use {}'s runner",
+                owner, owner
+            ),
+            None,
+        );
+    }
+    (
+        CheckStatus::Warn,
+        "prek.toml found but hooks not installed — run: prek install".to_string(),
+        None,
+    )
+}
+
+/// Outcome for the lefthook branch of `check_git_hooks`.
+fn lefthook_outcome(repo_root: &Path) -> (CheckStatus, String, Option<String>) {
+    // Check the delegated core.hooksPath first (e.g., when beads/bd sets hooksPath)
+    if let Some(hooks_path) = git_core_hooks_path(repo_root) {
+        let delegated_precommit = repo_root.join(&hooks_path).join("pre-commit");
+        let delegated_prepush = repo_root.join(&hooks_path).join("pre-push");
+
+        let lefthook_in_delegated = read_hook_from_path(&delegated_precommit)
+            .is_some_and(|c| c.contains("lefthook"))
+            || read_hook_from_path(&delegated_prepush).is_some_and(|c| c.contains("lefthook"));
+
+        if lefthook_in_delegated {
+            return (
+                CheckStatus::Pass,
+                "lefthook detected and installed".to_string(),
+                None,
+            );
+        }
+        return (
+            CheckStatus::Warn,
+            format!(
+                "lefthook.yml found but core.hooksPath is set ('{}') — lefthook not found in delegated path",
+                hooks_path,
+            ),
+            Some("Run: lefthook install".to_string()),
+        );
+    }
+    if hook_contains(repo_root, "lefthook") {
+        return (
+            CheckStatus::Pass,
+            "lefthook detected and installed".to_string(),
+            None,
+        );
+    }
+    (
+        CheckStatus::Warn,
+        "lefthook.yml found but hooks not installed — run: lefthook install".to_string(),
+        None,
+    )
+}
+
+/// Outcome for the husky branch of `check_git_hooks`.
+fn husky_outcome(repo_root: &Path) -> (CheckStatus, String, Option<String>) {
+    if hook_exists_nonempty(repo_root) {
+        (
+            CheckStatus::Pass,
+            "husky detected and installed".to_string(),
+            None,
+        )
+    } else {
+        (
+            CheckStatus::Warn,
+            ".husky/ found but hooks not installed — run: npx husky install".to_string(),
+            None,
+        )
+    }
+}
+
+/// Outcome for the pre-commit branch of `check_git_hooks`.
+fn precommit_outcome(repo_root: &Path) -> (CheckStatus, String, Option<String>) {
+    const PREK_HINT: &str =
+        "Consider prek for simpler hook management — https://github.com/chshersh/prek";
+    if hook_contains(repo_root, "pre-commit") {
+        (
+            CheckStatus::Pass,
+            "pre-commit detected and installed".to_string(),
+            Some(PREK_HINT.to_string()),
+        )
+    } else {
+        (
+            CheckStatus::Warn,
+            ".pre-commit-config.yaml found but hooks not installed — run: pre-commit install"
+                .to_string(),
+            Some(PREK_HINT.to_string()),
+        )
+    }
+}
+
 pub(super) fn check_git_hooks(repo_root: &Path) -> WayCheckEntry {
     let name = "Pre-commit quality gates";
     let intent = Some(
@@ -84,174 +201,35 @@ pub(super) fn check_git_hooks(repo_root: &Path) -> WayCheckEntry {
     let success_criteria = Some(
         "Automated checks (linters, tests) run automatically before code is committed.".to_string(),
     );
-
-    let prek_config = repo_root.join("prek.toml");
-    let precommit_config = repo_root.join(".pre-commit-config.yaml");
-    let lefthook_config = repo_root.join("lefthook.yml");
-    let lefthook_config_yaml = repo_root.join("lefthook.yaml");
-    let husky_dir = repo_root.join(".husky");
-
-    if prek_config.exists() {
-        // core.hooksPath being set means prek refuses to install — report this first.
-        if let Some(hooks_path) = git_core_hooks_path(repo_root) {
-            return WayCheckEntry {
-                name: name.to_string(),
-                status: CheckStatus::Warn,
-                message: format!(
-                    "prek.toml found but core.hooksPath is set ('{}') — prek cannot install",
-                    hooks_path
-                ),
-                intent,
-                success_criteria,
-                suggestion: Some(
-                    "Unset it first: git config --local --unset core.hooksPath".to_string(),
-                ),
-            };
-        }
-        // Check both pre-commit and pre-push for prek signature.
-        if hook_contains(repo_root, "prek") {
-            return WayCheckEntry {
-                name: name.to_string(),
-                status: CheckStatus::Pass,
-                message: "prek detected and installed".to_string(),
-                intent,
-                success_criteria,
-                suggestion: None,
-            };
-        }
-        // Another tool owns the hook — name it rather than suggest a re-install.
-        if let Some(owner) = hook_owner(repo_root) {
-            return WayCheckEntry {
-                name: name.to_string(),
-                status: CheckStatus::Warn,
-                message: format!(
-                    "prek.toml found but hook is owned by {} — chain prek or use {}'s runner",
-                    owner, owner
-                ),
-                intent,
-                success_criteria,
-                suggestion: None,
-            };
-        }
+    let mk = |status: CheckStatus, message: String, suggestion: Option<String>| -> WayCheckEntry {
         WayCheckEntry {
             name: name.to_string(),
-            status: CheckStatus::Warn,
-            message: "prek.toml found but hooks not installed — run: prek install".to_string(),
+            status,
+            message,
             intent,
             success_criteria,
-            suggestion: None,
+            suggestion,
         }
-    } else if lefthook_config.exists() || lefthook_config_yaml.exists() {
-        // Check the delegated core.hooksPath first (e.g., when beads/bd sets hooksPath)
-        if let Some(hooks_path) = git_core_hooks_path(repo_root) {
-            let delegated_precommit = repo_root.join(&hooks_path).join("pre-commit");
-            let delegated_prepush = repo_root.join(&hooks_path).join("pre-push");
+    };
 
-            let lefthook_in_delegated = read_hook_from_path(&delegated_precommit)
-                .is_some_and(|c| c.contains("lefthook"))
-                || read_hook_from_path(&delegated_prepush).is_some_and(|c| c.contains("lefthook"));
-
-            if lefthook_in_delegated {
-                WayCheckEntry {
-                    name: name.to_string(),
-                    status: CheckStatus::Pass,
-                    message: "lefthook detected and installed".to_string(),
-                    intent,
-                    success_criteria,
-                    suggestion: None,
-                }
-            } else {
-                WayCheckEntry {
-                    name: name.to_string(),
-                    status: CheckStatus::Warn,
-                    message: format!(
-                        "lefthook.yml found but core.hooksPath is set ('{}') — lefthook not found in delegated path",
-                        hooks_path,
-                    ),
-                    intent,
-                    success_criteria,
-                    suggestion: Some("Run: lefthook install".to_string()),
-                }
-            }
-        } else if hook_contains(repo_root, "lefthook") {
-            WayCheckEntry {
-                name: name.to_string(),
-                status: CheckStatus::Pass,
-                message: "lefthook detected and installed".to_string(),
-                intent,
-                success_criteria,
-                suggestion: None,
-            }
-        } else {
-            WayCheckEntry {
-                name: name.to_string(),
-                status: CheckStatus::Warn,
-                message: "lefthook.yml found but hooks not installed — run: lefthook install"
-                    .to_string(),
-                intent,
-                success_criteria,
-                suggestion: None,
-            }
-        }
-    } else if husky_dir.exists() && husky_dir.is_dir() {
-        if hook_exists_nonempty(repo_root) {
-            WayCheckEntry {
-                name: name.to_string(),
-                status: CheckStatus::Pass,
-                message: "husky detected and installed".to_string(),
-                intent,
-                success_criteria,
-                suggestion: None,
-            }
-        } else {
-            WayCheckEntry {
-                name: name.to_string(),
-                status: CheckStatus::Warn,
-                message: ".husky/ found but hooks not installed — run: npx husky install"
-                    .to_string(),
-                intent,
-                success_criteria,
-                suggestion: None,
-            }
-        }
-    } else if precommit_config.exists() {
-        if hook_contains(repo_root, "pre-commit") {
-            WayCheckEntry {
-                name: name.to_string(),
-                status: CheckStatus::Pass,
-                message: "pre-commit detected and installed".to_string(),
-                intent,
-                success_criteria,
-                suggestion: Some(
-                    "Consider prek for simpler hook management — https://github.com/chshersh/prek"
-                        .to_string(),
-                ),
-            }
-        } else {
-            WayCheckEntry {
-                name: name.to_string(),
-                status: CheckStatus::Warn,
-                message: ".pre-commit-config.yaml found but hooks not installed — run: pre-commit install".to_string(),
-                intent,
-                success_criteria,
-                suggestion: Some(
-                    "Consider prek for simpler hook management — https://github.com/chshersh/prek"
-                        .to_string(),
-                ),
-            }
-        }
+    let outcome = if repo_root.join("prek.toml").exists() {
+        prek_outcome(repo_root)
+    } else if repo_root.join("lefthook.yml").exists() || repo_root.join("lefthook.yaml").exists() {
+        lefthook_outcome(repo_root)
+    } else if repo_root.join(".husky").is_dir() {
+        husky_outcome(repo_root)
+    } else if repo_root.join(".pre-commit-config.yaml").exists() {
+        precommit_outcome(repo_root)
     } else {
-        WayCheckEntry {
-            name: name.to_string(),
-            status: CheckStatus::Warn,
-            message: "No git hook manager detected".to_string(),
-            intent,
-            success_criteria,
-            suggestion: Some(
-                "Add prek to manage git hooks — https://github.com/chshersh/prek".to_string(),
-            ),
-        }
-    }
+        (
+            CheckStatus::Warn,
+            "No git hook manager detected".to_string(),
+            Some("Add prek to manage git hooks — https://github.com/chshersh/prek".to_string()),
+        )
+    };
+
+    let (status, message, suggestion) = outcome;
+    mk(status, message, suggestion)
 }
 
 #[cfg(test)]

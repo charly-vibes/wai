@@ -61,9 +61,9 @@ pub fn run_install(args: ResourceInstallArgs) -> Result<()> {
     } else if let Some(repo_path) = args.from_repo {
         skills::install_skill_from_repo(&args.skill, &repo_path)
     } else {
-        miette::bail!(
+        Err(miette::miette!(
             "Specify either --global (to install globally) or --from-repo <path> (to install from another repository)"
-        )
+        ))
     }
 }
 

@@ -19,15 +19,42 @@ use super::require_project;
 
 const DEFAULT_LIMIT: usize = 20;
 
+/// CLI surface for `wai search` (clap derive).
+#[derive(Debug, Clone, clap::Args)]
 pub struct SearchArgs {
+    /// Search query (supports regex with --regex flag)
     pub query: String,
+
+    /// Filter by artifact type (research, plan, design, handoff)
+    #[arg(long = "type")]
     pub type_filter: Option<String>,
+
+    /// Search within a specific project
+    #[arg(long = "in")]
     pub project: Option<String>,
-    pub use_regex: bool,
+
+    /// Treat query as a regular expression
+    #[arg(long)]
+    pub regex: bool,
+
+    /// Limit number of results shown
+    #[arg(short = 'n', long)]
     pub limit: Option<usize>,
-    pub tag_filter: Vec<String>,
+
+    /// Filter by tag (frontmatter-based; repeatable)
+    #[arg(long)]
+    pub tag: Vec<String>,
+
+    /// Return only the most recently dated match
+    #[arg(long)]
     pub latest: bool,
+
+    /// Number of surrounding context lines to show (like grep -C)
+    #[arg(short = 'C', long = "context", default_value_t = 0)]
     pub context_size: usize,
+
+    /// Include bd memories in search results
+    #[arg(long)]
     pub include_memories: bool,
 }
 
@@ -36,9 +63,9 @@ pub fn run(args: SearchArgs) -> Result<()> {
         query,
         type_filter,
         project,
-        use_regex,
+        regex,
         limit,
-        tag_filter,
+        tag,
         latest,
         context_size,
         include_memories,
@@ -61,7 +88,7 @@ pub fn run(args: SearchArgs) -> Result<()> {
     };
 
     type Matcher = Box<dyn Fn(&str) -> Option<(usize, usize)>>;
-    let matcher: Matcher = if use_regex {
+    let matcher: Matcher = if regex {
         let re = regex::Regex::new(&query)
             .map_err(|e| miette::miette!("Invalid regex '{}': {}", query, e))?;
         Box::new(move |line: &str| re.find(line).map(|m| (m.start(), m.end())))
@@ -130,9 +157,9 @@ pub fn run(args: SearchArgs) -> Result<()> {
         };
 
         // Apply tag filter: parse YAML frontmatter and check tags.
-        if !tag_filter.is_empty() {
+        if !tag.is_empty() {
             let file_tags = parse_frontmatter_tags(&content);
-            let matches_all = tag_filter
+            let matches_all = tag
                 .iter()
                 .all(|required| file_tags.iter().any(|ft| ft.eq_ignore_ascii_case(required)));
             if !matches_all {

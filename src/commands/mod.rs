@@ -16,7 +16,7 @@ mod artifacts;
 mod close;
 mod config_cmd;
 mod doctor;
-mod feedback;
+pub(crate) mod feedback;
 mod handoff;
 mod import;
 mod init;
@@ -29,9 +29,9 @@ mod pipeline;
 mod plugin;
 mod prime;
 mod project;
-mod reflect;
+pub(crate) mod reflect;
 mod resource;
-mod search;
+pub(crate) mod search;
 mod show;
 mod status;
 mod sync;
@@ -55,27 +55,7 @@ pub fn run(cli: Cli, guide: &Guide) -> Result<()> {
         }) => sync::run(status, dry_run, from_main),
         Some(Commands::Config(cmd)) => config_cmd::run(cmd),
         Some(Commands::Handoff(cmd)) => handoff::run(cmd),
-        Some(Commands::Search {
-            query,
-            type_filter,
-            project,
-            regex,
-            limit,
-            tag,
-            latest,
-            context,
-            include_memories,
-        }) => search::run(search::SearchArgs {
-            query,
-            type_filter,
-            project,
-            use_regex: regex,
-            limit,
-            tag_filter: tag,
-            latest,
-            context_size: context,
-            include_memories,
-        }),
+        Some(Commands::Search(args)) => search::run(args),
         Some(Commands::Timeline {
             project,
             from,
@@ -86,36 +66,8 @@ pub fn run(cli: Cli, guide: &Guide) -> Result<()> {
         Some(Commands::Doctor { fix }) => doctor::run(fix),
         Some(Commands::Way { topic, fix }) => way::run(topic, fix),
         Some(Commands::Import { path }) => import::run(path),
-        Some(Commands::Resource(cmd)) => match cmd {
-            crate::cli::ResourceCommands::Add(add_cmd) => resource::run_add(add_cmd),
-            crate::cli::ResourceCommands::List(list_cmd) => resource::run_list(list_cmd),
-            crate::cli::ResourceCommands::Import(import_cmd) => resource::run_import(import_cmd),
-            crate::cli::ResourceCommands::Install(args) => resource::run_install(args),
-            crate::cli::ResourceCommands::Export(args) => resource::run_export(args),
-        },
-        Some(Commands::Feedback {
-            kind,
-            title,
-            body,
-            from_last_error,
-            dry_run,
-            web,
-            json,
-            yes,
-            no_context,
-            redact_remote,
-        }) => feedback::run(feedback::FeedbackArgs {
-            kind,
-            title,
-            body,
-            from_last_error,
-            dry_run,
-            web,
-            json,
-            yes,
-            no_context,
-            redact_remote,
-        }),
+        Some(Commands::Resource(cmd)) => dispatch_resource(cmd),
+        Some(Commands::Feedback(args)) => feedback::run(args),
         Some(Commands::Pipeline(cmd)) => pipeline::run(cmd),
         Some(Commands::Artifacts(cmd)) => artifacts::run(cmd),
         Some(Commands::Matrix(cmd)) => matrix::run(cmd),
@@ -133,71 +85,71 @@ pub fn run(cli: Cli, guide: &Guide) -> Result<()> {
             no_llm,
             json,
         }) => why::run(query, no_llm, json, cli.verbose.raw_count()),
-        Some(Commands::Reflect {
-            project,
-            conversation,
-            output,
-            dry_run,
-            yes,
-            inject_content,
-            save_memories,
-        }) => reflect::run(reflect::ReflectArgs {
-            project,
-            conversation,
-            output,
-            dry_run,
-            yes,
-            inject_content,
-            verbose: cli.verbose.raw_count(),
-            save_memories,
-        }),
-        Some(Commands::Completions { shell }) => {
-            let mut cmd = crate::cli::Cli::command();
-            genesis::cli::generate_completions(&mut cmd, shell).into_diagnostic()
+        Some(Commands::Reflect(mut args)) => {
+            args.verbose = cli.verbose.raw_count();
+            reflect::run(args)
         }
+        Some(Commands::Completions { shell }) => run_completions(shell),
         Some(Commands::External(args)) => match run_external(args, guide) {
             Ok(_) => Ok(()),
-            Err(err) => {
-                let context = current_context();
-                if context.json {
-                    let payload = crate::error::ErrorPayload {
-                        code: err
-                            .code()
-                            .map(|c| format!("{}", c))
-                            .unwrap_or_else(|| "wai::error::unknown".to_string()),
-                        message: err.to_string(),
-                        help: None,
-                        details: None,
-                    };
-                    let _ = crate::output::print_envelope_ok(&payload);
-                } else {
-                    // Self-healing error sink for the External (plugin/typo) path.
-                    //
-                    // Uses Display (err.to_string via ErrorSink::handle), not Debug —
-                    // intentional: run_external's bails carry their guidance inline, and
-                    // Display yields a clean `wai: <msg>` line. If a future bail! in
-                    // run_external attaches a #[diagnostic(help(...))], audit whether
-                    // that help needs separate rendering here (tracked with wai-0ly7).
-                    //
-                    // Scratch persistence is OFF until wai-0ly7 ships the
-                    // `--from-last-error` reader — don't write data nothing reads.
-                    // No generic footer — the bail messages already carry specific guidance.
-                    let sink = guide
-                        .error_sink()
-                        .with_suggest(false)
-                        .with_scratch(false)
-                        .with_feedback(None);
-                    let mut stderr = std::io::stderr();
-                    sink.handle(
-                        <miette::Report as AsRef<dyn std::error::Error>>::as_ref(&err),
-                        &mut stderr,
-                    );
-                }
-                std::process::exit(2);
-            }
+            Err(err) => handle_external_error(err, guide),
         },
         None => show_welcome(),
     }
+}
+
+fn run_completions(shell: clap_complete::Shell) -> Result<()> {
+    let mut cmd = crate::cli::Cli::command();
+    genesis::cli::generate_completions(&mut cmd, shell).into_diagnostic()
+}
+
+fn dispatch_resource(cmd: crate::cli::ResourceCommands) -> Result<()> {
+    match cmd {
+        crate::cli::ResourceCommands::Add(add_cmd) => resource::run_add(add_cmd),
+        crate::cli::ResourceCommands::List(list_cmd) => resource::run_list(list_cmd),
+        crate::cli::ResourceCommands::Import(import_cmd) => resource::run_import(import_cmd),
+        crate::cli::ResourceCommands::Install(args) => resource::run_install(args),
+        crate::cli::ResourceCommands::Export(args) => resource::run_export(args),
+    }
+}
+
+/// Self-healing error sink for the External (plugin/typo) path.
+///
+/// Uses Display (err.to_string via ErrorSink::handle), not Debug —
+/// intentional: run_external's bails carry their guidance inline, and
+/// Display yields a clean `wai: <msg>` line. If a future bail! in
+/// run_external attaches a #[diagnostic(help(...))], audit whether
+/// that help needs separate rendering here (tracked with wai-0ly7).
+///
+/// Scratch persistence is OFF until wai-0ly7 ships the
+/// `--from-last-error` reader — don't write data nothing reads.
+/// No generic footer — the bail messages already carry specific guidance.
+fn handle_external_error(err: miette::Report, guide: &Guide) -> ! {
+    let context = current_context();
+    if context.json {
+        let payload = crate::error::ErrorPayload {
+            code: err
+                .code()
+                .map(|c| format!("{}", c))
+                .unwrap_or_else(|| "wai::error::unknown".to_string()),
+            message: err.to_string(),
+            help: None,
+            details: None,
+        };
+        let _ = crate::output::print_envelope_ok(&payload);
+    } else {
+        let sink = guide
+            .error_sink()
+            .with_suggest(false)
+            .with_scratch(false)
+            .with_feedback(None);
+        let mut stderr = std::io::stderr();
+        sink.handle(
+            <miette::Report as AsRef<dyn std::error::Error>>::as_ref(&err),
+            &mut stderr,
+        );
+    }
+    std::process::exit(2);
 }
 
 fn welcome_suggestions(project_detected: bool) -> Vec<crate::json::Suggestion> {
@@ -265,63 +217,73 @@ fn show_welcome() -> Result<()> {
     intro("wai - Workflow manager for AI-driven development").into_diagnostic()?;
 
     if find_project_root().is_none() {
-        println!();
-        println!(
-            "  {} No project detected in current directory.",
-            "○".dimmed()
-        );
-
-        // Show example workflow for new users
-        if is_first_run {
-            println!();
-            println!("  {} Example workflow:", "○".cyan());
-            println!("     1. wai init                    Set up workspace");
-            println!("     2. wai new project \"mywork\"   Create your first project");
-            println!("     3. wai add research \"notes\"    Capture your research");
-            println!("     4. wai phase next              Advance to next phase");
-            println!("     5. wai handoff create mywork   Save your progress");
-        }
-
-        println!();
-        println!(
-            "  {} wai init           Initialize in current directory",
-            "→".cyan()
-        );
-        println!(
-            "  {} wai tutorial       Run the quickstart tutorial",
-            "→".cyan()
-        );
-        println!(
-            "  {} wai way            Check repo best practices",
-            "→".cyan()
-        );
-        println!("  {} wai --help         Show all commands", "→".cyan());
-
-        if is_first_run {
-            println!(
-                "  {} Getting Started: Run 'wai tutorial' to learn wai",
-                "→".cyan()
-            );
-        } else {
-            println!("  {} Run 'wai --help' for detailed usage", "•".dimmed());
-        }
+        print_no_project_hints(is_first_run);
     } else {
-        println!();
-        println!("  {} wai status         Check project status", "→".cyan());
-        println!(
-            "  {} wai phase          Show current project phase",
-            "→".cyan()
-        );
-        println!("  {} wai new project    Create a new project", "→".cyan());
-        println!(
-            "  {} wai way            Check repo best practices",
-            "→".cyan()
-        );
-        println!("  {} Run 'wai --help' for detailed usage", "•".dimmed());
+        print_project_hints();
     }
 
     outro("Run 'wai <command> --help' for detailed usage").into_diagnostic()?;
     Ok(())
+}
+
+/// Hints shown when no wai workspace is detected in the current directory.
+fn print_no_project_hints(is_first_run: bool) {
+    println!();
+    println!(
+        "  {} No project detected in current directory.",
+        "○".dimmed()
+    );
+
+    // Show example workflow for new users
+    if is_first_run {
+        println!();
+        println!("  {} Example workflow:", "○".cyan());
+        println!("     1. wai init                    Set up workspace");
+        println!("     2. wai new project \"mywork\"   Create your first project");
+        println!("     3. wai add research \"notes\"    Capture your research");
+        println!("     4. wai phase next              Advance to next phase");
+        println!("     5. wai handoff create mywork   Save your progress");
+    }
+
+    println!();
+    println!(
+        "  {} wai init           Initialize in current directory",
+        "→".cyan()
+    );
+    println!(
+        "  {} wai tutorial       Run the quickstart tutorial",
+        "→".cyan()
+    );
+    println!(
+        "  {} wai way            Check repo best practices",
+        "→".cyan()
+    );
+    println!("  {} wai --help         Show all commands", "→".cyan());
+
+    if is_first_run {
+        println!(
+            "  {} Getting Started: Run 'wai tutorial' to learn wai",
+            "→".cyan()
+        );
+    } else {
+        println!("  {} Run 'wai --help' for detailed usage", "•".dimmed());
+    }
+}
+
+/// Hints shown when a wai workspace is detected.
+fn print_project_hints() {
+    println!();
+    println!("  {} wai status         Check project status", "→".cyan());
+    println!(
+        "  {} wai phase          Show current project phase",
+        "→".cyan()
+    );
+    println!("  {} wai new project    Create a new project", "→".cyan());
+    println!(
+        "  {} wai way            Check repo best practices",
+        "→".cyan()
+    );
+    println!("  {} Run 'wai --help' for detailed usage", "•".dimmed());
 }
 
 fn run_external(args: Vec<String>, guide: &Guide) -> Result<()> {
@@ -347,15 +309,7 @@ fn run_external(args: Vec<String>, guide: &Guide) -> Result<()> {
     // Check for typos and wrong-order BEFORE requiring the workspace.
     // This ensures "Did you mean?" hints are shown even outside a workspace,
     // giving better context rather than just "NotInitialized".
-    if let Some(second) = args.get(1)
-        && let Some(suggestion) = engine.suggest_order(plugin_name, second, &valid_patterns)
-    {
-        miette::bail!(
-            "{}. {}",
-            suggestion.message(),
-            "Run 'wai --help' to see available commands."
-        );
-    }
+    reject_typo_or_wrong_order(&args, &engine, &valid_patterns, plugin_name)?;
 
     // Skip typo detection if the first arg matches a detected plugin name.
     let is_known_plugin = find_project_root().is_some_and(|root| {
@@ -380,20 +334,7 @@ fn run_external(args: Vec<String>, guide: &Guide) -> Result<()> {
     if let Some(cmd_name) = command_name
         && let Some(cmd) = crate::plugin::find_plugin_command(&plugins, plugin_name, cmd_name)
     {
-        let context = current_context();
-        if context.safe && !cmd.read_only {
-            return Err(WaiError::SafeModeViolation {
-                action: format!("{} {}", plugin_name, cmd_name),
-            }
-            .into());
-        }
-        let extra_args: Vec<String> = args[2..].to_vec();
-        let status =
-            crate::plugin::execute_passthrough(&project_root, &cmd.passthrough, &extra_args)
-                .into_diagnostic()?;
-        if !status.success() {
-            std::process::exit(status.code().unwrap_or(1));
-        }
+        execute_plugin_command(&project_root, plugin_name, cmd_name, cmd, &args[2..])?;
         return Ok(());
     }
 
@@ -402,6 +343,58 @@ fn run_external(args: Vec<String>, guide: &Guide) -> Result<()> {
         .iter()
         .any(|p| p.def.name == *plugin_name && p.detected);
 
+    plugin_not_usable_error(plugin_name, command_name, plugin_exists)
+}
+
+/// Typo and wrong-order detection for the External path, before workspace
+/// requirements — better context than a bare NotInitialized.
+fn reject_typo_or_wrong_order(
+    args: &[String],
+    engine: &SuggestionEngine,
+    valid_patterns: &[(&str, &str)],
+    plugin_name: &str,
+) -> Result<()> {
+    if let Some(second) = args.get(1)
+        && let Some(suggestion) = engine.suggest_order(plugin_name, second, valid_patterns)
+    {
+        miette::bail!(
+            "{}. {}",
+            suggestion.message(),
+            "Run 'wai --help' to see available commands."
+        );
+    }
+    Ok(())
+}
+
+/// Execute a detected plugin command in passthrough mode; safe-mode applies.
+fn execute_plugin_command(
+    project_root: &Path,
+    plugin_name: &str,
+    cmd_name: &str,
+    cmd: &crate::plugin::PluginCommand,
+    extra_args: &[String],
+) -> Result<()> {
+    let context = current_context();
+    if context.safe && !cmd.read_only {
+        return Err(WaiError::SafeModeViolation {
+            action: format!("{} {}", plugin_name, cmd_name),
+        }
+        .into());
+    }
+    let status = crate::plugin::execute_passthrough(project_root, &cmd.passthrough, extra_args)
+        .into_diagnostic()?;
+    if !status.success() {
+        std::process::exit(status.code().unwrap_or(1));
+    }
+    Ok(())
+}
+
+/// Terminal guidance when the plugin/command lookup can't proceed.
+fn plugin_not_usable_error(
+    plugin_name: &str,
+    command_name: Option<&str>,
+    plugin_exists: bool,
+) -> Result<()> {
     if plugin_exists {
         if let Some(cmd_name) = command_name {
             miette::bail!(
@@ -489,58 +482,78 @@ pub(crate) fn resolve_project(
     project_root: &Path,
     explicit: Option<&str>,
 ) -> Result<ResolvedProject> {
-    // 1. Explicit --project flag
+    // 1. Explicit --project flag (highest priority)
     if let Some(name) = explicit {
-        let proj_dir = projects_dir(project_root).join(name);
-        if !proj_dir.exists() {
-            let available = list_projects(project_root);
-            let available_str = if available.is_empty() {
-                "none".to_string()
-            } else {
-                available.join(", ")
-            };
-            miette::bail!(
-                "Project '{}' not found. Available projects: {}",
-                name,
-                available_str
-            );
-        }
-        return Ok(ResolvedProject {
-            name: name.to_string(),
-            source: ProjectSource::Flag,
-        });
+        return resolve_explicit(project_root, name);
     }
 
     // 2. WAI_PROJECT environment variable (empty string treated as unset)
     if let Ok(env_name) = std::env::var("WAI_PROJECT")
         && !env_name.is_empty()
+        && let Some(resolved) = resolve_env(project_root, &env_name)?
     {
-        let proj_dir = projects_dir(project_root).join(&env_name);
-        if !proj_dir.exists() {
-            let available = list_projects(project_root);
-            let available_str = if available.is_empty() {
-                "none".to_string()
-            } else {
-                available.join(", ")
-            };
-            miette::bail!(
-                "WAI_PROJECT='{}' but project not found. Available projects: {}",
-                env_name,
-                available_str
-            );
-        }
-        return Ok(ResolvedProject {
-            name: env_name,
-            source: ProjectSource::EnvVar,
-        });
+        return Ok(resolved);
     }
 
     // 3-5. Auto-detect / interactive / error
+    resolve_auto_or_interactive(project_root)
+}
+
+/// Stage 1: explicit `--project` flag. Errors when the project doesn't exist.
+fn resolve_explicit(project_root: &Path, name: &str) -> Result<ResolvedProject> {
+    let proj_dir = projects_dir(project_root).join(name);
+    if !proj_dir.exists() {
+        let available = list_projects(project_root);
+        let available_str = if available.is_empty() {
+            "none".to_string()
+        } else {
+            available.join(", ")
+        };
+        miette::bail!(
+            "Project '{}' not found. Available projects: {}",
+            name,
+            available_str
+        );
+    }
+    Ok(ResolvedProject {
+        name: name.to_string(),
+        source: ProjectSource::Flag,
+    })
+}
+
+/// Stage 2: `WAI_PROJECT` env var. `Ok(None)` means the named project
+/// doesn't exist and the caller should fall through to auto-detection.
+fn resolve_env(project_root: &Path, env_name: &str) -> Result<Option<ResolvedProject>> {
+    let proj_dir = projects_dir(project_root).join(env_name);
+    if !proj_dir.exists() {
+        let available = list_projects(project_root);
+        let available_str = if available.is_empty() {
+            "none".to_string()
+        } else {
+            available.join(", ")
+        };
+        miette::bail!(
+            "WAI_PROJECT='{}' but project not found. Available projects: {}",
+            env_name,
+            available_str
+        );
+    }
+    Ok(Some(ResolvedProject {
+        name: env_name.to_string(),
+        source: ProjectSource::EnvVar,
+    }))
+}
+
+/// Stages 3-5: auto-detect when exactly one project exists, interactive
+/// selector when multiple, error when none.
+fn resolve_auto_or_interactive(project_root: &Path) -> Result<ResolvedProject> {
     let mut projects = list_projects(project_root);
     projects.sort();
 
     match projects.len() {
-        0 => miette::bail!("No projects found. Create one with `wai new project <name>`."),
+        0 => Err(miette::miette!(
+            "No projects found. Create one with `wai new project <name>`."
+        )),
         1 => Ok(ResolvedProject {
             name: projects.remove(0),
             source: ProjectSource::AutoDetect,

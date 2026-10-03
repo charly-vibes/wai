@@ -1,3 +1,4 @@
+use crate::commands::pipeline::{ApprovalGate, ProceduralGate, StructuralGate};
 use miette::Result;
 use owo_colors::OwoColorize;
 use std::fs;
@@ -43,37 +44,47 @@ pub(super) fn parse_frontmatter(content: &str) -> Frontmatter {
     for line in fm_block.lines() {
         let line = line.trim();
         if let Some(value) = line.strip_prefix("tags:") {
-            let value = value.trim();
-            if value.starts_with('[') {
-                let inner = value.trim_start_matches('[').trim_end_matches(']');
-                for tag in inner.split(',') {
-                    let t = tag.trim().to_string();
-                    if !t.is_empty() {
-                        fm.tags.push(t);
-                    }
-                }
-            }
+            parse_tags(&mut fm, value);
         } else if let Some(value) = line.strip_prefix("reviews:") {
             fm.reviews = Some(value.trim().to_string());
         } else if let Some(value) = line.strip_prefix("severity:") {
-            // Parse flow mapping: {critical: 0, high: 1, medium: 3, low: 2}
-            let value = value.trim();
-            let inner = value.trim_start_matches('{').trim_end_matches('}');
-            for pair in inner.split(',') {
-                let parts: Vec<&str> = pair.splitn(2, ':').collect();
-                if parts.len() == 2 {
-                    let key = parts[0].trim();
-                    let val: u32 = parts[1].trim().parse().unwrap_or(0);
-                    match key {
-                        "critical" => fm.severity_critical = val,
-                        "high" => fm.severity_high = val,
-                        _ => {}
-                    }
-                }
-            }
+            parse_severity(&mut fm, value);
         }
     }
     fm
+}
+
+/// Parse a `tags:` flow sequence value: `[a, b]`.
+fn parse_tags(fm: &mut Frontmatter, value: &str) {
+    let value = value.trim();
+    if !value.starts_with('[') {
+        return;
+    }
+    let inner = value.trim_start_matches('[').trim_end_matches(']');
+    for tag in inner.split(',') {
+        let t = tag.trim().to_string();
+        if !t.is_empty() {
+            fm.tags.push(t);
+        }
+    }
+}
+
+/// Parse a `severity:` flow mapping value: `{critical: 0, high: 1}`.
+fn parse_severity(fm: &mut Frontmatter, value: &str) {
+    let value = value.trim();
+    let inner = value.trim_start_matches('{').trim_end_matches('}');
+    for pair in inner.split(',') {
+        let parts: Vec<&str> = pair.splitn(2, ':').collect();
+        if parts.len() == 2 {
+            let key = parts[0].trim();
+            let val: u32 = parts[1].trim().parse().unwrap_or(0);
+            match key {
+                "critical" => fm.severity_critical = val,
+                "high" => fm.severity_high = val,
+                _ => {}
+            }
+        }
+    }
 }
 
 /// Find all artifacts in the project tagged with the given run ID and step ID.
@@ -94,59 +105,74 @@ pub(super) fn find_step_artifacts(
     };
     for entry in entries.flatten() {
         let project_dir = entry.path();
-        if !project_dir.is_dir() {
-            continue;
-        }
-        // Check each artifact type directory
-        for (dir_name, art_type) in &[
-            ("research", "research"),
-            ("plans", "plan"),
-            ("designs", "design"),
-            ("handoffs", "handoff"),
-            ("reviews", "review"),
-        ] {
-            let dir = project_dir.join(dir_name);
-            if !dir.exists() {
-                continue;
-            }
-            let Ok(files) = fs::read_dir(&dir) else {
-                continue;
-            };
-            for file_entry in files.flatten() {
-                let path = file_entry.path();
-                if !path.is_file() || path.extension().and_then(|e| e.to_str()) != Some("md") {
-                    continue;
-                }
-                let Ok(content) = fs::read_to_string(&path) else {
-                    continue;
-                };
-                let fm = parse_frontmatter(&content);
-                if fm.tags.contains(&run_tag) && fm.tags.contains(&step_tag) {
-                    let filename = path
-                        .file_name()
-                        .and_then(|n| n.to_str())
-                        .unwrap_or("")
-                        .to_string();
-
-                    // Use file modification time as creation proxy
-                    let created_at = fs::metadata(&path)
-                        .ok()
-                        .and_then(|m| m.modified().ok())
-                        .map(|t| chrono::DateTime::<chrono::Utc>::from(t).to_rfc3339());
-
-                    artifacts.push(ArtifactInfo {
-                        filename,
-                        artifact_type: art_type.to_string(),
-                        reviews_target: fm.reviews,
-                        severity_critical: fm.severity_critical,
-                        severity_high: fm.severity_high,
-                        created_at,
-                    });
-                }
-            }
+        if project_dir.is_dir() {
+            collect_artifacts_from_project(&project_dir, &run_tag, &step_tag, &mut artifacts);
         }
     }
     artifacts
+}
+
+/// Artifact-type directories scanned by [`find_step_artifacts`].
+const ARTIFACT_DIRS: [(&str, &str); 5] = [
+    ("research", "research"),
+    ("plans", "plan"),
+    ("designs", "design"),
+    ("handoffs", "handoff"),
+    ("reviews", "review"),
+];
+
+fn collect_artifacts_from_project(
+    project_dir: &Path,
+    run_tag: &str,
+    step_tag: &str,
+    artifacts: &mut Vec<ArtifactInfo>,
+) {
+    // Check each artifact type directory
+    for (dir_name, art_type) in &ARTIFACT_DIRS {
+        let dir = project_dir.join(dir_name);
+        if !dir.exists() {
+            continue;
+        }
+        let Ok(files) = fs::read_dir(&dir) else {
+            continue;
+        };
+        for file_entry in files.flatten() {
+            let path = file_entry.path();
+            if !path.is_file() || path.extension().and_then(|e| e.to_str()) != Some("md") {
+                continue;
+            }
+            let Ok(content) = fs::read_to_string(&path) else {
+                continue;
+            };
+            let fm = parse_frontmatter(&content);
+            if fm.tags.contains(&run_tag.to_string()) && fm.tags.contains(&step_tag.to_string()) {
+                artifacts.push(artifact_info(&path, art_type, &fm));
+            }
+        }
+    }
+}
+
+fn artifact_info(path: &Path, art_type: &str, fm: &Frontmatter) -> ArtifactInfo {
+    let filename = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("")
+        .to_string();
+
+    // Use file modification time as creation proxy
+    let created_at = fs::metadata(path)
+        .ok()
+        .and_then(|m| m.modified().ok())
+        .map(|t| chrono::DateTime::<chrono::Utc>::from(t).to_rfc3339());
+
+    ArtifactInfo {
+        filename,
+        artifact_type: art_type.to_string(),
+        reviews_target: fm.reviews.clone(),
+        severity_critical: fm.severity_critical,
+        severity_high: fm.severity_high,
+        created_at,
+    }
 }
 
 /// Find all artifact file paths tagged with the given run ID and step ID.
@@ -250,92 +276,24 @@ pub(super) fn evaluate_gates(
     _definition: &PipelineDefinition,
     project_root: &Path,
 ) -> Result<Vec<String>> {
-    let mut failures = Vec::new();
-
-    // Collect artifacts for this step
     let step_artifacts = find_step_artifacts(project_root, &run.run_id, &step.id);
 
     // Tier 1: Structural
     if let Some(ref sg) = gate.structural {
-        let matching: Vec<_> = if sg.types.is_empty() {
-            step_artifacts.clone()
-        } else {
-            step_artifacts
-                .iter()
-                .filter(|a| sg.types.contains(&a.artifact_type))
-                .cloned()
-                .collect()
-        };
-        if matching.len() < sg.min_artifacts {
-            let type_desc = if sg.types.is_empty() {
-                String::new()
-            } else {
-                format!(" {} ", sg.types.join("/"))
-            };
-            failures.push(format!(
-                "Step '{}' requires at least {} {}artifact(s). Found {}.",
-                step.id,
-                sg.min_artifacts,
-                type_desc,
-                matching.len()
-            ));
+        let failures = structural_failures(sg, step, &step_artifacts);
+        if !failures.is_empty() {
+            return Ok(failures);
         }
-    }
-    if !failures.is_empty() {
-        return Ok(failures);
     }
 
     // Tier 2: Procedural
     if let Some(ref pg) = gate.procedural
         && pg.require_review
     {
-        let reviewable: Vec<_> = step_artifacts
-            .iter()
-            .filter(|a| {
-                if a.artifact_type == "review" {
-                    return false; // reviews never need reviews
-                }
-                if pg.review_types.is_empty() {
-                    true
-                } else {
-                    pg.review_types.contains(&a.artifact_type)
-                }
-            })
-            .collect();
-
-        let review_artifacts: Vec<_> = step_artifacts
-            .iter()
-            .filter(|a| a.artifact_type == "review")
-            .collect();
-
-        for artifact in &reviewable {
-            let review = review_artifacts
-                .iter()
-                .find(|r| r.reviews_target.as_deref() == Some(&artifact.filename));
-            let Some(review) = review else {
-                failures.push(format!("Artifact '{}' has no review.", artifact.filename));
-                continue;
-            };
-            if let Some(max_crit) = pg.max_critical
-                && review.severity_critical > max_crit
-            {
-                failures.push(format!(
-                    "Review of '{}' has {} critical findings (max: {}).",
-                    artifact.filename, review.severity_critical, max_crit
-                ));
-            }
-            if let Some(max_h) = pg.max_high
-                && review.severity_high > max_h
-            {
-                failures.push(format!(
-                    "Review of '{}' has {} high findings (max: {}).",
-                    artifact.filename, review.severity_high, max_h
-                ));
-            }
+        let failures = procedural_review_failures(pg, &step_artifacts);
+        if !failures.is_empty() {
+            return Ok(failures);
         }
-    }
-    if !failures.is_empty() {
-        return Ok(failures);
     }
 
     // Tier 3: Coverage
@@ -343,16 +301,14 @@ pub(super) fn evaluate_gates(
         && cg.require_input_manifest
         && !has_coverage_manifest(project_root, &step.id)
     {
-        failures.push(format!(
+        return Ok(vec![format!(
             "Coverage gate not satisfied. Create a coverage manifest (type: review, tag: coverage-manifest:{}) listing all inputs addressed.",
             step.id
-        ));
-    }
-    if !failures.is_empty() {
-        return Ok(failures);
+        )]);
     }
 
     // Tier 4: Oracles
+    let mut failures = Vec::new();
     for oracle in &gate.oracles {
         let oracle_failures = run_oracle(oracle, &step_artifacts, project_root)?;
         failures.extend(oracle_failures);
@@ -365,33 +321,126 @@ pub(super) fn evaluate_gates(
     if let Some(ref ag) = gate.approval
         && ag.required
     {
-        let step_id = &step.id;
-        match run.approvals.get(step_id) {
-            None => {
-                let msg = ag
-                    .message
-                    .as_deref()
-                    .unwrap_or("This step requires human approval.");
-                failures.push(format!("{} Run 'wai pipeline approve' when ready.", msg));
-            }
-            Some(approval_ts) => {
-                // Check if any artifact was created after approval
-                for artifact in &step_artifacts {
-                    if let Some(ref created) = artifact.created_at
-                        && created.as_str() > approval_ts.as_str()
-                    {
-                        failures.push(format!(
-                            "Approval invalidated — artifact '{}' created after approval. Run 'wai pipeline approve' again.",
-                            artifact.filename
-                        ));
-                        break;
-                    }
-                }
-            }
-        }
+        return Ok(approval_failures(ag, run, step, &step_artifacts));
     }
 
     Ok(failures)
+}
+
+/// Tier 1 — structural: minimum artifact count per type.
+fn structural_failures(
+    sg: &StructuralGate,
+    step: &PipelineStep,
+    step_artifacts: &[ArtifactInfo],
+) -> Vec<String> {
+    let matching: Vec<_> = if sg.types.is_empty() {
+        step_artifacts.to_vec()
+    } else {
+        step_artifacts
+            .iter()
+            .filter(|a| sg.types.contains(&a.artifact_type))
+            .cloned()
+            .collect()
+    };
+    if matching.len() >= sg.min_artifacts {
+        return Vec::new();
+    }
+    let type_desc = if sg.types.is_empty() {
+        String::new()
+    } else {
+        format!(" {} ", sg.types.join("/"))
+    };
+    vec![format!(
+        "Step '{}' requires at least {} {}artifact(s). Found {}.",
+        step.id,
+        sg.min_artifacts,
+        type_desc,
+        matching.len()
+    )]
+}
+
+/// Tier 2 — procedural: every reviewable artifact must have a review whose
+/// critical/high finding counts stay within the configured maxima.
+fn procedural_review_failures(pg: &ProceduralGate, step_artifacts: &[ArtifactInfo]) -> Vec<String> {
+    let mut failures = Vec::new();
+    let reviewable: Vec<_> = step_artifacts
+        .iter()
+        .filter(|a| {
+            if a.artifact_type == "review" {
+                return false; // reviews never need reviews
+            }
+            if pg.review_types.is_empty() {
+                true
+            } else {
+                pg.review_types.contains(&a.artifact_type)
+            }
+        })
+        .collect();
+
+    let review_artifacts: Vec<_> = step_artifacts
+        .iter()
+        .filter(|a| a.artifact_type == "review")
+        .collect();
+
+    for artifact in &reviewable {
+        let review = review_artifacts
+            .iter()
+            .find(|r| r.reviews_target.as_deref() == Some(&artifact.filename));
+        let Some(review) = review else {
+            failures.push(format!("Artifact '{}' has no review.", artifact.filename));
+            continue;
+        };
+        if let Some(max_crit) = pg.max_critical
+            && review.severity_critical > max_crit
+        {
+            failures.push(format!(
+                "Review of '{}' has {} critical findings (max: {}).",
+                artifact.filename, review.severity_critical, max_crit
+            ));
+        }
+        if let Some(max_h) = pg.max_high
+            && review.severity_high > max_h
+        {
+            failures.push(format!(
+                "Review of '{}' has {} high findings (max: {}).",
+                artifact.filename, review.severity_high, max_h
+            ));
+        }
+    }
+    failures
+}
+
+/// Tier 5 — approval: an approval must exist and predate every artifact.
+fn approval_failures(
+    ag: &ApprovalGate,
+    run: &PipelineRun,
+    step: &PipelineStep,
+    step_artifacts: &[ArtifactInfo],
+) -> Vec<String> {
+    let step_id = &step.id;
+    match run.approvals.get(step_id) {
+        None => {
+            let msg = ag
+                .message
+                .as_deref()
+                .unwrap_or("This step requires human approval.");
+            vec![format!("{} Run 'wai pipeline approve' when ready.", msg)]
+        }
+        Some(approval_ts) => {
+            // Check if any artifact was created after approval
+            for artifact in step_artifacts {
+                if let Some(ref created) = artifact.created_at
+                    && created.as_str() > approval_ts.as_str()
+                {
+                    return vec![format!(
+                        "Approval invalidated — artifact '{}' created after approval. Run 'wai pipeline approve' again.",
+                        artifact.filename
+                    )];
+                }
+            }
+            Vec::new()
+        }
+    }
 }
 
 // ─── Oracle helpers ───────────────────────────────────────────────────────────
@@ -467,7 +516,11 @@ pub(super) fn resolve_oracle_command(name: &str, project_root: &Path) -> Result<
             return Ok(path.to_string_lossy().to_string());
         }
     }
-    miette::bail!("Oracle '{}' not found in {}", name, oracles_dir.display())
+    Err(miette::miette!(
+        "Oracle '{}' not found in {}",
+        name,
+        oracles_dir.display()
+    ))
 }
 
 /// Execute an oracle command with arguments. Returns None on success (exit 0),
@@ -591,126 +644,115 @@ pub(super) fn print_gate_status(
         Vec::new()
     };
 
-    // Structural
     if let Some(ref sg) = gate.structural {
-        let type_desc = if sg.types.is_empty() {
-            "any".to_string()
-        } else {
-            sg.types.join("/")
-        };
-        if live {
-            let matching: Vec<_> = if sg.types.is_empty() {
-                step_artifacts.clone()
-            } else {
-                step_artifacts
-                    .iter()
-                    .filter(|a| sg.types.contains(&a.artifact_type))
-                    .cloned()
-                    .collect()
-            };
-            let passed = matching.len() >= sg.min_artifacts;
-            if passed {
-                println!(
-                    "    {} Structural: min {} {} artifact(s) — found {}",
-                    "✓".green(),
-                    sg.min_artifacts,
-                    type_desc,
-                    matching.len()
-                );
-            } else {
-                println!(
-                    "    {} Structural: min {} {} artifact(s) — found {}",
-                    "✗".red(),
-                    sg.min_artifacts,
-                    type_desc,
-                    matching.len()
-                );
-            }
-        } else {
-            println!(
-                "    {} Structural: min {} {} artifact(s)",
-                "•".dimmed(),
-                sg.min_artifacts,
-                type_desc
-            );
-        }
+        print_structural_gate(sg, live, &step_artifacts);
     }
-
-    // Procedural
     if let Some(ref pg) = gate.procedural
         && pg.require_review
     {
-        let type_desc = if pg.review_types.is_empty() {
-            "all (except review)".to_string()
-        } else {
-            pg.review_types.join("/")
-        };
-        if live {
-            let reviewable: Vec<_> = step_artifacts
-                .iter()
-                .filter(|a| {
-                    if a.artifact_type == "review" {
-                        return false;
-                    }
-                    if pg.review_types.is_empty() {
-                        true
-                    } else {
-                        pg.review_types.contains(&a.artifact_type)
-                    }
-                })
-                .collect();
-            let reviews: Vec<_> = step_artifacts
-                .iter()
-                .filter(|a| a.artifact_type == "review")
-                .collect();
-            let missing: Vec<_> = reviewable
-                .iter()
-                .filter(|a| {
-                    !reviews
-                        .iter()
-                        .any(|r| r.reviews_target.as_deref() == Some(&a.filename))
-                })
-                .collect();
-            let passed = missing.is_empty();
-            if passed {
-                println!(
-                    "    {} Procedural: require review for {} types — {} unreviewed",
-                    "✓".green(),
-                    type_desc,
-                    missing.len()
-                );
-            } else {
-                println!(
-                    "    {} Procedural: require review for {} types — {} unreviewed",
-                    "✗".red(),
-                    type_desc,
-                    missing.len()
-                );
-            }
-        } else {
-            println!(
-                "    {} Procedural: require review for {} types",
-                "•".dimmed(),
-                type_desc
-            );
-        }
-        if let Some(mc) = pg.max_critical {
-            println!("      {} max_critical: {}", "•".dimmed(), mc);
-        }
-        if let Some(mh) = pg.max_high {
-            println!("      {} max_high: {}", "•".dimmed(), mh);
-        }
+        print_procedural_gate(pg, live, &step_artifacts);
     }
-
-    // Coverage
     if let Some(ref cg) = gate.coverage
         && cg.require_input_manifest
     {
         println!("    {} Coverage: require input manifest", "•".dimmed(),);
     }
+    print_oracle_gates(&gate.oracles);
+    if let Some(ref ag) = gate.approval
+        && ag.required
+    {
+        print_approval_gate(ag, run, &step.id);
+    }
 
-    // Oracles
-    for oracle in &gate.oracles {
+    println!();
+    Ok(())
+}
+
+/// ✓ when live and satisfied, ✗ when live and unsatisfied, • when dry.
+fn pass_icon(passed: bool, live: bool) -> String {
+    match (live, passed) {
+        (true, true) => "✓".green().to_string(),
+        (true, false) => "✗".red().to_string(),
+        (false, _) => "•".dimmed().to_string(),
+    }
+}
+
+fn print_structural_gate(sg: &StructuralGate, live: bool, step_artifacts: &[ArtifactInfo]) {
+    let type_desc = if sg.types.is_empty() {
+        "any".to_string()
+    } else {
+        sg.types.join("/")
+    };
+    let matching: Vec<_> = if sg.types.is_empty() {
+        step_artifacts.to_vec()
+    } else {
+        step_artifacts
+            .iter()
+            .filter(|a| sg.types.contains(&a.artifact_type))
+            .cloned()
+            .collect()
+    };
+    let icon = pass_icon(matching.len() >= sg.min_artifacts, live);
+    let found = if live {
+        format!(" — found {}", matching.len())
+    } else {
+        String::new()
+    };
+    println!(
+        "    {} Structural: min {} {} artifact(s){}",
+        icon, sg.min_artifacts, type_desc, found
+    );
+}
+
+fn print_procedural_gate(pg: &ProceduralGate, live: bool, step_artifacts: &[ArtifactInfo]) {
+    let type_desc = if pg.review_types.is_empty() {
+        "all (except review)".to_string()
+    } else {
+        pg.review_types.join("/")
+    };
+    if live {
+        let reviews: Vec<_> = step_artifacts
+            .iter()
+            .filter(|a| a.artifact_type == "review")
+            .collect();
+        let missing: Vec<_> = step_artifacts
+            .iter()
+            .filter(|a| {
+                if a.artifact_type == "review" {
+                    return false;
+                }
+                if !pg.review_types.is_empty() && !pg.review_types.contains(&a.artifact_type) {
+                    return false;
+                }
+                !reviews
+                    .iter()
+                    .any(|r| r.reviews_target.as_deref() == Some(&a.filename))
+            })
+            .collect();
+        let icon = pass_icon(missing.is_empty(), live);
+        println!(
+            "    {} Procedural: require review for {} types — {} unreviewed",
+            icon,
+            type_desc,
+            missing.len()
+        );
+    } else {
+        println!(
+            "    {} Procedural: require review for {} types",
+            "•".dimmed(),
+            type_desc
+        );
+    }
+    if let Some(mc) = pg.max_critical {
+        println!("      {} max_critical: {}", "•".dimmed(), mc);
+    }
+    if let Some(mh) = pg.max_high {
+        println!("      {} max_high: {}", "•".dimmed(), mh);
+    }
+}
+
+fn print_oracle_gates(oracles: &[OracleGate]) {
+    for oracle in oracles {
         let scope = oracle.scope.as_deref().unwrap_or("artifact");
         let desc = oracle.description.as_deref().unwrap_or("");
         if !desc.is_empty() {
@@ -730,29 +772,19 @@ pub(super) fn print_gate_status(
             );
         }
     }
+}
 
-    // Approval
-    if let Some(ref ag) = gate.approval
-        && ag.required
-    {
-        if live {
-            let r = run.unwrap();
-            let approved = r.approvals.contains_key(&step.id);
-            let msg = ag.message.as_deref().unwrap_or("required");
-            if approved {
-                println!("    {} Approval: {} (approved)", "✓".green(), msg);
-            } else {
-                println!("    {} Approval: {} (pending)", "✗".red(), msg);
-            }
+fn print_approval_gate(ag: &ApprovalGate, run: Option<&PipelineRun>, step_id: &str) {
+    let msg = ag.message.as_deref().unwrap_or("required");
+    if let Some(r) = run {
+        let icon = pass_icon(r.approvals.contains_key(step_id), true);
+        let state = if r.approvals.contains_key(step_id) {
+            "approved"
         } else {
-            println!(
-                "    {} Approval: {}",
-                "•".dimmed(),
-                ag.message.as_deref().unwrap_or("required")
-            );
-        }
+            "pending"
+        };
+        println!("    {} Approval: {} ({})", icon, msg, state);
+    } else {
+        println!("    {} Approval: {}", "•".dimmed(), msg);
     }
-
-    println!();
-    Ok(())
 }
