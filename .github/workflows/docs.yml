@@ -44,6 +44,8 @@ jobs:
           mkdir -p docs/src/specs
           for dir in openspec/specs/*/; do
             name=$(basename "$dir")
+            # Archived specs (spec.md.archived) are excluded from the book.
+            [ -f "$dir/spec.md" ] || { echo "skip $name (no spec.md — archived?)"; continue; }
             cp "$dir/spec.md" "docs/src/specs/$name.md"
           done
 
