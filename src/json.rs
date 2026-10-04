@@ -211,6 +211,10 @@ pub struct PrimePayload {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub beads: Option<BeadsSummary>,
     pub openspec: Vec<OpenspecEntry>,
+    /// Active mid-flight pipeline run to adopt (wai-vx02.1) — same shape as
+    /// `wai pipeline current --json` so consumers share the parser.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pipeline: Option<PipelineCurrentPayload>,
 }
 
 #[derive(Debug, Serialize)]

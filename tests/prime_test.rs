@@ -208,9 +208,56 @@ fn prime_shows_active_pipeline_run_step() {
         .args(["prime", "--project", "myproject", "--no-input"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("PIPELINE ACTIVE"))
+        .stdout(predicate::str::contains("PIPELINE RUN ADOPT/RESUME"))
+        .stdout(predicate::str::contains("research-flow-test-run"))
         .stdout(predicate::str::contains("research-flow"))
-        .stdout(predicate::str::contains("step 1/2"));
+        .stdout(predicate::str::contains("step 1/2"))
+        .stdout(predicate::str::contains("wai pipeline next"));
+}
+
+#[test]
+fn prime_adopts_active_run_in_json() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproject");
+    write_pipeline(
+        tmp.path(),
+        "research-flow",
+        "Use for research investigation",
+        &[("gather", "Gather {topic}"), ("synth", "Synth {topic}")],
+    );
+    write_active_run(tmp.path(), "research-flow", 0);
+
+    wai_cmd(tmp.path())
+        .args(["prime", "--project", "myproject", "--no-input", "--json"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"run_id\": \"research-flow-test-run\"",
+        ))
+        .stdout(predicate::str::contains("\"pipeline\": \"research-flow\""))
+        .stdout(predicate::str::contains(
+            "\"next_command\": \"wai pipeline next\"",
+        ));
+}
+
+#[test]
+fn prime_no_adopt_block_without_active_run() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproject");
+    write_pipeline(
+        tmp.path(),
+        "research-flow",
+        "Use for research investigation",
+        &[("gather", "Gather {topic}")],
+    );
+
+    wai_cmd(tmp.path())
+        .args(["prime", "--project", "myproject", "--no-input"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("ADOPT/RESUME").not());
 }
 
 #[test]
