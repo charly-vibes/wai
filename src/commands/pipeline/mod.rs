@@ -16,7 +16,10 @@ mod setup;
 
 // Re-export public items that other modules reference
 pub use definition::load_pipeline_toml;
-pub use orchestration::{clear_complete_pipeline_run, pipeline_current_status, run_is_incomplete};
+pub use orchestration::{
+    clear_complete_pipeline_run, find_stale_runs, pipeline_current_status, run_is_incomplete,
+    stale_threshold_days,
+};
 
 // ─── Data structures ─────────────────────────────────────────────────────────
 
@@ -196,6 +199,7 @@ pub fn run(cmd: PipelineCommands) -> Result<()> {
         PipelineCommands::Current { json } => queries::cmd_current(json),
         PipelineCommands::Suggest { description } => queries::cmd_suggest(description.as_deref()),
         PipelineCommands::Approve => orchestration::cmd_approve(),
+        PipelineCommands::Gc { yes } => orchestration::cmd_gc(yes),
         PipelineCommands::Show { name } => queries::cmd_show(&name),
         PipelineCommands::Gates { name, step } => {
             queries::cmd_gates(name.as_deref(), step.as_deref())

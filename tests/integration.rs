@@ -9343,3 +9343,186 @@ fn cli_verbosity_quiet_and_verbose_coexist() {
         .assert()
         .success();
 }
+
+// ─── stale-run GC (wai-vx02.2) ────────────────────────────────────────────────
+
+/// Write a pipeline run state file, backdate its mtime by `age_days`, and point
+/// `.last-run` at it. Fixture recipe from the ticket: touch -d 'N days ago' a
+/// mid-flight run and write the matching pointer.
+fn write_stale_run_fixture(
+    dir: &std::path::Path,
+    pipeline_name: &str,
+    run_id: &str,
+    current_step: usize,
+    age_days: u64,
+) {
+    write_pipeline_toml(dir, pipeline_name);
+    write_pipeline_run(dir, pipeline_name, run_id, current_step);
+
+    let run_path = dir.join(".wai/pipeline-runs").join(format!("{run_id}.yml"));
+    let mtime = std::time::SystemTime::now() - std::time::Duration::from_secs(age_days * 86_400);
+    let file = fs::OpenOptions::new().write(true).open(&run_path).unwrap();
+    file.set_times(fs::FileTimes::new().set_accessed(mtime).set_modified(mtime))
+        .unwrap();
+}
+
+fn init_workspace_with_project(dir: &std::path::Path, name: &str) {
+    init_workspace(dir);
+    create_project(dir, name);
+}
+
+#[test]
+fn stale_run_doctor_flags_old_midflight_run() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace_with_project(tmp.path(), "my-app");
+    write_stale_run_fixture(tmp.path(), "my-pipe", "my-pipe-old-run", 0, 30);
+
+    let output = wai_cmd(tmp.path()).args(["doctor"]).assert().success();
+    let stdout = String::from_utf8(output.get_output().stdout.clone()).unwrap();
+    assert!(
+        stdout.contains("stale") && stdout.contains("my-pipe-old-run"),
+        "doctor must flag a 30-day-old mid-flight run as stale, got: {stdout}"
+    );
+    assert!(
+        stdout.contains("wai pipeline gc --yes"),
+        "stale warning must name the quarantine command, got: {stdout}"
+    );
+}
+
+#[test]
+fn stale_run_doctor_ignores_fresh_run() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace_with_project(tmp.path(), "my-app");
+    write_stale_run_fixture(tmp.path(), "my-pipe", "my-pipe-fresh-run", 0, 2);
+
+    let output = wai_cmd(tmp.path()).args(["doctor"]).assert().success();
+    let stdout = String::from_utf8(output.get_output().stdout.clone()).unwrap();
+    assert!(
+        !stdout.contains("my-pipe-fresh-run"),
+        "doctor must not flag a 2-day-old run as stale, got: {stdout}"
+    );
+}
+
+#[test]
+fn stale_run_doctor_ignores_old_complete_run() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace_with_project(tmp.path(), "my-app");
+    // current_step == 2 (total) → complete, not mid-flight → not GC material.
+    write_stale_run_fixture(tmp.path(), "my-pipe", "my-pipe-done-run", 2, 30);
+
+    let output = wai_cmd(tmp.path()).args(["doctor"]).assert().success();
+    let stdout = String::from_utf8(output.get_output().stdout.clone()).unwrap();
+    assert!(
+        !stdout.contains("my-pipe-done-run"),
+        "doctor must not flag an old COMPLETE run as stale, got: {stdout}"
+    );
+}
+
+#[test]
+fn stale_run_gc_dry_run_lists_without_moving() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace_with_project(tmp.path(), "my-app");
+    write_stale_run_fixture(tmp.path(), "my-pipe", "my-pipe-old-run", 1, 30);
+    let run_path = tmp.path().join(".wai/pipeline-runs/my-pipe-old-run.yml");
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "gc"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("my-pipe-old-run"))
+        .stdout(predicate::str::contains("--yes"));
+
+    assert!(run_path.exists(), "dry run must not move the run file");
+    assert!(
+        tmp.path()
+            .join(".wai/resources/pipelines/.last-run")
+            .exists(),
+        "dry run must not remove the pointer"
+    );
+}
+
+#[test]
+fn stale_run_gc_yes_quarantines_under_stale_dir() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace_with_project(tmp.path(), "my-app");
+    write_stale_run_fixture(tmp.path(), "my-pipe", "my-pipe-old-run", 1, 30);
+    let run_path = tmp.path().join(".wai/pipeline-runs/my-pipe-old-run.yml");
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "gc", "--yes"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("my-pipe-old-run"));
+
+    assert!(
+        !run_path.exists(),
+        "quarantined run must be moved out of pipeline-runs/"
+    );
+    let stale_dir = tmp.path().join(".wai/pipeline-runs/stale");
+    let quarantined: Vec<_> = fs::read_dir(&stale_dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .collect();
+    assert!(
+        quarantined
+            .iter()
+            .any(|f| f.starts_with("my-pipe-old-run") && f.ends_with(".yml")),
+        "run file must be preserved under stale/ with original name + timestamp suffix, got: {quarantined:?}"
+    );
+    assert!(
+        !tmp.path()
+            .join(".wai/resources/pipelines/.last-run")
+            .exists(),
+        "pointer to a quarantined run must be removed"
+    );
+
+    // prime no longer shows the run as current.
+    wai_cmd(tmp.path())
+        .args(["prime", "--project", "my-app", "--no-input"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("ADOPT/RESUME").not());
+}
+
+#[test]
+fn stale_run_gc_leaves_fresh_runs_untouched() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace_with_project(tmp.path(), "my-app");
+    write_stale_run_fixture(tmp.path(), "my-pipe", "my-pipe-fresh-run", 1, 2);
+    let run_path = tmp.path().join(".wai/pipeline-runs/my-pipe-fresh-run.yml");
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "gc", "--yes"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No stale runs"));
+
+    assert!(run_path.exists(), "fresh run must not be quarantined");
+    assert!(
+        tmp.path()
+            .join(".wai/resources/pipelines/.last-run")
+            .exists(),
+        "pointer to a fresh run must survive gc"
+    );
+}
+
+#[test]
+fn stale_run_config_stale_days_override() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace_with_project(tmp.path(), "my-app");
+    write_stale_run_fixture(tmp.path(), "my-pipe", "my-pipe-old-run", 1, 30);
+    // Raise the threshold: a 30-day-old run is no longer stale at staleDays=60.
+    fs::write(
+        tmp.path().join(".wai/config.toml"),
+        "[project]\nname = \"test-ws\"\n\n[pipeline]\nstaleDays = 60\n",
+    )
+    .unwrap();
+
+    let output = wai_cmd(tmp.path()).args(["doctor"]).assert().success();
+    let stdout = String::from_utf8(output.get_output().stdout.clone()).unwrap();
+    assert!(
+        !stdout.contains("my-pipe-old-run"),
+        "staleDays=60 must keep a 30-day-old run under threshold, got: {stdout}"
+    );
+}

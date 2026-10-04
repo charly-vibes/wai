@@ -165,6 +165,7 @@ pub fn run(name: Option<String>) -> Result<()> {
         plugins: vec![],
         llm: Some(LlmConfig::default()),
         why: None,
+        pipeline: None,
     };
 
     // Save config (creates .wai directory)

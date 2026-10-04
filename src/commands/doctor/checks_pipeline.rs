@@ -8,9 +8,43 @@ use genesis::doctor::CheckStatus;
 
 use super::WaiCheckEntry;
 use super::checks_session::read_non_managed_block_content;
+use crate::commands::pipeline::find_stale_runs;
 use crate::config::projects_dir;
 use crate::workspace::detect_installed_pipelines;
 use std::path::Path;
+
+/// Doctor check: flag mid-flight runs whose state file mtime exceeds the
+/// stale threshold (pipeline.staleDays, default 14). Silent when green;
+/// suggests `wai pipeline gc --yes` (never auto-deletes — GC is explicit).
+pub(super) fn check_stale_pipeline_runs(project_root: &Path) -> Vec<WaiCheckEntry> {
+    let threshold = crate::commands::pipeline::stale_threshold_days(project_root);
+    let Ok(runs) = find_stale_runs(project_root, threshold) else {
+        return vec![]; // fail-open: detection must never block the doctor
+    };
+    if runs.is_empty() {
+        return vec![];
+    }
+    let listed = runs
+        .iter()
+        .map(|r| {
+            format!(
+                "'{}' (pipeline '{}', step {}/{}, {}d old)",
+                r.run_id, r.pipeline, r.current_step, r.total_steps, r.age_days
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    vec![WaiCheckEntry {
+        name: "Pipeline: stale-runs".to_string(),
+        status: CheckStatus::Warn,
+        message: format!(
+            "{} abandoned mid-flight run(s): {listed} — quarantine with `wai pipeline gc --yes`",
+            runs.len()
+        ),
+        fix: None,
+        fix_fn: None,
+    }]
+}
 
 /// Build a pipeline-check entry with the standard name prefix.
 fn pipeline_entry(file_stem: &str, status: CheckStatus, message: String) -> WaiCheckEntry {
