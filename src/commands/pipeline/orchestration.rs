@@ -403,6 +403,15 @@ pub fn pipeline_current_status(project_root: &Path) -> Result<Option<PipelineCur
     }))
 }
 
+// ─── run-completeness predicate ──────────────────────────────────────────────
+
+/// True when the payload describes an active pipeline run that has not yet
+/// reached its final step. Shared by `wai close` (refusal),
+/// `clear_complete_pipeline_run`, and prime adoption gating (wai-vx02.1).
+pub fn run_is_incomplete(status: &PipelineCurrentPayload) -> bool {
+    status.step.is_some()
+}
+
 // ─── clear_complete_pipeline_run ─────────────────────────────────────────────
 
 /// If the active pipeline run is complete (its `current_step` has reached the
@@ -419,8 +428,8 @@ pub fn pipeline_current_status(project_root: &Path) -> Result<Option<PipelineCur
 /// the `WAI_PIPELINE_RUN` env var is left to the caller's environment.
 pub fn clear_complete_pipeline_run(project_root: &Path) -> Option<String> {
     let status = pipeline_current_status(project_root).ok().flatten()?;
-    // Only clear when the run has no current step, i.e. it is complete.
-    if status.step.is_some() {
+    // Only clear when the run is complete (no current step remains).
+    if run_is_incomplete(&status) {
         return None;
     }
     let name = status.pipeline.clone();

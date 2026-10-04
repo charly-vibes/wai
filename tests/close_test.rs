@@ -152,25 +152,104 @@ fn close_clears_complete_pipeline_run_pointers() {
     );
 }
 
+// ── close-time enforcement for in-progress pipeline runs (wai-csgb) ──────────
+
 #[test]
-fn close_preserves_in_progress_pipeline_run() {
+fn close_refuses_incomplete_pipeline_run() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
-    // current_step == 0 of 2 → run is in progress.
+    // current_step == 0 of 2 → run is mid-flight.
     write_pipeline_run(tmp.path(), "flow", 0);
 
     let last_run = tmp.path().join(".wai/resources/pipelines/.last-run");
+    let run_state = tmp.path().join(".wai/pipeline-runs/flow-run.yml");
+    let before = fs::read_to_string(&run_state).unwrap();
+
+    wai_cmd(tmp.path())
+        .args(["close", "--project", "myproject"])
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("Handoff created:").not())
+        .stderr(predicates::str::contains("flow-run"))
+        .stderr(predicates::str::contains("flow"))
+        .stderr(predicates::str::contains("step 1 of 2"))
+        .stderr(predicates::str::contains("wai pipeline next"))
+        .stderr(predicates::str::contains("wai close --force"));
+
+    // Run state must be untouched by the refusal.
+    assert_eq!(
+        fs::read_to_string(&run_state).unwrap(),
+        before,
+        "refused close must not modify the run state file"
+    );
+    assert!(last_run.exists(), ".last-run must survive a refused close");
+
+    // Refusal must not create a handoff either.
+    let handoffs_dir = tmp.path().join(".wai/projects/myproject/handoffs");
+    if handoffs_dir.exists() {
+        let files: Vec<_> = fs::read_dir(&handoffs_dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .collect();
+        assert!(
+            files.is_empty(),
+            "refused close must not create a handoff file"
+        );
+    }
+}
+
+#[test]
+fn close_force_overrides_incomplete_pipeline_run() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproject");
+    // current_step == 0 of 2 → run is mid-flight.
+    write_pipeline_run(tmp.path(), "flow", 0);
+
+    wai_cmd(tmp.path())
+        .args(["close", "--project", "myproject", "--force"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Handoff created:"));
+
+    // The .last-run pointer survives a forced close: --force means "close the
+    // session anyway", not "clear the run" — stale-run GC (wai-vx02.2) owns
+    // abandoned-run cleanup.
+    let last_run = tmp.path().join(".wai/resources/pipelines/.last-run");
+    assert!(
+        last_run.exists(),
+        "--force must not clear an in-progress run pointer"
+    );
+    // And the refusal path must have been skipped (close proceeded).
+    let handoffs_dir = tmp.path().join(".wai/projects/myproject/handoffs");
+    let files: Vec<_> = fs::read_dir(&handoffs_dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .collect();
+    assert_eq!(files.len(), 1, "forced close creates the handoff");
+}
+
+#[test]
+fn close_still_clears_complete_pipeline_run_pointers() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproject");
+    // current_step == 2 (total) → run is complete.
+    write_pipeline_run(tmp.path(), "flow", 2);
+
+    let last_run = tmp.path().join(".wai/resources/pipelines/.last-run");
+    assert!(last_run.exists(), "pointer exists before close");
 
     wai_cmd(tmp.path())
         .args(["close", "--project", "myproject"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Cleared complete pipeline run").not());
+        .stdout(predicate::str::contains("Cleared complete pipeline run"));
 
     assert!(
-        last_run.exists(),
-        ".last-run must remain for an in-progress run"
+        !last_run.exists(),
+        ".last-run should be removed after close"
     );
 }
 
@@ -184,6 +263,13 @@ fn close_with_no_pipeline_run_is_unchanged() {
     wai_cmd(tmp.path())
         .args(["close", "--project", "myproject"])
         .assert()
-        .success()
-        .stdout(predicate::str::contains("Cleared complete pipeline run").not());
+        .success();
+
+    // Nothing to clear: no run pointer was ever created, and close reports no
+    // pipeline clearing.
+    let last_run = tmp.path().join(".wai/resources/pipelines/.last-run");
+    assert!(
+        !last_run.exists(),
+        "no pointer should appear on a bare close"
+    );
 }

@@ -212,6 +212,11 @@ pub enum Commands {
         /// Prompt for a short insight to save to bd memories
         #[arg(long)]
         remember: bool,
+
+        /// Close even when an active pipeline run is still in progress
+        /// (intentional abandonment)
+        #[arg(long)]
+        force: bool,
     },
 
     /// Orient yourself at session start: project, phase, last handoff, and suggested next step
