@@ -1,0 +1,8 @@
+- 2026-10-05T17:46:25Z [id:55934d8ea4976b1e4a39b54534efd5747ddede8442c9741fa7ae3162f5c52a96] (#wai-vx02-3-epic-run-tree) ### 2026-10-05 15:32 — catastrophic RED violation recorded (run: epic-autonomy-tdd-ro5-2026-10-05-wai-vx02-3-epic-run-tree) — topic wai-vx02.3 (epic run tree)
+  
+  - Step 5 refactor-or-tidy found ZERO GREEN evidence: no GREEN design artifact ever recorded; no src implementation (no bd-epic detection for close refusal — `bd backup` ran because it does not trigger close refusal); no GREEN/red-gate artifacts; 4 RED tests appended in tests/integration.rs but written against an imaginary fixture API (bin_dir/bd stub style does not exist; real bd.list must be tested via the stub bd bin_dir, like wai-csgb's close tests); RED tests do not even compile (assert! on Result, unrelated changes summary format, no Epic kind in test fixtures); 4 slugs claimed to exist in run state but zero artifacts found
+  - Existing GREEN evidence is from OTHER tickets (wai-csgb close refusals 87b5464, 5be1888; wai-csgb display; wai-csgb sync)
+  - Conclusion: GREEN phase never implemented — the run advanced steps 4→5 with zero underlying work; entire epic-run-tree GREEN loop for this topic must be re-executed (bd-epic detection in src + working RED tests + GREEN design + GREEN/red-gate artifacts + tidy + tests-pass)
+  - No src edits made in this step (probe artifact deleted: .wai/projects/qa-round-execution/designs/2026-10-05-redact-probe.md)
+  - Run tree displays: current_step 5 refactor-or-tidy; gate_summary [tests-pass oracle] (misleading — the underlying tests-pass work for this topic does not exist)
+  - ticket wai-vx02.3 remains in_progress (assignee charly vibes)
