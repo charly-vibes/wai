@@ -27,3 +27,9 @@
   - Gates: fmt clean, clippy 0 warnings, integration 382 + bin 498 pass (flake wai-z25x isolated-pass). Gotcha: pipeline gate oracle requires literal 'commands run' evidence text inside the design/research artifact itself
   - bd wai-vx02.3 closed; committed 1801028 on feat/close-pipeline-enforcement (now 10 commits ahead of origin/main) — NOT pushed, push/PR still awaiting user authorization
   - Next: wai-vx02.4 (approval+release oracle gates in tdd-ro5 template) or push+PR
+- 2026-10-05T20:45:58Z [id:38706afc160d5a36d59ac972e42eaba04e7f71e91798ac520b44aeed1f3009c1] ### 2026-10-05 17:44 — snap
+  - Epic wai-vx02 fully closed: wai-csgb, wai-vx02.1 (prime adopt/resume), wai-vx02.2 (stale-run GC), wai-vx02.3 (epic run tree — GREEN close refusal verified, tidy smoke tests reverted, pipeline run cleared, handoff committed)
+  - Session closed cleanly: full suite 382 passed / 0 failed; handoff at .wai/projects/qa-round-execution/handoffs/2026-10-05-session-end.md; commit f72c07e (12 commits ahead on feat/close-pipeline-enforcement, NOT pushed)
+  - wai reflect LLM tool failed twice with empty error → filed upstream bug charly-vibes/wai#32 via 'wai feedback bug --from-last-error'
+  - Search fixes wai-cmej + wai-005m sit on same branch, ride the same future PR
+  - **Next:** push branch + open PR (needs user authorization); then wai-vx02.4 (approval+release oracle gates in tdd-ro5 template) in a fresh session; possible follow-up ticket to refresh uncommitted pretender baseline (~240 stale violations)

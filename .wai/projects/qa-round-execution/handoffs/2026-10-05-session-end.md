@@ -36,10 +36,11 @@ phase: research
 
 ```
  M .beads/backup/backup_state.json
- M .wai/pipeline-runs/epic-autonomy-tdd-ro5-2026-10-05-wai-vx02-3-epic-run-tree.yml
-?? .wai/resources/oracles/README.md
-?? .wai/resources/oracles/example-check.sh
-?? .wai/resources/pipelines/tdd-ro5.toml
+ M .beads/issues.jsonl
+ M .wai/pipeline-runs/tdd-ro5-2026-10-05-wai-vx02-4-approval-release-oracle-gates.yml
+ M .whisper/branches/feat--close-pipeline-enforcement/notes.md
+ M .whisper/branches/feat--close-pipeline-enforcement/notes.usage.jsonl
+ M .whisper/env.usage.jsonl
 ```
 
 ### open_issues
@@ -81,7 +82,6 @@ phase: research
 └── ○ wai-fvhv.110 P3 Docs: strengthen guidance for `wai plugin` management and passthrough behavior
 ○ wai-sib1 P1 [bug] fix(project): make 'wai project use' output portable across shells
 ○ wai-vx02 P1 [epic] pipeline orchestration driver: make runs self-driving across sessions
-├── ○ wai-vx02.4 P2 pipeline: approval + release oracle gates in shipped tdd-ro5 template
 └── ○ wai-vx02.5 P2 pipeline: inter-child handoff artifact for epic run trees
 ○ wai-42ig P2 Write ADR: command taxonomy and admission criteria
 ○ wai-ekwq P2 Detail docs IA restructuring work
@@ -98,7 +98,7 @@ phase: research
 ○ wai-z25x P3 [bug] flaky test: execute_hook_no_deadlock_on_fast_command fails under parallel load
 
 --------------------------------------------------------------------------------
-Total: 51 issues (51 open, 0 in progress)
+Total: 50 issues (50 open, 0 in progress)
 
 Status: ○ open  ◐ in_progress  ● blocked  ✓ closed  ❄ deferred
 Priority: P0–P4 (label only; not a status icon)
