@@ -94,6 +94,7 @@ pub(super) fn cmd_current(json: bool) -> Result<()> {
                 step: None,
                 gate_summary: None,
                 next_command: Some("wai pipeline start <name> --topic=<topic>".to_string()),
+                epic: None,
             });
         }
         miette::bail!(

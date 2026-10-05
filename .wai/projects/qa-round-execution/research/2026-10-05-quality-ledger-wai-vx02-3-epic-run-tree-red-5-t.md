@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:epic-autonomy-tdd-ro5-2026-10-05-wai-vx02-3-epic-run-tree, pipeline-step:quality-ledger]
+---
+
+QUALITY LEDGER: wai-vx02.3 epic run tree. RED: 5 tests compiled against real fixture API (stub bd ready --json via fake-bin + PATH injection; hand-written epic run-state YAML fixtures) and failed for the expected missing behavior. GREEN: features 1-4 implemented (start --epic discovery+parent run, child-run append to parent state, parent advance blocked mid-flight children, current --json epic tree); design artifact carries verification section. REFACTOR: extracted epic_parent_midflight_children + build_epic_tree helpers, no behavior change. RO5U review pass 1: 0 critical, 0 high, 2 medium — both fixed in same session (idempotency ordering; parent reuse scoped to pipeline name), 2 low deferred. Final gates: cargo test all suites pass (single known timing-flake wai-z25x passes isolated), cargo fmt clean, cargo clippy --all-targets 0 warnings. Exact next action: wai pipeline next to reach close-and-handoff, then bd close wai-vx02.3

@@ -9607,3 +9607,289 @@ fn stale_run_config_stale_days_override() {
         "staleDays=60 must keep a 30-day-old run under threshold, got: {stdout}"
     );
 }
+
+// ─── epic run tree (wai-vx02.3) ──────────────────────────────────────────────
+// A beads epic with ready children can be driven by a parent pipeline run
+// (`pipeline start <pipeline> --epic=<id>`, one per epic per repo) that
+// discovers ready children via `bd ready --json` parent filtering, records
+// child-run ids on its state, and refuses to advance while child runs are
+// mid-flight. `pipeline current --json` renders the tree.
+
+/// Stub `bd` that answers `bd ready --json` with the given JSON payload
+/// (exactly the real fixture style: fake-bin/bd + PATH injection).
+fn install_fake_bd_ready_json(dir: &std::path::Path, issues_json: &str) -> std::path::PathBuf {
+    let bin_dir = dir.join("fake-bin");
+    fs::create_dir_all(&bin_dir).unwrap();
+    let script_path = bin_dir.join("bd");
+    let escaped = issues_json.replace('\'', "'\"'\"'");
+    let script = format!(
+        "#!/bin/sh
+if [ \"$1\" = \"ready\" ] && [ \"$2\" = \"--json\" ]; then
+    printf '%s' '{escaped}'
+    exit 0
+fi
+exit 1
+"
+    );
+    fs::write(&script_path, script).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&script_path).unwrap().permissions();
+        perms.set_mode(0o755);
+        let _ = fs::set_permissions(&script_path, perms);
+    }
+    bin_dir
+}
+
+/// Write a mid-flight child run state fixture (no `.last-run` touch: the
+/// active run stays the epic parent). Child topic == the child issue id.
+fn write_child_run_fixture(dir: &std::path::Path, run_id: &str, pipeline: &str, issue: &str) {
+    let runs_dir = dir.join(".wai/pipeline-runs");
+    fs::create_dir_all(&runs_dir).unwrap();
+    fs::write(
+        runs_dir.join(format!("{run_id}.yml")),
+        format!(
+            "run_id: {run_id}\npipeline: {pipeline}\ntopic: {issue}\ncreated_at: '2026-10-05T00:00:00Z'\ncurrent_step: 0\napprovals: {{}}\n"
+        ),
+    )
+    .unwrap();
+}
+
+/// Write an epic parent run state fixture + `.last-run` pointer
+/// (style of close_test.rs `write_pipeline_run`, extended with epic fields).
+fn write_epic_run_fixture(
+    dir: &std::path::Path,
+    run_id: &str,
+    pipeline: &str,
+    epic: &str,
+    child_issues: &[&str],
+    child_runs: &[&str],
+) {
+    let runs_dir = dir.join(".wai/pipeline-runs");
+    fs::create_dir_all(&runs_dir).unwrap();
+    let issues = child_issues
+        .iter()
+        .map(|i| format!("    - {i}\n"))
+        .collect::<String>();
+    let runs = child_runs
+        .iter()
+        .map(|r| format!("    - {r}\n"))
+        .collect::<String>();
+    fs::write(
+        runs_dir.join(format!("{run_id}.yml")),
+        format!(
+            "run_id: {run_id}\npipeline: {pipeline}\ntopic: {epic}\ncreated_at: '2026-10-05T00:00:00Z'\ncurrent_step: 0\napprovals: {{}}\nepic: {epic}\nchild_issues:\n{issues}child_runs:\n{runs}"
+        ),
+    )
+    .unwrap();
+    let pipelines_dir = dir.join(".wai/resources/pipelines");
+    fs::create_dir_all(&pipelines_dir).unwrap();
+    fs::write(pipelines_dir.join(".last-run"), run_id).unwrap();
+}
+
+#[test]
+fn pipeline_start_epic_discovers_children_creates_parent_run() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml(tmp.path(), "my-pipe");
+    let fake_bin = install_fake_bd_ready_json(
+        tmp.path(),
+        r#"[{"id":"child-a","parent":"epic-1"},{"id":"child-b","parent":"epic-1"},{"id":"other","parent":"epic-2"}]"#,
+    );
+    let path = format!(
+        "{}:{}",
+        fake_bin.display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "start", "my-pipe", "--epic=epic-1"])
+        .env("PATH", path.clone())
+        .assert()
+        .success();
+
+    let runs_dir = tmp.path().join(".wai/pipeline-runs");
+    let ymls: Vec<_> = fs::read_dir(&runs_dir)
+        .unwrap()
+        .flatten()
+        .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("yml"))
+        .collect();
+    assert_eq!(ymls.len(), 1, "exactly one parent run state expected");
+    let stem = ymls[0]
+        .path()
+        .file_stem()
+        .unwrap()
+        .to_string_lossy()
+        .to_string();
+    assert!(
+        stem.ends_with("-parent"),
+        "parent run id must end in -parent, got: {stem}"
+    );
+
+    let content = fs::read_to_string(ymls[0].path()).unwrap();
+    assert!(
+        content.contains("epic: epic-1"),
+        "parent run must record the epic id, got: {content}"
+    );
+    assert!(
+        content.contains("- child-a"),
+        "ready child must be discovered: {content}"
+    );
+    assert!(
+        content.contains("- child-b"),
+        "ready child must be discovered: {content}"
+    );
+    assert!(
+        !content.contains("- other"),
+        "children of other epics must not be recorded: {content}"
+    );
+
+    // Idempotent: a second start for the same epic reuses the parent run.
+    wai_cmd(tmp.path())
+        .args(["pipeline", "start", "my-pipe", "--epic=epic-1"])
+        .env("PATH", path)
+        .assert()
+        .success();
+    let ymls2: Vec<_> = fs::read_dir(&runs_dir)
+        .unwrap()
+        .flatten()
+        .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("yml"))
+        .collect();
+    assert_eq!(
+        ymls2.len(),
+        1,
+        "second start must not create a duplicate parent run"
+    );
+}
+
+#[test]
+fn pipeline_start_epic_skips_when_no_ready_children() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml(tmp.path(), "my-pipe");
+    let fake_bin = install_fake_bd_ready_json(tmp.path(), r#"[{"id":"other","parent":"epic-2"}]"#);
+    let path = format!(
+        "{}:{}",
+        fake_bin.display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "start", "my-pipe", "--epic=epic-1"])
+        .env("PATH", path)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("no ready children"));
+
+    let runs_dir = tmp.path().join(".wai/pipeline-runs");
+    if runs_dir.exists() {
+        let ymls: Vec<_> = fs::read_dir(&runs_dir)
+            .unwrap()
+            .flatten()
+            .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("yml"))
+            .collect();
+        assert!(
+            ymls.is_empty(),
+            "no parent run must be created without ready children"
+        );
+    }
+    assert!(
+        !tmp.path()
+            .join(".wai/resources/pipelines/.last-run")
+            .exists(),
+        ".last-run must not be written when no parent run is created"
+    );
+}
+
+#[test]
+fn pipeline_start_child_appends_run_to_epic_parent() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml(tmp.path(), "my-pipe");
+    write_epic_run_fixture(
+        tmp.path(),
+        "my-pipe-parent",
+        "my-pipe",
+        "epic-1",
+        &["child-a"],
+        &[],
+    );
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "start", "my-pipe", "--topic=child-a"])
+        .assert()
+        .success();
+
+    // Find the child run file just created (the one that is not the parent).
+    let runs_dir = tmp.path().join(".wai/pipeline-runs");
+    let child_run: String = fs::read_dir(&runs_dir)
+        .unwrap()
+        .flatten()
+        .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("yml"))
+        .map(|e| e.path().file_stem().unwrap().to_string_lossy().to_string())
+        .find(|stem| stem != "my-pipe-parent")
+        .expect("child run state must exist");
+
+    let parent = fs::read_to_string(runs_dir.join("my-pipe-parent.yml")).unwrap();
+    assert!(
+        parent.contains(&child_run),
+        "epic parent state must record the child run id '{child_run}', got: {parent}"
+    );
+}
+
+#[test]
+fn pipeline_next_epic_parent_blocked_while_children_midflight() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml(tmp.path(), "my-pipe");
+    write_epic_run_fixture(
+        tmp.path(),
+        "my-pipe-parent",
+        "my-pipe",
+        "epic-1",
+        &["child-a"],
+        &["child-run"],
+    );
+    // Mid-flight child run: step 0 of 2.
+    write_child_run_fixture(tmp.path(), "child-run", "my-pipe", "child-a");
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "next"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("child-run"));
+
+    let parent =
+        fs::read_to_string(tmp.path().join(".wai/pipeline-runs/my-pipe-parent.yml")).unwrap();
+    assert!(
+        parent.contains("current_step: 0"),
+        "refused parent advance must not modify parent state, got: {parent}"
+    );
+}
+
+#[test]
+fn pipeline_current_json_renders_epic_tree() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml(tmp.path(), "my-pipe");
+    write_epic_run_fixture(
+        tmp.path(),
+        "my-pipe-parent",
+        "my-pipe",
+        "epic-1",
+        &["child-a"],
+        &["child-run"],
+    );
+    write_child_run_fixture(tmp.path(), "child-run", "my-pipe", "child-a");
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "current", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("epic-1")
+                .and(predicate::str::contains("\"run_id\": \"child-run\""))
+                .and(predicate::str::contains("\"mid_flight\": true")),
+        );
+}

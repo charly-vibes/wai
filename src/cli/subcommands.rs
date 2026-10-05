@@ -318,6 +318,11 @@ pub enum PipelineCommands {
         /// Topic to use for {topic} substitution in step prompts
         #[arg(long)]
         topic: Option<String>,
+
+        /// Coordinate a beads epic: discover ready children via `bd ready
+        /// --json` (parent filter) and create a parent run for them
+        #[arg(long = "epic", value_name = "EPIC_ID")]
+        epic: Option<String>,
     },
 
     /// Show status for the active pipeline run
