@@ -33,3 +33,11 @@
   - wai reflect LLM tool failed twice with empty error → filed upstream bug charly-vibes/wai#32 via 'wai feedback bug --from-last-error'
   - Search fixes wai-cmej + wai-005m sit on same branch, ride the same future PR
   - **Next:** push branch + open PR (needs user authorization); then wai-vx02.4 (approval+release oracle gates in tdd-ro5 template) in a fresh session; possible follow-up ticket to refresh uncommitted pretender baseline (~240 stale violations)
+- 2026-10-05T22:06:28Z [id:4706802a0510b6712270e07a95080d7f9d9376ac5118506bca4f4a78aa169674] ### 2026-10-05 — wai-vx02.4 shipped and closed
+  - tdd-ro5 ship-close now carries [steps.gate.approval] (required, human checkpoint 'wai pipeline approve') + release-docs-fresh oracle (newest CHANGELOG release heading == Cargo.toml version AND git status --porcelain docs/ empty; exit 1 w/ drift on stderr; read-only)
+  - pipeline init ships the oracle (bundled_oracles_for + write_executable_if_absent dedupe in setup.rs); local mirrors updated; gates output shows Approval + release oracle on ship-close
+  - Live proof: ship-close gate blocked on approval tier with oracles green — approved in-session, run completed, bd wai-vx02.4 closed
+  - RO5U: 0 crit/0 high; 2 medium fixed (oracle pipefail grep-no-match made 'no release heading' stderr unreachable; mdbook {{#include}} resolves relative to including file — snippet must use ../snippets/), 1 low fixed (unused var)
+  - Docs: gate-tier table extracted to docs/src/snippets/gate-tiers.md (pairs wai-fvhv.105)
+  - Suite 1242 passed / 0 failed; fmt/clippy/mdbook clean. Commit c74ea99 (feat) + d61c379 (chore handoff) — 14 commits ahead of origin/main, NOT pushed
+  - **Next:** push + PR (needs user authorization); then wai-vx02.5 (inter-child handoff artifact) in fresh session
