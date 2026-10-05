@@ -838,6 +838,31 @@ fn search_accepts_plural_type_aliases() {
 }
 
 #[test]
+fn search_json_honors_limit() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+    write_artifact(
+        tmp.path(),
+        "my-app",
+        "research",
+        "2026-01-15-a.md",
+        "match_one match_two match_three\n",
+    );
+
+    let out = wai_cmd(tmp.path())
+        .args(["search", "match_", "--json", "-n", "1"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let out_str = String::from_utf8(out).unwrap();
+    let results: serde_json::Value = serde_json::from_str(&out_str).unwrap();
+    assert_eq!(results["data"]["results"].as_array().unwrap().len(), 1);
+}
+
+#[test]
 fn search_no_results() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());

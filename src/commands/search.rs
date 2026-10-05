@@ -228,9 +228,11 @@ pub fn run(args: SearchArgs) -> Result<()> {
     };
 
     if context.json {
+        let total = results.len();
+        let limited_results = &results[..total.min(display_limit)];
         let payload = SearchPayload {
             query: query.clone(),
-            results: results
+            results: limited_results
                 .iter()
                 .map(
                     |(path, line_num, line, _start, _end, context_lines)| SearchResult {
