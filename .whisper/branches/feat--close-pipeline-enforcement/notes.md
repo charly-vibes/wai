@@ -41,3 +41,7 @@
   - Docs: gate-tier table extracted to docs/src/snippets/gate-tiers.md (pairs wai-fvhv.105)
   - Suite 1242 passed / 0 failed; fmt/clippy/mdbook clean. Commit c74ea99 (feat) + d61c379 (chore handoff) — 14 commits ahead of origin/main, NOT pushed
   - **Next:** push + PR (needs user authorization); then wai-vx02.5 (inter-child handoff artifact) in fresh session
+- 2026-10-05T22:41:48Z [id:6c0f6c7790830a002428842fe3912d1502f70de7a27d0921d6713af8c72e0c08] ### 2026-10-05 — pushed + PR #33 open
+  - feat/close-pipeline-enforcement pushed to origin (15 commits incl. 95d7c97 note commit); PR https://github.com/charly-vibes/wai/pull/33 → main, awaiting CI/review
+  - PR carries vx02.1–.4 + wai-cmej + wai-005m. Epic wai-vx02 now 80% (4/5 children closed)
+  - **Next:** review/merge PR #33; then wai-vx02.5 (inter-child handoff artifact) in fresh session; close epic when vx02.5 lands
