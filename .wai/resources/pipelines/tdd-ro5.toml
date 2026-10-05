@@ -220,6 +220,8 @@ Do:
 
 Do not push unless project policy or user instruction explicitly says to push.
 
+This step requires human approval: review the ship evidence, then run `wai pipeline approve` when ready.
+
 Pipeline complete.
 """
 
@@ -227,3 +229,12 @@ Pipeline complete.
 name = "tests-pass"
 description = "Final tests must pass before close"
 timeout = 300
+
+[[steps.gate.oracles]]
+name = "release-docs-fresh"
+description = "CHANGELOG newest release matches Cargo.toml version and docs/ has no uncommitted changes"
+timeout = 30
+
+[steps.gate.approval]
+required = true
+message = "Human checkpoint before ship-close — review ship evidence, then run 'wai pipeline approve'"

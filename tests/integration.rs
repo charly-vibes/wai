@@ -8444,6 +8444,167 @@ fn pipeline_validate_fails_for_invalid_toml() {
     );
 }
 
+// ─── wai-vx02.4: approval + release oracle gates in shipped tdd-ro5 ─────────
+
+/// Helper: initialize a git repo in `dir` and commit everything present.
+fn git_repo_init_and_commit(dir: &std::path::Path, message: &str) {
+    let run = |args: &[&str]| {
+        let output = std::process::Command::new("git")
+            .args(args)
+            .current_dir(dir)
+            .env("GIT_AUTHOR_NAME", "test")
+            .env("GIT_AUTHOR_EMAIL", "test@example.com")
+            .env("GIT_COMMITTER_NAME", "test")
+            .env("GIT_COMMITTER_EMAIL", "test@example.com")
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "git {:?} failed: {}",
+            args,
+            String::from_utf8_lossy(&output.stderr)
+        );
+    };
+    run(&["init"]);
+    run(&["add", "-A"]);
+    run(&["commit", "-m", message]);
+}
+
+/// Helper: run the shipped release-docs-fresh oracle, returning (exit code, stderr).
+fn run_release_oracle(dir: &std::path::Path) -> (i32, String) {
+    let script = dir.join(".wai/resources/oracles/release-docs-fresh.sh");
+    let output = std::process::Command::new(&script)
+        .arg("artifact.md")
+        .current_dir(dir)
+        .output()
+        .expect("release-docs-fresh.sh should exist and be executable");
+    (
+        output.status.code().unwrap_or(-1),
+        String::from_utf8_lossy(&output.stderr).to_string(),
+    )
+}
+
+/// Helper: init workspace, init the built-in tdd-ro5 pipeline, and set up a
+/// demo repo whose Cargo.toml version and CHANGELOG heading both say `cargo_version`.
+fn release_oracle_sandbox(cargo_version: &str, changelog_version: Option<&str>) -> TempDir {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    wai_cmd(tmp.path())
+        .args(["pipeline", "init", "tdd-ro5"])
+        .assert()
+        .success();
+
+    fs::write(
+        tmp.path().join("Cargo.toml"),
+        format!("[package]\nname = \"demo\"\nversion = \"{cargo_version}\"\n"),
+    )
+    .unwrap();
+    let changelog_heading = changelog_version
+        .map(|v| format!("## [{v}] - 2026-09-01\n\n- older release\n"))
+        .unwrap_or_else(|| "## [Unreleased]\n\n(nothing yet)\n".to_string());
+    fs::write(
+        tmp.path().join("CHANGELOG.md"),
+        format!("# Changelog\n\n{changelog_heading}"),
+    )
+    .unwrap();
+    fs::create_dir_all(tmp.path().join("docs")).unwrap();
+    fs::write(tmp.path().join("docs/index.md"), "docs").unwrap();
+    git_repo_init_and_commit(tmp.path(), "initial");
+    tmp
+}
+
+#[test]
+fn pipeline_init_tdd_ro5_ships_release_oracle_script() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "init", "tdd-ro5"])
+        .assert()
+        .success();
+
+    let script = tmp
+        .path()
+        .join(".wai/resources/oracles/release-docs-fresh.sh");
+    let meta =
+        fs::metadata(&script).expect("pipeline init tdd-ro5 should ship release-docs-fresh.sh");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        assert!(
+            meta.permissions().mode() & 0o111 != 0,
+            "shipped oracle must be executable: {:?}",
+            script
+        );
+    }
+}
+
+#[test]
+fn release_oracle_accepts_fresh_docs() {
+    let tmp = release_oracle_sandbox("2026.10.3", Some("2026.10.3"));
+    let (code, stderr) = run_release_oracle(tmp.path());
+    assert_eq!(code, 0, "expected accept for fresh docs, stderr: {stderr}");
+}
+
+#[test]
+fn release_oracle_rejects_lagging_changelog() {
+    let tmp = release_oracle_sandbox("2026.10.3", Some("2026.9.28"));
+    let (code, stderr) = run_release_oracle(tmp.path());
+    assert_eq!(
+        code, 1,
+        "expected reject for lagging CHANGELOG, stderr: {stderr}"
+    );
+    assert!(
+        stderr.contains("2026.10.3") && stderr.contains("2026.9.28"),
+        "stderr must name the drift (both versions), got: {stderr}"
+    );
+}
+
+#[test]
+fn release_oracle_rejects_dirty_docs() {
+    let tmp = release_oracle_sandbox("2026.10.3", Some("2026.10.3"));
+    // Uncommitted docs change after the initial commit -> docs drift
+    fs::write(tmp.path().join("docs/index.md"), "uncommitted edit").unwrap();
+    let (code, stderr) = run_release_oracle(tmp.path());
+    assert_eq!(code, 1, "expected reject for dirty docs/, stderr: {stderr}");
+    assert!(
+        stderr.to_lowercase().contains("docs"),
+        "stderr must name docs/ as the drift, got: {stderr}"
+    );
+}
+
+#[test]
+fn pipeline_gates_tdd_ro5_shows_approval_on_ship_close() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    wai_cmd(tmp.path())
+        .args(["pipeline", "init", "tdd-ro5"])
+        .assert()
+        .success();
+
+    let output = wai_cmd(tmp.path())
+        .args(["pipeline", "gates", "tdd-ro5"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let stripped = strip_ansi(&String::from_utf8(output).unwrap());
+    let ship_idx = stripped
+        .find("ship-close")
+        .expect("ship-close step must be shown, got:\n{stripped}");
+    assert!(
+        stripped[ship_idx..].contains("Approval"),
+        "gates output must show the approval tier on ship-close, got:\n{stripped}"
+    );
+
+    // The shipped template must still validate.
+    wai_cmd(tmp.path())
+        .args(["pipeline", "validate", "tdd-ro5"])
+        .assert()
+        .success();
+}
+
 #[test]
 fn pipeline_lock_creates_lock_files_for_step_artifacts() {
     let tmp = TempDir::new().unwrap();
