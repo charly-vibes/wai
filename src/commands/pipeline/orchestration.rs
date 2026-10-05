@@ -284,6 +284,7 @@ fn write_run_state(
         epic: epic.map(|e| e.to_string()),
         child_issues: child_issues.to_vec(),
         child_runs: Vec::new(),
+        handoff_artifact: None,
     };
 
     let runs_dir = crate::config::wai_dir(project_root).join("pipeline-runs");
@@ -384,6 +385,24 @@ fn run_state_path(project_root: &Path, run_id: &str) -> Result<PathBuf> {
 fn load_run_state(run_path: &Path, run_id: &str) -> Result<PipelineRun> {
     serde_yml::from_str(&fs::read_to_string(run_path).into_diagnostic()?)
         .map_err(|e| miette::miette!("Failed to parse run state for '{}': {}", run_id, e))
+}
+
+/// Record a handoff artifact path (project-root-relative) on a pipeline run's
+/// state file (wai-vx02.5). Called by `wai handoff create` when a run is
+/// active, so the epic tree can link child runs to their handoff artifacts.
+pub(crate) fn record_handoff_artifact(
+    project_root: &Path,
+    run_id: &str,
+    artifact: &str,
+) -> Result<()> {
+    let runs_dir = crate::config::wai_dir(project_root).join("pipeline-runs");
+    let run_path = runs_dir.join(format!("{}.yml", run_id));
+    let mut run = load_run_state(&run_path, run_id)?;
+    run.handoff_artifact = Some(artifact.to_string());
+    let yaml = serde_yml::to_string(&run)
+        .map_err(|e| miette::miette!("Failed to serialize run state: {}", e))?;
+    fs::write(&run_path, yaml).into_diagnostic()?;
+    Ok(())
 }
 
 fn report_gate_failures(failures: &[String], step_id: &str) {
@@ -627,6 +646,45 @@ fn build_epic_tree(
     run: &PipelineRun,
     runs_dir: &Path,
 ) -> Option<crate::json::EpicTreePayload> {
+    // The tree is anchored on the epic parent run: the active run itself when
+    // it is the parent, otherwise the parent run that owns the active child's
+    // topic (wai-vx02.5 — a started child surfaces sibling handoffs).
+    if run.epic.is_some() {
+        build_epic_tree_from_parent(project_root, run, runs_dir)
+    } else {
+        let parent = find_epic_parent_run_by_topic(runs_dir, &run.topic)?;
+        build_epic_tree_from_parent(project_root, &parent, runs_dir)
+    }
+}
+
+/// Find the epic parent run that owns `topic` as a child issue. Unreadable
+/// or non-parent runs are skipped, not errors. (Distinct from
+/// `find_epic_parent_run`, which matches by pipeline name + epic id at start
+/// time; this resolves the owning parent for an already-started child.)
+fn find_epic_parent_run_by_topic(runs_dir: &Path, topic: &str) -> Option<PipelineRun> {
+    for entry in fs::read_dir(runs_dir).ok()?.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|x| x.to_str()) != Some("yml") {
+            continue;
+        }
+        let Ok(text) = fs::read_to_string(&path) else {
+            continue;
+        };
+        let Ok(candidate) = serde_yml::from_str::<PipelineRun>(&text) else {
+            continue;
+        };
+        if candidate.epic.is_some() && candidate.child_issues.iter().any(|i| i == topic) {
+            return Some(candidate);
+        }
+    }
+    None
+}
+
+fn build_epic_tree_from_parent(
+    project_root: &Path,
+    run: &PipelineRun,
+    runs_dir: &Path,
+) -> Option<crate::json::EpicTreePayload> {
     let epic_id = run.epic.as_ref()?;
     let mut children = Vec::new();
     for issue in &run.child_issues {
@@ -654,16 +712,25 @@ fn build_epic_tree(
             }
         }
         let node = match started {
-            Some((child_run_id, child_run)) => crate::json::ChildRunNode {
-                issue: issue.clone(),
-                run_id: Some(child_run_id),
-                mid_flight: child_def_steps(project_root, &child_run)
-                    .is_some_and(|total| child_run.current_step < total),
-            },
+            Some((child_run_id, child_run)) => {
+                let mid_flight = child_def_steps(project_root, &child_run)
+                    .is_some_and(|total| child_run.current_step < total);
+                crate::json::ChildRunNode {
+                    issue: issue.clone(),
+                    run_id: Some(child_run_id),
+                    mid_flight,
+                    // Handoff-ready = terminal step + artifact recorded
+                    // (wai-vx02.5).
+                    handoff_ready: !mid_flight && child_run.handoff_artifact.is_some(),
+                    handoff_artifact: child_run.handoff_artifact.clone(),
+                }
+            }
             None => crate::json::ChildRunNode {
                 issue: issue.clone(),
                 run_id: None,
                 mid_flight: false,
+                handoff_ready: false,
+                handoff_artifact: None,
             },
         };
         children.push(node);

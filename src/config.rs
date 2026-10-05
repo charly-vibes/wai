@@ -430,6 +430,16 @@ pub fn read_pipeline_run_state(project_root: &Path) -> Option<String> {
     }
 }
 
+/// Resolve the active pipeline run id: the `WAI_PIPELINE_RUN` env var first
+/// (backwards compat), then the `.last-run` pointer file.
+pub fn resolve_active_pipeline_run(project_root: &Path) -> Option<String> {
+    std::env::var("WAI_PIPELINE_RUN")
+        .ok()
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+        .or_else(|| read_pipeline_run_state(project_root))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

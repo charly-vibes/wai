@@ -9803,15 +9803,27 @@ exit 1
     bin_dir
 }
 
-/// Write a mid-flight child run state fixture (no `.last-run` touch: the
-/// active run stays the epic parent). Child topic == the child issue id.
-fn write_child_run_fixture(dir: &std::path::Path, run_id: &str, pipeline: &str, issue: &str) {
+/// Write a child run state fixture (no `.last-run` touch: the active run
+/// stays the epic parent). Child topic == the child issue id. `current_step`
+/// controls mid-flight vs terminal (2 = terminal for the 2-step test
+/// pipeline); `handoff_artifact` simulates a recorded handoff artifact path.
+fn write_child_run_fixture(
+    dir: &std::path::Path,
+    run_id: &str,
+    pipeline: &str,
+    issue: &str,
+    current_step: usize,
+    handoff_artifact: Option<&str>,
+) {
     let runs_dir = dir.join(".wai/pipeline-runs");
     fs::create_dir_all(&runs_dir).unwrap();
+    let artifact = handoff_artifact
+        .map(|a| format!("handoff_artifact: {a}\n"))
+        .unwrap_or_default();
     fs::write(
         runs_dir.join(format!("{run_id}.yml")),
         format!(
-            "run_id: {run_id}\npipeline: {pipeline}\ntopic: {issue}\ncreated_at: '2026-10-05T00:00:00Z'\ncurrent_step: 0\napprovals: {{}}\n"
+            "run_id: {run_id}\npipeline: {pipeline}\ntopic: {issue}\ncreated_at: '2026-10-05T00:00:00Z'\ncurrent_step: {current_step}\napprovals: {{}}\n{artifact}"
         ),
     )
     .unwrap();
@@ -10013,7 +10025,7 @@ fn pipeline_next_epic_parent_blocked_while_children_midflight() {
         &["child-run"],
     );
     // Mid-flight child run: step 0 of 2.
-    write_child_run_fixture(tmp.path(), "child-run", "my-pipe", "child-a");
+    write_child_run_fixture(tmp.path(), "child-run", "my-pipe", "child-a", 0, None);
 
     wai_cmd(tmp.path())
         .args(["pipeline", "next"])
@@ -10042,7 +10054,7 @@ fn pipeline_current_json_renders_epic_tree() {
         &["child-a"],
         &["child-run"],
     );
-    write_child_run_fixture(tmp.path(), "child-run", "my-pipe", "child-a");
+    write_child_run_fixture(tmp.path(), "child-run", "my-pipe", "child-a", 0, None);
 
     wai_cmd(tmp.path())
         .args(["pipeline", "current", "--json"])
@@ -10053,4 +10065,154 @@ fn pipeline_current_json_renders_epic_tree() {
                 .and(predicate::str::contains("\"run_id\": \"child-run\""))
                 .and(predicate::str::contains("\"mid_flight\": true")),
         );
+}
+
+// ─── inter-child handoff artifacts (wai-vx02.5) ────────────────────────────
+// A child run that reaches its terminal step with a handoff artifact recorded
+// (via `wai handoff create` while the run is active) is handoff-ready: the
+// epic tree marks it and links the artifact path, and starting the next child
+// surfaces the prior child's handoff artifact path in `pipeline current`.
+
+#[test]
+fn epic_handoff_terminal_child_marks_handoff_ready() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml(tmp.path(), "my-pipe");
+    write_epic_run_fixture(
+        tmp.path(),
+        "my-pipe-parent",
+        "my-pipe",
+        "epic-1",
+        &["child-a"],
+        &["child-run-a"],
+    );
+    // Terminal child run (step 2 of 2) with a recorded handoff artifact.
+    write_child_run_fixture(
+        tmp.path(),
+        "child-run-a",
+        "my-pipe",
+        "child-a",
+        2,
+        Some("handoffs/2026-10-05-session-end.md"),
+    );
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "current", "--json"])
+        .env_remove("WAI_PIPELINE_RUN")
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("\"handoff_ready\": true").and(predicate::str::contains(
+                "handoffs/2026-10-05-session-end.md",
+            )),
+        );
+}
+
+#[test]
+fn epic_handoff_midflight_child_not_handoff_ready() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml(tmp.path(), "my-pipe");
+    write_epic_run_fixture(
+        tmp.path(),
+        "my-pipe-parent",
+        "my-pipe",
+        "epic-1",
+        &["child-a"],
+        &["child-run-a"],
+    );
+    // Mid-flight child run (step 0 of 2) that already recorded an artifact:
+    // not handoff-ready until the run reaches its terminal step.
+    write_child_run_fixture(
+        tmp.path(),
+        "child-run-a",
+        "my-pipe",
+        "child-a",
+        0,
+        Some("handoffs/2026-10-05-session-end.md"),
+    );
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "current", "--json"])
+        .env_remove("WAI_PIPELINE_RUN")
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("\"handoff_ready\": false")
+                .and(predicate::str::contains("\"mid_flight\": true")),
+        );
+}
+
+#[test]
+fn epic_handoff_create_records_artifact_on_active_run() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+    write_pipeline_toml(tmp.path(), "my-pipe");
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "start", "my-pipe", "--topic=child-a"])
+        .assert()
+        .success();
+
+    wai_cmd(tmp.path())
+        .args(["handoff", "create", "my-app"])
+        .env_remove("WAI_PIPELINE_RUN")
+        .assert()
+        .success();
+
+    // The active (child) run state must record the created handoff artifact.
+    let runs_dir = tmp.path().join(".wai/pipeline-runs");
+    let child_run: String = fs::read_dir(&runs_dir)
+        .unwrap()
+        .flatten()
+        .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("yml"))
+        .map(|e| e.path().file_stem().unwrap().to_string_lossy().to_string())
+        .find(|stem| stem != "my-pipe-parent")
+        .expect("child run state must exist");
+    let state = fs::read_to_string(runs_dir.join(format!("{child_run}.yml"))).unwrap();
+    assert!(
+        state.contains(".wai/projects/my-app/handoffs/2026-"),
+        "child run state must record the handoff artifact path, got: {state}"
+    );
+}
+
+#[test]
+fn epic_handoff_next_child_surfaces_prior_sibling_handoff() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml(tmp.path(), "my-pipe");
+    write_epic_run_fixture(
+        tmp.path(),
+        "my-pipe-parent",
+        "my-pipe",
+        "epic-1",
+        &["child-a", "child-b"],
+        &["child-run-a"],
+    );
+    // Prior child completed (terminal) with a recorded handoff artifact.
+    write_child_run_fixture(
+        tmp.path(),
+        "child-run-a",
+        "my-pipe",
+        "child-a",
+        2,
+        Some("handoffs/2026-10-05-session-end.md"),
+    );
+
+    // Starting the NEXT child makes it the active run...
+    wai_cmd(tmp.path())
+        .args(["pipeline", "start", "my-pipe", "--topic=child-b"])
+        .assert()
+        .success();
+
+    // ...and `pipeline current` must surface the prior child's handoff path.
+    wai_cmd(tmp.path())
+        .args(["pipeline", "current", "--json"])
+        .env_remove("WAI_PIPELINE_RUN")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "handoffs/2026-10-05-session-end.md",
+        ));
 }

@@ -25,7 +25,7 @@ mod matrix;
 mod move_cmd;
 mod new;
 mod phase;
-mod pipeline;
+pub(crate) mod pipeline;
 mod plugin;
 mod prime;
 mod project;

@@ -254,6 +254,12 @@ pub struct ChildRunNode {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub run_id: Option<String>,
     pub mid_flight: bool,
+    /// True when the child run is terminal AND has a recorded handoff
+    /// artifact (wai-vx02.5).
+    pub handoff_ready: bool,
+    /// Project-root-relative path of the recorded handoff artifact.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub handoff_artifact: Option<String>,
 }
 
 #[derive(Debug, Serialize)]

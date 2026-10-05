@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:epic-autonomy-tdd-ro5-2026-10-05-wai-vx02-5-inter-child-handoff, pipeline-step:red-or-analysis]
+---
+
+RED: wai-vx02.5; command=cargo test --test integration epic_handoff_ -- --nocapture; result=4 failed / 0 passed, each for the expected missing behavior — epic_handoff_terminal_child_marks_handoff_ready: current --json has no handoff_ready/handoff_artifact in ChildRunNode (unknown fixture field silently dropped by serde); epic_handoff_midflight_child_not_handoff_ready: same missing fields; epic_handoff_create_records_artifact_on_active_run: 'wai handoff create my-app' creates the doc but does not write handoff_artifact into the active child run state (.wai/pipeline-runs/my-pipe-2026-10-05-child-a.yml); epic_handoff_next_child_surfaces_prior_sibling_handoff: after starting child-b the active run is a child (epic: null) so build_epic_tree returns None and no sibling handoff path appears. Setup intact: existing epic tests (pipeline_current_json_renders_epic_tree etc.) still pass with extended fixture signature.

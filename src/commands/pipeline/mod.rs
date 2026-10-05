@@ -10,7 +10,7 @@ use super::require_project;
 
 mod definition;
 mod gates;
-mod orchestration;
+pub(crate) mod orchestration;
 mod queries;
 mod setup;
 
@@ -180,6 +180,10 @@ pub struct PipelineRun {
     /// Run ids of child runs spawned under this epic (parent runs).
     #[serde(default)]
     pub child_runs: Vec<String>,
+    /// Path (project-root-relative) of the handoff artifact recorded for this
+    /// run's topic via `wai handoff create` (wai-vx02.5).
+    #[serde(default)]
+    pub handoff_artifact: Option<String>,
 }
 
 /// Validation issue found during pipeline definition checking.
@@ -673,6 +677,7 @@ prompt = "Do something else."
             epic: None,
             child_issues: Vec::new(),
             child_runs: Vec::new(),
+            handoff_artifact: None,
         };
         let def = PipelineDefinition {
             name: "test".to_string(),
@@ -715,6 +720,7 @@ prompt = "Do something else."
             epic: None,
             child_issues: Vec::new(),
             child_runs: Vec::new(),
+            handoff_artifact: None,
         };
         let def = PipelineDefinition {
             name: "test".to_string(),
@@ -762,6 +768,7 @@ prompt = "Do something else."
             epic: None,
             child_issues: Vec::new(),
             child_runs: Vec::new(),
+            handoff_artifact: None,
         };
         let def = PipelineDefinition {
             name: "test".to_string(),
@@ -859,6 +866,7 @@ prompt = "Do {topic}."
             epic: None,
             child_issues: Vec::new(),
             child_runs: Vec::new(),
+            handoff_artifact: None,
         };
         let def = PipelineDefinition {
             name: "p".to_string(),
@@ -1210,6 +1218,7 @@ require_input_manifest = true
             epic: None,
             child_issues: Vec::new(),
             child_runs: Vec::new(),
+            handoff_artifact: None,
         };
         let def = PipelineDefinition {
             name: "test".to_string(),
