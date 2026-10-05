@@ -35,7 +35,11 @@ phase: research
 ### git_status
 
 ```
-?? .whisper/
+ M .beads/backup/backup_state.json
+ M .wai/pipeline-runs/epic-autonomy-tdd-ro5-2026-10-05-wai-vx02-3-epic-run-tree.yml
+?? .wai/resources/oracles/README.md
+?? .wai/resources/oracles/example-check.sh
+?? .wai/resources/pipelines/tdd-ro5.toml
 ```
 
 ### open_issues
