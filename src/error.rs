@@ -86,6 +86,15 @@ pub enum WaiError {
     )]
     PluginNotFound { name: String },
 
+    #[error("Invalid --type value: {value}\nValid --type values: {valid}")]
+    #[diagnostic(
+        code(wai::search::invalid_type),
+        help(
+            "Canonical values are research, plan, design, handoff, review; plurals (e.g. plans) are accepted as aliases"
+        )
+    )]
+    InvalidSearchType { value: String, valid: String },
+
     #[error("Plugin trust error: {message}")]
     #[diagnostic(
         code(wai::plugin::trust),

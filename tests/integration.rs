@@ -782,6 +782,62 @@ fn search_case_insensitive() {
 }
 
 #[test]
+fn search_rejects_unknown_type() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+
+    wai_cmd(tmp.path())
+        .args(["search", "x", "--type", "blogposts"])
+        .assert()
+        .failure()
+        .stderr(
+            predicate::str::contains("Valid --type values")
+                .and(predicate::str::contains("handoff")),
+        );
+}
+
+#[test]
+fn search_accepts_canonical_type_values() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+    write_artifact(
+        tmp.path(),
+        "my-app",
+        "research",
+        "2026-01-15-notes.md",
+        "canonical_type_match here\n",
+    );
+
+    wai_cmd(tmp.path())
+        .args(["search", "canonical_type_match", "--type", "research"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("canonical_type_match"));
+}
+
+#[test]
+fn search_accepts_plural_type_aliases() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+    write_artifact(
+        tmp.path(),
+        "my-app",
+        "research",
+        "2026-01-15-notes.md",
+        "alias_type_match here\n",
+    );
+
+    wai_cmd(tmp.path())
+        .args(["search", "alias_type_match", "--type", "plans"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("alias_type_match"));
+}
+
+#[test]
 fn search_no_results() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
