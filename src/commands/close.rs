@@ -7,12 +7,43 @@ use crate::plugin;
 use crate::plugin::{detect_main_worktree_root, store_memory};
 
 use super::handoff::create_handoff;
+use super::pipeline::{pipeline_current_status, run_is_incomplete};
 use super::reflect::{count_handoffs_since, read_reflect_meta};
 use super::{require_project, resolve_project};
 
-pub fn run(project: Option<String>, remember: bool) -> Result<()> {
+pub fn run(project: Option<String>, remember: bool, force: bool) -> Result<()> {
     let project_root = require_project()?;
     require_safe_mode("create handoff")?;
+
+    // Close-time enforcement (wai-csgb): refuse to close while an active
+    // pipeline run is still mid-flight — closing silently would strand the run
+    // and poison `wai status`/`wai prime` nudges. `--force` marks intentional
+    // abandonment.
+    if let Some(status) = pipeline_current_status(&project_root).ok().flatten()
+        && run_is_incomplete(&status)
+        && !force
+    {
+        let step = status.step.as_ref().expect("incomplete run has a step");
+        let run_id = status.run_id.as_deref().unwrap_or("<unknown>");
+        let pipeline = status.pipeline.as_deref().unwrap_or("<unknown>");
+        let topic = status.topic.as_deref().unwrap_or("");
+        let remaining = step.total.saturating_sub(step.index);
+        let steps_word = if remaining == 1 { "step" } else { "steps" };
+        return Err(miette::miette!(
+            "Refusing to close: pipeline run '{}' (pipeline '{}', topic '{}') \
+             is still in progress at step {} of {}.\n\
+             {} {} remaining before this run is complete.\n\
+             → Resume the run: wai pipeline next\n\
+             → Abandon it anyway: wai close --force",
+            run_id,
+            pipeline,
+            topic,
+            step.index,
+            step.total,
+            remaining,
+            steps_word,
+        ));
+    }
 
     let resolved = resolve_project(&project_root, project.as_deref())?;
     let project_name = resolved.name;

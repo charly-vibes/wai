@@ -211,6 +211,10 @@ pub struct PrimePayload {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub beads: Option<BeadsSummary>,
     pub openspec: Vec<OpenspecEntry>,
+    /// Active mid-flight pipeline run to adopt (wai-vx02.1) — same shape as
+    /// `wai pipeline current --json` so consumers share the parser.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pipeline: Option<PipelineCurrentPayload>,
 }
 
 #[derive(Debug, Serialize)]
@@ -230,6 +234,32 @@ pub struct PipelineCurrentPayload {
     pub gate_summary: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub next_command: Option<String>,
+    /// Epic run tree (wai-vx02.3): present only when the active run is an
+    /// epic parent run.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub epic: Option<EpicTreePayload>,
+}
+
+/// Epic run tree (wai-vx02.3): a parent run's epic id and its children.
+#[derive(Debug, Serialize)]
+pub struct EpicTreePayload {
+    pub epic: String,
+    pub children: Vec<ChildRunNode>,
+}
+
+/// One node of the epic run tree: a child issue and its run, if started.
+#[derive(Debug, Serialize)]
+pub struct ChildRunNode {
+    pub issue: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub run_id: Option<String>,
+    pub mid_flight: bool,
+    /// True when the child run is terminal AND has a recorded handoff
+    /// artifact (wai-vx02.5).
+    pub handoff_ready: bool,
+    /// Project-root-relative path of the recorded handoff artifact.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub handoff_artifact: Option<String>,
 }
 
 #[derive(Debug, Serialize)]

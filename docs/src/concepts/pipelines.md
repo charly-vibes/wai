@@ -63,12 +63,7 @@ Steps can optionally define **gates** — conditions that must be satisfied befo
 
 Gates evaluate in order. The first failure blocks advancement — `wai pipeline next` prints the failing gate and what's missing, and blocks until the condition is satisfied.
 
-| Tier | Type | Purpose |
-|------|------|---------|
-| 1 | **Structural** | Verify the step produced expected outputs (artifact count/type) |
-| 2 | **Procedural** | Verify the validation process was followed (reviews exist, verdicts pass) |
-| 3a | **Oracle** | Domain-specific machine-verifiable checks (user-written scripts) |
-| 3b | **Approval** | Forced human checkpoint |
+{{#include ../snippets/gate-tiers.md}}
 
 ### Configuring gates in TOML
 

@@ -21,7 +21,7 @@ mod checks_workspace;
 use checks_blocks::{check_agent_instructions, check_managed_block_staleness};
 use checks_pipeline::{
     check_artifact_locks, check_dont_drift_signals, check_pipeline_definitions,
-    check_pipeline_utilization,
+    check_pipeline_utilization, check_stale_pipeline_runs,
 };
 use checks_session::{check_claude_session_hook, check_pi_session_hook};
 use checks_workspace::{check_agent_tool_coverage, check_skills_in_repo};
@@ -147,6 +147,11 @@ const DOCTOR_CHECKS: &[CheckEntry] = &[
         "pipeline-definitions",
         "Check pipeline definitions for issues",
         |root| check_pipeline_definitions(root),
+    ),
+    (
+        "stale-pipeline-runs",
+        "Detect abandoned mid-flight pipeline runs",
+        |root| check_stale_pipeline_runs(root),
     ),
     ("readme-badge", "Check that README has wai badge", |root| {
         checks_basic::check_readme_badge(root)

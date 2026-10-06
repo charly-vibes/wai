@@ -15,7 +15,7 @@ use crate::state::ProjectState;
 use crate::workspace::detect_installed_pipelines;
 
 use super::doctor::health_summary;
-use super::pipeline::pipeline_current_status;
+use super::pipeline::{pipeline_current_status, run_is_incomplete};
 
 use super::{beads_counts, beads_summary, list_projects, require_project, resolve_project};
 
@@ -40,6 +40,7 @@ pub fn run(project: Option<String>) -> Result<()> {
                 prior_context: Vec::new(),
                 beads: None,
                 openspec: Vec::new(),
+                pipeline: None,
             };
             return print_envelope(genesis::envelope::EnvelopeKind::Ok, payload, vec![], vec![]);
         }
@@ -260,6 +261,13 @@ fn render_json(
     let plans = read_recent_plans(project_root, project_name, 3);
     let prior_context = read_prior_context(project_root, project_name, 5);
 
+    // Adopt gate (wai-vx02.1): surface an active incomplete run in the JSON
+    // payload. Reuses the close-time completeness predicate (wai-csgb).
+    let pipeline = pipeline_current_status(project_root)
+        .ok()
+        .flatten()
+        .filter(|status| status.active && run_is_incomplete(status));
+
     let payload = PrimePayload {
         project: Some(project_name.to_string()),
         phase: Some(phase.to_string()),
@@ -270,6 +278,7 @@ fn render_json(
         prior_context,
         beads,
         openspec,
+        pipeline,
     };
     print_envelope(genesis::envelope::EnvelopeKind::Ok, payload, vec![], vec![])
 }
@@ -585,15 +594,29 @@ fn render_pipelines(project_root: &Path, phase: &str) {
         let name = status.pipeline.unwrap_or_default();
         println!("{} Pipelines", "◆".cyan());
         match status.step {
-            Some(step) => println!(
-                "{} {} {} step {}/{} — {}",
-                "⚡".yellow(),
-                "PIPELINE ACTIVE:".yellow(),
-                name,
-                step.index,
-                step.total,
-                status.next_command.unwrap_or_default(),
-            ),
+            Some(step) => {
+                // Session-start adoption gate (wai-vx02.1): a mid-flight run is
+                // a hard adopt/ resume decision, not a passive status line.
+                let run_id = status.run_id.as_deref().unwrap_or("<unknown>");
+                println!(
+                    "{} PIPELINE RUN ADOPT/RESUME: {} — {} step {}/{}",
+                    "⚡".yellow(),
+                    run_id,
+                    name,
+                    step.index,
+                    step.total,
+                );
+                if let Some(topic) = &status.topic {
+                    println!("  {} topic: {}", "•".dimmed(), topic);
+                }
+                println!(
+                    "  {} Resume: {}",
+                    "→".cyan(),
+                    status
+                        .next_command
+                        .unwrap_or_else(|| "wai pipeline next".to_string()),
+                );
+            }
             // Run is complete — nudge the user to close it.
             None => println!(
                 "{} {} {} complete — {}",

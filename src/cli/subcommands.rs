@@ -318,6 +318,11 @@ pub enum PipelineCommands {
         /// Topic to use for {topic} substitution in step prompts
         #[arg(long)]
         topic: Option<String>,
+
+        /// Coordinate a beads epic: discover ready children via `bd ready
+        /// --json` (parent filter) and create a parent run for them
+        #[arg(long = "epic", value_name = "EPIC_ID")]
+        epic: Option<String>,
     },
 
     /// Show status for the active pipeline run
@@ -407,6 +412,23 @@ pub enum PipelineCommands {
     /// EXAMPLES
     ///   wai pipeline approve
     Approve,
+
+    /// Quarantine abandoned mid-flight runs (stale-run GC)
+    ///
+    /// Scans `.wai/pipeline-runs/` for mid-flight runs whose state-file mtime
+    /// exceeds the stale threshold (`pipeline.staleDays` in config.toml,
+    /// default 14). Default is a dry run listing candidates; `--yes` moves
+    /// each to `pipeline-runs/stale/<run>.<timestamp>.yml` (moved, never
+    /// deleted) and drops a pointer that references a quarantined run.
+    ///
+    /// EXAMPLES
+    ///   wai pipeline gc
+    ///   wai pipeline gc --yes
+    Gc {
+        /// Execute the quarantine (default: dry run)
+        #[arg(long)]
+        yes: bool,
+    },
 
     /// Show detailed pipeline definition with steps and gate configuration
     ///

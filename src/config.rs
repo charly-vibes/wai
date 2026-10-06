@@ -57,6 +57,9 @@ pub struct ProjectConfig {
     /// New canonical LLM configuration section (`[llm]`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub llm: Option<LlmConfig>,
+    /// Pipeline behavior knobs (`[pipeline]`, e.g. `staleDays`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pipeline: Option<PipelineConfig>,
     /// Legacy `[why]` section kept for backwards-compatible deserialisation.
     ///
     /// **Deprecated.** New code must always write to `llm`. This field is only
@@ -72,6 +75,11 @@ pub struct ProjectConfig {
 }
 
 impl ProjectConfig {
+    /// Effective pipeline config (defaults when `[pipeline]` is absent).
+    pub fn pipeline_config(&self) -> PipelineConfig {
+        self.pipeline.clone().unwrap_or_default()
+    }
+
     /// Return the effective LLM configuration.
     ///
     /// Prefers `[llm]` when present. Falls back to `[why]` (legacy) with a
@@ -87,6 +95,26 @@ impl ProjectConfig {
             Some(why) => std::borrow::Cow::Borrowed(why),
             None => std::borrow::Cow::Owned(LlmConfig::default()),
         }
+    }
+}
+
+/// Pipeline behavior knobs.
+///
+/// Stored under `[pipeline]` in `.wai/config.toml`.
+#[derive(Debug, Serialize, Deserialize, Default, Clone)]
+pub struct PipelineConfig {
+    /// Days after which a mid-flight run's state-file mtime marks it stale
+    /// (`staleDays` in config.toml). Defaults to 14.
+    #[serde(rename = "staleDays", default, skip_serializing_if = "Option::is_none")]
+    pub stale_days: Option<u64>,
+}
+
+impl PipelineConfig {
+    pub const DEFAULT_STALE_DAYS: u64 = 14;
+
+    /// Effective stale threshold in days (default when unset).
+    pub fn effective_stale_days(&self) -> u64 {
+        self.stale_days.unwrap_or(Self::DEFAULT_STALE_DAYS)
     }
 }
 
@@ -400,6 +428,16 @@ pub fn read_pipeline_run_state(project_root: &Path) -> Option<String> {
     } else {
         Some(trimmed)
     }
+}
+
+/// Resolve the active pipeline run id: the `WAI_PIPELINE_RUN` env var first
+/// (backwards compat), then the `.last-run` pointer file.
+pub fn resolve_active_pipeline_run(project_root: &Path) -> Option<String> {
+    std::env::var("WAI_PIPELINE_RUN")
+        .ok()
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+        .or_else(|| read_pipeline_run_state(project_root))
 }
 
 #[cfg(test)]

@@ -70,6 +70,11 @@ pub(super) fn cmd_init(name: &str) -> Result<()> {
         .join("resources")
         .join("oracles");
     fs::create_dir_all(&oracles_dir).into_diagnostic()?;
+
+    // Ship bundled oracle scripts referenced by built-in templates
+    for (script_name, script_content) in bundled_oracles_for(name) {
+        write_executable_if_absent(&oracles_dir.join(script_name), script_content)?;
+    }
     let readme_path = oracles_dir.join("README.md");
     if !readme_path.exists() {
         let readme = "# Oracle Scripts\n\n\
@@ -105,14 +110,7 @@ pub(super) fn cmd_init(name: &str) -> Result<()> {
             \x20   echo \"Artifact is empty: $FILE\" >&2\n\
             \x20   exit 1\n\
             fi\n";
-        fs::write(&example_path, example).into_diagnostic()?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let mut perms = fs::metadata(&example_path).into_diagnostic()?.permissions();
-            perms.set_mode(0o755);
-            fs::set_permissions(&example_path, perms).into_diagnostic()?;
-        }
+        write_executable_if_absent(&example_path, example)?;
     }
 
     log::success(format!("Created pipeline: {}", file_path.display())).into_diagnostic()?;
@@ -125,6 +123,34 @@ pub(super) fn cmd_init(name: &str) -> Result<()> {
 }
 
 // ─── Built-in templates ───────────────────────────────────────────────────────
+
+/// Write a script file with executable permissions (unix) if it does not exist yet.
+fn write_executable_if_absent(path: &std::path::Path, contents: &str) -> Result<()> {
+    if path.exists() {
+        return Ok(());
+    }
+    fs::write(path, contents).into_diagnostic()?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(path).into_diagnostic()?.permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(path, perms).into_diagnostic()?;
+    }
+    Ok(())
+}
+
+/// Bundled oracle scripts shipped with a built-in template so its oracle
+/// gate references resolve out of the box. Returns (filename, contents) pairs.
+fn bundled_oracles_for(name: &str) -> Vec<(&'static str, &'static str)> {
+    match name {
+        "tdd-ro5" => vec![(
+            "release-docs-fresh.sh",
+            include_str!("../../templates/oracles/release-docs-fresh.sh"),
+        )],
+        _ => Vec::new(),
+    }
+}
 
 /// Returns a built-in template if one exists for the given name.
 pub(super) fn get_builtin_template(name: &str) -> Option<&'static str> {

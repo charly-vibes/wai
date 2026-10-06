@@ -52,6 +52,7 @@ Do NOT skip `wai close` — it enables resume detection.
 | scientific-research | Frontier-level research requiring systematic validation | `wai pipeline start scientific-research --topic=<topic>` |
 
 > Pipeline steps may have gates that enforce artifact creation, review coverage, and oracle checks before advancement. Run `wai pipeline gates <name>` for details.
+> **Before any edit**: run `wai pipeline current --json`; if a run is active for this project, resume it (`wai pipeline next`) rather than starting ad-hoc work.
 
 ## Ubiquitous Language
 
@@ -81,7 +82,7 @@ Read it at the start of your first session or when you need detailed guidance.
 Keep this managed block so `wai init` can refresh the instructions.
 
 
-<!-- provenance: generator=wai version=0.11.1 source=WAI sha=40ec675f -->
+<!-- provenance: generator=wai version=0.11.1 source=WAI sha=fd7a2ae3 -->
 <!-- WAI:END -->
 
 <!-- WAI:REFLECT:REF:START -->

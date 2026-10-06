@@ -10,13 +10,16 @@ use super::require_project;
 
 mod definition;
 mod gates;
-mod orchestration;
+pub(crate) mod orchestration;
 mod queries;
 mod setup;
 
 // Re-export public items that other modules reference
 pub use definition::load_pipeline_toml;
-pub use orchestration::{clear_complete_pipeline_run, pipeline_current_status};
+pub use orchestration::{
+    clear_complete_pipeline_run, find_stale_runs, pipeline_current_status, run_is_incomplete,
+    stale_threshold_days,
+};
 
 // ─── Data structures ─────────────────────────────────────────────────────────
 
@@ -167,6 +170,20 @@ pub struct PipelineRun {
     /// Per-step approval timestamps (step_id → ISO 8601 timestamp).
     #[serde(default)]
     pub approvals: std::collections::HashMap<String, String>,
+    /// Epic coordination (wai-vx02.3): set on parent runs coordinating the
+    /// child runs of a beads epic.
+    #[serde(default)]
+    pub epic: Option<String>,
+    /// Ready child issue ids discovered at epic start (parent runs).
+    #[serde(default)]
+    pub child_issues: Vec<String>,
+    /// Run ids of child runs spawned under this epic (parent runs).
+    #[serde(default)]
+    pub child_runs: Vec<String>,
+    /// Path (project-root-relative) of the handoff artifact recorded for this
+    /// run's topic via `wai handoff create` (wai-vx02.5).
+    #[serde(default)]
+    pub handoff_artifact: Option<String>,
 }
 
 /// Validation issue found during pipeline definition checking.
@@ -189,13 +206,14 @@ pub fn run(cmd: PipelineCommands) -> Result<()> {
         PipelineCommands::Status => cmd_status(),
         PipelineCommands::List => queries::cmd_list(),
         PipelineCommands::Init { name } => setup::cmd_init(&name),
-        PipelineCommands::Start { name, topic } => {
-            orchestration::cmd_start(&name, topic.as_deref())
+        PipelineCommands::Start { name, topic, epic } => {
+            orchestration::cmd_start(&name, topic.as_deref(), epic.as_deref())
         }
         PipelineCommands::Next => orchestration::cmd_next(),
         PipelineCommands::Current { json } => queries::cmd_current(json),
         PipelineCommands::Suggest { description } => queries::cmd_suggest(description.as_deref()),
         PipelineCommands::Approve => orchestration::cmd_approve(),
+        PipelineCommands::Gc { yes } => orchestration::cmd_gc(yes),
         PipelineCommands::Show { name } => queries::cmd_show(&name),
         PipelineCommands::Gates { name, step } => {
             queries::cmd_gates(name.as_deref(), step.as_deref())
@@ -656,6 +674,10 @@ prompt = "Do something else."
             created_at: "2026-04-02T00:00:00Z".to_string(),
             current_step: 0,
             approvals: HashMap::new(),
+            epic: None,
+            child_issues: Vec::new(),
+            child_runs: Vec::new(),
+            handoff_artifact: None,
         };
         let def = PipelineDefinition {
             name: "test".to_string(),
@@ -695,6 +717,10 @@ prompt = "Do something else."
             created_at: "2026-04-02T00:00:00Z".to_string(),
             current_step: 0,
             approvals: HashMap::new(),
+            epic: None,
+            child_issues: Vec::new(),
+            child_runs: Vec::new(),
+            handoff_artifact: None,
         };
         let def = PipelineDefinition {
             name: "test".to_string(),
@@ -739,6 +765,10 @@ prompt = "Do something else."
             created_at: "2026-04-02T00:00:00Z".to_string(),
             current_step: 0,
             approvals,
+            epic: None,
+            child_issues: Vec::new(),
+            child_runs: Vec::new(),
+            handoff_artifact: None,
         };
         let def = PipelineDefinition {
             name: "test".to_string(),
@@ -833,6 +863,10 @@ prompt = "Do {topic}."
             created_at: "2026-04-02T00:00:00Z".to_string(),
             current_step: 0,
             approvals: HashMap::new(),
+            epic: None,
+            child_issues: Vec::new(),
+            child_runs: Vec::new(),
+            handoff_artifact: None,
         };
         let def = PipelineDefinition {
             name: "p".to_string(),
@@ -1181,6 +1215,10 @@ require_input_manifest = true
             created_at: "2026-04-02T00:00:00Z".to_string(),
             current_step: 0,
             approvals: HashMap::new(),
+            epic: None,
+            child_issues: Vec::new(),
+            child_runs: Vec::new(),
+            handoff_artifact: None,
         };
         let def = PipelineDefinition {
             name: "test".to_string(),

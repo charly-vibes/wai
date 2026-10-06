@@ -19,6 +19,7 @@ pub fn run(cmd: HandoffCommands) -> Result<()> {
         HandoffCommands::Create { project } => {
             require_safe_mode("create handoff")?;
             let path = create_handoff(&project_root, &project)?;
+            record_handoff_on_pipeline_run(&project_root, &path);
             if !current_context().quiet {
                 let filename = path.file_name().unwrap_or_default().to_string_lossy();
                 log::success(format!(
@@ -29,6 +30,33 @@ pub fn run(cmd: HandoffCommands) -> Result<()> {
             }
             Ok(())
         }
+    }
+}
+
+/// Best-effort recording of a created handoff artifact on the active pipeline
+/// run (wai-vx02.5): resolves the run the same way `wai add` does (env var
+/// first, then the `.last-run` pointer) and writes the project-root-relative
+/// artifact path into the run state's `handoff_artifact` field. Never fails
+/// the handoff creation — without an active run or on state errors this is a
+/// silent no-op for missing runs, logged otherwise.
+fn record_handoff_on_pipeline_run(project_root: &Path, artifact_path: &Path) {
+    let Some(run_id) = crate::config::resolve_active_pipeline_run(project_root) else {
+        return;
+    };
+    let rel = artifact_path
+        .strip_prefix(project_root)
+        .unwrap_or(artifact_path)
+        .to_string_lossy()
+        .to_string();
+    if let Err(err) =
+        super::pipeline::orchestration::record_handoff_artifact(project_root, &run_id, &rel)
+    {
+        log::warning(format!(
+            "Could not record handoff artifact on pipeline run '{}': {}",
+            run_id, err
+        ))
+        .into_diagnostic()
+        .ok();
     }
 }
 

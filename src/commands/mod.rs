@@ -25,7 +25,7 @@ mod matrix;
 mod move_cmd;
 mod new;
 mod phase;
-mod pipeline;
+pub(crate) mod pipeline;
 mod plugin;
 mod prime;
 mod project;
@@ -71,7 +71,11 @@ pub fn run(cli: Cli, guide: &Guide) -> Result<()> {
         Some(Commands::Pipeline(cmd)) => pipeline::run(cmd),
         Some(Commands::Artifacts(cmd)) => artifacts::run(cmd),
         Some(Commands::Matrix(cmd)) => matrix::run(cmd),
-        Some(Commands::Close { project, remember }) => close::run(project, remember),
+        Some(Commands::Close {
+            project,
+            remember,
+            force,
+        }) => close::run(project, remember, force),
         Some(Commands::Prime { project }) => prime::run(project),
         Some(Commands::Project(cmd)) => project::run(cmd),
         Some(Commands::Ls {

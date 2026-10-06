@@ -782,6 +782,87 @@ fn search_case_insensitive() {
 }
 
 #[test]
+fn search_rejects_unknown_type() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+
+    wai_cmd(tmp.path())
+        .args(["search", "x", "--type", "blogposts"])
+        .assert()
+        .failure()
+        .stderr(
+            predicate::str::contains("Valid --type values")
+                .and(predicate::str::contains("handoff")),
+        );
+}
+
+#[test]
+fn search_accepts_canonical_type_values() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+    write_artifact(
+        tmp.path(),
+        "my-app",
+        "research",
+        "2026-01-15-notes.md",
+        "canonical_type_match here\n",
+    );
+
+    wai_cmd(tmp.path())
+        .args(["search", "canonical_type_match", "--type", "research"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("canonical_type_match"));
+}
+
+#[test]
+fn search_accepts_plural_type_aliases() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+    write_artifact(
+        tmp.path(),
+        "my-app",
+        "research",
+        "2026-01-15-notes.md",
+        "alias_type_match here\n",
+    );
+
+    wai_cmd(tmp.path())
+        .args(["search", "alias_type_match", "--type", "plans"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("alias_type_match"));
+}
+
+#[test]
+fn search_json_honors_limit() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+    write_artifact(
+        tmp.path(),
+        "my-app",
+        "research",
+        "2026-01-15-a.md",
+        "match_one match_two match_three\n",
+    );
+
+    let out = wai_cmd(tmp.path())
+        .args(["search", "match_", "--json", "-n", "1"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let out_str = String::from_utf8(out).unwrap();
+    let results: serde_json::Value = serde_json::from_str(&out_str).unwrap();
+    assert_eq!(results["data"]["results"].as_array().unwrap().len(), 1);
+}
+
+#[test]
 fn search_no_results() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
@@ -8363,6 +8444,167 @@ fn pipeline_validate_fails_for_invalid_toml() {
     );
 }
 
+// ─── wai-vx02.4: approval + release oracle gates in shipped tdd-ro5 ─────────
+
+/// Helper: initialize a git repo in `dir` and commit everything present.
+fn git_repo_init_and_commit(dir: &std::path::Path, message: &str) {
+    let run = |args: &[&str]| {
+        let output = std::process::Command::new("git")
+            .args(args)
+            .current_dir(dir)
+            .env("GIT_AUTHOR_NAME", "test")
+            .env("GIT_AUTHOR_EMAIL", "test@example.com")
+            .env("GIT_COMMITTER_NAME", "test")
+            .env("GIT_COMMITTER_EMAIL", "test@example.com")
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "git {:?} failed: {}",
+            args,
+            String::from_utf8_lossy(&output.stderr)
+        );
+    };
+    run(&["init"]);
+    run(&["add", "-A"]);
+    run(&["commit", "-m", message]);
+}
+
+/// Helper: run the shipped release-docs-fresh oracle, returning (exit code, stderr).
+fn run_release_oracle(dir: &std::path::Path) -> (i32, String) {
+    let script = dir.join(".wai/resources/oracles/release-docs-fresh.sh");
+    let output = std::process::Command::new(&script)
+        .arg("artifact.md")
+        .current_dir(dir)
+        .output()
+        .expect("release-docs-fresh.sh should exist and be executable");
+    (
+        output.status.code().unwrap_or(-1),
+        String::from_utf8_lossy(&output.stderr).to_string(),
+    )
+}
+
+/// Helper: init workspace, init the built-in tdd-ro5 pipeline, and set up a
+/// demo repo whose Cargo.toml version and CHANGELOG heading both say `cargo_version`.
+fn release_oracle_sandbox(cargo_version: &str, changelog_version: Option<&str>) -> TempDir {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    wai_cmd(tmp.path())
+        .args(["pipeline", "init", "tdd-ro5"])
+        .assert()
+        .success();
+
+    fs::write(
+        tmp.path().join("Cargo.toml"),
+        format!("[package]\nname = \"demo\"\nversion = \"{cargo_version}\"\n"),
+    )
+    .unwrap();
+    let changelog_heading = changelog_version
+        .map(|v| format!("## [{v}] - 2026-09-01\n\n- older release\n"))
+        .unwrap_or_else(|| "## [Unreleased]\n\n(nothing yet)\n".to_string());
+    fs::write(
+        tmp.path().join("CHANGELOG.md"),
+        format!("# Changelog\n\n{changelog_heading}"),
+    )
+    .unwrap();
+    fs::create_dir_all(tmp.path().join("docs")).unwrap();
+    fs::write(tmp.path().join("docs/index.md"), "docs").unwrap();
+    git_repo_init_and_commit(tmp.path(), "initial");
+    tmp
+}
+
+#[test]
+fn pipeline_init_tdd_ro5_ships_release_oracle_script() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "init", "tdd-ro5"])
+        .assert()
+        .success();
+
+    let script = tmp
+        .path()
+        .join(".wai/resources/oracles/release-docs-fresh.sh");
+    let meta =
+        fs::metadata(&script).expect("pipeline init tdd-ro5 should ship release-docs-fresh.sh");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        assert!(
+            meta.permissions().mode() & 0o111 != 0,
+            "shipped oracle must be executable: {:?}",
+            script
+        );
+    }
+}
+
+#[test]
+fn release_oracle_accepts_fresh_docs() {
+    let tmp = release_oracle_sandbox("2026.10.3", Some("2026.10.3"));
+    let (code, stderr) = run_release_oracle(tmp.path());
+    assert_eq!(code, 0, "expected accept for fresh docs, stderr: {stderr}");
+}
+
+#[test]
+fn release_oracle_rejects_lagging_changelog() {
+    let tmp = release_oracle_sandbox("2026.10.3", Some("2026.9.28"));
+    let (code, stderr) = run_release_oracle(tmp.path());
+    assert_eq!(
+        code, 1,
+        "expected reject for lagging CHANGELOG, stderr: {stderr}"
+    );
+    assert!(
+        stderr.contains("2026.10.3") && stderr.contains("2026.9.28"),
+        "stderr must name the drift (both versions), got: {stderr}"
+    );
+}
+
+#[test]
+fn release_oracle_rejects_dirty_docs() {
+    let tmp = release_oracle_sandbox("2026.10.3", Some("2026.10.3"));
+    // Uncommitted docs change after the initial commit -> docs drift
+    fs::write(tmp.path().join("docs/index.md"), "uncommitted edit").unwrap();
+    let (code, stderr) = run_release_oracle(tmp.path());
+    assert_eq!(code, 1, "expected reject for dirty docs/, stderr: {stderr}");
+    assert!(
+        stderr.to_lowercase().contains("docs"),
+        "stderr must name docs/ as the drift, got: {stderr}"
+    );
+}
+
+#[test]
+fn pipeline_gates_tdd_ro5_shows_approval_on_ship_close() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    wai_cmd(tmp.path())
+        .args(["pipeline", "init", "tdd-ro5"])
+        .assert()
+        .success();
+
+    let output = wai_cmd(tmp.path())
+        .args(["pipeline", "gates", "tdd-ro5"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let stripped = strip_ansi(&String::from_utf8(output).unwrap());
+    let ship_idx = stripped
+        .find("ship-close")
+        .expect("ship-close step must be shown, got:\n{stripped}");
+    assert!(
+        stripped[ship_idx..].contains("Approval"),
+        "gates output must show the approval tier on ship-close, got:\n{stripped}"
+    );
+
+    // The shipped template must still validate.
+    wai_cmd(tmp.path())
+        .args(["pipeline", "validate", "tdd-ro5"])
+        .assert()
+        .success();
+}
+
 #[test]
 fn pipeline_lock_creates_lock_files_for_step_artifacts() {
     let tmp = TempDir::new().unwrap();
@@ -9342,4 +9584,635 @@ fn cli_verbosity_quiet_and_verbose_coexist() {
         .args(["-q", "-v", "status"])
         .assert()
         .success();
+}
+
+// ─── stale-run GC (wai-vx02.2) ────────────────────────────────────────────────
+
+/// Write a pipeline run state file, backdate its mtime by `age_days`, and point
+/// `.last-run` at it. Fixture recipe from the ticket: touch -d 'N days ago' a
+/// mid-flight run and write the matching pointer.
+fn write_stale_run_fixture(
+    dir: &std::path::Path,
+    pipeline_name: &str,
+    run_id: &str,
+    current_step: usize,
+    age_days: u64,
+) {
+    write_pipeline_toml(dir, pipeline_name);
+    write_pipeline_run(dir, pipeline_name, run_id, current_step);
+
+    let run_path = dir.join(".wai/pipeline-runs").join(format!("{run_id}.yml"));
+    let mtime = std::time::SystemTime::now() - std::time::Duration::from_secs(age_days * 86_400);
+    let file = fs::OpenOptions::new().write(true).open(&run_path).unwrap();
+    file.set_times(fs::FileTimes::new().set_accessed(mtime).set_modified(mtime))
+        .unwrap();
+}
+
+fn init_workspace_with_project(dir: &std::path::Path, name: &str) {
+    init_workspace(dir);
+    create_project(dir, name);
+}
+
+#[test]
+fn stale_run_doctor_flags_old_midflight_run() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace_with_project(tmp.path(), "my-app");
+    write_stale_run_fixture(tmp.path(), "my-pipe", "my-pipe-old-run", 0, 30);
+
+    let output = wai_cmd(tmp.path()).args(["doctor"]).assert().success();
+    let stdout = String::from_utf8(output.get_output().stdout.clone()).unwrap();
+    assert!(
+        stdout.contains("stale") && stdout.contains("my-pipe-old-run"),
+        "doctor must flag a 30-day-old mid-flight run as stale, got: {stdout}"
+    );
+    assert!(
+        stdout.contains("wai pipeline gc --yes"),
+        "stale warning must name the quarantine command, got: {stdout}"
+    );
+}
+
+#[test]
+fn stale_run_doctor_ignores_fresh_run() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace_with_project(tmp.path(), "my-app");
+    write_stale_run_fixture(tmp.path(), "my-pipe", "my-pipe-fresh-run", 0, 2);
+
+    let output = wai_cmd(tmp.path()).args(["doctor"]).assert().success();
+    let stdout = String::from_utf8(output.get_output().stdout.clone()).unwrap();
+    assert!(
+        !stdout.contains("my-pipe-fresh-run"),
+        "doctor must not flag a 2-day-old run as stale, got: {stdout}"
+    );
+}
+
+#[test]
+fn stale_run_doctor_ignores_old_complete_run() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace_with_project(tmp.path(), "my-app");
+    // current_step == 2 (total) → complete, not mid-flight → not GC material.
+    write_stale_run_fixture(tmp.path(), "my-pipe", "my-pipe-done-run", 2, 30);
+
+    let output = wai_cmd(tmp.path()).args(["doctor"]).assert().success();
+    let stdout = String::from_utf8(output.get_output().stdout.clone()).unwrap();
+    assert!(
+        !stdout.contains("my-pipe-done-run"),
+        "doctor must not flag an old COMPLETE run as stale, got: {stdout}"
+    );
+}
+
+#[test]
+fn stale_run_gc_dry_run_lists_without_moving() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace_with_project(tmp.path(), "my-app");
+    write_stale_run_fixture(tmp.path(), "my-pipe", "my-pipe-old-run", 1, 30);
+    let run_path = tmp.path().join(".wai/pipeline-runs/my-pipe-old-run.yml");
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "gc"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("my-pipe-old-run"))
+        .stdout(predicate::str::contains("--yes"));
+
+    assert!(run_path.exists(), "dry run must not move the run file");
+    assert!(
+        tmp.path()
+            .join(".wai/resources/pipelines/.last-run")
+            .exists(),
+        "dry run must not remove the pointer"
+    );
+}
+
+#[test]
+fn stale_run_gc_yes_quarantines_under_stale_dir() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace_with_project(tmp.path(), "my-app");
+    write_stale_run_fixture(tmp.path(), "my-pipe", "my-pipe-old-run", 1, 30);
+    let run_path = tmp.path().join(".wai/pipeline-runs/my-pipe-old-run.yml");
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "gc", "--yes"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("my-pipe-old-run"));
+
+    assert!(
+        !run_path.exists(),
+        "quarantined run must be moved out of pipeline-runs/"
+    );
+    let stale_dir = tmp.path().join(".wai/pipeline-runs/stale");
+    let quarantined: Vec<_> = fs::read_dir(&stale_dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .collect();
+    assert!(
+        quarantined
+            .iter()
+            .any(|f| f.starts_with("my-pipe-old-run") && f.ends_with(".yml")),
+        "run file must be preserved under stale/ with original name + timestamp suffix, got: {quarantined:?}"
+    );
+    assert!(
+        !tmp.path()
+            .join(".wai/resources/pipelines/.last-run")
+            .exists(),
+        "pointer to a quarantined run must be removed"
+    );
+
+    // prime no longer shows the run as current.
+    wai_cmd(tmp.path())
+        .args(["prime", "--project", "my-app", "--no-input"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("ADOPT/RESUME").not());
+}
+
+#[test]
+fn stale_run_gc_leaves_fresh_runs_untouched() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace_with_project(tmp.path(), "my-app");
+    write_stale_run_fixture(tmp.path(), "my-pipe", "my-pipe-fresh-run", 1, 2);
+    let run_path = tmp.path().join(".wai/pipeline-runs/my-pipe-fresh-run.yml");
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "gc", "--yes"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No stale runs"));
+
+    assert!(run_path.exists(), "fresh run must not be quarantined");
+    assert!(
+        tmp.path()
+            .join(".wai/resources/pipelines/.last-run")
+            .exists(),
+        "pointer to a fresh run must survive gc"
+    );
+}
+
+#[test]
+fn stale_run_config_stale_days_override() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace_with_project(tmp.path(), "my-app");
+    write_stale_run_fixture(tmp.path(), "my-pipe", "my-pipe-old-run", 1, 30);
+    // Raise the threshold: a 30-day-old run is no longer stale at staleDays=60.
+    fs::write(
+        tmp.path().join(".wai/config.toml"),
+        "[project]\nname = \"test-ws\"\n\n[pipeline]\nstaleDays = 60\n",
+    )
+    .unwrap();
+
+    let output = wai_cmd(tmp.path()).args(["doctor"]).assert().success();
+    let stdout = String::from_utf8(output.get_output().stdout.clone()).unwrap();
+    assert!(
+        !stdout.contains("my-pipe-old-run"),
+        "staleDays=60 must keep a 30-day-old run under threshold, got: {stdout}"
+    );
+}
+
+// ─── epic run tree (wai-vx02.3) ──────────────────────────────────────────────
+// A beads epic with ready children can be driven by a parent pipeline run
+// (`pipeline start <pipeline> --epic=<id>`, one per epic per repo) that
+// discovers ready children via `bd ready --json` parent filtering, records
+// child-run ids on its state, and refuses to advance while child runs are
+// mid-flight. `pipeline current --json` renders the tree.
+
+/// Stub `bd` that answers `bd ready --json` with the given JSON payload
+/// (exactly the real fixture style: fake-bin/bd + PATH injection).
+fn install_fake_bd_ready_json(dir: &std::path::Path, issues_json: &str) -> std::path::PathBuf {
+    let bin_dir = dir.join("fake-bin");
+    fs::create_dir_all(&bin_dir).unwrap();
+    let script_path = bin_dir.join("bd");
+    let escaped = issues_json.replace('\'', "'\"'\"'");
+    let script = format!(
+        "#!/bin/sh
+if [ \"$1\" = \"ready\" ] && [ \"$2\" = \"--json\" ]; then
+    printf '%s' '{escaped}'
+    exit 0
+fi
+exit 1
+"
+    );
+    fs::write(&script_path, script).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&script_path).unwrap().permissions();
+        perms.set_mode(0o755);
+        let _ = fs::set_permissions(&script_path, perms);
+    }
+    bin_dir
+}
+
+/// Write a child run state fixture (no `.last-run` touch: the active run
+/// stays the epic parent). Child topic == the child issue id. `current_step`
+/// controls mid-flight vs terminal (2 = terminal for the 2-step test
+/// pipeline); `handoff_artifact` simulates a recorded handoff artifact path.
+fn write_child_run_fixture(
+    dir: &std::path::Path,
+    run_id: &str,
+    pipeline: &str,
+    issue: &str,
+    current_step: usize,
+    handoff_artifact: Option<&str>,
+) {
+    let runs_dir = dir.join(".wai/pipeline-runs");
+    fs::create_dir_all(&runs_dir).unwrap();
+    let artifact = handoff_artifact
+        .map(|a| format!("handoff_artifact: {a}\n"))
+        .unwrap_or_default();
+    fs::write(
+        runs_dir.join(format!("{run_id}.yml")),
+        format!(
+            "run_id: {run_id}\npipeline: {pipeline}\ntopic: {issue}\ncreated_at: '2026-10-05T00:00:00Z'\ncurrent_step: {current_step}\napprovals: {{}}\n{artifact}"
+        ),
+    )
+    .unwrap();
+}
+
+/// Write an epic parent run state fixture + `.last-run` pointer
+/// (style of close_test.rs `write_pipeline_run`, extended with epic fields).
+fn write_epic_run_fixture(
+    dir: &std::path::Path,
+    run_id: &str,
+    pipeline: &str,
+    epic: &str,
+    child_issues: &[&str],
+    child_runs: &[&str],
+) {
+    let runs_dir = dir.join(".wai/pipeline-runs");
+    fs::create_dir_all(&runs_dir).unwrap();
+    let issues = child_issues
+        .iter()
+        .map(|i| format!("    - {i}\n"))
+        .collect::<String>();
+    let runs = child_runs
+        .iter()
+        .map(|r| format!("    - {r}\n"))
+        .collect::<String>();
+    fs::write(
+        runs_dir.join(format!("{run_id}.yml")),
+        format!(
+            "run_id: {run_id}\npipeline: {pipeline}\ntopic: {epic}\ncreated_at: '2026-10-05T00:00:00Z'\ncurrent_step: 0\napprovals: {{}}\nepic: {epic}\nchild_issues:\n{issues}child_runs:\n{runs}"
+        ),
+    )
+    .unwrap();
+    let pipelines_dir = dir.join(".wai/resources/pipelines");
+    fs::create_dir_all(&pipelines_dir).unwrap();
+    fs::write(pipelines_dir.join(".last-run"), run_id).unwrap();
+}
+
+#[test]
+fn pipeline_start_epic_discovers_children_creates_parent_run() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml(tmp.path(), "my-pipe");
+    let fake_bin = install_fake_bd_ready_json(
+        tmp.path(),
+        r#"[{"id":"child-a","parent":"epic-1"},{"id":"child-b","parent":"epic-1"},{"id":"other","parent":"epic-2"}]"#,
+    );
+    let path = format!(
+        "{}:{}",
+        fake_bin.display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "start", "my-pipe", "--epic=epic-1"])
+        .env("PATH", path.clone())
+        .assert()
+        .success();
+
+    let runs_dir = tmp.path().join(".wai/pipeline-runs");
+    let ymls: Vec<_> = fs::read_dir(&runs_dir)
+        .unwrap()
+        .flatten()
+        .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("yml"))
+        .collect();
+    assert_eq!(ymls.len(), 1, "exactly one parent run state expected");
+    let stem = ymls[0]
+        .path()
+        .file_stem()
+        .unwrap()
+        .to_string_lossy()
+        .to_string();
+    assert!(
+        stem.ends_with("-parent"),
+        "parent run id must end in -parent, got: {stem}"
+    );
+
+    let content = fs::read_to_string(ymls[0].path()).unwrap();
+    assert!(
+        content.contains("epic: epic-1"),
+        "parent run must record the epic id, got: {content}"
+    );
+    assert!(
+        content.contains("- child-a"),
+        "ready child must be discovered: {content}"
+    );
+    assert!(
+        content.contains("- child-b"),
+        "ready child must be discovered: {content}"
+    );
+    assert!(
+        !content.contains("- other"),
+        "children of other epics must not be recorded: {content}"
+    );
+
+    // Idempotent: a second start for the same epic reuses the parent run.
+    wai_cmd(tmp.path())
+        .args(["pipeline", "start", "my-pipe", "--epic=epic-1"])
+        .env("PATH", path)
+        .assert()
+        .success();
+    let ymls2: Vec<_> = fs::read_dir(&runs_dir)
+        .unwrap()
+        .flatten()
+        .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("yml"))
+        .collect();
+    assert_eq!(
+        ymls2.len(),
+        1,
+        "second start must not create a duplicate parent run"
+    );
+}
+
+#[test]
+fn pipeline_start_epic_skips_when_no_ready_children() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml(tmp.path(), "my-pipe");
+    let fake_bin = install_fake_bd_ready_json(tmp.path(), r#"[{"id":"other","parent":"epic-2"}]"#);
+    let path = format!(
+        "{}:{}",
+        fake_bin.display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "start", "my-pipe", "--epic=epic-1"])
+        .env("PATH", path)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("no ready children"));
+
+    let runs_dir = tmp.path().join(".wai/pipeline-runs");
+    if runs_dir.exists() {
+        let ymls: Vec<_> = fs::read_dir(&runs_dir)
+            .unwrap()
+            .flatten()
+            .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("yml"))
+            .collect();
+        assert!(
+            ymls.is_empty(),
+            "no parent run must be created without ready children"
+        );
+    }
+    assert!(
+        !tmp.path()
+            .join(".wai/resources/pipelines/.last-run")
+            .exists(),
+        ".last-run must not be written when no parent run is created"
+    );
+}
+
+#[test]
+fn pipeline_start_child_appends_run_to_epic_parent() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml(tmp.path(), "my-pipe");
+    write_epic_run_fixture(
+        tmp.path(),
+        "my-pipe-parent",
+        "my-pipe",
+        "epic-1",
+        &["child-a"],
+        &[],
+    );
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "start", "my-pipe", "--topic=child-a"])
+        .assert()
+        .success();
+
+    // Find the child run file just created (the one that is not the parent).
+    let runs_dir = tmp.path().join(".wai/pipeline-runs");
+    let child_run: String = fs::read_dir(&runs_dir)
+        .unwrap()
+        .flatten()
+        .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("yml"))
+        .map(|e| e.path().file_stem().unwrap().to_string_lossy().to_string())
+        .find(|stem| stem != "my-pipe-parent")
+        .expect("child run state must exist");
+
+    let parent = fs::read_to_string(runs_dir.join("my-pipe-parent.yml")).unwrap();
+    assert!(
+        parent.contains(&child_run),
+        "epic parent state must record the child run id '{child_run}', got: {parent}"
+    );
+}
+
+#[test]
+fn pipeline_next_epic_parent_blocked_while_children_midflight() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml(tmp.path(), "my-pipe");
+    write_epic_run_fixture(
+        tmp.path(),
+        "my-pipe-parent",
+        "my-pipe",
+        "epic-1",
+        &["child-a"],
+        &["child-run"],
+    );
+    // Mid-flight child run: step 0 of 2.
+    write_child_run_fixture(tmp.path(), "child-run", "my-pipe", "child-a", 0, None);
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "next"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("child-run"));
+
+    let parent =
+        fs::read_to_string(tmp.path().join(".wai/pipeline-runs/my-pipe-parent.yml")).unwrap();
+    assert!(
+        parent.contains("current_step: 0"),
+        "refused parent advance must not modify parent state, got: {parent}"
+    );
+}
+
+#[test]
+fn pipeline_current_json_renders_epic_tree() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml(tmp.path(), "my-pipe");
+    write_epic_run_fixture(
+        tmp.path(),
+        "my-pipe-parent",
+        "my-pipe",
+        "epic-1",
+        &["child-a"],
+        &["child-run"],
+    );
+    write_child_run_fixture(tmp.path(), "child-run", "my-pipe", "child-a", 0, None);
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "current", "--json"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("epic-1")
+                .and(predicate::str::contains("\"run_id\": \"child-run\""))
+                .and(predicate::str::contains("\"mid_flight\": true")),
+        );
+}
+
+// ─── inter-child handoff artifacts (wai-vx02.5) ────────────────────────────
+// A child run that reaches its terminal step with a handoff artifact recorded
+// (via `wai handoff create` while the run is active) is handoff-ready: the
+// epic tree marks it and links the artifact path, and starting the next child
+// surfaces the prior child's handoff artifact path in `pipeline current`.
+
+#[test]
+fn epic_handoff_terminal_child_marks_handoff_ready() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml(tmp.path(), "my-pipe");
+    write_epic_run_fixture(
+        tmp.path(),
+        "my-pipe-parent",
+        "my-pipe",
+        "epic-1",
+        &["child-a"],
+        &["child-run-a"],
+    );
+    // Terminal child run (step 2 of 2) with a recorded handoff artifact.
+    write_child_run_fixture(
+        tmp.path(),
+        "child-run-a",
+        "my-pipe",
+        "child-a",
+        2,
+        Some("handoffs/2026-10-05-session-end.md"),
+    );
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "current", "--json"])
+        .env_remove("WAI_PIPELINE_RUN")
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("\"handoff_ready\": true").and(predicate::str::contains(
+                "handoffs/2026-10-05-session-end.md",
+            )),
+        );
+}
+
+#[test]
+fn epic_handoff_midflight_child_not_handoff_ready() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml(tmp.path(), "my-pipe");
+    write_epic_run_fixture(
+        tmp.path(),
+        "my-pipe-parent",
+        "my-pipe",
+        "epic-1",
+        &["child-a"],
+        &["child-run-a"],
+    );
+    // Mid-flight child run (step 0 of 2) that already recorded an artifact:
+    // not handoff-ready until the run reaches its terminal step.
+    write_child_run_fixture(
+        tmp.path(),
+        "child-run-a",
+        "my-pipe",
+        "child-a",
+        0,
+        Some("handoffs/2026-10-05-session-end.md"),
+    );
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "current", "--json"])
+        .env_remove("WAI_PIPELINE_RUN")
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("\"handoff_ready\": false")
+                .and(predicate::str::contains("\"mid_flight\": true")),
+        );
+}
+
+#[test]
+fn epic_handoff_create_records_artifact_on_active_run() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+    write_pipeline_toml(tmp.path(), "my-pipe");
+
+    wai_cmd(tmp.path())
+        .args(["pipeline", "start", "my-pipe", "--topic=child-a"])
+        .assert()
+        .success();
+
+    wai_cmd(tmp.path())
+        .args(["handoff", "create", "my-app"])
+        .env_remove("WAI_PIPELINE_RUN")
+        .assert()
+        .success();
+
+    // The active (child) run state must record the created handoff artifact.
+    let runs_dir = tmp.path().join(".wai/pipeline-runs");
+    let child_run: String = fs::read_dir(&runs_dir)
+        .unwrap()
+        .flatten()
+        .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("yml"))
+        .map(|e| e.path().file_stem().unwrap().to_string_lossy().to_string())
+        .find(|stem| stem != "my-pipe-parent")
+        .expect("child run state must exist");
+    let state = fs::read_to_string(runs_dir.join(format!("{child_run}.yml"))).unwrap();
+    assert!(
+        state.contains(".wai/projects/my-app/handoffs/2026-"),
+        "child run state must record the handoff artifact path, got: {state}"
+    );
+}
+
+#[test]
+fn epic_handoff_next_child_surfaces_prior_sibling_handoff() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    write_pipeline_toml(tmp.path(), "my-pipe");
+    write_epic_run_fixture(
+        tmp.path(),
+        "my-pipe-parent",
+        "my-pipe",
+        "epic-1",
+        &["child-a", "child-b"],
+        &["child-run-a"],
+    );
+    // Prior child completed (terminal) with a recorded handoff artifact.
+    write_child_run_fixture(
+        tmp.path(),
+        "child-run-a",
+        "my-pipe",
+        "child-a",
+        2,
+        Some("handoffs/2026-10-05-session-end.md"),
+    );
+
+    // Starting the NEXT child makes it the active run...
+    wai_cmd(tmp.path())
+        .args(["pipeline", "start", "my-pipe", "--topic=child-b"])
+        .assert()
+        .success();
+
+    // ...and `pipeline current` must surface the prior child's handoff path.
+    wai_cmd(tmp.path())
+        .args(["pipeline", "current", "--json"])
+        .env_remove("WAI_PIPELINE_RUN")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "handoffs/2026-10-05-session-end.md",
+        ));
 }

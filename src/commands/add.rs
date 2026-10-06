@@ -5,9 +5,7 @@ use std::path::Path;
 
 use super::resource;
 use crate::cli::AddCommands;
-use crate::config::{
-    DESIGNS_DIR, PLANS_DIR, RESEARCH_DIR, REVIEWS_DIR, projects_dir, read_pipeline_run_state,
-};
+use crate::config::{DESIGNS_DIR, PLANS_DIR, RESEARCH_DIR, REVIEWS_DIR, projects_dir};
 use crate::context::{current_context, require_safe_mode};
 use crate::json::Suggestion;
 use crate::state::Phase;
@@ -535,11 +533,7 @@ fn build_tags(user_tags: Option<&str>, project_root: &std::path::Path) -> Vec<St
     }
 
     // Resolve active pipeline run: env var first (backwards compat), then state file.
-    let active_run = std::env::var("WAI_PIPELINE_RUN")
-        .ok()
-        .map(|v| v.trim().to_string())
-        .filter(|v| !v.is_empty())
-        .or_else(|| read_pipeline_run_state(project_root));
+    let active_run = crate::config::resolve_active_pipeline_run(project_root);
 
     if let Some(ref run_id) = active_run {
         tags.push(format!("pipeline-run:{}", run_id));

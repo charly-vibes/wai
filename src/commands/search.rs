@@ -58,6 +58,28 @@ pub struct SearchArgs {
     pub include_memories: bool,
 }
 
+/// Valid `--type` values for `wai search` (canonical + plural aliases).
+fn known_type_values() -> &'static [&'static str] {
+    &[
+        "research", "plan", "plans", "design", "designs", "handoff", "handoffs", "review",
+        "reviews",
+    ]
+}
+
+/// Reject invalid values for `--type` early, before any directory walk.
+fn validate_type_filter(type_filter: Option<&str>) -> Result<()> {
+    if let Some(type_f) = type_filter
+        && !known_type_values().contains(&type_f)
+    {
+        return Err(crate::error::WaiError::InvalidSearchType {
+            value: type_f.to_string(),
+            valid: "research, plan, design, handoff, review".to_string(),
+        }
+        .into());
+    }
+    Ok(())
+}
+
 pub fn run(args: SearchArgs) -> Result<()> {
     let SearchArgs {
         query,
@@ -71,6 +93,7 @@ pub fn run(args: SearchArgs) -> Result<()> {
         include_memories,
     } = args;
     let display_limit = limit.unwrap_or(DEFAULT_LIMIT);
+    validate_type_filter(type_filter.as_deref())?;
     let project_root = require_project()?;
     let context = current_context();
 
@@ -205,9 +228,11 @@ pub fn run(args: SearchArgs) -> Result<()> {
     };
 
     if context.json {
+        let total = results.len();
+        let limited_results = &results[..total.min(display_limit)];
         let payload = SearchPayload {
             query: query.clone(),
-            results: results
+            results: limited_results
                 .iter()
                 .map(
                     |(path, line_num, line, _start, _end, context_lines)| SearchResult {
@@ -523,6 +548,29 @@ mod tests {
         let line2 = "hello world";
         let result2 = highlight_match(line2, 6, 11);
         assert!(result2.contains("world"));
+    }
+
+    #[test]
+    fn validate_type_filter_accepts_known_values() {
+        for known in [
+            "research", "plan", "plans", "design", "designs", "handoff", "handoffs", "review",
+            "reviews",
+        ] {
+            assert!(
+                validate_type_filter(Some(known)).is_ok(),
+                "{known} should be accepted"
+            );
+        }
+    }
+
+    #[test]
+    fn validate_type_filter_rejects_unknown_values() {
+        for unknown in ["blog", "epic", "specs", "notes", ""] {
+            assert!(
+                validate_type_filter(Some(unknown)).is_err(),
+                "{unknown:?} should be rejected"
+            );
+        }
     }
 
     #[test]

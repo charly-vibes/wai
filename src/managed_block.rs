@@ -176,7 +176,10 @@ fn slim_pipelines_section(installed_pipelines: &[InstalledPipeline]) -> String {
     section.push_str(
         "\n> Pipeline steps may have gates that enforce artifact creation, review \
          coverage, and oracle checks before advancement. \
-         Run `wai pipeline gates <name>` for details.\n",
+         Run `wai pipeline gates <name>` for details.\
+         \n> **Before any edit**: run `wai pipeline current --json`; if a run is \
+         active for this project, resume it (`wai pipeline next`) rather than \
+         starting ad-hoc work.\n",
     );
     section
 }
@@ -386,6 +389,36 @@ pub fn describe_inject_result(result: &InjectResult, filename: &str) -> String {
 #[cfg(test)]
 mod wai_block_tests {
     use super::*;
+
+    // ── Pipeline run adoption (wai-vx02.1) ────────────────────────────────
+
+    #[test]
+    fn slim_block_instructs_run_adoption_when_pipelines_installed() {
+        let pipes = [InstalledPipeline {
+            name: "research-flow".into(),
+            description: "d".into(),
+            when: "research".into(),
+            step_count: 2,
+        }];
+        let output = wai_block_content(Path::new("."), &[], &[], &pipes);
+        assert!(
+            output.contains("wai pipeline current --json"),
+            "expected run-adoption instruction mentioning `wai pipeline current --json` in slim block"
+        );
+        assert!(
+            output.contains("wai pipeline next"),
+            "expected resume command in slim block"
+        );
+    }
+
+    #[test]
+    fn slim_block_has_no_adoption_instruction_without_pipelines() {
+        let output = wai_block_content(Path::new("."), &[], &[], &[]);
+        assert!(
+            !output.contains("wai pipeline current --json"),
+            "adoption instruction is noise when no pipelines are installed"
+        );
+    }
 
     // ── Slim block (Layer 1: CLAUDE.md / AGENTS.md) ──────────────────────
 
