@@ -7,6 +7,38 @@ and this project adheres to [Calendar Versioning](https://calver.org/) (YYYY.M.M
 
 ## [Unreleased]
 
+## [2026.10.4] - 2026-10-05
+
+### Added
+
+- **Pipeline close enforcement** — `wai close` refuses while a pipeline run
+  is mid-flight, with a `--force` escape hatch (wai-csgb).
+- **Prime adopt/resume gate** — session start adopts or resumes a mid-flight
+  pipeline run instead of ignoring it; prime output carries a PIPELINE RUN
+  managed block with JSON pipeline field (wai-vx02.1).
+- **Stale-run GC** — `wai doctor` flags stale pipeline runs and
+  `wai pipeline gc` quarantines them to `pipeline-runs/stale/` (never
+  deletes); configurable `pipeline.staleDays` (default 14) (wai-vx02.2).
+- **Epic run tree** — `wai pipeline start <pipeline> --epic=<id>` creates a
+  parent run that discovers ready children via beads, records child run ids,
+  blocks parent advance while children are mid-flight, and renders the tree
+  in `wai pipeline current --json` (wai-vx02.3).
+- **Inter-child handoff artifacts** — `wai handoff create` records the doc
+  path on the active pipeline run; the epic tree marks terminal children
+  handoff-ready and surfaces the prior sibling's handoff artifact path in
+  `pipeline current` output (wai-vx02.5).
+- **Ship-close approval + release oracle** — the tdd-ro5 template blocks
+  ship-close on an explicit human checkpoint (`wai pipeline approve`) and a
+  release-docs-fresh oracle (CHANGELOG heading == Cargo.toml version, docs/
+  clean); `wai pipeline init` ships the oracle script (wai-vx02.4).
+
+### Fixed
+
+- `wai search` rejects invalid values for the `--type` filter (wai-cmej).
+- `wai search --json` results are capped at the display limit (wai-005m).
+- Docs deploy: upload artifact from `docs/_book` (mdbook 0.5 fallout) and
+  skip archived specs without `spec.md` in the spec-copy step.
+
 ## [2026.10.3] - 2026-10-03
 
 ### Added
