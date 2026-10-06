@@ -3,3 +3,8 @@
   - Tag v2026.10.4 pushed → release.yml builds binaries + tap/scoop/crates.io
   - Gotcha: 'wai add review' needs --reviews pointing at an EXISTING artifact; findings via 'wai add design' first, then review references it
   - **Next:** verify release.yml + docs workflows green for v2026.10.4; close epic wai-vx02 when merged-tag lands (may already be closed — verify); watch crates.io publish + homebrew tap update
+- 2026-10-06T12:41:07Z [id:6078257d1c4a89eb39699bac4824521c30a8d9c94f80f7ae1c4700da87f12f6d] ### 2026-10-06 — v2026.10.4 released, epic wai-vx02 closed
+  - Release fully verified: GitHub release v2026.10.4 (5 binaries + checksums), crates.io wai-cli 2026.10.4 (API-confirmed), docs deployed from main, tap/scoop steps ran in successful release.yml
+  - PR #33 (feat/close-pipeline-enforcement, 17 commits) + PR #34 (release/v2026.10.4) merged; tag pushed; epic wai-vx02 closed; beads exported + pushed (4d3f741)
+  - Standing wart: tag-ref docs.yml runs fail on github-pages env protection (wai-35zh) — main docs deploys fine, versioned snapshots missing for every tag
+  - **Next:** no in-flight work; candidates wai-35zh, wai-sib1 (P1), wai-sojk, wai-i1lo. Use wai close + /clear between tickets
