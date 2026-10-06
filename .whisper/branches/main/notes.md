@@ -1,0 +1,5 @@
+- 2026-10-06T00:25:45Z [id:6874966b56171841b1dee751ea3f3edf5df4df6b0d57ceef1b66a7ca5428d5a1] ### 2026-10-05 — release v2026.10.4 shipped
+  - PR #33 merged (epic wai-vx02 complete: all 5 children closed); release/v2026.10.4 branch: CHANGELOG [2026.10.4] + version bump Cargo.toml/Cargo.lock/.wai/config.toml; release-docs-fresh oracle PASS; PR #34 CI green, merged
+  - Tag v2026.10.4 pushed → release.yml builds binaries + tap/scoop/crates.io
+  - Gotcha: 'wai add review' needs --reviews pointing at an EXISTING artifact; findings via 'wai add design' first, then review references it
+  - **Next:** verify release.yml + docs workflows green for v2026.10.4; close epic wai-vx02 when merged-tag lands (may already be closed — verify); watch crates.io publish + homebrew tap update
