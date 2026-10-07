@@ -460,6 +460,7 @@ fn render_human(checks: &[WaiCheckEntry], summary: &DoctorSummary) -> Result<()>
 #[cfg(test)]
 mod tests {
     use super::checks_pipeline::drift_signals_to_check_results;
+    use super::checks_pipeline::{check_pipeline_utilization, manual_cycle_matches};
     use super::checks_session::pi_extensions_run_wai_prime;
     use super::*;
     use tempfile::TempDir;
@@ -509,6 +510,84 @@ mod tests {
         let tmp = setup_workspace();
         let results = check_artifact_locks(tmp.path());
         assert!(results.is_empty());
+    }
+
+    // ---- pipeline utilization: manual-cycle prose matching (wai-2am8) ----
+
+    /// Fixture: install a pipeline whose `when` mentions TDD so the
+    /// utilization check treats it as a TDD pipeline.
+    fn write_tdd_pipeline_fixture(root: &Path) {
+        let dir = root.join(".wai/resources/pipelines");
+        std::fs::create_dir_all(&dir).expect("create pipelines dir");
+        std::fs::write(
+            dir.join("tdd-flow.toml"),
+            r#"
+[pipeline]
+name = "tdd-flow"
+description = "test pipeline"
+
+[pipeline.metadata]
+when = "Use when doing TDD work autonomously"
+"#,
+        )
+        .expect("write pipeline fixture");
+    }
+
+    #[test]
+    fn manual_cycle_ignores_generic_follow_prose() {
+        // "follow " alone must not count as a manual TDD cycle.
+        let content = "Use existing abstractions. Follow the existing style guide.";
+        assert!(manual_cycle_matches(content).is_empty());
+    }
+
+    #[test]
+    fn manual_cycle_matches_unicode_arrow_cycle() {
+        let content = "Per-ticket pipeline: always follow `TDD \u{2192} ro5u \u{2192} fix \u{2192} commit \u{2192} next ticket`";
+        let matches = manual_cycle_matches(content);
+        assert!(!matches.is_empty());
+        assert!(!matches.contains(&"follow "));
+    }
+
+    #[test]
+    fn manual_cycle_matches_ascii_arrow_cycle() {
+        let content = "Per-ticket pipeline: TDD -> ro5u -> fix -> commit -> next ticket";
+        assert!(!manual_cycle_matches(content).is_empty());
+    }
+
+    #[test]
+    fn manual_cycle_matches_spread_cycle_words() {
+        let content = "each ticket: do TDD, then ro5u, then fix, then commit";
+        assert!(!manual_cycle_matches(content).is_empty());
+    }
+
+    #[test]
+    fn utilization_warns_when_tdd_pipeline_and_manual_cycle_prose() {
+        let tmp = setup_workspace();
+        write_tdd_pipeline_fixture(tmp.path());
+        std::fs::write(
+            tmp.path().join("AGENTS.md"),
+            "# Project\n\nPer-ticket pipeline: always follow `TDD \u{2192} ro5u \u{2192} fix \u{2192} commit`\n",
+        )
+        .expect("write AGENTS.md");
+
+        let entries = check_pipeline_utilization(tmp.path());
+        assert_eq!(entries.len(), 1);
+        assert!(matches!(entries[0].status, CheckStatus::Warn));
+        assert!(entries[0].message.contains("tdd-flow"));
+    }
+
+    #[test]
+    fn utilization_no_warn_when_prose_points_at_pipeline_start() {
+        let tmp = setup_workspace();
+        write_tdd_pipeline_fixture(tmp.path());
+        std::fs::write(
+            tmp.path().join("AGENTS.md"),
+            "# Project\n\nPer-ticket pipeline: run `wai pipeline start tdd-flow --topic=<t>`\n",
+        )
+        .expect("write AGENTS.md");
+
+        let entries = check_pipeline_utilization(tmp.path());
+        assert!(entries.is_empty());
     }
 
     #[test]

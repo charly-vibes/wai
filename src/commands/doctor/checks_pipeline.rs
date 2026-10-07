@@ -424,24 +424,45 @@ pub(super) fn check_pipeline_utilization(project_root: &Path) -> Vec<WaiCheckEnt
     }]
 }
 
-/// Patterns that indicate manual-cycle instructions, matched (case
-///-insensitively, ignoring spaces) against agent-file content.
-fn manual_cycle_matches(content: &str) -> Vec<&'static str> {
-    let manual_patterns = [
-        "Per-ticket pipeline",
-        "TDD → ro5u",
-        "TDD.*ro5.*fix.*commit",
-        "follow ",
-    ];
-    let content_lower = content.to_lowercase();
-    manual_patterns
-        .into_iter()
-        .filter(|pattern| {
-            let pat_lower = pattern.to_lowercase();
-            content_lower.contains(&pat_lower)
-                || content_lower.contains(&pattern.replace(" ", "").to_lowercase())
+/// Patterns that indicate manual-cycle instructions, matched line-by-line
+/// (case-insensitively, whitespace-normalized) against agent-file content.
+///
+/// Each entry pairs a human-readable label (returned on match) with its
+/// regex. A line that points the reader at `wai pipeline start` is a
+/// pipeline pointer, not a manual instruction, and never matches (wai-2am8).
+const MANUAL_CYCLE_PATTERNS: &[(&str, &str)] = &[
+    ("per-ticket pipeline", r"per[- ]ticket pipeline"),
+    ("tdd→ro5 arrow cycle", r"tdd\s*(?:→|->)\s*ro5"),
+    (
+        "tdd/ro5/fix/commit word sequence",
+        r"tdd\b[^.]{0,20}\bro5u?\b[^.]{0,20}\bfix\b[^.]{0,20}\bcommit\b",
+    ),
+];
+
+pub(super) fn manual_cycle_matches(content: &str) -> Vec<&'static str> {
+    let patterns: Vec<(&'static str, regex::Regex)> = MANUAL_CYCLE_PATTERNS
+        .iter()
+        .map(|(label, pattern)| {
+            (
+                *label,
+                regex::Regex::new(&format!("(?i){pattern}")).expect("valid pattern"),
+            )
         })
-        .collect()
+        .collect();
+
+    let mut matched: Vec<&'static str> = Vec::new();
+    for line in content.lines() {
+        let normalized = line.split_whitespace().collect::<Vec<_>>().join(" ");
+        if normalized.is_empty() || normalized.contains("wai pipeline start") {
+            continue;
+        }
+        for (label, re) in &patterns {
+            if re.is_match(&normalized) && !matched.iter().any(|m| m == label) {
+                matched.push(label);
+            }
+        }
+    }
+    matched
 }
 
 pub(super) fn check_dont_drift_signals(project_root: &Path) -> Vec<WaiCheckEntry> {
