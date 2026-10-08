@@ -262,6 +262,64 @@ The pipeline uses nine gated steps:
 
 Review and fixing are intentionally separate steps: the review step observes and records evidence; the fix step applies bounded remediation. Push/release/deploy remains outside the default pipeline unless explicitly authorized by project policy or user instruction.
 
+## Built-in: Epic-Orchestrator Pipeline
+
+The `epic-orchestrator` pipeline is designed for epic execution where a **lead** agent orchestrates only — one ready child ticket per run — and **subagents** do the implementation. It encodes the orchestrator + subagents pattern as enforceable steps instead of hoping agents follow prose: the lead's job is claim → gates → brief → spawn → verify → ship → STOP, never inline implementation.
+
+### Starting a run
+
+```bash
+wai pipeline start epic-orchestrator --topic="<child ticket id>"
+```
+
+Each run handles exactly one child ticket. The next ticket starts a fresh run — the loop ends in an explicit STOP at the ticket boundary and never chains past it.
+
+### Steps
+
+1. **Claim** — orient (`wai prime`, `wai status`, `bd ready`) and claim exactly one ready, unblocked child issue atomically (`bd update <id> --claim`). Write the per-ticket state file (see below).
+2. **Gates** — run the project's pre-work quality gates and establish a green test-suite baseline so later failures are attributable to this change only. No implementation yet.
+3. **Brief** — write the subagent brief as a **committed repo artifact** at `.wai/projects/<project>/briefs/<slug>.md`, with mandatory `## Why` (delegation rationale), `## Completion criteria` (runnable commands only — exit 0 = done), and `## Spawn model` (model plus a context ceiling expressed as `≤ N%` of the actual model window; fixed token counts are invalid). Commit the brief before spawning so the subagent starts from a clean tree.
+4. **Spawn** — spawn a named, resumable subagent session for the brief, streaming output to a known log path the orchestrator can tail. Spawn is a named session (retry is a fresh `-retry`-suffixed session, never an in-place resume).
+5. **Verify** — verify before trust. With a second model family configured, a read-only verifier session (`subagent:<ticket>:verify`) cross-checks the implementor's report against reality: commits vs `git log`, report claims vs ticket-tracker state.
+6. **Ship** — inspect the diff, commit atomically, update the ticket tracker and openspec tasks. Push only when project policy or user instruction explicitly authorizes it.
+7. **STOP** — hard stop at the ticket boundary. Record the final checkpoint and start the next ticket as a new run.
+
+Every step ends with recording an artifact (`wai add`), appending a `step id + sha` checkpoint to the state file, and `wai pipeline next`.
+
+### Per-ticket state file
+
+The claim step creates a durable state file at `.wai/projects/<project>/runs/<ticket>.state`, e.g.:
+
+```yaml
+ticket: wai-hr0w
+branch: main
+brief_path: .wai/projects/<project>/briefs/<slug>.md
+step_history: []
+- claim @ 52c6de8604ad86f87c4a6a3defe4800a23b3b1bf
+- gates @ 52c6de8604ad86f87c4a6a3defe4800a23b3b1bf
+- brief @ 939dae26e2b7aefa0e4200d09a41c4259029d4b4
+```
+
+It records the ticket id, the branch, the brief path (empty until the brief step), and a step history of `step id + sha` checkpoints appended before each advance.
+
+**Retry and drift:** if the state file already exists at claim, the retry reads it and runs a drift check before resuming — it refuses to resume when HEAD advanced without a completed step accounting for the advance. A mid-run advance is expected (the implementor commits) and is never flagged as drift. Retries resume from the last completed gate, not from the beginning.
+
+**Refusal conditions:**
+
+- Spawn refuses to run without a **committed brief** at its recorded path.
+- Spawn refuses to run without the **state file** — the spawn must be resumable through it.
+- The retry-entry **drift check** refuses to resume a state file whose HEAD advanced without an accounting step.
+
+### Single-model degradation
+
+The primary verify path spawns a verifier from a *different model family*. Single-model setups degrade to **lead-side checks** instead of a spawned verifier: record the branch head at verify entry, diff `git log`/`git diff` against the report, run the repo's test suite, and check the ticket tracker. This degradation is **non-blocking** — the run may advance once the lead-side checks pass. A contradiction between the report and reality always blocks the run, degraded or not.
+
+### Oracle requirement
+
+The verify and ship steps carry a `tests-pass` oracle gate. Provide a `tests-pass` script (see [Oracle scripts](#oracle-scripts)) in `.wai/resources/oracles/` so the gates resolve; without one, advancing past those steps fails.
+
+> Provenance: the evidence base and design proposal for this pipeline live in the orchestrator-tooling project (`~/.wai/projects/orchestrator-tooling/`); the openspec change is `openspec/changes/add-epic-orchestrator-template/`.
+
 ## Artifact Locking
 
 Steps can declare `lock = true` to freeze their artifacts with SHA-256 hashes when you advance past them. This prevents accidental modification of validated work — once a step's artifacts are locked, any change will be caught by `wai pipeline verify` or `wai doctor`.

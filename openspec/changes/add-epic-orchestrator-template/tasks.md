@@ -24,3 +24,18 @@
 
 - [x] 2.1 `openspec validate add-epic-orchestrator-template --strict` passes
 - [ ] 2.2 `cargo test` fully green; pre-push hook passes
+
+## 3. Distribution (wai-hr0w)
+
+- [x] 3.1 Integration test `tests/suite_pipeline_epic_orchestrator_ticket_state.rs` —
+      scaffolds the template in a temp repo, walks a simulated ticket through
+      claim → gates → brief, asserts the per-ticket state-file shape
+      (`.wai/projects/<project>/runs/<ticket>.state`: ticket id, branch, brief
+      path, `step id + sha` step-history entries) plus the refusal conditions
+      and single-model degradation declared by the template.
+- [x] 3.2 Document the epic-orchestrator pipeline in `docs/src/concepts/pipelines.md`
+      alongside the tdd-ro5 section: usage, loop steps, per-ticket state file
+      (path, shape, retry/drift semantics), refusal conditions, single-model
+      degradation, and the `tests-pass` oracle requirement.
+- [x] 3.3 Distribution note linking provenance (`~/.wai/projects/orchestrator-tooling/`)
+      in the docs section and this change's proposal.

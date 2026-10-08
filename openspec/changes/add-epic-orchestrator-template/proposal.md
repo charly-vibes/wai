@@ -42,3 +42,6 @@ durability (wai-wvjz), brief format (wai-3eo0), and the isolation-based verify s
   - `src/cli/subcommands.rs`, `src/cli/mod.rs`, `src/help.rs` (template listing/help text)
   - `src/commands/pipeline/setup.rs` (built-in scaffold path — no gate change needed, list-driven)
   - `tests/` (new template test mirroring tdd-ro5 tests)
+
+Provenance: the evidence base and design proposal for this change live in the
+orchestrator-tooling project (`~/.wai/projects/orchestrator-tooling/`).
