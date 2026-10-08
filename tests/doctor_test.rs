@@ -1,5 +1,4 @@
 use assert_cmd::Command;
-use predicates::prelude::*;
 use std::fs;
 use tempfile::TempDir;
 
@@ -15,17 +14,19 @@ fn wai_cmd(dir: &std::path::Path) -> Command {
 }
 
 fn init_workspace(dir: &std::path::Path) {
-    wai_cmd(dir)
+    let out = wai_cmd(dir)
         .args(["init", "--name", "test-ws"])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 }
 
 fn create_project(dir: &std::path::Path, name: &str) {
-    wai_cmd(dir)
+    let out = wai_cmd(dir)
         .args(["new", "project", name])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 }
 
 // ── healthy workspace ────────────────────────────────────────────────────────
@@ -35,15 +36,15 @@ fn doctor_healthy_workspace_reports_zero_failures() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["doctor", "--json"])
-        .assert()
-        .success()
-        .stdout(
-            predicate::str::contains("\"fail\": 0")
-                .and(predicate::str::contains("\"summary\""))
-                .and(predicate::str::contains("\"pass\"")),
-        );
+        .output()
+        .expect("command should run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success());
+    assert!(stdout.contains("\"fail\": 0"));
+    assert!(stdout.contains("\"summary\""));
+    assert!(stdout.contains("\"pass\""));
 }
 
 // ── broken workspace detection ───────────────────────────────────────────────
@@ -55,14 +56,14 @@ fn doctor_missing_required_directory_reports_fail() {
 
     fs::remove_dir_all(tmp.path().join(".wai/archives")).unwrap();
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["doctor", "--json"])
-        .assert()
-        .code(1)
-        .stdout(
-            predicate::str::contains("\"status\": \"fail\"")
-                .and(predicate::str::contains("archives")),
-        );
+        .output()
+        .expect("command should run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert_eq!(out.status.code(), Some(1));
+    assert!(stdout.contains("\"status\": \"fail\""));
+    assert!(stdout.contains("archives"));
 }
 
 #[test]
@@ -72,14 +73,14 @@ fn doctor_invalid_config_toml_reports_fail() {
 
     fs::write(tmp.path().join(".wai/config.toml"), "{{invalid toml!!!").unwrap();
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["doctor", "--json"])
-        .assert()
-        .code(1)
-        .stdout(
-            predicate::str::contains("\"status\": \"fail\"")
-                .and(predicate::str::contains("Configuration")),
-        );
+        .output()
+        .expect("command should run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert_eq!(out.status.code(), Some(1));
+    assert!(stdout.contains("\"status\": \"fail\""));
+    assert!(stdout.contains("Configuration"));
 }
 
 #[test]
@@ -94,14 +95,14 @@ fn doctor_corrupted_project_state_reports_fail() {
     )
     .unwrap();
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["doctor", "--json"])
-        .assert()
-        .code(1)
-        .stdout(
-            predicate::str::contains("\"status\": \"fail\"")
-                .and(predicate::str::contains("project-state")),
-        );
+        .output()
+        .expect("command should run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert_eq!(out.status.code(), Some(1));
+    assert!(stdout.contains("\"status\": \"fail\""));
+    assert!(stdout.contains("project-state"));
 }
 
 // ── fix paths (non-interactive) ──────────────────────────────────────────────
@@ -113,11 +114,13 @@ fn doctor_fix_with_yes_repairs_missing_directory() {
 
     fs::remove_dir_all(tmp.path().join(".wai/archives")).unwrap();
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["doctor", "--fix", "--yes"])
-        .assert()
-        .success()
-        .stderr(predicate::str::contains("Fixed"));
+        .output()
+        .expect("command should run");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success());
+    assert!(stderr.contains("Fixed"));
 
     assert!(tmp.path().join(".wai/archives").is_dir());
 }
@@ -129,13 +132,13 @@ fn doctor_fix_with_safe_flag_refuses_to_apply_fixes() {
 
     fs::remove_dir_all(tmp.path().join(".wai/archives")).unwrap();
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["doctor", "--fix", "--safe"])
-        .assert()
-        .failure()
-        .stderr(
-            predicate::str::contains("apply doctor fixes").or(predicate::str::contains("--safe")),
-        );
+        .output()
+        .expect("command should run");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(!out.status.success());
+    assert!((stderr.contains("apply doctor fixes") || stderr.contains("--safe")));
 }
 
 // ── pi session hook (wai-hfgz) ───────────────────────────────────────────────
@@ -146,11 +149,13 @@ fn doctor_pi_hook_omitted_when_no_pi_dir() {
     init_workspace(tmp.path());
 
     // No `.pi/` → the pi session hook check must not appear at all.
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["doctor"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Pi session hook").not());
+        .output()
+        .expect("command should run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success());
+    assert!(!(stdout.contains("Pi session hook")));
 }
 
 #[test]
@@ -164,12 +169,14 @@ fn doctor_pi_hook_warns_when_pi_present_without_wai_extension() {
     )
     .unwrap();
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["doctor"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Pi session hook"))
-        .stdout(predicate::str::contains("session_start"));
+        .output()
+        .expect("command should run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success());
+    assert!(stdout.contains("Pi session hook"));
+    assert!(stdout.contains("session_start"));
 }
 
 #[test]
@@ -183,10 +190,12 @@ fn doctor_pi_hook_passes_when_wai_prime_extension_present() {
     )
     .unwrap();
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["doctor"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Pi session hook"))
-        .stdout(predicate::str::contains("wai prime"));
+        .output()
+        .expect("command should run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success());
+    assert!(stdout.contains("Pi session hook"));
+    assert!(stdout.contains("wai prime"));
 }

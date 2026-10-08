@@ -1,5 +1,4 @@
 use assert_cmd::Command;
-use predicates::prelude::*;
 use std::fs;
 use tempfile::TempDir;
 
@@ -15,17 +14,19 @@ fn wai_cmd(dir: &std::path::Path) -> Command {
 }
 
 fn init_workspace(dir: &std::path::Path) {
-    wai_cmd(dir)
+    let out = wai_cmd(dir)
         .args(["init", "--name", "test-ws"])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 }
 
 fn create_project(dir: &std::path::Path, name: &str) {
-    wai_cmd(dir)
+    let out = wai_cmd(dir)
         .args(["new", "project", name])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 }
 
 // ── handoff creation ─────────────────────────────────────────────────────────
@@ -36,11 +37,13 @@ fn handoff_create_for_named_project_succeeds() {
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["handoff", "create", "myproject"])
-        .assert()
-        .success()
-        .stderr(predicate::str::contains("Created handoff for 'myproject'"));
+        .output()
+        .expect("command should run");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success());
+    assert!(stderr.contains("Created handoff for 'myproject'"));
 
     let handoffs_dir = tmp.path().join(".wai/projects/myproject/handoffs");
     let files: Vec<_> = fs::read_dir(&handoffs_dir)
@@ -58,10 +61,11 @@ fn handoff_create_includes_project_and_phase_context() {
     init_workspace(tmp.path());
     create_project(tmp.path(), "alpha");
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["handoff", "create", "alpha"])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 
     let handoffs_dir = tmp.path().join(".wai/projects/alpha/handoffs");
     let entry = fs::read_dir(&handoffs_dir)
@@ -92,9 +96,11 @@ fn handoff_create_for_missing_project_fails() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["handoff", "create", "nonexistent"])
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("not found"));
+        .output()
+        .expect("command should run");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(!out.status.success());
+    assert!(stderr.contains("not found"));
 }

@@ -26,10 +26,11 @@ fn fixture_with_wai_marker_is_detected_by_doctor() {
         .expect("build fixture");
 
     // After init, .wai/ should exist
-    wai_cmd(fixture.root())
+    let out = wai_cmd(fixture.root())
         .args(["init", "--name", "test-ws"])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
     assert!(
         fixture.path(".wai").exists(),
         ".wai/ should exist after init"
@@ -51,7 +52,11 @@ fn fixture_with_toml_config_parses_correctly() {
         .build()
         .expect("build fixture");
 
-    wai_cmd(fixture.root()).args(["status"]).assert().success();
+    let out = wai_cmd(fixture.root())
+        .args(["status"])
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 }
 
 // ── Fixture: with git init ────────────────────────────────────────────────────
@@ -64,10 +69,11 @@ fn fixture_with_git_init_allows_commit() {
         .expect("build fixture");
 
     // Run wai init inside the git repo
-    wai_cmd(fixture.root())
+    let out = wai_cmd(fixture.root())
         .args(["init", "--name", "git-test"])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 
     // Git should have auto-committed .wai/
     let output = fixture

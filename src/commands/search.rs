@@ -1,5 +1,7 @@
 use miette::Result;
 use owo_colors::OwoColorize;
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
 use crate::config::{projects_dir, wai_dir};
@@ -16,6 +18,12 @@ struct MemoryMatch {
 }
 
 use super::require_project;
+
+type Matcher = Box<dyn Fn(&str) -> Option<(usize, usize)>>;
+
+/// A raw search hit: (display path, line number, line, match start, match
+/// end, surrounding context lines).
+type RawMatch = (String, usize, String, usize, usize, Vec<String>);
 
 const DEFAULT_LIMIT: usize = 20;
 
@@ -110,7 +118,6 @@ pub fn run(args: SearchArgs) -> Result<()> {
         wai_dir(&project_root)
     };
 
-    type Matcher = Box<dyn Fn(&str) -> Option<(usize, usize)>>;
     let matcher: Matcher = if regex {
         let re = regex::Regex::new(&query)
             .map_err(|e| miette::miette!("Invalid regex '{}': {}", query, e))?;
@@ -139,74 +146,47 @@ pub fn run(args: SearchArgs) -> Result<()> {
     };
 
     // results: (file_path, line_num, line, start, end, context_lines)
-    let mut results: Vec<(String, usize, String, usize, usize, Vec<String>)> = Vec::new();
+    let mut results: Vec<RawMatch> = Vec::new();
+
+    // Canonical paths already scanned, so the global resources walk (wai-gkk3)
+    // never duplicates a hit for a file also present in the repo scope (they
+    // can coincide when the workspace lives under $HOME/.wai).
+    let mut scanned: HashSet<PathBuf> = HashSet::new();
 
     // Managed files that should not appear in artifact search results.
     let agents_md = search_root.join("AGENTS.md");
 
-    for entry in WalkDir::new(&search_root)
-        .into_iter()
-        .filter_map(|e| e.ok())
-        .filter(|e| e.file_type().is_file())
-        .filter(|e| {
-            e.path()
-                .extension()
-                .and_then(|ext| ext.to_str())
-                .map(|ext| ext == "md" || ext == "yml" || ext == "yaml" || ext == "toml")
-                .unwrap_or(false)
-        })
-        // Skip managed files (e.g. .wai/AGENTS.md) — not user artifacts
-        .filter(|e| e.path() != agents_md)
-    {
-        // Apply type filter
-        if let Some(ref type_f) = type_filter {
-            let path_str = entry.path().to_str().unwrap_or("");
-            let matches = match type_f.as_str() {
-                "research" => path_str.contains("/research/"),
-                "plan" | "plans" => path_str.contains("/plans/"),
-                "design" | "designs" => path_str.contains("/designs/"),
-                "handoff" | "handoffs" => path_str.contains("/handoffs/"),
-                "review" | "reviews" => path_str.contains("/reviews/"),
-                _ => true,
-            };
-            if !matches {
-                continue;
-            }
-        }
+    collect_matches(
+        &search_root,
+        &project_root,
+        &agents_md,
+        &matcher,
+        type_filter.as_deref(),
+        &tag,
+        context_size,
+        "",
+        &mut scanned,
+        &mut results,
+    );
 
-        let content = match std::fs::read_to_string(entry.path()) {
-            Ok(c) => c,
-            Err(_) => continue,
-        };
-
-        // Apply tag filter: parse YAML frontmatter and check tags.
-        if !tag.is_empty() {
-            let file_tags = parse_frontmatter_tags(&content);
-            let matches_all = tag
-                .iter()
-                .all(|required| file_tags.iter().any(|ft| ft.eq_ignore_ascii_case(required)));
-            if !matches_all {
-                continue;
-            }
-        }
-
-        for (line_num, line) in content.lines().enumerate() {
-            if let Some((start, end)) = matcher(line) {
-                let rel_path = entry
-                    .path()
-                    .strip_prefix(&project_root)
-                    .unwrap_or(entry.path());
-                let context_lines = extract_context_lines(&content, line_num, context_size);
-                results.push((
-                    rel_path.display().to_string(),
-                    line_num + 1,
-                    line.to_string(),
-                    start,
-                    end,
-                    context_lines,
-                ));
-            }
-        }
+    // Global scope (wai-gkk3): ~/.wai/resources is searchable from any repo
+    // workspace, with hits tagged `global:<rel-path>`. Skipped when --in
+    // scopes the search to a single project.
+    if project.is_none() {
+        let global_dir = crate::config::global_resources_dir();
+        let global_agents_md = global_dir.join("AGENTS.md");
+        collect_matches(
+            &global_dir,
+            &global_dir,
+            &global_agents_md,
+            &matcher,
+            type_filter.as_deref(),
+            &tag,
+            context_size,
+            "global:",
+            &mut scanned,
+            &mut results,
+        );
     }
 
     // Apply --latest: keep only matches from the file with the greatest date prefix.
@@ -358,6 +338,98 @@ pub fn run(args: SearchArgs) -> Result<()> {
     render_memory_matches(&memory_matches, context.verbose);
 
     Ok(())
+}
+
+/// Walk `dir` collecting text/regex matches, appending to `results`.
+///
+/// `display_base` is stripped from each file path for display; `prefix` is
+/// prepended to the display path ("global:" for the user-level resources
+/// walk, wai-gkk3). Files whose canonical path is already in `scanned` are
+/// skipped so repo and global walks never duplicate a hit.
+#[allow(clippy::too_many_arguments)]
+fn collect_matches(
+    dir: &Path,
+    display_base: &Path,
+    agents_md: &Path,
+    matcher: &Matcher,
+    type_filter: Option<&str>,
+    tag: &[String],
+    context_size: usize,
+    prefix: &str,
+    scanned: &mut HashSet<PathBuf>,
+    results: &mut Vec<RawMatch>,
+) {
+    for entry in WalkDir::new(dir)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().is_file())
+        .filter(|e| {
+            e.path()
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .map(|ext| ext == "md" || ext == "yml" || ext == "yaml" || ext == "toml")
+                .unwrap_or(false)
+        })
+        // Skip managed files (e.g. .wai/AGENTS.md) — not user artifacts
+        .filter(|e| e.path() != agents_md)
+    {
+        let Ok(canonical) = entry.path().canonicalize() else {
+            continue;
+        };
+        if !scanned.insert(canonical) {
+            continue;
+        }
+
+        // Apply type filter
+        if let Some(type_f) = type_filter {
+            let path_str = entry.path().to_str().unwrap_or("");
+            let matches = match type_f {
+                "research" => path_str.contains("/research/"),
+                "plan" | "plans" => path_str.contains("/plans/"),
+                "design" | "designs" => path_str.contains("/designs/"),
+                "handoff" | "handoffs" => path_str.contains("/handoffs/"),
+                "review" | "reviews" => path_str.contains("/reviews/"),
+                _ => true,
+            };
+            if !matches {
+                continue;
+            }
+        }
+
+        let content = match std::fs::read_to_string(entry.path()) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        // Apply tag filter: parse YAML frontmatter and check tags.
+        if !tag.is_empty() {
+            let file_tags = parse_frontmatter_tags(&content);
+            let matches_all = tag
+                .iter()
+                .all(|required| file_tags.iter().any(|ft| ft.eq_ignore_ascii_case(required)));
+            if !matches_all {
+                continue;
+            }
+        }
+
+        for (line_num, line) in content.lines().enumerate() {
+            if let Some((start, end)) = matcher(line) {
+                let rel_path = entry
+                    .path()
+                    .strip_prefix(display_base)
+                    .unwrap_or(entry.path());
+                let context_lines = extract_context_lines(&content, line_num, context_size);
+                results.push((
+                    format!("{prefix}{}", rel_path.display()),
+                    line_num + 1,
+                    line.to_string(),
+                    start,
+                    end,
+                    context_lines,
+                ));
+            }
+        }
+    }
 }
 
 /// Parse the YAML frontmatter block at the top of a file and return any tags listed.

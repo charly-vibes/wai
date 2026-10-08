@@ -20,11 +20,12 @@ const TARGET_REPO: &str = "charly-vibes/wai";
 fn feedback_dry_run_prints_title_body_labels_and_exact_gh_line() {
     let tmp = tempfile::TempDir::new().unwrap();
     // Initialize a workspace so context-gathering has a repo to inspect.
-    wai_cmd()
+    let out = wai_cmd()
         .current_dir(tmp.path())
         .args(["init", "--name", "demo"])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 
     let output = wai_cmd()
         .current_dir(tmp.path())
@@ -71,11 +72,12 @@ fn feedback_dry_run_prints_title_body_labels_and_exact_gh_line() {
 #[test]
 fn feedback_dry_run_no_context_omits_environment_section() {
     let tmp = tempfile::TempDir::new().unwrap();
-    wai_cmd()
+    let out = wai_cmd()
         .current_dir(tmp.path())
         .args(["init", "--name", "demo"])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 
     let output = wai_cmd()
         .current_dir(tmp.path())
@@ -111,11 +113,12 @@ fn feedback_dry_run_no_context_omits_environment_section() {
 #[test]
 fn feedback_from_last_error_without_scratch_is_stable() {
     let tmp = tempfile::TempDir::new().unwrap();
-    wai_cmd()
+    let out = wai_cmd()
         .current_dir(tmp.path())
         .args(["init", "--name", "demo"])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 
     // Point XDG_CACHE_HOME at the temp dir so there is no prior scratch.
     let output = wai_cmd()
@@ -150,11 +153,12 @@ fn feedback_from_last_error_without_scratch_is_stable() {
 #[test]
 fn feedback_dry_run_redacts_pat_from_remote_url_in_body() {
     let tmp = tempfile::TempDir::new().unwrap();
-    wai_cmd()
+    let out = wai_cmd()
         .current_dir(tmp.path())
         .args(["init", "--name", "demo"])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 
     let pat_url = "https://ghp_SECRET1234567890@github.com/charly-vibes/wai.git";
     let output = wai_cmd()
@@ -192,11 +196,12 @@ fn feedback_dry_run_redacts_pat_from_remote_url_in_body() {
 #[test]
 fn feedback_dry_run_preserves_monkey_type_and_keymap_values() {
     let tmp = tempfile::TempDir::new().unwrap();
-    wai_cmd()
+    let out = wai_cmd()
         .current_dir(tmp.path())
         .args(["init", "--name", "demo"])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 
     let body = "I was configuring my keymap and testing monkey_type when wai crashed.";
     let output = wai_cmd()
@@ -227,27 +232,30 @@ fn feedback_dry_run_preserves_monkey_type_and_keymap_values() {
 #[test]
 fn feedback_invalid_kind_is_rejected() {
     let tmp = tempfile::TempDir::new().unwrap();
-    wai_cmd()
+    let out = wai_cmd()
         .current_dir(tmp.path())
         .args(["init", "--name", "demo"])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 
-    wai_cmd()
+    let out = wai_cmd()
         .current_dir(tmp.path())
         .args(["feedback", "not-a-kind", "--dry-run", "--yes"])
-        .assert()
-        .failure();
+        .output()
+        .expect("command should run");
+    assert!(!out.status.success());
 }
 
 #[test]
 fn feedback_missing_title_without_from_last_error_errors_cleanly() {
     let tmp = tempfile::TempDir::new().unwrap();
-    wai_cmd()
+    let out = wai_cmd()
         .current_dir(tmp.path())
         .args(["init", "--name", "demo"])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 
     let output = wai_cmd()
         .current_dir(tmp.path())

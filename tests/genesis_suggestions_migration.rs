@@ -101,8 +101,9 @@ fn test_wai_statos_regression() {
     cmd.env("GENESIS_NO_UPDATE_CHECK", "1");
     cmd.arg("statos");
 
-    cmd.assert()
-        .failure()
-        .stderr(predicates::str::contains("Did you mean"))
-        .stderr(predicates::str::contains("status"));
+    let out = cmd.output().expect("command should run");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(!out.status.success());
+    assert!(stderr.contains("Did you mean"));
+    assert!(stderr.contains("status"));
 }

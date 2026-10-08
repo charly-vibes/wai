@@ -1,5 +1,4 @@
 use assert_cmd::Command;
-use predicates::prelude::*;
 use std::fs;
 use tempfile::TempDir;
 
@@ -42,12 +41,14 @@ fn ls_discovers_nested_workspace_and_project() {
     make_workspace(&ws, "my-ws");
     make_project(&ws, "my-proj", "implement");
 
-    wai_cmd(root.path())
+    let out = wai_cmd(root.path())
         .args(["ls", "--root", root.path().to_str().unwrap()])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("my-proj"))
-        .stdout(predicate::str::contains("implement"));
+        .output()
+        .expect("command should run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success());
+    assert!(stdout.contains("my-proj"));
+    assert!(stdout.contains("implement"));
 }
 
 // ── flag path: --depth ────────────────────────────────────────────────────────
@@ -64,7 +65,7 @@ fn ls_depth_flag_limits_recursion() {
     make_workspace(&deep, "deep");
     make_project(&deep, "deep-proj", "research");
 
-    wai_cmd(root.path())
+    let out = wai_cmd(root.path())
         .args([
             "ls",
             "--root",
@@ -72,10 +73,12 @@ fn ls_depth_flag_limits_recursion() {
             "--depth",
             "1",
         ])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("shallow-proj"))
-        .stdout(predicate::str::contains("deep-proj").not());
+        .output()
+        .expect("command should run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success());
+    assert!(stdout.contains("shallow-proj"));
+    assert!(!(stdout.contains("deep-proj")));
 }
 
 // ── no-results path ───────────────────────────────────────────────────────────
@@ -84,9 +87,11 @@ fn ls_depth_flag_limits_recursion() {
 fn ls_empty_root_reports_no_workspaces() {
     let root = TempDir::new().unwrap();
 
-    wai_cmd(root.path())
+    let out = wai_cmd(root.path())
         .args(["ls", "--root", root.path().to_str().unwrap()])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("No wai workspaces found"));
+        .output()
+        .expect("command should run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success());
+    assert!(stdout.contains("No wai workspaces found"));
 }

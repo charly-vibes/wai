@@ -1,5 +1,4 @@
 use assert_cmd::Command;
-use predicates::prelude::*;
 use std::fs;
 use tempfile::TempDir;
 
@@ -15,10 +14,11 @@ fn wai_cmd(dir: &std::path::Path) -> Command {
 }
 
 fn init_workspace(dir: &std::path::Path) {
-    wai_cmd(dir)
+    let out = wai_cmd(dir)
         .args(["init", "--name", "test-ws"])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 }
 
 // ── project creation ──────────────────────────────────────────────────────────
@@ -28,10 +28,11 @@ fn new_project_creates_directory_structure() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["new", "project", "my-app"])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 
     let proj = tmp.path().join(".wai/projects/my-app");
     assert!(proj.join("research").is_dir());
@@ -52,10 +53,11 @@ fn new_area_creates_area_directory() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["new", "area", "dev-standards"])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 
     assert!(
         tmp.path().join(".wai/areas/dev-standards").is_dir(),
@@ -70,14 +72,17 @@ fn new_project_duplicate_fails_with_diagnostic() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["new", "project", "my-app"])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["new", "project", "my-app"])
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("already exists"));
+        .output()
+        .expect("command should run");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(!out.status.success());
+    assert!(stderr.contains("already exists"));
 }

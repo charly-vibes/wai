@@ -1,5 +1,4 @@
 use assert_cmd::Command;
-use predicates::prelude::*;
 use tempfile::TempDir;
 
 #[allow(deprecated)]
@@ -14,17 +13,19 @@ fn wai_cmd(dir: &std::path::Path) -> Command {
 }
 
 fn init_workspace(dir: &std::path::Path) {
-    wai_cmd(dir)
+    let out = wai_cmd(dir)
         .args(["init", "--name", "test-ws"])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 }
 
 fn create_project(dir: &std::path::Path, name: &str) {
-    wai_cmd(dir)
+    let out = wai_cmd(dir)
         .args(["new", "project", name])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 }
 
 // ── move between PARA categories ──────────────────────────────────────────────
@@ -35,11 +36,13 @@ fn move_project_to_archives() {
     init_workspace(tmp.path());
     create_project(tmp.path(), "old-proj");
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["move", "old-proj", "archives"])
-        .assert()
-        .success()
-        .stderr(predicate::str::contains("Moved"));
+        .output()
+        .expect("command should run");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success());
+    assert!(stderr.contains("Moved"));
 
     assert!(
         !tmp.path().join(".wai/projects/old-proj").exists(),
@@ -57,11 +60,13 @@ fn move_project_to_areas() {
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-proj");
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["move", "my-proj", "areas"])
-        .assert()
-        .success()
-        .stderr(predicate::str::contains("Moved"));
+        .output()
+        .expect("command should run");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success());
+    assert!(stderr.contains("Moved"));
 
     assert!(
         !tmp.path().join(".wai/projects/my-proj").exists(),
@@ -80,9 +85,11 @@ fn move_nonexistent_item_fails_with_diagnostic() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["move", "ghost", "archives"])
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("not found"));
+        .output()
+        .expect("command should run");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(!out.status.success());
+    assert!(stderr.contains("not found"));
 }

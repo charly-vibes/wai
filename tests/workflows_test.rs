@@ -188,14 +188,16 @@ fn wai_cmd(dir: &std::path::Path) -> Command {
 }
 
 fn init_and_create(dir: &std::path::Path, project: &str) {
-    wai_cmd(dir)
+    let out = wai_cmd(dir)
         .args(["init", "--name", "test-ws"])
-        .assert()
-        .success();
-    wai_cmd(dir)
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
+    let out = wai_cmd(dir)
         .args(["new", "project", project])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 }
 
 #[test]
@@ -230,10 +232,11 @@ fn scan_project_detects_correct_phase() {
     init_and_create(tmp.path(), "phased");
 
     // Advance to design phase via CLI
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["phase", "set", "design"])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 
     let ctx = scan_project(tmp.path(), "phased").expect("scan_project should succeed");
     assert_eq!(ctx.phase, Phase::Design);

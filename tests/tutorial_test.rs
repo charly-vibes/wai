@@ -20,11 +20,12 @@ fn tutorial_first_run_shows_welcome_message() {
     let tmp_config = TempDir::new().unwrap();
     let tmp_project = TempDir::new().unwrap();
 
-    wai_cmd(tmp_project.path())
+    let out = wai_cmd(tmp_project.path())
         .env("XDG_CONFIG_HOME", tmp_config.path())
         .args(["tutorial"])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 }
 
 // ── persistence of tutorial-seen state ───────────────────────────────────────
@@ -34,11 +35,12 @@ fn tutorial_marks_seen_after_completion() {
     let tmp_config = TempDir::new().unwrap();
     let tmp_project = TempDir::new().unwrap();
 
-    wai_cmd(tmp_project.path())
+    let out = wai_cmd(tmp_project.path())
         .env("XDG_CONFIG_HOME", tmp_config.path())
         .args(["tutorial"])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 
     let config_content =
         fs::read_to_string(tmp_config.path().join("wai/config.toml")).unwrap_or_default();
@@ -60,11 +62,12 @@ fn tutorial_repeat_run_shows_replay_message() {
     let mut config_file = fs::File::create(wai_config_dir.join("config.toml")).unwrap();
     writeln!(config_file, "seen_tutorial = true").unwrap();
 
-    wai_cmd(tmp_project.path())
+    let out = wai_cmd(tmp_project.path())
         .env("XDG_CONFIG_HOME", tmp_config.path())
         .args(["tutorial"])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 }
 
 // ── unit tests for UserConfig ─────────────────────────────────────────────────
