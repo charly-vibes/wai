@@ -28,11 +28,12 @@ pub const CONTEXT_DIR: &str = "context";
 pub const PIPELINES_DIR: &str = "pipelines";
 
 /// Built-in pipeline templates available via `wai pipeline init <name>`.
-pub const BUILTIN_PIPELINE_TEMPLATES: &[&str] = &["scientific-research", "tdd-ro5"];
+pub const BUILTIN_PIPELINE_TEMPLATES: &[&str] =
+    &["epic-orchestrator", "scientific-research", "tdd-ro5"];
 
 /// Help text line listing built-in pipeline templates.
 pub const BUILTIN_PIPELINE_TEMPLATES_HELP: &str =
-    "Built-in templates: scientific-research, tdd-ro5";
+    "Built-in templates: epic-orchestrator, scientific-research, tdd-ro5";
 
 /// Template and pattern resource files within resources/
 pub const TEMPLATES_DIR: &str = "templates";

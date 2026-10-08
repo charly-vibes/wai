@@ -345,6 +345,7 @@ pub enum Commands {
             EXAMPLES\n\
               wai pipeline init my-workflow\n\
               wai pipeline init tdd-ro5        # built-in template\n\
+              wai pipeline init epic-orchestrator  # orchestrator + subagents loop\n\
               wai pipeline start my-workflow --topic=auth-refactor\n\
               wai pipeline next\n\
               wai pipeline current\n\

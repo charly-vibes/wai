@@ -372,6 +372,10 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                     "Scaffold from a built-in template",
                 ),
                 (
+                    "wai pipeline init epic-orchestrator",
+                    "Scaffold the orchestrator + subagents loop",
+                ),
+                (
                     "wai pipeline start my-workflow --topic=auth-refactor",
                     "Start a pipeline run",
                 ),

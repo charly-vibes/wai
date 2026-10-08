@@ -159,6 +159,7 @@ pub(super) fn get_builtin_template(name: &str) -> Option<&'static str> {
     }
 
     match name {
+        "epic-orchestrator" => Some(include_str!("../../templates/epic-orchestrator.toml")),
         "scientific-research" => Some(include_str!("../../templates/scientific-research.toml")),
         "tdd-ro5" => Some(include_str!("../../templates/tdd-ro5.toml")),
         _ => None,
