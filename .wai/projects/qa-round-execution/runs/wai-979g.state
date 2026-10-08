@@ -4,3 +4,6 @@ brief_path: .wai/projects/qa-round-execution/briefs/wai-979g.md
 step_history: []
 - claim @ 3418941c5d8131a4811c4830f3310b5fdf717a01
 - gates @ 3418941c5d8131a4811c4830f3310b5fdf717a01
+- brief @ 2fd8414b536a0715db6832827d6ad2fbb9fa7ee6
+- spawn @ 2fd8414b536a0715db6832827d6ad2fbb9fa7ee6
+- verify @ 01674984565a9fb28cb170bd2f2af1322e3c16ee
