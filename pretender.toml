@@ -16,6 +16,7 @@ exclude = [
     "**/*_generated.*",
     "target/**",
     "docs/book/**",
+    "docs/_book/**",
     "*.min.js",
 ]
 
