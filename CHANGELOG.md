@@ -7,6 +7,44 @@ and this project adheres to [Calendar Versioning](https://calver.org/) (YYYY.M.M
 
 ## [Unreleased]
 
+## [2026.10.5] - 2026-10-08
+
+### Added
+
+- **Epic-orchestrator pipeline** — new built-in `epic-orchestrator` template encoding
+  the orchestrator + subagents pattern as an enforceable loop: claim → gates → brief →
+  spawn → verify → ship → STOP, one ticket per advance (wai-t2ar).
+- **Orchestrator run-state durability** — claim writes a per-ticket state file
+  (`.wai/projects/<project>/runs/<ticket>.state`); every step boundary appends step id
+  + HEAD sha; retry-entry drift check refuses unaccounted HEAD advances (mid-run
+  advances are expected, never flagged); retry resumes from the last completed gate;
+  spawn refuses without the state file (wai-wvjz).
+- **Orchestrator brief format** — the brief step now mandates `## Why` (delegation
+  rationale), `## Completion criteria` (runnable commands, exit 0 = done), and
+  `## Spawn model` (context ceiling as a % of the live model window; fixed token
+  counts are invalid); the spawn step refuses without a committed brief (wai-3eo0).
+- **Isolation-based verify step** — verification spawns a named read-only verifier
+  session (`subagent:<ticket>:verify`) cross-checking the implementor's report vs
+  `git log` and vs ticket-tracker state; a contradiction blocks ship; single-model
+  setups degrade to lead-side checks (non-blocking) (wai-979g).
+- **Bundled tests-pass oracle** — `wai pipeline init epic-orchestrator` scaffolds the
+  `tests-pass` evidence oracle out of the box instead of blocking at verify/ship
+  (wai-lqdr).
+- **Template shared-block mechanism** — `[[blocks]]` tables + `{{block:name}}`
+  references resolved at load time with fail-loudly validation (unknown, malformed,
+  duplicate, cyclic); a committed byte-identity ratchet proves rendered prompts are
+  unchanged (wai-vsn6).
+- **Epic-orchestrator integration tests + docs** — suite walking a simulated ticket
+  through claim→brief→state asserting the state-file contract; `docs/src/concepts/
+pipelines.md` documents usage, the state file, refusal conditions, and degradation
+  behavior (wai-hr0w).
+
+### Fixed
+
+- Portable shell output in `wai project use` (wai-sib1, PR #40).
+- Replace `bail!` in expression position with `Err(miette!)` for newer rustc
+  (PR #40).
+
 ## [2026.10.4] - 2026-10-05
 
 ### Added

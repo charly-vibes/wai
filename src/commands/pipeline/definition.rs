@@ -60,7 +60,10 @@ fn resolve_block_refs(
         }
         current = expand_block_refs_once(&current, context, blocks)?;
     }
-    miette::bail!("cyclic or too deeply nested block reference in {}", context)
+    Err(miette::miette!(
+        "cyclic or too deeply nested block reference in {}",
+        context
+    ))
 }
 
 /// Perform one expansion pass over `text`, replacing every well-formed
