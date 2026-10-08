@@ -144,10 +144,10 @@ fn resolve_shell(s: &str) -> Result<ShellSyntax> {
     match s.to_ascii_lowercase().as_str() {
         "posix" | "bash" | "zsh" | "sh" => Ok(ShellSyntax::Posix),
         "fish" => Ok(ShellSyntax::Fish),
-        _ => miette::bail!(
+        other => Err(miette::miette!(
             "Unknown shell '{}'. Supported values: posix (also bash, zsh, sh), fish.",
-            s
-        ),
+            other
+        )),
     }
 }
 
