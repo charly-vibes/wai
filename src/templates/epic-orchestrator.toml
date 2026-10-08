@@ -90,8 +90,17 @@ Rules:
 - Write the brief from the repo's brief template into a committed path:
   `.wai/projects/<project>/briefs/<slug>.md` and record its path in the
   state file's brief path field.
-- Include: ticket ID, desired outcome, out of scope, exact files, exact
-  test/review commands, red/green/refactor sequence, follow-up threshold.
+- Include the three mandatory brief sections:
+  - `## Why` — delegation rationale: why this ticket goes to a subagent
+    instead of being done in the lead session.
+  - `## Completion criteria` — runnable commands only; exit 0 = done. A
+    criterion that cannot be executed is not a completion criterion.
+  - `## Spawn model` — the model to spawn plus a context ceiling
+    expressed as `≤ N%` of the actual model window, computed at spawn.
+    Fixed token counts are invalid — model windows differ per model.
+- Also include: ticket ID, desired outcome, out of scope, exact files,
+  exact test/review commands, red/green/refactor sequence, follow-up
+  threshold.
 - Commit the brief before spawn so the subagent starts from a clean tree.
 
 Record brief: `wai add design "BRIEF: <path>; committed"`
@@ -109,6 +118,8 @@ prompt = """
 {topic}: Spawn a named, resumable subagent session for the brief.
 
 Rules:
+- Refuse to spawn without a committed brief — the brief must be committed
+  at its recorded path before any spawn happens.
 - Refuse to spawn without the state file — the spawn must be resumable
   through it.
 - The spawn must be resumable and discoverable (canon Invariant 2) — a spawn

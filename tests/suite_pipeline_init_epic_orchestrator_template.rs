@@ -172,6 +172,58 @@ fn pipeline_init_epic_orchestrator_encodes_run_state_durability() {
 }
 
 #[test]
+fn pipeline_init_epic_orchestrator_encodes_brief_format() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    let out = wai_cmd(tmp.path())
+        .args(["pipeline", "init", "epic-orchestrator"])
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
+
+    let toml_path = tmp
+        .path()
+        .join(".wai/resources/pipelines/epic-orchestrator.toml");
+    let content = fs::read_to_string(&toml_path).unwrap();
+
+    // Brief step mandates the three brief sections.
+    for section in ["## Why", "## Completion criteria", "## Spawn model"] {
+        assert!(
+            content.contains(section),
+            "Brief step must mandate section {section:?}: {content}"
+        );
+    }
+
+    // Completion criteria are runnable commands: exit 0 = done.
+    assert!(
+        content.contains("exit 0"),
+        "Completion criteria must be stated as runnable commands where exit 0 = done: {content}"
+    );
+
+    // Spawn model: context ceiling as a % of the actual model window,
+    // computed at spawn; fixed token counts are flagged invalid.
+    assert!(
+        content.contains('%'),
+        "Spawn model must express the context ceiling as a percentage: {content}"
+    );
+    assert!(
+        content.contains("computed at spawn"),
+        "Context ceiling must be computed at spawn: {content}"
+    );
+    assert!(
+        content.contains("Fixed token counts") && content.contains("invalid"),
+        "Fixed token counts must be flagged invalid: {content}"
+    );
+
+    // Spawn step refuses without a committed brief.
+    assert!(
+        content.contains("without a committed brief"),
+        "Spawn step must refuse to spawn without a committed brief: {content}"
+    );
+}
+
+#[test]
 fn pipeline_help_lists_epic_orchestrator_builtin() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
