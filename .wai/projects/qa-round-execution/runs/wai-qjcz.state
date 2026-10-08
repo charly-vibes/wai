@@ -7,3 +7,5 @@ step_history: []
 - brief @ 5a54f44e9a7432197681b442a54da95bd96e27b1
 - spawn @ 5a54f44e9a7432197681b442a54da95bd96e27b1
 - verify @ 5a54f44e9a7432197681b442a54da95bd96e27b1
+- ship @ 43cfd80ed16b8ba02a84d6a9e9d8d0b88f4a6340
+- stop @ 43cfd80ed16b8ba02a84d6a9e9d8d0b88f4a6340 (run complete; epic-orchestrator child thread done)
