@@ -29,44 +29,56 @@ pub(super) fn cmd_init(name: &str) -> Result<()> {
         );
     }
 
-    // Check for built-in template, otherwise use generic scaffold
-    let template = if let Some(builtin) = get_builtin_template(name) {
-        builtin.to_string()
-    } else {
-        // The template uses {topic} as the variable substitution placeholder.
-        // We build this as a plain string (no format!) to avoid escaping collisions.
-        let tmpl = concat!(
-            "# Step prompts are navigation hints. Instructions for HOW to do the\n",
-            "# work belong in skills.\n",
-            "[pipeline]\n",
-            "name = \"PIPELINE_NAME\"\n",
-            "description = \"Describe what this pipeline does\"\n",
-            "\n",
-            "[[steps]]\n",
-            "id = \"step-one\"\n",
-            "prompt = \"\"\"\n",
-            "{topic}: TODO describe step one task.\n",
-            "Use skill `<skill-name>` if available.\n",
-            "Record findings: `wai add research \"...\"`\n",
-            "Advance: `wai pipeline next`\n",
-            "\"\"\"\n",
-            "\n",
-            "[[steps]]\n",
-            "id = \"step-two\"\n",
-            "prompt = \"\"\"\n",
-            "{topic}: TODO describe step two task.\n",
-            "Use skill `<skill-name>` if available.\n",
-            "Record decisions: `wai add design \"...\"`\n",
-            "Advance: `wai pipeline next`\n",
-            "\"\"\"\n",
-        );
-        tmpl.replace("PIPELINE_NAME", name)
-    };
+    fs::write(&file_path, template_for(name)).into_diagnostic()?;
+    scaffold_oracles(&project_root, name)?;
 
-    fs::write(&file_path, template).into_diagnostic()?;
+    log::success(format!("Created pipeline: {}", file_path.display())).into_diagnostic()?;
+    println!(
+        "  {} Edit the prompts, then start with: wai pipeline start {} --topic=<your-topic>",
+        "→".cyan(),
+        name
+    );
+    Ok(())
+}
 
-    // Scaffold oracles directory with README if not present
-    let oracles_dir = crate::config::wai_dir(&project_root)
+/// Built-in template content for `name`, or a generic two-step scaffold.
+fn template_for(name: &str) -> String {
+    if let Some(builtin) = get_builtin_template(name) {
+        return builtin.to_string();
+    }
+    // The template uses {topic} as the variable substitution placeholder.
+    // We build this as a plain string (no format!) to avoid escaping collisions.
+    let tmpl = concat!(
+        "# Step prompts are navigation hints. Instructions for HOW to do the\n",
+        "# work belong in skills.\n",
+        "[pipeline]\n",
+        "name = \"PIPELINE_NAME\"\n",
+        "description = \"Describe what this pipeline does\"\n",
+        "\n",
+        "[[steps]]\n",
+        "id = \"step-one\"\n",
+        "prompt = \"\"\"\n",
+        "{topic}: TODO describe step one task.\n",
+        "Use skill `<skill-name>` if available.\n",
+        "Record findings: `wai add research \"...\"`\n",
+        "Advance: `wai pipeline next`\n",
+        "\"\"\"\n",
+        "\n",
+        "[[steps]]\n",
+        "id = \"step-two\"\n",
+        "prompt = \"\"\"\n",
+        "{topic}: TODO describe step two task.\n",
+        "Use skill `<skill-name>` if available.\n",
+        "Record decisions: `wai add design \"...\"`\n",
+        "Advance: `wai pipeline next`\n",
+        "\"\"\"\n",
+    );
+    tmpl.replace("PIPELINE_NAME", name)
+}
+
+/// Scaffold `.wai/resources/oracles/` with bundled scripts, README, and example.
+fn scaffold_oracles(project_root: &std::path::Path, name: &str) -> Result<()> {
+    let oracles_dir = crate::config::wai_dir(project_root)
         .join("resources")
         .join("oracles");
     fs::create_dir_all(&oracles_dir).into_diagnostic()?;
@@ -75,50 +87,57 @@ pub(super) fn cmd_init(name: &str) -> Result<()> {
     for (script_name, script_content) in bundled_oracles_for(name) {
         write_executable_if_absent(&oracles_dir.join(script_name), script_content)?;
     }
-    let readme_path = oracles_dir.join("README.md");
-    if !readme_path.exists() {
-        let readme = "# Oracle Scripts\n\n\
-            Oracle scripts are user-defined validators run during pipeline gate checks.\n\n\
-            ## Convention\n\n\
-            - Place scripts here: `.wai/resources/oracles/<name>[.sh|.py]`\n\
-            - Scripts must be executable (`chmod +x`)\n\
-            - Exit 0 = pass, non-zero = fail\n\
-            - Write failure reasons to stderr\n\
-            - Default scope: one invocation per artifact (`<script> <artifact-path>`)\n\
-            - Cross-artifact scope: `scope = \"all\"` passes all paths at once\n\n\
-            ## Example\n\n\
-            ```bash\n\
-            #!/usr/bin/env bash\n\
-            # example-check.sh — verify artifact contains required sections\n\
-            grep -q '## Constraints' \"$1\" || { echo 'Missing ## Constraints section' >&2; exit 1; }\n\
-            ```\n\n\
-            Configure in your pipeline TOML:\n\
-            ```toml\n\
-            [[steps.gate.oracles]]\n\
-            name = \"example-check\"\n\
-            ```\n";
-        fs::write(&readme_path, readme).into_diagnostic()?;
-    }
-    let example_path = oracles_dir.join("example-check.sh");
-    if !example_path.exists() {
-        let example = "#!/usr/bin/env bash\n\
-            # example-check.sh — sample oracle that verifies artifact has content\n\
-            # Exit 0 = pass, non-zero = fail. Stderr is shown on failure.\n\
-            set -euo pipefail\n\n\
-            FILE=\"$1\"\n\
-            if [ ! -s \"$FILE\" ]; then\n\
-            \x20   echo \"Artifact is empty: $FILE\" >&2\n\
-            \x20   exit 1\n\
-            fi\n";
-        write_executable_if_absent(&example_path, example)?;
-    }
+    write_oracles_readme(&oracles_dir)?;
+    write_oracles_example(&oracles_dir)?;
+    Ok(())
+}
 
-    log::success(format!("Created pipeline: {}", file_path.display())).into_diagnostic()?;
-    println!(
-        "  {} Edit the prompts, then start with: wai pipeline start {} --topic=<your-topic>",
-        "→".cyan(),
-        name
-    );
+/// Write the oracles directory README if not present.
+fn write_oracles_readme(oracles_dir: &std::path::Path) -> Result<()> {
+    let readme_path = oracles_dir.join("README.md");
+    if readme_path.exists() {
+        return Ok(());
+    }
+    let readme = "# Oracle Scripts\n\n\
+        Oracle scripts are user-defined validators run during pipeline gate checks.\n\n\
+        ## Convention\n\n\
+        - Place scripts here: `.wai/resources/oracles/<name>[.sh|.py]`\n\
+        - Scripts must be executable (`chmod +x`)\n\
+        - Exit 0 = pass, non-zero = fail\n\
+        - Write failure reasons to stderr\n\
+        - Default scope: one invocation per artifact (`<script> <artifact-path>`)\n\
+        - Cross-artifact scope: `scope = \"all\"` passes all paths at once\n\n\
+        ## Example\n\n\
+        ```bash\n\
+        #!/usr/bin/env bash\n\
+        # example-check.sh — verify artifact contains required sections\n\
+        grep -q '## Constraints' \"$1\" || { echo 'Missing ## Constraints section' >&2; exit 1; }\n\
+        ```\n\n\
+        Configure in your pipeline TOML:\n\
+        ```toml\n\
+        [[steps.gate.oracles]]\n\
+        name = \"example-check\"\n\
+        ```\n";
+    fs::write(&readme_path, readme).into_diagnostic()?;
+    Ok(())
+}
+
+/// Write the sample `example-check.sh` oracle if not present.
+fn write_oracles_example(oracles_dir: &std::path::Path) -> Result<()> {
+    let example_path = oracles_dir.join("example-check.sh");
+    if example_path.exists() {
+        return Ok(());
+    }
+    let example = "#!/usr/bin/env bash\n\
+        # example-check.sh — sample oracle that verifies artifact has content\n\
+        # Exit 0 = pass, non-zero = fail. Stderr is shown on failure.\n\
+        set -euo pipefail\n\n\
+        FILE=\"$1\"\n\
+        if [ ! -s \"$FILE\" ]; then\n\
+        \x20   echo \"Artifact is empty: $FILE\" >&2\n\
+        \x20   exit 1\n\
+        fi\n";
+    write_executable_if_absent(&example_path, example)?;
     Ok(())
 }
 
@@ -147,6 +166,10 @@ fn bundled_oracles_for(name: &str) -> Vec<(&'static str, &'static str)> {
         "tdd-ro5" => vec![(
             "release-docs-fresh.sh",
             include_str!("../../templates/oracles/release-docs-fresh.sh"),
+        )],
+        "epic-orchestrator" => vec![(
+            "tests-pass.sh",
+            include_str!("../../templates/oracles/tests-pass.sh"),
         )],
         _ => Vec::new(),
     }
