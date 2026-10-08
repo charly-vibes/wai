@@ -1,0 +1,21 @@
+Commit landed with all pre-commit hooks green (pretender-check, format-check, clippy lint, bd). Not pushing and not closing the ticket, per the brief — the orchestrator handles ship.
+
+## REPORT
+
+**Commits made**
+- `0167498` feat(pipeline): orchestrator isolation verify step (wai-979g) — 2 files changed, 97 insertions(+), 5 deletions(-)
+
+**Commands run + results**
+1. RED: `cargo test --test suite_pipeline_init_epic_orchestrator_template` → FAILED as expected (7 passed, 1 failed — `pipeline_init_epic_orchestrator_encodes_isolation_verify`, missing behavior)
+2. GREEN (first attempt): same command → still failed on `no advance to ship` assertion; the phrase was split across a line wrap in the prompt. Fixed wording (second edit), rerun → **ok, 8 passed; 0 failed**
+3. Regression: `cargo test --test suite_pipeline_init_tdd_ro5_ships_release_oracle_script` → **ok, 34 passed; 0 failed**
+4. Scaffold validation: `wai pipeline validate epic-orchestrator` → **exit 0** (7 steps, 7 gated)
+5. Tidy gate: `cargo fmt --check` → **clean**
+6. Post-refactor rerun of 2, 3, 4, 5 → all green again
+7. Commit: pre-commit hooks (pretender-check, format-check, clippy `-D warnings`, bd) → all passed
+
+**Files changed**
+- `src/templates/epic-orchestrator.toml` — verify step prompt only: isolation-based verify encoding `subagent:<ticket>:verify` named read-only verifier session (read-only tools, cannot spawn further subagents, different model family when configured), cross-check of listed commits vs `git log` on the ticket's branch/worktree and vs ticket-tracker (beads) state, contradiction-fails-the-run/no-advance-to-ship rule, and single-model degradation via lead-side checks (non-blocking). Preserved existing asserted strings (`branch head at verify entry`, step-boundary checkpoints, VERIFY record).
+- `tests/suite_pipeline_init_epic_orchestrator_template.rs` — appended one new test `pipeline_init_epic_orchestrator_encodes_isolation_verify`; no existing tests modified.
+
+Out-of-scope items untouched (brief step, state-durability blocks, docs/strict validation, shared conventions, Rust engine). No push, beads ticket left open for the orchestrator.

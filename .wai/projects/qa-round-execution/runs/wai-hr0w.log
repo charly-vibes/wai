@@ -1,0 +1,34 @@
+Done. The orchestrator's remaining dirty files (`.wai/` run artifacts, whisper notes, `scripts/*.py`) are pre-existing orchestrator state — not touched.
+
+# REPORT
+
+## Commits made
+| sha | subject |
+|-----|---------|
+| `fe61e15` | feat(pipeline): epic-orchestrator integration test + docs (wai-hr0w) |
+
+Single atomic commit (4 files, 471 insertions). First commit attempt was rejected by the pre-commit `lint` hook (one clippy `needless_borrows_for_generic_args` warning in the new test); fixed, re-verified, and committed cleanly — all four hooks passed (pretender-check, format-check, bd, lint). Not pushed, ticket not closed — per ticket rules, the orchestrator's ship step owns both.
+
+## Commands run + results
+| Command | Result |
+|---|---|
+| `cargo test --test suite_pipeline_epic_orchestrator_ticket_state` | ✅ 3 passed |
+| `cargo test` (full suite) | ✅ 49 test binaries, all `ok`, 0 failures |
+| `openspec validate add-epic-orchestrator-template --strict` | ✅ "is valid" |
+| `cargo fmt --check` | ✅ clean |
+| `cargo clippy --all-targets` | ✅ no warnings after fix |
+| pre-commit hooks (on commit) | ✅ all 4 passed |
+
+## Files changed
+- **`tests/suite_pipeline_epic_orchestrator_ticket_state.rs`** (new) — 3 tests:
+  1. `pipeline_epic_orchestrator_walks_claim_gates_brief_to_ticket_state` — scaffolds via `wai pipeline init epic-orchestrator` in a temp git repo, starts a run, simulates claim (writes `.wai/projects/demo/runs/wai-test-child.state`) → gates → brief (committed brief artifact, brief_path recorded in state), asserting gate-satisfying artifacts, prompt hand-offs, and the state-file shape: ticket id, branch, brief path, ordered `- step @ <40-hex-sha>` history entries.
+  2. `pipeline_epic_orchestrator_template_declares_ticket_state_contract` — state-file path convention, shape fields, `step id + sha` checkpoints, retry drift check + refuse-to-resume.
+  3. `pipeline_epic_orchestrator_template_declares_refusals_and_degradation` — both spawn refusals (uncommitted brief / missing state file), single-model degradation (lead-side checks, non-blocking, contradiction still blocks).
+- **`docs/src/concepts/pipelines.md`** — new "Built-in: Epic-Orchestrator Pipeline" section after the tdd-ro5 section, matching the established pattern: usage, the 7 loop steps, per-ticket state file (path/shape/retry-drift), refusal conditions, single-model degradation, `tests-pass` oracle requirement, and a provenance line linking `~/.wai/projects/orchestrator-tooling/`.
+- **`openspec/changes/add-epic-orchestrator-template/tasks.md`** — added section "3. Distribution (wai-hr0w)" with the three completed tasks.
+- **`openspec/changes/add-epic-orchestrator-template/proposal.md`** — provenance link appended to Impact.
+
+## Findings for the orchestrator
+- **RED note (as anticipated in the brief):** the test passed immediately against the already-landed template — it is a regression ratchet, not a template driver. No template edit was made (file untouched).
+- **Real discovery during RED:** the template's prose wraps "drift check" across lines ("run the drift\ncheck"), so literal substring assertions on the template text are line-wrap-sensitive; the tests normalize whitespace before matching. Worth remembering for future template-contract tests.
+- **Potential follow-up (not filed here — needs template change, which is frozen):** `pipeline init epic-orchestrator` bundles **no** `tests-pass` oracle, but the verify/ship steps declare `tests-pass` oracle gates — advancing past them fails unless the user hand-writes `.wai/resources/oracles/tests-pass`. Documented in the docs section; if a bundled oracle is wanted, file a child under epic `wai-fvhv`.

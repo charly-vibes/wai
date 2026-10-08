@@ -1,0 +1,39 @@
+# REPORT — wai-qjcz: Tidy: extract shared template conventions (review-first)
+
+## Verdict per convention block
+
+| # | Convention block | Duplicated? | Verdict |
+|---|------------------|-------------|---------|
+| C1 | `Advance: \`wai pipeline next\`` trail line (7×/8×/7× across the three templates, every step) | Yes | Not extractable zero-change |
+| C2 | `Record X: \`wai add <type> "..."\`` line (7×/9×/7×) | Yes | Not extractable zero-change |
+| C3 | `State checkpoint: append the step id + sha (current HEAD)...` (8× epic-orchestrator only) | Yes (intra-template) | Not extractable zero-change |
+| C4 | Orientation command list (`wai prime`/`wai status`/`bd ready`/`openspec list`/`wai search`) — epic-orchestrator:33-37 vs tdd-ro5:26-30, verbatim | Yes | Not extractable zero-change |
+| C5 | Push-refusal boilerplate — epic-orchestrator:204 vs tdd-ro5:221 | Yes, but **wording differs** | Not extractable zero-change (unifying = prompt change) |
+| C6 | `[[steps.gate.oracles]] tests-pass timeout=300` blocks | Yes | Not extractable zero-change |
+| C7 | Structural gates `min_artifacts = 1` (+`types`) — 6×/5× | Yes | Not extractable zero-change |
+| C8 | `skills = ["tdd", "rule-of-5-universal", "commit"]` — epic-orchestrator:25 vs tdd-ro5:18, identical | Yes | Not extractable zero-change |
+
+## Does the template format support shared blocks? — NO
+
+- `src/commands/pipeline/mod.rs:309-310` — `render_prompt()` is a single `prompt.replace("{topic}", topic)`; no other placeholder/directive is processed.
+- `src/commands/pipeline/definition.rs:32-55` — `load_pipeline_toml()` passes the raw file string straight to `toml::from_str`; no preprocessing pass, no include/extends/shared-block resolution.
+- `src/commands/pipeline/setup.rs:66` + `setup.rs:162-164` — built-in templates are `include_str!`'d and copied verbatim (`fs::write(&file_path, template)`); no deploy-time resolution either.
+
+**Hypothesis confirmed:** duplication is real, but extraction requires an engine preprocessing feature (template includes at load/deploy time) — a behavior-adding engine change, not a tidy. Per ticket instructions: **no code changes, no commit**; extraction left to the lead (follow-up ticket by orchestrator).
+
+## Changes made
+
+None — no template or `src/` edits, no commit, no push, ticket left open.
+
+Review artifact written:
+`.wai/projects/qa-round-execution/reviews/2026-10-08-template-convention-duplication-review-wai-qjcz.md`
+(evidence recorded via `wai add research "REVIEW wai-qjcz: ..."`)
+
+## Commands run + results
+
+- `cargo test --test suite_pipeline_init_epic_orchestrator_template` → **8 passed, 0 failed** ✅
+- `cargo test --test suite_pipeline_epic_orchestrator_ticket_state` → **3 passed, 0 failed** ✅
+- `cargo test --test suite_pipeline_init_tdd_ro5_ships_release_oracle_script` → **34 passed, 0 failed** ✅
+- `cargo fmt --check` — not applicable (no files edited); tree untouched.
+
+Completion criteria met: all three suites exit 0 unchanged; review artifact exists with per-convention verdicts.

@@ -8,3 +8,31 @@
   - PR #33 (feat/close-pipeline-enforcement, 17 commits) + PR #34 (release/v2026.10.4) merged; tag pushed; epic wai-vx02 closed; beads exported + pushed (4d3f741)
   - Standing wart: tag-ref docs.yml runs fail on github-pages env protection (wai-35zh) — main docs deploys fine, versioned snapshots missing for every tag
   - **Next:** no in-flight work; candidates wai-35zh, wai-sib1 (P1), wai-sojk, wai-i1lo. Use wai close + /clear between tickets
+- 2026-10-08T18:43:41Z [id:c3a2aceeca7b5f58366157ea33ff46e980244e6f43589ac03a088cffa6f50f39] ### 2026-10-08 — PR #41 merged: epic-orchestrator template on main
+  - PR #41 (feat/epic-orchestrator-template, 4 commits) CI green in 3m12s, merged into main; branch deleted
+  - Main verified: template files present, 5 template tests green on main
+  - Orchestrator NOT fully implemented: still open wai-wvjz (state durability), wai-3eo0 (brief format), wai-979g (isolation verify), wai-hr0w (strict validation/docs), wai-qjcz (tidy) + debt tickets wai-80x5 (help.rs split), wai-0v2e (pretender gate statefulness)
+  - **Next:** fresh session (/clear + /renew); start wai-wvjz (first child, same TOML step blocks — rebase expectations per co-modification note)
+- 2026-10-08T19:31:08Z [id:3c7dd9974c97e54ada6fab85d2bdae65b85f05920fffdd1d7243382649b0c774] (#snap) ### 2026-10-08 16:30 — snap
+  - Fresh session started on main; /renew ran (turu recall + workspace scan) — no code or ticket ops yet
+  - Workspace state: clean of commits; untracked scripts/pretender-codemod.py + scripts/split-integration-tests.py; main at merge of PR #41
+  - **Next:** complete /renew output, then claim wai-wvjz (first open child of epic wai-fvhv; state durability, same TOML step blocks — rebase expectations per co-modification note)
+- 2026-10-08T19:38:45Z [id:7c29d2731033fc5de4ba22854b2fbd88c7692c83693079519411cfe075184dff] ### 2026-10-08 16:40 — wai-wvjz shipped (orchestrator run-state durability)
+  - Full epic-autonomy-tdd-ro5 run completed 9 steps: red→green→tidy→ro5u→fixes→ledger
+  - Template: claim writes <ticket>.state (id/branch/brief path/step history); retry-entry drift check (mid-run advance EXPECTED, resume from last completed gate); per-step id+sha appends; verify-entry head record; spawn refuses without state file
+  - Tests: suite_pipeline_init_epic_orchestrator_template 6/6, tdd-ro5 oracle suite 34/34, validate exit 0. RO5U 0 findings. bead closed, JSONL exported, commit 851a176 on main (NOT pushed — awaiting authorization)
+  - Next: wai-3eo0 (brief format) is next in co-modification order; fresh session via /renew recommended
+- 2026-10-08T20:16:56Z [id:5fa5d80f27b8969760eb7b0ee72a96835151b5aba4857adcb2bc90348d59624e] ### 2026-10-08 17:35 — epic-orchestrator children fully orchestrated (4 runs, dogfooded the loop)
+  - Ran wai pipeline epic-orchestrator for wai-3eo0, wai-979g, wai-hr0w, wai-qjcz: claim→gates→brief→spawn(pi -p -n subagent:<ticket>:implement, streamed to runs/<ticket>.log)→verify→ship→stop per run
+  - All 6 epic-orchestrator children now closed (t2ar, wvjz, 3eo0, 979g, hr0w, qjcz); wai-979g verify dogfooded the new verifier convention (subagent:wai-979g:verify, read-only, CONFIRM)
+  - Landed: brief format (Why/completion criteria/spawn model % window), isolation verify step, integration test suite_pipeline_epic_orchestrator_ticket_state (3 tests), docs section in pipelines.md w/ provenance, full cargo test green
+  - wai-qjcz verdict: extraction requires engine include mechanism — no code change; follow-ups filed: wai-e8tc (wai add tags artifacts one step behind — REAL BUG, retag workaround), wai-lqdr (bundle tests-pass oracle on init), wai-vsn6 (template shared-block/include mechanism)
+  - Gotcha: stale ~/.cargo/bin/wai lacked template registration — cargo install --path . fixed; wai add step-tag lag worked around by retagging artifact frontmatter
+  - Main is 16 commits ahead of origin — NOT pushed (awaiting authorization)
+  - **Next:** orchestrator releasable pending push/release decision; then follow-ups e8tc/lqdr/vsn6; fresh session via /renew recommended
+- 2026-10-08T21:51:16Z [id:d216300d5022dc403c58b976a1a7f2f1d9c2f732a1ec946ba04d85526daff316] ### 2026-10-08 18:30 — bug-fix orchestration round complete (3 more epic-orchestrator runs)
+  - wai-e8tc: resolved works-as-intended — instrumented repro found NO tag lag; my session-time readings were add-before-next sequencing + file-pick confusion; ratchet suite landed (99116ee, tag correspondence + yml-write-before-prompt ordering pinned); follow-up wai-t3qa filed (next exits 0 on gate block — real DX bug)
+  - wai-lqdr: tests-pass.sh now bundled with epic-orchestrator init (be439f5, byte-identical to proven deployed script, red→green suite); forced pretender-gate tidy split cmd_init; flake side-filed wai-of8s
+  - wai-vsn6: template shared-block mechanism landed (8b73602) — [[blocks]] + {{block:name}} resolved at load time in definition.rs, fail-loudly validation, byte-identity ratchet via committed pre-change rendered baselines (fixtures/pipeline-rendered-baseline-vsn6/); adoption scoped to Advance trail; mechanical follow-up wai-opk8 filed
+  - Main now 28 commits ahead of origin — NOT pushed (awaiting authorization)
+  - **Next:** push/release decision; then open P2s: wai-t3qa, wai-of8s, wai-opk8; fresh session via /renew recommended

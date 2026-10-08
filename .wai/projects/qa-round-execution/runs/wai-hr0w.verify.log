@@ -1,0 +1,18 @@
+**VERDICT: CONFIRM**
+
+All claims verified against commit `fe61e15`:
+
+| # | Check | Result |
+|---|-------|--------|
+| 1 | `git show --stat fe61e15` | ✅ Exactly 4 files, 471 insertions: test suite (395), pipelines.md (+58), tasks.md (+15), proposal.md (+3) |
+| 2 | Template frozen | ✅ `git diff fe61e15~1 fe61e15 -- src/templates/epic-orchestrator.toml` is empty |
+| 3 | 3 `#[test]` functions | ✅ `pipeline_epic_orchestrator_template_declares_ticket_state_contract`, `..._declares_refusals_and_degradation`, `..._walks_claim_gates_brief_to_ticket_state` — all in the commit |
+| 4 | Docs section | ✅ `## Built-in: Epic-Orchestrator Pipeline` (line 265) covers state file `.wai/projects/<project>/runs/<ticket>.state` (line 291), refusal conditions (lines 309–311), single-model degradation (line 313–315), provenance `~/.wai/projects/orchestrator-tooling/` (line 321) |
+| 5 | Issue status | ✅ `bd show wai-hr0w` shows **IN_PROGRESS**, not closed |
+
+Bonus verification beyond the checklist:
+- **Tests actually run green**: `cargo test --test suite_pipeline_epic_orchestrator_ticket_state` → 3 passed, 0 failed
+- **openspec strict valid**: `openspec validate add-epic-orchestrator-template --strict` → valid
+- Tasks 3.1–3.3 present under new `## 3. Distribution (wai-hr0w)` section, proposal provenance line matches docs
+
+Minor note (not a discrepancy): working tree has unrelated dirty files (`.beads/backup`, `.wai/pipeline-runs/*.yml`, `wai-hr0w.state`) — expected pipeline-state churn, no source/test files touched.

@@ -1,0 +1,21 @@
+## VERDICT: CONFIRM
+
+All five cross-checks match the implementor's report:
+
+**1. Commit stat — matches.** `0167498` shows exactly 2 files changed, 97 insertions(+), 5 deletions(-): `src/templates/epic-orchestrator.toml` (27+/5−) and `tests/suite_pipeline_init_epic_orchestrator_template.rs` (70+/0−).
+
+**2. TOML diff is verify-step only — confirmed.** The single hunk starts at `[[steps]] id = "verify"` (line ~144). All changes are within the verify step's prompt:
+- Named session `subagent:<ticket>:verify`, read-only tools, cannot spawn further subagents, different model family when configured ✓
+- Cross-check: report commits vs `git log` on branch/worktree, and vs beads state ✓
+- "A contradiction between report and reality fails the run — no advance to ship" ✓
+- "Single-model degradation" → lead-side checks, "non-blocking" ✓
+
+No edits to the brief step or any state-durability block.
+
+**3. Exactly one test appended — confirmed.** The test diff is a single pure insertion (70+/0−) placing `pipeline_init_epic_orchestrator_encodes_isolation_verify` between the existing `pipeline_init_epic_orchestrator_encodes_brief_format` and `pipeline_help_lists_epic_orchestrator_builtin` tests. No existing test lines were touched. The test asserts all claimed behaviors (named session, read-only, no sub-spawn, different family, cross-check vs git + ticket-tracker, contradiction fails run, non-blocking degradation).
+
+**4. Prior tickets' content intact — confirmed.** Grep shows the state-durability lines (drift retry semantics, "mid-run advance is EXPECTED... never flagged as drift") and brief-format lines (`## Why`, `## Spawn model`) are all still present.
+
+**5. Ticket state — confirmed open.** `bd show wai-979g` shows status **IN_PROGRESS** (P2), not closed by the implementor.
+
+No contradictions found.

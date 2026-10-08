@@ -2,7 +2,7 @@ run_id: epic-orchestrator-2026-10-08-wai-lqdr
 pipeline: epic-orchestrator
 topic: wai-lqdr
 created_at: '2026-10-08T20:51:05.064675068+00:00'
-current_step: 5
+current_step: 7
 approvals: {}
 epic: null
 child_issues: []

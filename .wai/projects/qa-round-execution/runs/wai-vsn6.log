@@ -1,0 +1,52 @@
+Working tree clean, commit landed with all pre-commit hooks green. Final verification summary and report:
+
+---
+
+# REPORT — wai-vsn6: Pipeline template shared-block mechanism
+
+## Design summary
+
+**Syntax:** `[[blocks]]` top-level TOML array of tables in the pipeline TOML (same file only):
+```toml
+[[blocks]]
+name = "advance-trail"
+content = "Advance: `wai pipeline next`"
+```
+Step prompts reference blocks as `{{block:<name>}}`.
+
+**Resolution point:** load time, inside `load_pipeline_toml` (`src/commands/pipeline/definition.rs`). After parsing, every step prompt is expanded before the `PipelineDefinition` is constructed — so **all** downstream paths (`pipeline next`, `current`, `show`, gates, validate) see already-resolved prompts and `render_prompt` itself is untouched (`{topic}` substitution still happens at render time, and block content may contain `{topic}`).
+
+**Fail-loudly validation** (hard errors at load): unknown block name (`unknown block '<name>' referenced in step '<id>'`), malformed marker (missing `}}`), duplicate block names, cyclic/too-deep nested refs (depth cap 32). Nested references resolve recursively via repeated passes.
+
+**Out of scope honored:** no cross-file includes, no deploy/scaffold changes (scaffold copies the TOML verbatim, refs + `[[blocks]]` included — resolved on load), no gate semantics changes, `render_prompt` untouched.
+
+## Ratchet test approach
+- **Byte-identity baseline:** rendered prompts of all 3 built-in templates (24 steps, topic=`SNAPSHOT_TOPIC`) were captured with the **pre-change engine** into committed fixtures `tests/fixtures/pipeline-rendered-baseline-vsn6/<name>.txt`. Test `builtin_templates_render_byte_identical_to_baseline` re-renders every built-in template through the current engine (load + `render_prompt`) and compares byte-for-byte. This catches drift from both block expansion and `render_prompt` itself. Captured *before* implementation; passed before adoption and still passes after (proves transparency).
+- **Unknown-block error:** engine-level (`load_pipeline_toml` returns error naming the block) and CLI-level (`wai pipeline validate` fails with "unknown block").
+- **`wai pipeline validate` passes for all built-ins:** integration test scaffolds each template and validates.
+
+## RED→GREEN
+RED confirmed before implementation: 7 engine mechanism tests + 1 CLI validate test failing; ratchet guard green. GREEN after implementation + adoption: all pass.
+
+## Commits
+| sha | subject |
+|-----|---------|
+| `8b73602` | feat(pipeline): template shared-block mechanism (wai-vsn6) |
+
+## Commands run + results
+- Baseline capture (pre-change engine): `cargo test --bins zz_dump` → fixtures written, dump test removed
+- RED: `cargo test --bins -- commands::pipeline::tests` → 7 failed (mechanism), ratchet ok; `cargo test --test suite_pipeline_template_blocks` → 1 failed (unknown-block), 2 ok
+- GREEN: same suites → all ok (79 engine tests, 3 integration)
+- `cargo fmt --check` → clean (after `cargo fmt`)
+- `just lint` (clippy `--all-targets -- -D warnings`) → clean
+- `cargo test` (full suite) → **exit 0, 52 test binaries all ok**. Note: one pre-existing flake, `plugin::tests::execute_hook_no_deadlock_on_fast_command` (`src/plugin.rs:1098`, timing-sensitive spawn under parallel load) failed in 2 of 4 full runs; passes in isolation and in green runs — unrelated to this change, no pipeline involvement.
+- `ah check` → envelope `ok:true` (only pre-existing repo-wide `no-tests-declared` findings in unrelated openspec specs)
+- Pre-commit hooks (lefthook): pretender-check, format-check, bd, lint — all ✔️. Note: the pretender gate blocks staging `src/commands/pipeline/mod.rs` due to 4 pre-existing violations in it (file_lines >1000, 2× test abc, cmd_verify function_lines); the mechanism + tests were therefore placed in `definition.rs` (gates clean) and `mod.rs` was left untouched.
+
+## Files changed (commit 8b73602)
+- `src/commands/pipeline/definition.rs` — `[[blocks]]` parsing (`SharedBlock`), `resolve_block_refs`/`expand_block_refs_once`/`build_block_map`, load-time expansion in `load_pipeline_toml`, `blocks_tests` module (10 tests incl. ratchet)
+- `src/templates/epic-orchestrator.toml` — 7× `Advance: \`wai pipeline next\`` → `{{block:advance-trail}}` + `[[blocks]]` table (adoption, one convention only)
+- `tests/fixtures/pipeline-rendered-baseline-vsn6/{epic-orchestrator,scientific-research,tdd-ro5}.txt` — committed rendered baselines
+- `tests/suite_pipeline_template_blocks.rs` — CLI-level: validate passes for all built-ins, unknown block fails validate, defined blocks validate cleanly
+
+Not pushed, beads ticket not closed (per brief).

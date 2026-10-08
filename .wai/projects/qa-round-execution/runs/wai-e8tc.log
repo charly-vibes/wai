@@ -1,0 +1,52 @@
+Commit `99116ee` landed with all 4 pre-commit hooks green. Not pushing, not closing the ticket — per ticket rules.
+
+---
+
+# REPORT — wai-e8tc
+
+## Root cause (with file:line)
+
+**No code defect exists in `wai add` step-tag resolution.** The reported lag could not be reproduced through the sequential CLI path on either the current build or the session-era installed binary (`851a176-main-dirty`):
+
+- `src/commands/pipeline/orchestration.rs:353-359` (`cmd_next`) — persists the advanced `current_step` to `.wai/pipeline-runs/<run>.yml` **before** printing the new step prompt (`fs::write(&run_path, yaml)` at :358, `print_step` at :363-365). Any process that observes the new step prompt can rely on the yml being current.
+- `src/commands/add.rs:554-567` (`resolve_current_step_id`) — reads the yml fresh from disk on every invocation (no cache); indexes `definition.steps.get(run.current_step)` — same 0-based indexing as `wai pipeline current` (`src/commands/pipeline/queries.rs:303-307`). No off-by-one.
+- `src/config.rs:441-447` (`resolve_active_pipeline_run`) — env var then `.last-run` pointer; both point at the same run id in all observed evidence (artifact tags carried the **correct** run ids, ruling out hypothesis (c) pointer staleness).
+
+**Hypotheses verdict:** (a) stale yml — refuted (write precedes prompt; reads are uncached); (b) off-by-one — refuted (identical indexing in add and current); (c) stale `.last-run` — refuted (run ids in evidence tags are correct).
+
+**Most parsimonious explanation of the 4× observations — operator sequencing:** the artifact was added *before* the advancing `wai pipeline next`. Tags are immutable at add time, so an artifact added at step N is tagged step N even after the run advances to N+1. The evidence pattern (`gates-*` research tagged `pipeline-step:claim` while yml said `current_step: 1`) matches exactly. Compounding factor: when the gate then blocks, `report_gate_failures` → `return Ok(())` (`orchestration.rs:342-346`) makes a **blocked advance exit 0** — a scripted/agent flow can miss the failed advance entirely. (Fixing that exit-code semantics is gate-behavior territory → follow-up candidate under epic `wai-fvhv`, per the brief's follow-up threshold.)
+
+## Repro result
+
+| Attempt | Setup | Result |
+|---|---|---|
+| 1 (RED, debug build) | temp workspace, `init` → `new project` → `pipeline init epic-orchestrator` → `start` → `add` (claim ✓) → `next` (advances, prints gates) → `add` | tagged `pipeline-step:gates` — **correct, RED did not fail** |
+| 2 (installed binary 851a176 — what the orchestrator sessions ran) | identical sequence | **correct** |
+| 3 | yml/def instrumentation (`eprintln` in `resolve_current_step_id`) | read `current_step=1`, def steps `["claim","gates",...]` — resolution correct; an initial "claim tag" reading was my own wrong file pick (alphabetical `ls`, not a bug) |
+
+## Fix summary
+
+No production code changed (nothing to fix). Added a **regression ratchet** — `tests/suite_pipeline_add_step_tag_correspondence.rs` (3 tests):
+1. `add_after_next_tags_artifact_with_current_step` — the contract the ticket demands: first `add` after `next` must equal the step id `pipeline current --json` reports.
+2. `add_before_next_tags_artifact_with_then_current_step` — pins that sequenced artifacts legitimately carry the previous step id (the observed evidence pattern is documented correct behavior).
+3. `next_persists_run_state_before_printing_new_step_prompt` — pins the yml-write-before-prompt ordering.
+
+## Commands run + results
+
+| Command | Result |
+|---|---|
+| `cargo build` | ✅ |
+| Empirical repros (temp workspaces, both binaries, instrumented) | ✅ no lag found |
+| `cargo test --test suite_pipeline_add_step_tag_correspondence` | ✅ 3 passed |
+| `cargo test` (full suite) | ✅ 50 test binaries, all `ok`, 0 failures |
+| `cargo fmt --check` | ✅ clean |
+| `cargo clippy --all-targets` | ✅ no warnings |
+| pre-commit hooks (pretender-check, format-check, bd, lint) | ✅ all 4 passed |
+
+## Files changed
+
+- `tests/suite_pipeline_add_step_tag_correspondence.rs` (new, +202) — committed as `99116ee` `fix(add): resolve current pipeline step without lag (wai-e8tc)`
+
+## Suggested follow-up (needs human/orchestrator decision — not filed, per "do NOT close/file" ambiguity)
+
+File under epic `wai-fvhv`: **`wai pipeline next` exits 0 when a gate blocks advancement** — agent/scripted flows can't distinguish "advanced" from "blocked", which converts sequencing artifacts into silent gate starvation. Either exit non-zero or print a machine-detectable marker.

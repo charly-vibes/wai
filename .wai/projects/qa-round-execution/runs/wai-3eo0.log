@@ -1,0 +1,23 @@
+All pre-commit hooks (format-check, lint, bd) passed.
+
+REPORT
+======
+
+**Commits made**
+- `8858ed2` feat(pipeline): orchestrator brief format (wai-3eo0) — 2 files, +65/−2. Pre-commit hooks (format-check, lint, bd) passed.
+
+**Files changed**
+- `src/templates/epic-orchestrator.toml` — brief step now mandates the three sections (`## Why` delegation rationale, `## Completion criteria` runnable commands / exit 0 = done, `## Spawn model` model + `≤ N%` context ceiling computed at spawn, fixed token counts invalid); spawn step now refuses without a committed brief.
+- `tests/suite_pipeline_init_epic_orchestrator_template.rs` — appended `pipeline_init_epic_orchestrator_encodes_brief_format` RED test (existing tests untouched).
+
+**Commands run + results**
+1. `cargo test --test suite_pipeline_init_epic_orchestrator_template` — RED first (1 failed: new test only), GREEN after template edit, tidy re-run: **7 passed** ✅
+2. `cargo test --test suite_pipeline_init_tdd_ro5_ships_release_oracle_script` — **34 passed** ✅ (regression clean)
+3. `wai pipeline validate epic-orchestrator` — exit 0, 7 steps / 7 gated ✅
+4. `cargo fmt --check` — clean ✅
+5. `cargo clippy --test suite_pipeline_init_epic_orchestrator_template` — no warnings ✅
+
+**Notes**
+- RED phase confirmed exactly one failure (the new test) before any template change.
+- Two wording iterations during GREEN/refactor: literal `%` requirement and keeping "Fixed token counts" un-split across line wraps; case-sensitivity ("Fixed" vs "fixed") resolved by matching the template's actual phrasing in the test.
+- Scope held to the two exact files; no Rust engine changes, no verify/state-step touching, no push, ticket left open (IN_PROGRESS) for the orchestrator to ship.

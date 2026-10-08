@@ -1,0 +1,36 @@
+# REPORT — wai-lqdr: bundle tests-pass oracle with epic-orchestrator init
+
+## Outcome
+`wai pipeline init epic-orchestrator` now scaffolds an executable `.wai/resources/oracles/tests-pass.sh` out of the box — fresh scaffolds no longer block at verify/ship. Implemented TDD red→green, mirroring the tdd-ro5 oracle-bundling pattern.
+
+## Commits
+- `be439f5` — `fix(pipeline): bundle tests-pass oracle with epic-orchestrator init (wai-lqdr)` (all pre-commit hooks green: pretender-check, format-check, lint, bd)
+- Follow-up filed (not committed): beads `wai-of8s` — flaky `gather_git_file_context_returns_history_for_tracked_file` test (pre-existing, unrelated)
+
+## RED → GREEN evidence
+1. **RED**: wrote `tests/suite_pipeline_epic_orchestrator_ships_tests_pass_oracle.rs` (3 tests) → all 3 failed with `No such file or directory` on `tests-pass.sh`
+2. **GREEN**: added template + extended `bundled_oracles_for` → 3/3 passed; tdd-ro5 suite still 34/34 green
+
+## Files changed (in commit)
+- `src/templates/oracles/tests-pass.sh` (new, executable) — generic, repo-agnostic evidence gate based on the deployed `.wai/resources/oracles/tests-pass.sh`; passes on `command=|commands run|verified:|tests pass|validation run|non-code|no code changes|full verification command`, rejects with stderr otherwise
+- `src/commands/pipeline/setup.rs` — added `"epic-orchestrator" => vec![("tests-pass.sh", include_str!(...))]` to `bundled_oracles_for`; plus tidy extraction of `template_for` / `scaffold_oracles` / `write_oracles_readme` / `write_oracles_example` helpers from `cmd_init` (function_lines 110 → under the 60 gate threshold; behavior unchanged, covered by existing init tests)
+- `tests/suite_pipeline_epic_orchestrator_ships_tests_pass_oracle.rs` (new) — mirrors the tdd-ro5 suite: scaffolding+executable test, accept-with-evidence test, reject-without-evidence test
+- `docs/src/concepts/pipelines.md` — updated the "Oracle requirement" line that instructed the user to hand-provide the script (now: ships out of the box)
+
+## Commands run + results
+| Command | Result |
+|---|---|
+| `cargo test --test suite_pipeline_epic_orchestrator_ships_tests_pass_oracle` (RED) | 3 failed (expected) |
+| same (GREEN) | 3 passed |
+| `cargo test --test suite_pipeline_init_tdd_ro5_ships_release_oracle_script` | 34 passed |
+| `cargo fmt --check` | OK |
+| `cargo clippy --all-targets -- -D warnings` | clean |
+| `cargo test` (full, ×2 after commit) | 51/51 binaries ok, 0 failures |
+| `pretender check --staged --mode gate` | exit 0 ("1 fixed since last check") |
+| pre-commit hooks (lefthook) | all ✔️ |
+
+## Notes / deviations
+- **Hook-blocked commit → forced tidy refactor**: the pretender gate (`--staged --mode gate`, diff base `origin/main`) flagged the pre-existing `cmd_init` violation (110 lines > 60) since the ticket touches `setup.rs`. Since "pre-commit hooks must pass" was mandatory and `--no-verify` is WIP-only per `lefthook.yml`, I mechanically split `cmd_init` into four helpers (same commit, noted in the message). No behavior change; `cmd_init`'s paths are covered by the existing init suites.
+- One transient full-suite failure in `gather_git_file_context_returns_history_for_tracked_file` (pre-existing flake in untouched code) — passes 5/5 isolated and in both full-suite reruns; filed as `wai-of8s`.
+- Docs updated (ticket said "only if it explicitly says the user must hand-write it" — it did).
+- Not pushed; beads ticket `wai-lqdr` left open per instructions.
