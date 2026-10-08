@@ -7,3 +7,5 @@ step_history: []
 - brief @ 2fd8414b536a0715db6832827d6ad2fbb9fa7ee6
 - spawn @ 2fd8414b536a0715db6832827d6ad2fbb9fa7ee6
 - verify @ 01674984565a9fb28cb170bd2f2af1322e3c16ee
+- ship @ f1a351f1dd034663847fafb163d10705af3071f9
+- stop @ f1a351f1dd034663847fafb163d10705af3071f9 (run complete)
