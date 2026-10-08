@@ -2,7 +2,7 @@ run_id: epic-orchestrator-2026-10-08-wai-3eo0
 pipeline: epic-orchestrator
 topic: wai-3eo0
 created_at: '2026-10-08T19:41:20.068833985+00:00'
-current_step: 2
+current_step: 5
 approvals: {}
 epic: null
 child_issues: []

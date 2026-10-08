@@ -4,3 +4,6 @@ brief_path:
 step_history: []
 - claim @ 851a176c2e04b7b4b4b516bc8c75785514febf6b
 - gates @ 851a176c2e04b7b4b4b516bc8c75785514febf6b
+- brief @ 2f4aad4b8224357fb4a2b38bf342ef665a02f336
+- spawn @ 2f4aad4b8224357fb4a2b38bf342ef665a02f336
+- verify @ 8858ed2643eaae8cecce82029ad7fb439c2d4800
