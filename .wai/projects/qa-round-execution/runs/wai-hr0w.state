@@ -6,3 +6,5 @@ step_history: []
 - gates @ 52c6de8604ad86f87c4a6a3defe4800a23b3b1bf
 - brief @ 939dae26e2b7aefa0e4200d09a41c4259029d4b4
 - spawn @ 939dae26e2b7aefa0e4200d09a41c4259029d4b4
+- ship @ be3f8b65f0d92ef292c737b649f8e1d43235c774
+- stop @ be3f8b65f0d92ef292c737b649f8e1d43235c774 (run complete)
