@@ -111,6 +111,67 @@ fn pipeline_init_epic_orchestrator_toml_is_valid() {
 }
 
 #[test]
+fn pipeline_init_epic_orchestrator_encodes_run_state_durability() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    let out = wai_cmd(tmp.path())
+        .args(["pipeline", "init", "epic-orchestrator"])
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
+
+    let toml_path = tmp
+        .path()
+        .join(".wai/resources/pipelines/epic-orchestrator.toml");
+    let content = fs::read_to_string(&toml_path).unwrap();
+
+    // Claim step writes the durable per-ticket state file with its fixed shape.
+    assert!(
+        content.contains(".wai/projects/<project>/runs/<ticket>.state"),
+        "Claim step must write the per-ticket state file path: {content}"
+    );
+    for field in ["ticket id", "branch", "brief path", "empty step history"] {
+        assert!(
+            content.contains(field),
+            "State file shape must include {field:?}: {content}"
+        );
+    }
+
+    // Every step boundary appends step id + sha to the state file.
+    assert!(
+        content.contains("step id + sha"),
+        "Step-boundary state append must be encoded: {content}"
+    );
+    assert!(
+        content.contains("branch head at verify entry"),
+        "Verify step must record the branch head at entry: {content}"
+    );
+
+    // Spawn refuses to run without the state file.
+    assert!(
+        content.contains("refuse") && content.contains("without the state file"),
+        "Spawn step must refuse without the state file: {content}"
+    );
+
+    // Retry-entry drift check: refuse resume when HEAD advanced without a
+    // completed step accounting for it; mid-run advances are expected, never
+    // flagged; retry resumes from the last completed gate.
+    assert!(
+        content.contains("drift"),
+        "Retry-entry drift check must be encoded: {content}"
+    );
+    assert!(
+        content.contains("mid-run advance is EXPECTED"),
+        "Mid-run advance must be explicitly expected, never flagged: {content}"
+    );
+    assert!(
+        content.contains("resumes from the last completed gate"),
+        "Retry must resume from the last completed gate: {content}"
+    );
+}
+
+#[test]
 fn pipeline_help_lists_epic_orchestrator_builtin() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());

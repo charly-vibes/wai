@@ -40,9 +40,18 @@ Rules:
 - Select exactly one ready, unblocked child issue. Prefer P1, then P2, then P3.
 - Claim atomically: `bd update <id> --claim`.
 - Check for file-level conflicts with other in_progress tickets before writing code.
+- Write the durable per-ticket run state file (create if absent):
+  `.wai/projects/<project>/runs/<ticket>.state` containing the ticket id,
+  branch, brief path (empty until the brief step), and an empty step history.
+- Retry entry: if the state file already exists, read it and run the drift
+  check before resuming — refuse to resume when HEAD advanced without a
+  completed step accounting for the advance. A mid-run advance is EXPECTED
+  (the implementor commits) and is never flagged as drift. Retry reads
+  state and resumes from the last completed gate, not from the beginning.
 - If the ticket is ambiguous or larger than one session, stop and file follow-up tickets.
 
 Record orientation: `wai add research "ORIENT: selected <id>; why chosen; blockers checked"`
+State checkpoint: append the step id + sha (current HEAD) to the state file before advancing.
 Advance: `wai pipeline next`
 """
 
@@ -63,6 +72,7 @@ Run:
 Do not start implementation until gates are understood and baseline is green.
 
 Record gate status: `wai add research "GATES: <commands run>; results"`
+State checkpoint: append the step id + sha (current HEAD) to the state file before advancing.
 Advance: `wai pipeline next`
 """
 
@@ -78,12 +88,14 @@ prompt = """
 Rules:
 - Briefs are repo artifacts, not /tmp files (canon Invariant 4).
 - Write the brief from the repo's brief template into a committed path:
-  `.wai/projects/<project>/briefs/<slug>.md`
+  `.wai/projects/<project>/briefs/<slug>.md` and record its path in the
+  state file's brief path field.
 - Include: ticket ID, desired outcome, out of scope, exact files, exact
   test/review commands, red/green/refactor sequence, follow-up threshold.
 - Commit the brief before spawn so the subagent starts from a clean tree.
 
 Record brief: `wai add design "BRIEF: <path>; committed"`
+State checkpoint: append the step id + sha (current HEAD) to the state file before advancing.
 Advance: `wai pipeline next`
 """
 
@@ -97,6 +109,8 @@ prompt = """
 {topic}: Spawn a named, resumable subagent session for the brief.
 
 Rules:
+- Refuse to spawn without the state file — the spawn must be resumable
+  through it.
 - The spawn must be resumable and discoverable (canon Invariant 2) — a spawn
   that leaves no session record loses usage/cost/trace forever.
 - Stream output to a known log path the orchestrator can tail (canon
@@ -108,6 +122,7 @@ Rules:
   suffix. Never resume a wedged spawn in-place.
 
 Record spawn: `wai add research "SPAWN: <session name>; log=<path>"`
+State checkpoint: append the step id + sha (current HEAD) to the state file before advancing.
 Advance: `wai pipeline next`
 """
 
@@ -121,6 +136,8 @@ prompt = """
 {topic}: Verify before trust (canon Invariant 5).
 
 Check the subagent's report against reality:
+- State checkpoint: record the branch head at verify entry — append the
+  step id + sha (current HEAD) to the state file before any verification.
 - `git log` / `git diff` vs the report — do the commits match the claims?
 - repo gates: run the relevant test suite; reports are claims, not facts
 - ticket state: does beads reflect the claimed work?
@@ -129,6 +146,7 @@ If the report and reality disagree, the discrepancy is a finding — fix or
 file it before proceeding.
 
 Record verification: `wai add research "VERIFY: <evidence>"`
+State checkpoint: append the step id + sha (current HEAD) to the state file before advancing.
 Advance: `wai pipeline next`
 """
 
@@ -153,6 +171,7 @@ Do:
 - push only when project policy or user instruction explicitly says to push
 
 Record ship: `wai add research "SHIP: <commit/ticket state>"`
+State checkpoint: append the step id + sha (current HEAD) to the state file before advancing.
 Advance: `wai pipeline next`
 """
 
@@ -172,6 +191,7 @@ least resistance and the historical failure mode (canon Invariant 1) —
 the next ticket starts a fresh run, not this one.
 
 Record STOP: `wai add research "STOP: ticket <id> complete; next run for next ticket"`
+State checkpoint: append the step id + sha (current HEAD) to the state file; the run is complete.
 Advance: `wai pipeline next`
 """
 
