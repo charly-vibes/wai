@@ -224,6 +224,76 @@ fn pipeline_init_epic_orchestrator_encodes_brief_format() {
 }
 
 #[test]
+fn pipeline_init_epic_orchestrator_encodes_isolation_verify() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    let out = wai_cmd(tmp.path())
+        .args(["pipeline", "init", "epic-orchestrator"])
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
+
+    let toml_path = tmp
+        .path()
+        .join(".wai/resources/pipelines/epic-orchestrator.toml");
+    let content = fs::read_to_string(&toml_path).unwrap();
+
+    // Named read-only verifier session convention.
+    assert!(
+        content.contains("subagent:<ticket>:verify"),
+        "Verify step must encode the named verifier session `subagent:<ticket>:verify`: {content}"
+    );
+    assert!(
+        content.contains("read-only"),
+        "Verifier must be restricted to read-only tools: {content}"
+    );
+    assert!(
+        content.contains("cannot spawn further subagents"),
+        "Verifier must not be able to spawn further subagents: {content}"
+    );
+    assert!(
+        content.contains("different model family"),
+        "Verifier should use a different model family when configured: {content}"
+    );
+
+    // Cross-check: listed commits vs git log on the ticket's branch/worktree,
+    // and vs ticket-tracker (beads) state.
+    assert!(
+        content.contains("cross-check"),
+        "Verifier must cross-check the implementor's report against reality: {content}"
+    );
+    assert!(
+        content.contains("branch/worktree"),
+        "Cross-check must compare listed commits vs git log on the ticket's branch/worktree: {content}"
+    );
+    assert!(
+        content.contains("ticket-tracker"),
+        "Cross-check must compare report claims vs ticket-tracker state: {content}"
+    );
+
+    // Contradiction fails the run — no advance to ship.
+    assert!(
+        content.contains("fails the run") && content.contains("no advance to ship"),
+        "A contradiction between report and reality must fail the run — no advance to ship: {content}"
+    );
+
+    // Single-model degradation: lead-side checks, non-blocking.
+    assert!(
+        content.contains("Single-model degradation"),
+        "Single-model degradation must be encoded: {content}"
+    );
+    assert!(
+        content.contains("lead-side checks"),
+        "Degradation path must apply the lead-side checks: {content}"
+    );
+    assert!(
+        content.contains("non-blocking"),
+        "Single-model degradation must be non-blocking: {content}"
+    );
+}
+
+#[test]
 fn pipeline_help_lists_epic_orchestrator_builtin() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());

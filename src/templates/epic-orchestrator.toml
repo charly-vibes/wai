@@ -144,17 +144,39 @@ types = ["research"]
 [[steps]]
 id = "verify"
 prompt = """
-{topic}: Verify before trust (canon Invariant 5).
+{topic}: Verify before trust (canon Invariant 5) — isolation-based.
 
-Check the subagent's report against reality:
+Primary path (a second model family is configured): spawn a read-only
+verifier as a separate NAMED session `subagent:<ticket>:verify` and have it
+cross-check the implementor's report against reality.
+
+Verifier rules:
+- The verifier session is named `subagent:<ticket>:verify` and is resumable
+  and discoverable like any other spawn (canon Invariant 2).
+- The verifier runs read-only tools only: it inspects, it does not edit,
+  commit, or close anything. It cannot spawn further subagents.
+- Use a different model family than the implementor when one is
+  configured — independent judgment, not a second copy of the same model.
+- The verifier cross-checks the implementor's report:
+  - commits listed in the report vs `git log` on the ticket's
+    branch/worktree — do they actually exist and match the claims?
+  - report claims vs ticket-tracker state (beads) — does the tracker
+    reflect the claimed work?
+- A contradiction between report and reality fails the run —
+  no advance to ship. The discrepancy is a finding — fix or file it, then
+  re-verify with a fresh verifier session.
+
+Single-model degradation: when no second model family is configured, skip
+the spawned verifier and apply the lead-side checks below instead. This
+degradation is non-blocking — the run may advance once the lead-side
+checks pass.
+
+Lead-side checks (degradation path):
 - State checkpoint: record the branch head at verify entry — append the
   step id + sha (current HEAD) to the state file before any verification.
 - `git log` / `git diff` vs the report — do the commits match the claims?
 - repo gates: run the relevant test suite; reports are claims, not facts
 - ticket state: does beads reflect the claimed work?
-
-If the report and reality disagree, the discrepancy is a finding — fix or
-file it before proceeding.
 
 Record verification: `wai add research "VERIFY: <evidence>"`
 State checkpoint: append the step id + sha (current HEAD) to the state file before advancing.
