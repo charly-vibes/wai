@@ -4,3 +4,6 @@ brief_path: .wai/projects/qa-round-execution/briefs/wai-e8tc.md
 step_history: []
 - claim @ 0a6c6f9bacb05fbd131e848613e064835b3bbb95
 - gates @ 0a6c6f9bacb05fbd131e848613e064835b3bbb95
+- brief @ 50d2dfe2565346b8e0408667d8fd72e2c7f78e5d
+- spawn @ 50d2dfe2565346b8e0408667d8fd72e2c7f78e5d
+- verify @ 99116ee3439b7cdb3cbf5bb0eaf0317d1898ec90
