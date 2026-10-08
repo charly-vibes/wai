@@ -36,7 +36,7 @@ phase: research
 
 ```
  M .beads/backup/backup_state.json
- M .wai/pipeline-runs/epic-autonomy-tdd-ro5-2026-10-08-wai-sib1.yml
+ M .wai/pipeline-runs/epic-autonomy-tdd-ro5-2026-10-08-wai-t2ar.yml
  M .whisper/env.usage.jsonl
 ?? .whisper/branches/main/notes.usage.jsonl
 ?? scripts/pretender-codemod.py
@@ -80,15 +80,16 @@ phase: research
 ├── ○ wai-fvhv.105 P3 Docs: strengthen guidance for `wai pipeline` gates and approvals
 ├── ○ wai-fvhv.106 P3 Docs: strengthen guidance for `wai pipeline` authoring and integrity commands
 └── ○ wai-fvhv.110 P3 Docs: strengthen guidance for `wai plugin` management and passthrough behavior
+○ wai-0v2e P2 investigate: pretender gate (--mode gate) is stateful — passes with cmd_init red staged, blocks with command_help red staged, flaps across runs with identical output
 ○ wai-3eo0 P2 Orchestrator brief format: Why / checkable completion criteria / model window
 ○ wai-42ig P2 Write ADR: command taxonomy and admission criteria
+○ wai-80x5 P2 refactor(src/help.rs): split command_help (598 lines) and render_main_help (86 lines, abc 60) under function_lines_max=60
 ○ wai-979g P2 Isolation-based verify step: named read-only verifier, cross-check report vs git vs beads
 ○ wai-abiy P2 refactor(src/commands): resolve pretender app-role complexity debt (~130 findings)
 ○ wai-ekwq P2 Detail docs IA restructuring work
 ○ wai-hr0w P2 Epic-orchestrator template: strict validation, integration test, docs
 ○ wai-qjcz P2 Tidy: extract shared template conventions between epic-orchestrator and tdd-ro5
 ○ wai-sojk P2 wai way/doctor: staleness notification for .wai artifacts
-○ wai-t2ar P2 Add epic-orchestrator built-in pipeline template registration (red→green)
 ○ wai-wra0 P2 Design: absorb sync into doctor --fix
 ○ wai-wvjz P2 Orchestrator run-state durability: <ticket>.state write/resume/refuse
 ○ wai-35zh P3 docs: v2026.10.3 versioned snapshot missing — tag ran broken docs.yml before fixes
@@ -101,7 +102,7 @@ phase: research
 ○ wai-z25x P3 [bug] flaky test: execute_hook_no_deadlock_on_fast_command fails under parallel load
 
 --------------------------------------------------------------------------------
-Total: 53 issues (53 open, 0 in progress)
+Total: 54 issues (54 open, 0 in progress)
 
 Status: ○ open  ◐ in_progress  ● blocked  ✓ closed  ❄ deferred
 Priority: P0–P4 (label only; not a status icon)
