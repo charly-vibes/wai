@@ -5,7 +5,7 @@
 use genesis::managed_block::{BlockDef, BlockInjector, BlockRegistry, InjectResult};
 use tempfile::TempDir;
 
-fn test_injector() -> BlockInjector {
+fn block_injector() -> BlockInjector {
     let mut reg = BlockRegistry::new();
     reg.register(BlockDef::new("WAI"));
     reg.register(BlockDef::with_markers(
@@ -20,7 +20,7 @@ fn test_injector() -> BlockInjector {
 fn test_genesis_block_injector_creates_new_file() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("AGENTS.md");
-    let injector = test_injector();
+    let injector = block_injector();
 
     let result = injector.inject(&path, "WAI", "\n# Test content\n").unwrap();
     assert_eq!(result, InjectResult::Created);
@@ -36,7 +36,7 @@ fn test_genesis_block_injector_creates_new_file() {
 fn test_genesis_block_injector_updates_existing_block() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("AGENTS.md");
-    let injector = test_injector();
+    let injector = block_injector();
 
     injector.inject(&path, "WAI", "\n# Old\n").unwrap();
     let result = injector.inject(&path, "WAI", "\n# New\n").unwrap();
@@ -53,7 +53,7 @@ fn test_genesis_block_injector_prepends_to_existing_file() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("AGENTS.md");
     std::fs::write(&path, "# Existing content\n").unwrap();
-    let injector = test_injector();
+    let injector = block_injector();
 
     let result = injector.inject(&path, "WAI", "\n# Block\n").unwrap();
     assert_eq!(result, InjectResult::Prepended);
@@ -67,7 +67,7 @@ fn test_genesis_block_injector_prepends_to_existing_file() {
 fn test_genesis_block_injector_has_block() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("AGENTS.md");
-    let injector = test_injector();
+    let injector = block_injector();
 
     assert!(!injector.has_block(&path, "WAI"));
     injector.inject(&path, "WAI", "content").unwrap();
@@ -78,7 +78,7 @@ fn test_genesis_block_injector_has_block() {
 fn test_genesis_block_injector_read_block() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("AGENTS.md");
-    let injector = test_injector();
+    let injector = block_injector();
 
     injector.inject(&path, "WAI", "\n# Readable\n").unwrap();
     let content = injector.read_block(&path, "WAI").unwrap();
@@ -91,7 +91,7 @@ fn test_genesis_block_injector_read_block() {
 fn test_genesis_block_injector_multiple_blocks() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("AGENTS.md");
-    let injector = test_injector();
+    let injector = block_injector();
 
     injector.inject(&path, "WAI", "\n# WAI\n").unwrap();
     injector
@@ -121,7 +121,8 @@ fn test_wai_sync_injects_managed_block() {
     // must not depend on real ~/.cache state (wai-r3p0 tidy).
     cmd.env("GENESIS_NO_UPDATE_CHECK", "1");
     cmd.args(["init", "--name", "regression-test"]);
-    cmd.assert().success();
+    let out = cmd.output().expect("command should run");
+    assert!(out.status.success());
 
     // Check that AGENTS.md has the WAI:START block
     let agents_md = dir.path().join("AGENTS.md");
@@ -154,7 +155,8 @@ fn test_wai_sync_injects_managed_block() {
     // must not depend on real ~/.cache state (wai-r3p0 tidy).
     cmd.env("GENESIS_NO_UPDATE_CHECK", "1");
     cmd.args(["sync"]);
-    cmd.assert().success();
+    let out = cmd.output().expect("command should run");
+    assert!(out.status.success());
 
     // Block is still there after sync
     let content = std::fs::read_to_string(&agents_md).unwrap();

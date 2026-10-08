@@ -1,5 +1,4 @@
 use assert_cmd::Command;
-use predicates::prelude::*;
 use std::fs;
 use tempfile::TempDir;
 
@@ -15,17 +14,19 @@ fn wai_cmd(dir: &std::path::Path) -> Command {
 }
 
 fn init_workspace(dir: &std::path::Path) {
-    wai_cmd(dir)
+    let out = wai_cmd(dir)
         .args(["init", "--name", "test-ws"])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 }
 
 fn create_project(dir: &std::path::Path, name: &str) {
-    wai_cmd(dir)
+    let out = wai_cmd(dir)
         .args(["new", "project", name])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 }
 
 // ── wai artifacts stale ──────────────────────────────────────────────────────
@@ -37,10 +38,11 @@ fn artifacts_stale_clean_workspace_exits_zero_with_no_stale() {
     create_project(tmp.path(), "proj");
 
     // No artifacts with `tracks` → clean
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["artifacts", "stale"])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 }
 
 #[test]
@@ -81,7 +83,7 @@ fn artifacts_stale_detects_changed_tracked_file() {
     fs::write(&tracked_file, "// original content").unwrap();
 
     // Add a research artifact that tracks the file
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args([
             "add",
             "research",
@@ -91,18 +93,21 @@ fn artifacts_stale_detects_changed_tracked_file() {
             "--tracks",
             "src/commands/target.rs",
         ])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 
     // Modify the tracked file
     fs::write(&tracked_file, "// changed content").unwrap();
 
     // wai artifacts stale should report the artifact as stale
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["artifacts", "stale"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("stale"));
+        .output()
+        .expect("command should run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success());
+    assert!(stdout.contains("stale"));
 }
 
 #[test]
@@ -117,7 +122,7 @@ fn artifacts_stale_reports_untracked_artifact_separately() {
     fs::write(&tracked_file, "// content").unwrap();
 
     // Add a research artifact with tracks
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args([
             "add",
             "research",
@@ -127,20 +132,12 @@ fn artifacts_stale_reports_untracked_artifact_separately() {
             "--tracks",
             "src/thing.rs",
         ])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 
     // Manually delete the sidecar to simulate "untracked" state
-    let research_dir = tmp.path().join(".wai/projects/proj/research");
-    let sidecars: Vec<_> = fs::read_dir(&research_dir)
-        .unwrap()
-        .filter_map(|e| e.ok())
-        .filter(|e| e.file_name().to_string_lossy().ends_with(".fresh.lock"))
-        .collect();
-
-    for sidecar in &sidecars {
-        fs::remove_file(sidecar.path()).unwrap();
-    }
+    delete_fresh_sidecars(&tmp.path().join(".wai/projects/proj/research"));
 
     // JSON output should have untracked entry
     let output = wai_cmd(tmp.path())
@@ -157,6 +154,20 @@ fn artifacts_stale_reports_untracked_artifact_separately() {
     assert!(!untracked.is_empty(), "expected untracked artifact in JSON");
 }
 
+/// Delete every `.fresh.lock` sidecar in `research_dir` to simulate an
+/// untracked (freshness-lost) artifact.
+fn delete_fresh_sidecars(research_dir: &std::path::Path) {
+    let sidecars: Vec<_> = fs::read_dir(research_dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_name().to_string_lossy().ends_with(".fresh.lock"))
+        .collect();
+
+    for sidecar in &sidecars {
+        fs::remove_file(sidecar.path()).unwrap();
+    }
+}
+
 // ── wai add --tracks ─────────────────────────────────────────────────────────
 
 #[test]
@@ -170,7 +181,7 @@ fn add_research_with_tracks_writes_frontmatter_and_sidecar() {
     fs::create_dir_all(tracked_file.parent().unwrap()).unwrap();
     fs::write(&tracked_file, "// status implementation").unwrap();
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args([
             "add",
             "research",
@@ -180,8 +191,9 @@ fn add_research_with_tracks_writes_frontmatter_and_sidecar() {
             "--tracks",
             "src/commands/status.rs",
         ])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 
     let research_dir = tmp.path().join(".wai/projects/proj/research");
     let artifacts: Vec<_> = fs::read_dir(&research_dir)

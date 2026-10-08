@@ -301,19 +301,24 @@ pub fn resource_path(project_root: &Path, name: &str) -> PathBuf {
     resources_dir(project_root).join(name)
 }
 
+/// Get the global resources directory (~/.wai/resources/).
+///
+/// User-level resources (patterns, oracles, templates, …) shared across all
+/// projects and workspaces (wai-gkk3).
+pub fn global_resources_dir() -> PathBuf {
+    if let Some(home) = dirs::home_dir() {
+        home.join(".wai").join(RESOURCES_DIR)
+    } else {
+        PathBuf::from(".").join(".wai").join(RESOURCES_DIR)
+    }
+}
+
 /// Get the global skills directory path (~/.wai/resources/skills/).
 ///
 /// This is the user-level skill library shared across all projects.
 /// Skills here are available in every project, with local skills taking priority.
 pub fn global_skills_dir() -> PathBuf {
-    if let Some(home) = dirs::home_dir() {
-        home.join(".wai").join(RESOURCES_DIR).join(SKILLS_DIR)
-    } else {
-        PathBuf::from(".")
-            .join(".wai")
-            .join(RESOURCES_DIR)
-            .join(SKILLS_DIR)
-    }
+    global_resources_dir().join(SKILLS_DIR)
 }
 
 /// User-level configuration (stored in ~/.config/wai/config.toml)

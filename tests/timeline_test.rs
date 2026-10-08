@@ -1,5 +1,4 @@
 use assert_cmd::Command;
-use predicates::prelude::*;
 use std::fs;
 use tempfile::TempDir;
 
@@ -15,17 +14,19 @@ fn wai_cmd(dir: &std::path::Path) -> Command {
 }
 
 fn init_workspace(dir: &std::path::Path) {
-    wai_cmd(dir)
+    let out = wai_cmd(dir)
         .args(["init", "--name", "test-ws"])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 }
 
 fn create_project(dir: &std::path::Path, name: &str) {
-    wai_cmd(dir)
+    let out = wai_cmd(dir)
         .args(["new", "project", name])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 }
 
 fn write_artifact(
@@ -66,13 +67,15 @@ fn timeline_shows_dated_artifacts_in_output() {
         "Second\n",
     );
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["timeline", "my-app"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Timeline for"))
-        .stdout(predicate::str::contains("2026-01-10"))
-        .stdout(predicate::str::contains("2026-01-20"));
+        .output()
+        .expect("command should run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success());
+    assert!(stdout.contains("Timeline for"));
+    assert!(stdout.contains("2026-01-10"));
+    assert!(stdout.contains("2026-01-20"));
 }
 
 // ── date filter ───────────────────────────────────────────────────────────────
@@ -97,12 +100,14 @@ fn timeline_from_filter_excludes_older_entries() {
         "New\n",
     );
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["timeline", "my-app", "--from", "2026-02-01"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("2026-02-15"))
-        .stdout(predicate::str::contains("2026-01-05").not());
+        .output()
+        .expect("command should run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success());
+    assert!(stdout.contains("2026-02-15"));
+    assert!(!(stdout.contains("2026-01-05")));
 }
 
 // ── failure: missing project ──────────────────────────────────────────────────
@@ -112,9 +117,11 @@ fn timeline_nonexistent_project_fails_with_diagnostic() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["timeline", "ghost"])
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("not found"));
+        .output()
+        .expect("command should run");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(!out.status.success());
+    assert!(stderr.contains("not found"));
 }

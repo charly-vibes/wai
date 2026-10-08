@@ -6,7 +6,7 @@ use std::time::{Duration, SystemTime};
 
 use crate::config::{HANDOFFS_DIR, PLANS_DIR, STATE_FILE, projects_dir};
 use crate::context::current_context;
-use crate::json::{BeadsSummary, OpenspecEntry, PrimePayload};
+use crate::json::{BeadsSummary, OpenspecEntry, PipelineCurrentPayload, PrimePayload};
 use crate::openspec;
 use crate::output::print_envelope;
 use crate::plugin;
@@ -29,35 +29,103 @@ pub fn run(project: Option<String>) -> Result<()> {
     // Graceful empty state: if no projects exist at all, show a helpful prompt
     // rather than crashing with "No projects found."
     if project.is_none() && list_projects(&project_root).is_empty() {
-        if json_mode {
-            let payload = PrimePayload {
-                project: None,
-                phase: None,
-                resume: false,
-                handoff_summary: None,
-                next_steps: Vec::new(),
-                plans: Vec::new(),
-                prior_context: Vec::new(),
-                beads: None,
-                openspec: Vec::new(),
-                pipeline: None,
-            };
-            return print_envelope(genesis::envelope::EnvelopeKind::Ok, payload, vec![], vec![]);
-        }
-        let today = Local::now().format("%Y-%m-%d");
-        println!("{} wai prime — {}", "◆".cyan(), today);
-        println!(
-            "{} No active projects. Create one with `wai new project <name>`.",
-            "→".cyan()
-        );
-        return Ok(());
+        return render_empty_state(json_mode);
     }
 
-    let resolved = resolve_project(&project_root, project.as_deref())?;
+    let state = resolve_session_state(&project_root, project.as_deref())?;
+
+    if json_mode {
+        return render_json(&project_root, &state);
+    }
+
+    render_terminal(&project_root, &state)
+}
+
+/// Render the terminal orientation output (date header, project sections,
+/// and closing hints).
+fn render_terminal(project_root: &Path, state: &SessionState) -> Result<()> {
+    let project_name = &state.project_name;
+    let today = Local::now().format("%Y-%m-%d");
+    println!("{} wai prime — {}", "◆".cyan(), today);
+    println!(
+        "{} Project: {} [{}]",
+        "•".dimmed(),
+        project_name,
+        state.phase
+    );
+
+    render_resume_or_handoff(&state.resume_info, project_root, project_name)?;
+
+    // Plans — shown when available so the AI has orient context even with an empty handoff
+    render_section(
+        "Plans",
+        &read_recent_plans(project_root, &state.project_name, 3),
+    );
+
+    render_beads(&state.hook_outputs);
+
+    // Prior context — existing research/design/review docs so the agent does
+    // not repeat investigations that already happened.
+    render_section(
+        "Prior context",
+        &read_prior_context(project_root, &state.project_name, 5),
+    );
+
+    // Global patterns — listed unconditionally when non-empty: passive
+    // surfacing at session start must not depend on agent cooperation.
+    render_section(
+        "Global Patterns (~/.wai/resources/patterns)",
+        &global_patterns(),
+    );
+
+    render_spec_status(state.spec_status.as_ref());
+
+    render_memories(project_root);
+
+    render_closing_sections(project_root, &state.phase);
+
+    Ok(())
+}
+
+/// Closing orientation sections: worktree sync hint, pipelines, doctor
+/// health summary, and the suggested-next issue from bd ready.
+fn render_closing_sections(project_root: &Path, phase: &str) {
+    // Worktree sync suggestion
+    if detect_main_worktree_root(project_root).is_some() {
+        println!(
+            "{} In a git worktree — run `wai sync --from-main` to sync areas/resources",
+            "→".cyan()
+        );
+    }
+
+    // Pipelines — surface available/active pipelines for the current project
+    render_pipelines(project_root, phase);
+
+    // Doctor health summary — one line when not clean, silent when green.
+    render_health_summary(project_root);
+
+    // Suggested next via bd ready --json
+    if let Some(next_id) = suggested_next(project_root) {
+        println!("{} Suggested next: bd show {}", "→".cyan(), next_id);
+    }
+}
+
+/// Orientation state gathered once for both the JSON and terminal renders.
+struct SessionState {
+    project_name: String,
+    phase: String,
+    resume_info: Option<(PathBuf, NaiveDate, String)>,
+    hook_outputs: Vec<crate::plugin::HookOutput>,
+    spec_status: Option<crate::openspec::OpenSpecStatus>,
+}
+
+/// Resolve the project, phase, resume signal, and plugin outputs for a prime run.
+fn resolve_session_state(project_root: &Path, project: Option<&str>) -> Result<SessionState> {
+    let resolved = resolve_project(project_root, project)?;
     let project_name = resolved.name;
 
     // Read phase
-    let proj_dir = projects_dir(&project_root).join(&project_name);
+    let proj_dir = projects_dir(project_root).join(&project_name);
     let state_path = proj_dir.join(STATE_FILE);
     let phase = match ProjectState::load(&state_path) {
         Ok(state) => state.current.to_string(),
@@ -72,75 +140,96 @@ pub fn run(project: Option<String>) -> Result<()> {
     let resume_info = check_pending_resume(&proj_dir, &pending_resume_path);
 
     // Plugin summaries (beads, openspec) — gathered for both JSON and terminal paths.
-    let hook_outputs = plugin::run_hooks(&project_root, "on_status");
-    let spec_status = openspec::read_status(&project_root);
+    let hook_outputs = plugin::run_hooks(project_root, "on_status");
+    let spec_status = openspec::read_status(project_root);
 
+    Ok(SessionState {
+        project_name,
+        phase,
+        resume_info,
+        hook_outputs,
+        spec_status,
+    })
+}
+
+/// Render the graceful empty state (no projects at all).
+fn render_empty_state(json_mode: bool) -> Result<()> {
     if json_mode {
-        return render_json(
-            &project_root,
-            &project_name,
-            &phase,
-            resume_info,
-            &hook_outputs,
-            spec_status,
-        );
+        let payload = PrimePayload {
+            project: None,
+            phase: None,
+            resume: false,
+            handoff_summary: None,
+            next_steps: Vec::new(),
+            plans: Vec::new(),
+            prior_context: Vec::new(),
+            beads: None,
+            openspec: Vec::new(),
+            pipeline: None,
+            global_patterns: global_patterns(),
+        };
+        return print_envelope(genesis::envelope::EnvelopeKind::Ok, payload, vec![], vec![]);
     }
-
-    // Date header
     let today = Local::now().format("%Y-%m-%d");
     println!("{} wai prime — {}", "◆".cyan(), today);
+    println!(
+        "{} No active projects. Create one with `wai new project <name>`.",
+        "→".cyan()
+    );
+    Ok(())
+}
 
-    // Project + phase
-    println!("{} Project: {} [{}]", "•".dimmed(), project_name, phase);
-
+/// Render the resume banner (⚡ RESUMING with next steps) or, in the normal
+/// path, the latest handoff summary line.
+fn render_resume_or_handoff(
+    resume_info: &Option<(PathBuf, NaiveDate, String)>,
+    project_root: &Path,
+    project_name: &str,
+) -> Result<()> {
     if let Some((handoff_path, date, snippet)) = resume_info {
         println!("⚡ RESUMING: {} — '{}'", date.format("%Y-%m-%d"), snippet);
-        let steps = extract_next_steps(&handoff_path);
+        let steps = extract_next_steps(handoff_path);
         if !steps.is_empty() {
             println!("  Next Steps:");
             for step in &steps {
                 println!("    {}", step);
             }
         }
-    } else {
-        // Handoff (normal path)
-        if let Some(handoff_path) = find_latest_handoff(&project_root, &project_name)? {
-            let (date, snippet) = read_handoff_summary(&handoff_path);
-            if !snippet.is_empty() {
-                println!("{} Handoff: {} — '{}'", "•".dimmed(), date, snippet);
-            }
-            // If snippet is empty, it means missing/invalid frontmatter → skip the line
+    } else if let Some(handoff_path) = find_latest_handoff(project_root, project_name)? {
+        let (date, snippet) = read_handoff_summary(&handoff_path);
+        if !snippet.is_empty() {
+            println!("{} Handoff: {} — '{}'", "•".dimmed(), date, snippet);
         }
+        // If snippet is empty, it means missing/invalid frontmatter → skip the line
     }
+    Ok(())
+}
 
-    // Plans — shown when available so the AI has orient context even with an empty handoff
-    let plans = read_recent_plans(&project_root, &project_name, 3);
-    if !plans.is_empty() {
-        println!("{} Plans:", "◆".cyan());
-        for plan in &plans {
-            println!("  {} {}", "•".dimmed(), plan);
-        }
+/// Render a titled bullet list; omitted entirely when the list is empty.
+fn render_section(title: &str, items: &[String]) {
+    if items.is_empty() {
+        return;
     }
+    println!("{} {title}:", "◆".cyan());
+    for item in items {
+        println!("  {} {}", "•".dimmed(), item);
+    }
+}
 
-    for output in &hook_outputs {
+/// Render the beads open/ready summary from the beads_stats hook output.
+fn render_beads(hook_outputs: &[crate::plugin::HookOutput]) {
+    for output in hook_outputs {
         if output.label == "beads_stats"
             && let Some(summary) = beads_summary(&output.content)
         {
             println!("{} Beads:   {}", "•".dimmed(), summary);
         }
     }
+}
 
-    // Prior context — existing research/design/review docs so the agent does
-    // not repeat investigations that already happened.
-    let prior = read_prior_context(&project_root, &project_name, 5);
-    if !prior.is_empty() {
-        println!("{} Prior context:", "◆".cyan());
-        for doc in &prior {
-            println!("  {} {}", "•".dimmed(), doc);
-        }
-    }
-
-    if let Some(ref spec) = spec_status {
+/// Render openspec change progress lines.
+fn render_spec_status(spec_status: Option<&crate::openspec::OpenSpecStatus>) {
+    if let Some(spec) = spec_status {
         for change in &spec.changes {
             let pct = (change.done * 100).checked_div(change.total).unwrap_or(0);
             println!(
@@ -153,9 +242,11 @@ pub fn run(project: Option<String>) -> Result<()> {
             );
         }
     }
+}
 
-    // bd memories — show up to 5, omit section if unavailable
-    if let Some(memories_raw) = fetch_memories(&project_root) {
+/// Render bd memories (up to 5, truncated); omit section if unavailable.
+fn render_memories(project_root: &Path) {
+    if let Some(memories_raw) = fetch_memories(project_root) {
         let lines: Vec<&str> = memories_raw
             .lines()
             .filter(|l| !l.trim().is_empty())
@@ -180,67 +271,29 @@ pub fn run(project: Option<String>) -> Result<()> {
             }
         }
     }
-
-    // Worktree sync suggestion
-    if detect_main_worktree_root(&project_root).is_some() {
-        println!(
-            "{} In a git worktree — run `wai sync --from-main` to sync areas/resources",
-            "→".cyan()
-        );
-    }
-
-    // Pipelines — surface available/active pipelines for the current project
-    render_pipelines(&project_root, &phase);
-
-    // Doctor health summary — one line when not clean, silent when green.
-    render_health_summary(&project_root);
-
-    // Suggested next via bd ready --json
-    if let Some(next_id) = suggested_next(&project_root) {
-        println!("{} Suggested next: bd show {}", "→".cyan(), next_id);
-    }
-
-    Ok(())
 }
 
 /// Render the prime output as structured JSON.
-fn render_json(
-    project_root: &Path,
-    project_name: &str,
-    phase: &str,
-    resume_info: Option<(PathBuf, NaiveDate, String)>,
-    hook_outputs: &[crate::plugin::HookOutput],
-    spec_status: Option<crate::openspec::OpenSpecStatus>,
-) -> Result<()> {
+fn render_json(project_root: &Path, state: &SessionState) -> Result<()> {
+    let project_name = &state.project_name;
     let (resume, handoff_summary, next_steps) =
-        if let Some((handoff_path, _, snippet)) = resume_info {
-            let steps = extract_next_steps(&handoff_path);
-            (true, Some(snippet), steps)
-        } else {
-            // Normal path: read latest handoff for summary only (no next steps shown).
-            let summary = find_latest_handoff(project_root, project_name)?.and_then(|hp| {
-                let (_, snippet) = read_handoff_summary(&hp);
-                if snippet.is_empty() {
-                    None
-                } else {
-                    Some(snippet)
-                }
-            });
-            (false, summary, Vec::new())
-        };
+        resolve_resume_context(state.resume_info.clone(), project_root, project_name)?;
 
-    let beads = hook_outputs
+    let beads = state
+        .hook_outputs
         .iter()
         .find(|o| o.label == "beads_stats")
         .and_then(|o| beads_counts(&o.content))
         .map(|(open, ready)| BeadsSummary { open, ready });
 
-    let openspec = spec_status
+    let openspec = state
+        .spec_status
+        .as_ref()
         .map(|s| {
             s.changes
-                .into_iter()
+                .iter()
                 .map(|c| OpenspecEntry {
-                    name: c.name,
+                    name: c.name.clone(),
                     done: c.done,
                     total: c.total,
                 })
@@ -258,29 +311,82 @@ fn render_json(
         next_steps
     };
 
-    let plans = read_recent_plans(project_root, project_name, 3);
-    let prior_context = read_prior_context(project_root, project_name, 5);
-
-    // Adopt gate (wai-vx02.1): surface an active incomplete run in the JSON
-    // payload. Reuses the close-time completeness predicate (wai-csgb).
-    let pipeline = pipeline_current_status(project_root)
-        .ok()
-        .flatten()
-        .filter(|status| status.active && run_is_incomplete(status));
-
     let payload = PrimePayload {
         project: Some(project_name.to_string()),
-        phase: Some(phase.to_string()),
+        phase: Some(state.phase.clone()),
         resume,
         handoff_summary,
         next_steps,
-        plans,
-        prior_context,
+        plans: read_recent_plans(project_root, project_name, 3),
+        prior_context: read_prior_context(project_root, project_name, 5),
         beads,
         openspec,
-        pipeline,
+        // Adopt gate (wai-vx02.1): surface an active incomplete run in the
+        // JSON payload. Reuses the close-time completeness predicate (wai-csgb).
+        pipeline: pipeline_current_status(project_root)
+            .ok()
+            .flatten()
+            .filter(|status| status.active && run_is_incomplete(status)),
+        global_patterns: global_patterns(),
     };
     print_envelope(genesis::envelope::EnvelopeKind::Ok, payload, vec![], vec![])
+}
+
+/// Resolve (resume, handoff_summary, next_steps) for the JSON payload.
+/// When resuming, steps come from the handoff's next-steps section; the
+/// normal path reads the latest handoff for a summary only.
+fn resolve_resume_context(
+    resume_info: Option<(PathBuf, NaiveDate, String)>,
+    project_root: &Path,
+    project_name: &str,
+) -> Result<(bool, Option<String>, Vec<String>)> {
+    if let Some((handoff_path, _, snippet)) = resume_info {
+        let steps = extract_next_steps(&handoff_path);
+        return Ok((true, Some(snippet), steps));
+    }
+    let summary = find_latest_handoff(project_root, project_name)?.and_then(|hp| {
+        let (_, snippet) = read_handoff_summary(&hp);
+        if snippet.is_empty() {
+            None
+        } else {
+            Some(snippet)
+        }
+    });
+    Ok((false, summary, Vec::new()))
+}
+
+/// List global pattern docs (~/.wai/resources/patterns/*.md) as
+/// "name — first heading" lines (wai-gkk3). Empty when the directory is
+/// absent or contains no markdown files.
+fn global_patterns() -> Vec<String> {
+    let dir = crate::config::global_resources_dir().join("patterns");
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        return Vec::new();
+    };
+    let mut paths: Vec<PathBuf> = entries
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .filter(|p| p.extension().and_then(|ext| ext.to_str()) == Some("md"))
+        .collect();
+    paths.sort();
+    paths
+        .iter()
+        .filter_map(|path| {
+            let name = path.file_stem()?.to_str()?.to_string();
+            let heading = std::fs::read_to_string(path)
+                .ok()?
+                .lines()
+                .find_map(|line| {
+                    line.strip_prefix("# ")
+                        .map(|h| h.trim().to_string())
+                        .filter(|h| !h.is_empty())
+                });
+            match heading {
+                Some(h) => Some(format!("{name} — {h}")),
+                None => Some(name),
+            }
+        })
+        .collect()
 }
 
 /// Parse the `date:` field from a handoff's frontmatter, returning `None` if
@@ -591,43 +697,7 @@ fn render_pipelines(project_root: &Path, phase: &str) {
     if let Some(status) = pipeline_current_status(project_root).ok().flatten()
         && status.active
     {
-        let name = status.pipeline.unwrap_or_default();
-        println!("{} Pipelines", "◆".cyan());
-        match status.step {
-            Some(step) => {
-                // Session-start adoption gate (wai-vx02.1): a mid-flight run is
-                // a hard adopt/ resume decision, not a passive status line.
-                let run_id = status.run_id.as_deref().unwrap_or("<unknown>");
-                println!(
-                    "{} PIPELINE RUN ADOPT/RESUME: {} — {} step {}/{}",
-                    "⚡".yellow(),
-                    run_id,
-                    name,
-                    step.index,
-                    step.total,
-                );
-                if let Some(topic) = &status.topic {
-                    println!("  {} topic: {}", "•".dimmed(), topic);
-                }
-                println!(
-                    "  {} Resume: {}",
-                    "→".cyan(),
-                    status
-                        .next_command
-                        .unwrap_or_else(|| "wai pipeline next".to_string()),
-                );
-            }
-            // Run is complete — nudge the user to close it.
-            None => println!(
-                "{} {} {} complete — {}",
-                "⚡".yellow(),
-                "PIPELINE ACTIVE:".yellow(),
-                name,
-                status
-                    .next_command
-                    .unwrap_or_else(|| "wai close".to_string()),
-            ),
-        }
+        render_active_pipeline_run(status);
         return;
     }
 
@@ -651,6 +721,46 @@ fn render_pipelines(project_root: &Path, phase: &str) {
             "→".cyan(),
             matched.name
         );
+    }
+}
+
+/// Render an active mid-flight pipeline run (wai-vx02.1): a hard adopt/
+/// resume decision, not a passive status line.
+fn render_active_pipeline_run(status: PipelineCurrentPayload) {
+    let name = status.pipeline.unwrap_or_default();
+    println!("{} Pipelines", "◆".cyan());
+    match status.step {
+        Some(step) => {
+            let run_id = status.run_id.as_deref().unwrap_or("<unknown>");
+            println!(
+                "{} PIPELINE RUN ADOPT/RESUME: {} — {} step {}/{}",
+                "⚡".yellow(),
+                run_id,
+                name,
+                step.index,
+                step.total,
+            );
+            if let Some(topic) = &status.topic {
+                println!("  {} topic: {}", "•".dimmed(), topic);
+            }
+            println!(
+                "  {} Resume: {}",
+                "→".cyan(),
+                status
+                    .next_command
+                    .unwrap_or_else(|| "wai pipeline next".to_string()),
+            );
+        }
+        // Run is complete — nudge the user to close it.
+        None => println!(
+            "{} {} {} complete — {}",
+            "⚡".yellow(),
+            "PIPELINE ACTIVE:".yellow(),
+            name,
+            status
+                .next_command
+                .unwrap_or_else(|| "wai close".to_string()),
+        ),
     }
 }
 

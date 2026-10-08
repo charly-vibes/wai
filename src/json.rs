@@ -215,6 +215,10 @@ pub struct PrimePayload {
     /// `wai pipeline current --json` so consumers share the parser.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pipeline: Option<PipelineCurrentPayload>,
+    /// Global patterns (~/.wai/resources/patterns/*.md) as "name — heading"
+    /// lines (wai-gkk3) so repo-session agents discover user-level canon.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub global_patterns: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]

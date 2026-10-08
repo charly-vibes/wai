@@ -1,5 +1,4 @@
 use assert_cmd::Command;
-use predicates::prelude::*;
 use std::fs;
 use tempfile::TempDir;
 
@@ -20,10 +19,11 @@ fn wai_cmd(dir: &std::path::Path) -> Command {
 fn init_creates_wai_directory_structure() {
     let tmp = TempDir::new().unwrap();
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["init", "--name", "my-ws"])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 
     assert!(tmp.path().join(".wai/projects").is_dir());
     assert!(tmp.path().join(".wai/areas").is_dir());
@@ -43,16 +43,19 @@ fn init_creates_wai_directory_structure() {
 fn init_reinit_warns_already_initialized() {
     let tmp = TempDir::new().unwrap();
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["init", "--name", "my-ws"])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["init", "--name", "my-ws"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("already initialized"));
+        .output()
+        .expect("command should run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success());
+    assert!(stdout.contains("already initialized"));
 }
 
 // ── non-default flag: --json ──────────────────────────────────────────────────

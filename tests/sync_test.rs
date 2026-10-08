@@ -14,10 +14,11 @@ fn wai_cmd(dir: &std::path::Path) -> Command {
 }
 
 fn init_workspace(dir: &std::path::Path) {
-    wai_cmd(dir)
+    let out = wai_cmd(dir)
         .args(["init", "--name", "test-ws"])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 }
 
 fn write_projections_yml(dir: &std::path::Path, content: &str) {
@@ -41,7 +42,11 @@ fn sync_projects_inline_source_to_target_file() {
         "projections:\n  - target: GUIDE.md\n    strategy: inline\n    sources: [docs]\n",
     );
 
-    wai_cmd(tmp.path()).args(["sync"]).assert().success();
+    let out = wai_cmd(tmp.path())
+        .args(["sync"])
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 
     assert!(
         tmp.path().join("GUIDE.md").exists(),
@@ -65,10 +70,11 @@ fn sync_dry_run_does_not_create_files() {
         "projections:\n  - target: GUIDE.md\n    strategy: inline\n    sources: [docs]\n",
     );
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["sync", "--dry-run"])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 
     assert!(
         !tmp.path().join("GUIDE.md").exists(),
@@ -83,5 +89,9 @@ fn sync_empty_workspace_succeeds_without_projections() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
 
-    wai_cmd(tmp.path()).args(["sync"]).assert().success();
+    let out = wai_cmd(tmp.path())
+        .args(["sync"])
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 }

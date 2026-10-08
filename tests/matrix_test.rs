@@ -4,7 +4,6 @@
 //! deciding (3.x), renderer (4.x), lints (5.x), and phase gate (6.1).
 
 use assert_cmd::Command;
-use predicates::prelude::*;
 use std::fs;
 use std::path::Path;
 use tempfile::TempDir;
@@ -21,17 +20,22 @@ fn wai_cmd(dir: &Path) -> Command {
 }
 
 fn init_workspace(dir: &Path) {
-    wai_cmd(dir)
-        .args(["init", "--name", "test-ws"])
-        .assert()
-        .success();
+    run_ok(dir, &["init", "--name", "test-ws"]);
 }
 
 fn create_project(dir: &Path, name: &str) {
-    wai_cmd(dir)
-        .args(["new", "project", name])
-        .assert()
-        .success();
+    run_ok(dir, &["new", "project", name]);
+}
+
+/// Run `wai <args>` in `dir`, asserting success; returns the output so
+/// callers can add their own assertions (pretender counts per-function).
+fn run_ok(dir: &Path, args: &[&str]) -> std::process::Output {
+    let out = wai_cmd(dir)
+        .args(args)
+        .output()
+        .expect("command should run");
+    assert!(out.status.success(), "wai {:?} failed", args);
+    out
 }
 
 fn matrix_dir(dir: &Path, project: &str) -> std::path::PathBuf {
@@ -48,10 +52,10 @@ fn matrix_init_scaffolds_expected_layout() {
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
-    wai_cmd(tmp.path())
-        .args(["matrix", "init", "Which storage engine should we adopt?"])
-        .assert()
-        .success();
+    run_ok(
+        tmp.path(),
+        &["matrix", "init", "Which storage engine should we adopt?"],
+    );
 
     let m = matrix_dir(tmp.path(), "my-app");
     assert!(m.join("problem.md").exists(), "problem.md must exist");
@@ -81,25 +85,25 @@ fn matrix_init_twice_fails_naming_existing_matrix() {
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
-    wai_cmd(tmp.path())
-        .args(["matrix", "init", "first"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "init", "first"]);
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["matrix", "init", "second"])
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("matrix"));
+        .output()
+        .expect("command should run");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(!out.status.success());
+    assert!(stderr.contains("matrix"));
 }
 
 #[test]
 fn matrix_init_requires_workspace() {
     let tmp = TempDir::new().unwrap();
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["matrix", "init", "problem"])
-        .assert()
-        .failure();
+        .output()
+        .expect("command should run");
+    assert!(!out.status.success());
 }
 
 // ── 1.3 criterion add ─────────────────────────────────────────────────────────
@@ -109,19 +113,13 @@ fn matrix_criterion_add_touches_every_approach() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
-    wai_cmd(tmp.path())
-        .args(["matrix", "init", "problem"])
-        .assert()
-        .success();
-    wai_cmd(tmp.path())
-        .args(["matrix", "approach", "add", "event-sourcing"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "init", "problem"]);
+    run_ok(tmp.path(), &["matrix", "approach", "add", "event-sourcing"]);
 
-    wai_cmd(tmp.path())
-        .args(["matrix", "criterion", "add", "operational-cost"])
-        .assert()
-        .success();
+    run_ok(
+        tmp.path(),
+        &["matrix", "criterion", "add", "operational-cost"],
+    );
 
     let m = matrix_dir(tmp.path(), "my-app");
     let crit = m.join("criteria/01-operational-cost.md");
@@ -145,23 +143,11 @@ fn matrix_approach_add_creates_empty_cells_for_all_criteria() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
-    wai_cmd(tmp.path())
-        .args(["matrix", "init", "problem"])
-        .assert()
-        .success();
-    wai_cmd(tmp.path())
-        .args(["matrix", "criterion", "add", "impact"])
-        .assert()
-        .success();
-    wai_cmd(tmp.path())
-        .args(["matrix", "criterion", "add", "risk"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "init", "problem"]);
+    run_ok(tmp.path(), &["matrix", "criterion", "add", "impact"]);
+    run_ok(tmp.path(), &["matrix", "criterion", "add", "risk"]);
 
-    wai_cmd(tmp.path())
-        .args(["matrix", "approach", "add", "event-sourcing"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "approach", "add", "event-sourcing"]);
 
     let m = matrix_dir(tmp.path(), "my-app");
     let approach = m.join("approaches/02-event-sourcing");
@@ -180,24 +166,18 @@ fn matrix_decide_writes_decision_and_design_doc() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
-    wai_cmd(tmp.path())
-        .args(["matrix", "init", "problem"])
-        .assert()
-        .success();
-    wai_cmd(tmp.path())
-        .args(["matrix", "approach", "add", "event-sourcing"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "init", "problem"]);
+    run_ok(tmp.path(), &["matrix", "approach", "add", "event-sourcing"]);
 
-    wai_cmd(tmp.path())
-        .args([
+    run_ok(
+        tmp.path(),
+        &[
             "matrix",
             "decide",
             "02-event-sourcing",
             "Best audit story at acceptable ops cost.",
-        ])
-        .assert()
-        .success();
+        ],
+    );
 
     let m = matrix_dir(tmp.path(), "my-app");
     let decision = fs::read_to_string(m.join("decision.md")).unwrap();
@@ -235,16 +215,15 @@ fn matrix_decide_rejects_unknown_approach_listing_valid() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
-    wai_cmd(tmp.path())
-        .args(["matrix", "init", "problem"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "init", "problem"]);
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["matrix", "decide", "02-nope", "because"])
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("01-status-quo"));
+        .output()
+        .expect("command should run");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(!out.status.success());
+    assert!(stderr.contains("01-status-quo"));
 }
 
 #[test]
@@ -252,26 +231,17 @@ fn matrix_decide_snapshot_includes_winning_column_facts() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
-    wai_cmd(tmp.path())
-        .args(["matrix", "init", "problem"])
-        .assert()
-        .success();
-    wai_cmd(tmp.path())
-        .args(["matrix", "approach", "add", "event-sourcing"])
-        .assert()
-        .success();
-    wai_cmd(tmp.path())
-        .args(["matrix", "criterion", "add", "impact"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "init", "problem"]);
+    run_ok(tmp.path(), &["matrix", "approach", "add", "event-sourcing"]);
+    run_ok(tmp.path(), &["matrix", "criterion", "add", "impact"]);
 
     let cell = matrix_dir(tmp.path(), "my-app").join("approaches/02-event-sourcing/01-impact");
     fs::write(cell.join("fact.md"), "Full audit trail by construction.").unwrap();
 
-    wai_cmd(tmp.path())
-        .args(["matrix", "decide", "02-event-sourcing", "because"])
-        .assert()
-        .success();
+    run_ok(
+        tmp.path(),
+        &["matrix", "decide", "02-event-sourcing", "because"],
+    );
 
     let designs = tmp.path().join(".wai/projects/my-app/designs");
     let body = fs::read_dir(&designs)
@@ -298,10 +268,7 @@ fn setup_matrix() -> (TempDir, std::path::PathBuf) {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
-    wai_cmd(tmp.path())
-        .args(["matrix", "init", "problem"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "init", "problem"]);
     let m = matrix_dir(tmp.path(), "my-app");
     (tmp, m)
 }
@@ -316,7 +283,8 @@ fn lint_cmd(dir: &Path) -> Command {
 fn lint_valid_matrix_passes() {
     let (tmp, m) = setup_matrix();
     fill_cell(&m, "01-status-quo", "x", "fact", Some("red"));
-    lint_cmd(tmp.path()).assert().success();
+    let out = lint_cmd(tmp.path()).output().expect("lint should run");
+    assert!(out.status.success());
 }
 
 // 5.1 rectangularity
@@ -324,21 +292,15 @@ fn lint_valid_matrix_passes() {
 #[test]
 fn lint_missing_cell_fails_naming_path() {
     let (tmp, m) = setup_matrix();
-    wai_cmd(tmp.path())
-        .args(["matrix", "criterion", "add", "impact"])
-        .assert()
-        .success();
-    wai_cmd(tmp.path())
-        .args(["matrix", "approach", "add", "es"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "criterion", "add", "impact"]);
+    run_ok(tmp.path(), &["matrix", "approach", "add", "es"]);
     // remove the cell dir from one approach → non-rectangular
     fs::remove_dir_all(m.join("approaches/02-es/01-impact")).unwrap();
 
-    lint_cmd(tmp.path())
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("02-es/01-impact"));
+    let out = lint_cmd(tmp.path()).output().expect("command should run");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(!out.status.success());
+    assert!(stderr.contains("02-es/01-impact"));
 }
 
 // 5.2 markers
@@ -346,33 +308,28 @@ fn lint_missing_cell_fails_naming_path() {
 #[test]
 fn lint_multiple_markers_fails_naming_cell() {
     let (tmp, m) = setup_matrix();
-    wai_cmd(tmp.path())
-        .args(["matrix", "criterion", "add", "c"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "criterion", "add", "c"]);
     let cell = m.join("approaches/01-status-quo/01-c");
     fs::write(cell.join("fact.md"), "fact").unwrap();
     fs::write(cell.join("green"), "").unwrap();
     fs::write(cell.join("red"), "").unwrap();
 
-    lint_cmd(tmp.path())
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("01-c"));
+    let out = lint_cmd(tmp.path()).output().expect("command should run");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(!out.status.success());
+    assert!(stderr.contains("01-c"));
 }
 
 #[test]
 fn lint_unknown_marker_fails() {
     let (tmp, m) = setup_matrix();
-    wai_cmd(tmp.path())
-        .args(["matrix", "criterion", "add", "c"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "criterion", "add", "c"]);
     let cell = m.join("approaches/01-status-quo/01-c");
     fs::write(cell.join("fact.md"), "fact").unwrap();
     fs::write(cell.join("chartreuse"), "").unwrap();
 
-    lint_cmd(tmp.path()).assert().failure();
+    let out = lint_cmd(tmp.path()).output().expect("lint should run");
+    assert!(!out.status.success());
 }
 
 // 5.3 empty/missing fact
@@ -380,28 +337,23 @@ fn lint_unknown_marker_fails() {
 #[test]
 fn lint_empty_fact_md_fails() {
     let (tmp, m) = setup_matrix();
-    wai_cmd(tmp.path())
-        .args(["matrix", "criterion", "add", "c"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "criterion", "add", "c"]);
     fs::write(m.join("approaches/01-status-quo/01-c/fact.md"), "   \n").unwrap();
 
-    lint_cmd(tmp.path()).assert().failure();
+    let out = lint_cmd(tmp.path()).output().expect("lint should run");
+    assert!(!out.status.success());
 }
 
 #[test]
 fn lint_marker_without_fact_reports_incomplete() {
     let (tmp, m) = setup_matrix();
-    wai_cmd(tmp.path())
-        .args(["matrix", "criterion", "add", "c"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "criterion", "add", "c"]);
     fs::write(m.join("approaches/01-status-quo/01-c/red"), "").unwrap();
 
-    lint_cmd(tmp.path())
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("missing or empty fact.md"));
+    let out = lint_cmd(tmp.path()).output().expect("command should run");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(!out.status.success());
+    assert!(stderr.contains("missing or empty fact.md"));
 }
 
 // 5.4 status quo first
@@ -410,7 +362,8 @@ fn lint_marker_without_fact_reports_incomplete() {
 fn lint_missing_status_quo_fails() {
     let (tmp, m) = setup_matrix();
     fs::remove_dir_all(m.join("approaches/01-status-quo")).unwrap();
-    lint_cmd(tmp.path()).assert().failure();
+    let out = lint_cmd(tmp.path()).output().expect("lint should run");
+    assert!(!out.status.success());
 }
 
 // 5.5 all-green column
@@ -418,20 +371,14 @@ fn lint_missing_status_quo_fails() {
 #[test]
 fn lint_all_green_column_warns_but_passes() {
     let (tmp, m) = setup_matrix();
-    wai_cmd(tmp.path())
-        .args(["matrix", "approach", "add", "es"])
-        .assert()
-        .success();
-    wai_cmd(tmp.path())
-        .args(["matrix", "criterion", "add", "c"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "approach", "add", "es"]);
+    run_ok(tmp.path(), &["matrix", "criterion", "add", "c"]);
     fill_cell(&m, "02-es", "01-c", "Perfect in every way.", Some("green"));
 
-    lint_cmd(tmp.path())
-        .assert()
-        .success()
-        .stderr(predicate::str::contains("02-es"));
+    let out = lint_cmd(tmp.path()).output().expect("command should run");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success());
+    assert!(stderr.contains("02-es"));
 }
 
 // 5.6 undistinguished columns
@@ -439,21 +386,15 @@ fn lint_all_green_column_warns_but_passes() {
 #[test]
 fn lint_undistinguished_columns_warn() {
     let (tmp, m) = setup_matrix();
-    wai_cmd(tmp.path())
-        .args(["matrix", "approach", "add", "es"])
-        .assert()
-        .success();
-    wai_cmd(tmp.path())
-        .args(["matrix", "criterion", "add", "c"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "approach", "add", "es"]);
+    run_ok(tmp.path(), &["matrix", "criterion", "add", "c"]);
     fill_cell(&m, "01-status-quo", "01-c", "Same text.", Some("neutral"));
     fill_cell(&m, "02-es", "01-c", "Same text.", Some("neutral"));
 
-    lint_cmd(tmp.path())
-        .assert()
-        .success()
-        .stderr(predicate::str::contains("indistinguish"));
+    let out = lint_cmd(tmp.path()).output().expect("command should run");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success());
+    assert!(stderr.contains("indistinguish"));
 }
 
 // 5.7/5.8/5.9 text lints
@@ -461,10 +402,7 @@ fn lint_undistinguished_columns_warn() {
 #[test]
 fn lint_judgment_words_in_fact_warn() {
     let (tmp, m) = setup_matrix();
-    wai_cmd(tmp.path())
-        .args(["matrix", "criterion", "add", "c"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "criterion", "add", "c"]);
     fill_cell(
         &m,
         "01-status-quo",
@@ -473,19 +411,16 @@ fn lint_judgment_words_in_fact_warn() {
         Some("neutral"),
     );
 
-    lint_cmd(tmp.path())
-        .assert()
-        .success()
-        .stderr(predicate::str::contains("judgment"));
+    let out = lint_cmd(tmp.path()).output().expect("command should run");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success());
+    assert!(stderr.contains("judgment"));
 }
 
 #[test]
 fn lint_link_only_cell_warns() {
     let (tmp, m) = setup_matrix();
-    wai_cmd(tmp.path())
-        .args(["matrix", "criterion", "add", "c"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "criterion", "add", "c"]);
     fill_cell(
         &m,
         "01-status-quo",
@@ -494,29 +429,26 @@ fn lint_link_only_cell_warns() {
         Some("neutral"),
     );
 
-    lint_cmd(tmp.path())
-        .assert()
-        .success()
-        .stderr(predicate::str::contains("link"));
+    let out = lint_cmd(tmp.path()).output().expect("command should run");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success());
+    assert!(stderr.contains("link"));
 }
 
 #[test]
 fn lint_criterion_phrased_as_question_warns() {
     let (tmp, _m) = setup_matrix();
-    wai_cmd(tmp.path())
-        .args(["matrix", "criterion", "add", "c"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "criterion", "add", "c"]);
     fs::write(
         matrix_dir(tmp.path(), "my-app").join("criteria/01-c.md"),
         "# c\n\nHow cheap is it?\n",
     )
     .unwrap();
 
-    lint_cmd(tmp.path())
-        .assert()
-        .success()
-        .stderr(predicate::str::contains("question"));
+    let out = lint_cmd(tmp.path()).output().expect("command should run");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success());
+    assert!(stderr.contains("question"));
 }
 
 // status-quo without red
@@ -524,10 +456,7 @@ fn lint_criterion_phrased_as_question_warns() {
 #[test]
 fn lint_status_quo_without_red_warns() {
     let (tmp, m) = setup_matrix();
-    wai_cmd(tmp.path())
-        .args(["matrix", "criterion", "add", "c"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "criterion", "add", "c"]);
     fill_cell(
         &m,
         "01-status-quo",
@@ -536,10 +465,10 @@ fn lint_status_quo_without_red_warns() {
         Some("green"),
     );
 
-    lint_cmd(tmp.path())
-        .assert()
-        .success()
-        .stderr(predicate::str::contains("status quo"));
+    let out = lint_cmd(tmp.path()).output().expect("command should run");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success());
+    assert!(stderr.contains("status quo"));
 }
 
 // decided with unfilled cells
@@ -547,23 +476,14 @@ fn lint_status_quo_without_red_warns() {
 #[test]
 fn lint_decided_with_unfilled_cells_warns() {
     let (tmp, _m) = setup_matrix();
-    wai_cmd(tmp.path())
-        .args(["matrix", "approach", "add", "es"])
-        .assert()
-        .success();
-    wai_cmd(tmp.path())
-        .args(["matrix", "criterion", "add", "c"])
-        .assert()
-        .success();
-    wai_cmd(tmp.path())
-        .args(["matrix", "decide", "02-es", "because"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "approach", "add", "es"]);
+    run_ok(tmp.path(), &["matrix", "criterion", "add", "c"]);
+    run_ok(tmp.path(), &["matrix", "decide", "02-es", "because"]);
 
-    lint_cmd(tmp.path())
-        .assert()
-        .success()
-        .stderr(predicate::str::contains("unfilled"));
+    let out = lint_cmd(tmp.path()).output().expect("command should run");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success());
+    assert!(stderr.contains("unfilled"));
 }
 
 // 5.10 empty problem
@@ -572,10 +492,10 @@ fn lint_decided_with_unfilled_cells_warns() {
 fn lint_empty_problem_md_warns() {
     let (tmp, m) = setup_matrix();
     fs::write(m.join("problem.md"), "# Problem\n\n").unwrap();
-    lint_cmd(tmp.path())
-        .assert()
-        .success()
-        .stderr(predicate::str::contains("problem"));
+    let out = lint_cmd(tmp.path()).output().expect("lint should run");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success());
+    assert!(stderr.contains("problem"));
 }
 
 // 5.11 stale decision
@@ -583,15 +503,9 @@ fn lint_empty_problem_md_warns() {
 #[test]
 fn lint_stale_decision_warns() {
     let (tmp, m) = setup_matrix();
-    wai_cmd(tmp.path())
-        .args(["matrix", "criterion", "add", "c"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "criterion", "add", "c"]);
     fill_cell(&m, "01-status-quo", "01-c", "fact", Some("red"));
-    wai_cmd(tmp.path())
-        .args(["matrix", "decide", "01-status-quo", "keep"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "decide", "01-status-quo", "keep"]);
     // simulate an edit after the decision, with a decision timestamp in the past
     fill_cell(&m, "01-status-quo", "01-c", "edited fact", Some("red"));
     let decision = fs::read_to_string(m.join("decision.md")).unwrap();
@@ -608,10 +522,10 @@ fn lint_stale_decision_warns() {
         .join("\n");
     fs::write(m.join("decision.md"), rewritten).unwrap();
 
-    lint_cmd(tmp.path())
-        .assert()
-        .success()
-        .stderr(predicate::str::contains("newer than the decision"));
+    let out = lint_cmd(tmp.path()).output().expect("command should run");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success());
+    assert!(stderr.contains("newer than the decision"));
 }
 
 // ── 8.1 agent-style direct file I/O ────────────────────────────────────
@@ -624,13 +538,28 @@ fn agent_flow_direct_file_io_lint_render_gate() {
     set_phase_design(tmp.path(), "my-app");
 
     // 1. Only `init` uses the CLI (scaffolding spans many directories).
-    wai_cmd(tmp.path())
-        .args(["matrix", "init", "Which storage engine?"])
-        .assert()
-        .success();
-    let m = matrix_dir(tmp.path(), "my-app");
+    run_ok(tmp.path(), &["matrix", "init", "Which storage engine?"]);
 
     // 2. Everything else is direct file I/O — no CLI sugar for cells.
+    write_agent_flow_cells(&matrix_dir(tmp.path(), "my-app"));
+
+    // 3. Lint passes (status quo has red — no methodology warning expected).
+    let out = lint_cmd(tmp.path()).output().expect("lint should run");
+    assert!(out.status.success());
+
+    // 4. Decide (multi-artifact op) + render + gate.
+    run_ok(
+        tmp.path(),
+        &["matrix", "decide", "02-event-sourcing", "Audit story wins."],
+    );
+    run_ok(tmp.path(), &["matrix", "render"]);
+    let html = fs::read_to_string(matrix_dir(tmp.path(), "my-app").join("matrix.html")).unwrap();
+    assert!(html.contains("Audit trail by construction."));
+    run_ok(tmp.path(), &["phase", "next"]);
+}
+
+/// Write the hand-built matrix cells used by the agent-flow test.
+fn write_agent_flow_cells(m: &Path) {
     fs::write(
         m.join("criteria/01-impact.md"),
         "# impact\n\nBlast radius of failure.\n",
@@ -649,34 +578,12 @@ fn agent_flow_direct_file_io_lint_render_gate() {
     fs::create_dir_all(&sq).unwrap();
     fs::write(sq.join("fact.md"), "Manual audit scripts, drift-prone.").unwrap();
     fs::write(sq.join("red"), "").unwrap();
-
-    // 3. Lint passes (status quo has red — no methodology warning expected).
-    lint_cmd(tmp.path()).assert().success();
-
-    // 4. Decide (multi-artifact op) + render + gate.
-    wai_cmd(tmp.path())
-        .args(["matrix", "decide", "02-event-sourcing", "Audit story wins."])
-        .assert()
-        .success();
-    wai_cmd(tmp.path())
-        .args(["matrix", "render"])
-        .assert()
-        .success();
-    let html = fs::read_to_string(m.join("matrix.html")).unwrap();
-    assert!(html.contains("Audit trail by construction."));
-    wai_cmd(tmp.path())
-        .args(["phase", "next"])
-        .assert()
-        .success();
 }
 
 // ── 6.1 design → plan phase gate ─────────────────────────────────────────
 
 fn set_phase_design(dir: &Path, project: &str) {
-    wai_cmd(dir)
-        .args(["phase", "set", "design"])
-        .assert()
-        .success();
+    run_ok(dir, &["phase", "set", "design"]);
     let _ = project;
 }
 
@@ -687,10 +594,8 @@ fn gate_no_matrix_passes() {
     create_project(tmp.path(), "my-app");
     set_phase_design(tmp.path(), "my-app");
 
-    wai_cmd(tmp.path())
-        .args(["phase", "next"])
-        .assert()
-        .success();
+    let out = run_ok(tmp.path(), &["phase", "next"]);
+    assert!(out.status.success());
 }
 
 #[test]
@@ -699,19 +604,16 @@ fn gate_scaffolded_decision_blocks() {
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     set_phase_design(tmp.path(), "my-app");
-    wai_cmd(tmp.path())
-        .args(["matrix", "init", "problem"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "init", "problem"]);
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["phase", "next"])
-        .assert()
-        .failure()
-        .stderr(
-            predicate::str::contains("no decision")
-                .and(predicate::str::contains("wai matrix decide")),
-        );
+        .output()
+        .expect("command should run");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(!out.status.success());
+    assert!(stderr.contains("no decision"));
+    assert!(stderr.contains("wai matrix decide"));
 }
 
 #[test]
@@ -720,14 +622,8 @@ fn gate_current_decision_passes() {
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     set_phase_design(tmp.path(), "my-app");
-    wai_cmd(tmp.path())
-        .args(["matrix", "init", "problem"])
-        .assert()
-        .success();
-    wai_cmd(tmp.path())
-        .args(["matrix", "criterion", "add", "c"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "init", "problem"]);
+    run_ok(tmp.path(), &["matrix", "criterion", "add", "c"]);
     fill_cell(
         &matrix_dir(tmp.path(), "my-app"),
         "01-status-quo",
@@ -735,15 +631,10 @@ fn gate_current_decision_passes() {
         "fact",
         Some("red"),
     );
-    wai_cmd(tmp.path())
-        .args(["matrix", "decide", "01-status-quo", "keep"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "decide", "01-status-quo", "keep"]);
 
-    wai_cmd(tmp.path())
-        .args(["phase", "next"])
-        .assert()
-        .success();
+    let out = run_ok(tmp.path(), &["phase", "next"]);
+    assert!(out.status.success());
 }
 
 #[test]
@@ -753,19 +644,10 @@ fn gate_edited_after_decision_blocks() {
     create_project(tmp.path(), "my-app");
     set_phase_design(tmp.path(), "my-app");
     let m = matrix_dir(tmp.path(), "my-app");
-    wai_cmd(tmp.path())
-        .args(["matrix", "init", "problem"])
-        .assert()
-        .success();
-    wai_cmd(tmp.path())
-        .args(["matrix", "criterion", "add", "c"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "init", "problem"]);
+    run_ok(tmp.path(), &["matrix", "criterion", "add", "c"]);
     fill_cell(&m, "01-status-quo", "01-c", "fact", Some("red"));
-    wai_cmd(tmp.path())
-        .args(["matrix", "decide", "01-status-quo", "keep"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "decide", "01-status-quo", "keep"]);
 
     // Edit after the decision, then force the edit's mtime well past the
     // recorded decision timestamp so the comparison is unambiguous.
@@ -778,14 +660,14 @@ fn gate_edited_after_decision_blocks() {
         }
     }
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["phase", "next"])
-        .assert()
-        .failure()
-        .stderr(
-            predicate::str::contains("newer than the decision")
-                .and(predicate::str::contains("wai matrix decide")),
-        );
+        .output()
+        .expect("command should run");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(!out.status.success());
+    assert!(stderr.contains("newer than the decision"));
+    assert!(stderr.contains("wai matrix decide"));
 }
 
 #[test]
@@ -795,35 +677,44 @@ fn gate_fresh_clone_equal_timestamps_warns_but_proceeds() {
     create_project(tmp.path(), "my-app");
     set_phase_design(tmp.path(), "my-app");
     let m = matrix_dir(tmp.path(), "my-app");
-    wai_cmd(tmp.path())
-        .args(["matrix", "init", "problem"])
-        .assert()
-        .success();
-    wai_cmd(tmp.path())
-        .args(["matrix", "criterion", "add", "c"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "init", "problem"]);
+    run_ok(tmp.path(), &["matrix", "criterion", "add", "c"]);
     fill_cell(&m, "01-status-quo", "01-c", "fact", Some("red"));
-    wai_cmd(tmp.path())
-        .args(["matrix", "decide", "01-status-quo", "keep"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "decide", "01-status-quo", "keep"]);
 
     // Simulate a fresh clone: all matrix files share one checkout timestamp,
     // and the recorded decision timestamp equals it (decided before commit).
-    let checkout = filetime::FileTime::from_unix_time(1_700_000_000, 0); // 2023-11-14T22:13:20Z
-    for entry in walkdir::WalkDir::new(&m) {
+    backdate_matrix_tree(&m, 1_700_000_000);
+    rewrite_decision_timestamp(&m, "2023-11-14T22:13:20Z");
+
+    let out = wai_cmd(tmp.path())
+        .args(["phase", "next"])
+        .output()
+        .expect("command should run");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success());
+    assert!(stderr.contains("stale"));
+}
+
+/// Set every file under `m` to one shared checkout timestamp.
+fn backdate_matrix_tree(m: &std::path::Path, unix_secs: i64) {
+    let checkout = filetime::FileTime::from_unix_time(unix_secs, 0);
+    for entry in walkdir::WalkDir::new(m) {
         let path = entry.unwrap().into_path();
         if path.is_file() {
             filetime::set_file_mtime(&path, checkout).unwrap();
         }
     }
+}
+
+/// Rewrite the decision's `Decided at:` line to the given RFC 3339 timestamp.
+fn rewrite_decision_timestamp(m: &std::path::Path, stamp: &str) {
     let decision = fs::read_to_string(m.join("decision.md")).unwrap();
     let rewritten: String = decision
         .lines()
         .map(|l| {
             if l.starts_with("Decided at:") {
-                "Decided at: 2023-11-14T22:13:20Z".to_string()
+                format!("Decided at: {stamp}")
             } else {
                 l.to_string()
             }
@@ -831,12 +722,6 @@ fn gate_fresh_clone_equal_timestamps_warns_but_proceeds() {
         .collect::<Vec<_>>()
         .join("\n");
     fs::write(m.join("decision.md"), rewritten).unwrap();
-
-    wai_cmd(tmp.path())
-        .args(["phase", "next"])
-        .assert()
-        .success()
-        .stderr(predicate::str::contains("stale"));
 }
 
 #[test]
@@ -845,17 +730,16 @@ fn gate_set_plan_bypass_blocked() {
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     set_phase_design(tmp.path(), "my-app");
-    wai_cmd(tmp.path())
-        .args(["matrix", "init", "problem"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "init", "problem"]);
 
     // `wai phase set plan` must not bypass the design gate.
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["phase", "set", "plan"])
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("no decision"));
+        .output()
+        .expect("command should run");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(!out.status.success());
+    assert!(stderr.contains("no decision"));
 }
 
 // ── 6.2 status awareness ─────────────────────────────────────────────────
@@ -867,22 +751,10 @@ fn status_design_phase_shows_matrix_progress() {
     create_project(tmp.path(), "my-app");
     set_phase_design(tmp.path(), "my-app");
     let m = matrix_dir(tmp.path(), "my-app");
-    wai_cmd(tmp.path())
-        .args(["matrix", "init", "Which storage engine?"])
-        .assert()
-        .success();
-    wai_cmd(tmp.path())
-        .args(["matrix", "approach", "add", "es"])
-        .assert()
-        .success();
-    wai_cmd(tmp.path())
-        .args(["matrix", "criterion", "add", "impact"])
-        .assert()
-        .success();
-    wai_cmd(tmp.path())
-        .args(["matrix", "criterion", "add", "risk"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "init", "Which storage engine?"]);
+    run_ok(tmp.path(), &["matrix", "approach", "add", "es"]);
+    run_ok(tmp.path(), &["matrix", "criterion", "add", "impact"]);
+    run_ok(tmp.path(), &["matrix", "criterion", "add", "risk"]);
     fill_cell(
         &m,
         "01-status-quo",
@@ -891,15 +763,15 @@ fn status_design_phase_shows_matrix_progress() {
         Some("red"),
     );
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["status"])
-        .assert()
-        .success()
-        .stdout(
-            predicate::str::contains("Which storage engine?")
-                .and(predicate::str::contains("1/4 cells filled"))
-                .and(predicate::str::contains("01-status-quo/02-risk")),
-        );
+        .output()
+        .expect("command should run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success());
+    assert!(stdout.contains("Which storage engine?"));
+    assert!(stdout.contains("1/4 cells filled"));
+    assert!(stdout.contains("01-status-quo/02-risk"));
 }
 
 // ── 6.3 close handoff ────────────────────────────────────────────────────
@@ -910,29 +782,20 @@ fn close_handoff_includes_matrix_context() {
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     let m = matrix_dir(tmp.path(), "my-app");
-    wai_cmd(tmp.path())
-        .args(["matrix", "init", "Which storage engine?"])
-        .assert()
-        .success();
-    wai_cmd(tmp.path())
-        .args(["matrix", "criterion", "add", "c"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "init", "Which storage engine?"]);
+    run_ok(tmp.path(), &["matrix", "criterion", "add", "c"]);
     fill_cell(&m, "01-status-quo", "01-c", "fact", Some("red"));
-    wai_cmd(tmp.path())
-        .args([
+    run_ok(
+        tmp.path(),
+        &[
             "matrix",
             "decide",
             "01-status-quo",
             "Keep the current engine.",
-        ])
-        .assert()
-        .success();
+        ],
+    );
 
-    wai_cmd(tmp.path())
-        .args(["close", "--project", "my-app"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["close", "--project", "my-app"]);
 
     let handoffs = tmp.path().join(".wai/projects/my-app/handoffs");
     let body: String = fs::read_dir(&handoffs)
@@ -972,18 +835,9 @@ fn matrix_render_produces_banner_rows_columns_and_key() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
-    wai_cmd(tmp.path())
-        .args(["matrix", "init", "Which storage engine?"])
-        .assert()
-        .success();
-    wai_cmd(tmp.path())
-        .args(["matrix", "approach", "add", "event-sourcing"])
-        .assert()
-        .success();
-    wai_cmd(tmp.path())
-        .args(["matrix", "criterion", "add", "impact"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "init", "Which storage engine?"]);
+    run_ok(tmp.path(), &["matrix", "approach", "add", "event-sourcing"]);
+    run_ok(tmp.path(), &["matrix", "criterion", "add", "impact"]);
     let m = matrix_dir(tmp.path(), "my-app");
     fill_cell(
         &m,
@@ -1000,10 +854,7 @@ fn matrix_render_produces_banner_rows_columns_and_key() {
         Some("green"),
     );
 
-    wai_cmd(tmp.path())
-        .args(["matrix", "render"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "render"]);
 
     let html = fs::read_to_string(m.join("matrix.html")).unwrap();
     assert!(html.contains("Which storage engine?"), "problem banner");
@@ -1020,30 +871,15 @@ fn matrix_render_is_deterministic_byte_identical() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
-    wai_cmd(tmp.path())
-        .args(["matrix", "init", "problem"])
-        .assert()
-        .success();
-    wai_cmd(tmp.path())
-        .args(["matrix", "approach", "add", "a"])
-        .assert()
-        .success();
-    wai_cmd(tmp.path())
-        .args(["matrix", "criterion", "add", "c"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "init", "problem"]);
+    run_ok(tmp.path(), &["matrix", "approach", "add", "a"]);
+    run_ok(tmp.path(), &["matrix", "criterion", "add", "c"]);
     let m = matrix_dir(tmp.path(), "my-app");
     fill_cell(&m, "01-status-quo", "01-c", "fact", Some("yellow"));
 
-    wai_cmd(tmp.path())
-        .args(["matrix", "render"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "render"]);
     let first = fs::read(m.join("matrix.html")).unwrap();
-    wai_cmd(tmp.path())
-        .args(["matrix", "render"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "render"]);
     let second = fs::read(m.join("matrix.html")).unwrap();
     assert_eq!(first, second, "same state must produce byte-identical HTML");
 }
@@ -1053,23 +889,11 @@ fn matrix_render_empty_cell_is_not_a_judgment_color() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
-    wai_cmd(tmp.path())
-        .args(["matrix", "init", "problem"])
-        .assert()
-        .success();
-    wai_cmd(tmp.path())
-        .args(["matrix", "approach", "add", "a"])
-        .assert()
-        .success();
-    wai_cmd(tmp.path())
-        .args(["matrix", "criterion", "add", "c"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "init", "problem"]);
+    run_ok(tmp.path(), &["matrix", "approach", "add", "a"]);
+    run_ok(tmp.path(), &["matrix", "criterion", "add", "c"]);
 
-    wai_cmd(tmp.path())
-        .args(["matrix", "render"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "render"]);
 
     let html = fs::read_to_string(matrix_dir(tmp.path(), "my-app").join("matrix.html")).unwrap();
     assert!(
@@ -1083,18 +907,9 @@ fn matrix_render_neutral_is_a_judgment_not_incomplete() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
-    wai_cmd(tmp.path())
-        .args(["matrix", "init", "problem"])
-        .assert()
-        .success();
-    wai_cmd(tmp.path())
-        .args(["matrix", "approach", "add", "a"])
-        .assert()
-        .success();
-    wai_cmd(tmp.path())
-        .args(["matrix", "criterion", "add", "c"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "init", "problem"]);
+    run_ok(tmp.path(), &["matrix", "approach", "add", "a"]);
+    run_ok(tmp.path(), &["matrix", "criterion", "add", "c"]);
     let m = matrix_dir(tmp.path(), "my-app");
     fill_cell(
         &m,
@@ -1104,10 +919,7 @@ fn matrix_render_neutral_is_a_judgment_not_incomplete() {
         Some("neutral"),
     );
 
-    wai_cmd(tmp.path())
-        .args(["matrix", "render"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "render"]);
 
     let html = fs::read_to_string(m.join("matrix.html")).unwrap();
     assert!(html.contains("Clear, nothing special."));
@@ -1121,31 +933,16 @@ fn matrix_add_commands_number_sequentially() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
-    wai_cmd(tmp.path())
-        .args(["matrix", "init", "problem"])
-        .assert()
-        .success();
-    wai_cmd(tmp.path())
-        .args(["matrix", "criterion", "add", "impact"])
-        .assert()
-        .success();
-    wai_cmd(tmp.path())
-        .args(["matrix", "criterion", "add", "risk"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "init", "problem"]);
+    run_ok(tmp.path(), &["matrix", "criterion", "add", "impact"]);
+    run_ok(tmp.path(), &["matrix", "criterion", "add", "risk"]);
 
     let m = matrix_dir(tmp.path(), "my-app");
     assert!(m.join("criteria/01-impact.md").exists());
     assert!(m.join("criteria/02-risk.md").exists());
 
-    wai_cmd(tmp.path())
-        .args(["matrix", "approach", "add", "event-sourcing"])
-        .assert()
-        .success();
-    wai_cmd(tmp.path())
-        .args(["matrix", "approach", "add", "cqrs"])
-        .assert()
-        .success();
+    run_ok(tmp.path(), &["matrix", "approach", "add", "event-sourcing"]);
+    run_ok(tmp.path(), &["matrix", "approach", "add", "cqrs"]);
     assert!(m.join("approaches/02-event-sourcing").is_dir());
     assert!(m.join("approaches/03-cqrs").is_dir());
 }

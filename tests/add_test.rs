@@ -1,5 +1,4 @@
 use assert_cmd::Command;
-use predicates::prelude::*;
 use std::fs;
 use tempfile::TempDir;
 
@@ -15,17 +14,19 @@ fn wai_cmd(dir: &std::path::Path) -> Command {
 }
 
 fn init_workspace(dir: &std::path::Path) {
-    wai_cmd(dir)
+    let out = wai_cmd(dir)
         .args(["init", "--name", "test-ws"])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 }
 
 fn create_project(dir: &std::path::Path, name: &str) {
-    wai_cmd(dir)
+    let out = wai_cmd(dir)
         .args(["new", "project", name])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 }
 
 #[test]
@@ -34,10 +35,11 @@ fn add_research_inline_content_creates_dated_artifact() {
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["add", "research", "inline findings", "--project", "my-app"])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 
     let research_dir = tmp.path().join(".wai/projects/my-app/research");
     let files: Vec<_> = fs::read_dir(&research_dir)
@@ -64,7 +66,7 @@ fn add_research_file_input_with_explicit_project_and_tags() {
     let source = tmp.path().join("notes.md");
     fs::write(&source, "file-backed research").unwrap();
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args([
             "add",
             "research",
@@ -75,8 +77,9 @@ fn add_research_file_input_with_explicit_project_and_tags() {
             "--tags",
             "api,design",
         ])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 
     let beta_research = tmp.path().join(".wai/projects/beta/research");
     let beta_files: Vec<_> = fs::read_dir(&beta_research)
@@ -101,9 +104,11 @@ fn add_research_file_input_with_explicit_project_and_tags() {
 fn add_research_fails_outside_workspace() {
     let tmp = TempDir::new().unwrap();
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["add", "research", "notes"])
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("No project initialized"));
+        .output()
+        .expect("command should run");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(!out.status.success());
+    assert!(stderr.contains("No project initialized"));
 }

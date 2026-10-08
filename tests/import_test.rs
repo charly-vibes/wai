@@ -1,5 +1,4 @@
 use assert_cmd::Command;
-use predicates::prelude::*;
 use std::fs;
 use tempfile::TempDir;
 
@@ -15,17 +14,19 @@ fn wai_cmd(dir: &std::path::Path) -> Command {
 }
 
 fn init_workspace(dir: &std::path::Path) {
-    wai_cmd(dir)
+    let out = wai_cmd(dir)
         .args(["init", "--name", "test-ws"])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 }
 
 fn create_project(dir: &std::path::Path, name: &str) {
-    wai_cmd(dir)
+    let out = wai_cmd(dir)
         .args(["new", "project", name])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 }
 
 #[test]
@@ -37,10 +38,11 @@ fn import_single_rule_file_copies_into_rules_directory() {
     let source = tmp.path().join(".cursorrules");
     fs::write(&source, "be explicit").unwrap();
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["import", source.to_str().unwrap()])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 
     let imported = tmp
         .path()
@@ -61,10 +63,11 @@ fn import_directory_routes_files_by_category() {
     fs::write(source.join("review-command.md"), "command").unwrap();
     fs::write(source.join("notes.md"), "context").unwrap();
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["import", source.to_str().unwrap()])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 
     let agent_config = tmp.path().join(".wai/resources/agent-config");
     assert!(agent_config.join("rules/team-rule.md").is_file());
@@ -81,17 +84,19 @@ fn repeated_import_overwrites_existing_file() {
     let source = tmp.path().join("notes.md");
     fs::write(&source, "first version").unwrap();
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["import", source.to_str().unwrap()])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 
     fs::write(&source, "second version").unwrap();
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["import", source.to_str().unwrap()])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 
     let imported = tmp
         .path()
@@ -105,9 +110,11 @@ fn import_missing_path_fails() {
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["import", "missing-path"])
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("Path not found"));
+        .output()
+        .expect("command should run");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(!out.status.success());
+    assert!(stderr.contains("Path not found"));
 }

@@ -120,7 +120,8 @@ fn test_wai_status_json_has_envelope_shape() {
     // must not depend on real ~/.cache state (wai-r3p0 tidy).
     init_cmd.env("GENESIS_NO_UPDATE_CHECK", "1");
     init_cmd.args(["init", "--name", "shape-test"]);
-    init_cmd.assert().success();
+    let out = init_cmd.output().expect("command should run");
+    assert!(out.status.success());
 
     // Check wai status --json
     let mut cmd = Command::cargo_bin("wai").unwrap();
@@ -131,8 +132,9 @@ fn test_wai_status_json_has_envelope_shape() {
     cmd.env("GENESIS_NO_UPDATE_CHECK", "1");
     cmd.arg("status").arg("--json");
 
-    let output = cmd.assert().success();
-    let stdout = String::from_utf8_lossy(&output.get_output().stdout);
+    let output = cmd.output().expect("command should run");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
     let parsed: serde_json::Value =
         serde_json::from_str(&stdout).expect("status --json should be valid JSON");
 
@@ -179,7 +181,8 @@ fn test_wai_prime_json_has_envelope_shape() {
     // must not depend on real ~/.cache state (wai-r3p0 tidy).
     init_cmd.env("GENESIS_NO_UPDATE_CHECK", "1");
     init_cmd.args(["init", "--name", "shape-test"]);
-    init_cmd.assert().success();
+    let out = init_cmd.output().expect("command should run");
+    assert!(out.status.success());
 
     let mut cmd = Command::cargo_bin("wai").unwrap();
     cmd.current_dir(dir.path());
@@ -189,8 +192,9 @@ fn test_wai_prime_json_has_envelope_shape() {
     cmd.env("GENESIS_NO_UPDATE_CHECK", "1");
     cmd.arg("prime").arg("--json");
 
-    let output = cmd.assert().success();
-    let stdout = String::from_utf8_lossy(&output.get_output().stdout);
+    let output = cmd.output().expect("command should run");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
     let parsed: serde_json::Value =
         serde_json::from_str(&stdout).expect("prime --json should be valid JSON");
 
@@ -236,8 +240,9 @@ fn test_wai_version_json_envelope_shape() {
     cmd.env("GENESIS_NO_UPDATE_CHECK", "1");
     cmd.arg("--version").arg("--json");
 
-    let output = cmd.assert().success();
-    let stdout = String::from_utf8_lossy(&output.get_output().stdout);
+    let output = cmd.output().expect("command should run");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
     let parsed: serde_json::Value =
         serde_json::from_str(&stdout).expect("--version --json should be valid JSON");
 

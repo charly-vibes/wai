@@ -1,5 +1,4 @@
 use assert_cmd::Command;
-use predicates::prelude::*;
 use std::fs;
 use tempfile::TempDir;
 
@@ -15,17 +14,19 @@ fn wai_cmd(dir: &std::path::Path) -> Command {
 }
 
 fn init_workspace(dir: &std::path::Path) {
-    wai_cmd(dir)
+    let out = wai_cmd(dir)
         .args(["init", "--name", "test-ws"])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 }
 
 fn create_project(dir: &std::path::Path, name: &str) {
-    wai_cmd(dir)
+    let out = wai_cmd(dir)
         .args(["new", "project", name])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 }
 
 // ── handoff creation for active project ──────────────────────────────────────
@@ -36,11 +37,13 @@ fn close_creates_handoff_for_named_project() {
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["close", "--project", "myproject"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Handoff created:"));
+        .output()
+        .expect("command should run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success());
+    assert!(stdout.contains("Handoff created:"));
 
     let handoffs_dir = tmp.path().join(".wai/projects/myproject/handoffs");
     let files: Vec<_> = fs::read_dir(&handoffs_dir)
@@ -63,11 +66,13 @@ fn close_with_project_flag_targets_only_named_project() {
     create_project(tmp.path(), "alpha");
     create_project(tmp.path(), "beta");
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["close", "--project", "alpha"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Handoff created:"));
+        .output()
+        .expect("command should run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success());
+    assert!(stdout.contains("Handoff created:"));
 
     let alpha_handoffs = tmp.path().join(".wai/projects/alpha/handoffs");
     let beta_handoffs = tmp.path().join(".wai/projects/beta/handoffs");
@@ -93,11 +98,13 @@ fn close_unknown_project_fails_with_diagnostic() {
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["close", "--project", "nonexistent"])
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("not found"));
+        .output()
+        .expect("command should run");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(!out.status.success());
+    assert!(stderr.contains("not found"));
 }
 
 // ── clearing stale complete pipeline-run pointer (wai-pa3b) ──────────────────
@@ -140,11 +147,13 @@ fn close_clears_complete_pipeline_run_pointers() {
     let last_run = tmp.path().join(".wai/resources/pipelines/.last-run");
     assert!(last_run.exists(), "pointer exists before close");
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["close", "--project", "myproject"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Cleared complete pipeline run"));
+        .output()
+        .expect("command should run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success());
+    assert!(stdout.contains("Cleared complete pipeline run"));
 
     assert!(
         !last_run.exists(),
@@ -166,16 +175,19 @@ fn close_refuses_incomplete_pipeline_run() {
     let run_state = tmp.path().join(".wai/pipeline-runs/flow-run.yml");
     let before = fs::read_to_string(&run_state).unwrap();
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["close", "--project", "myproject"])
-        .assert()
-        .failure()
-        .stdout(predicate::str::contains("Handoff created:").not())
-        .stderr(predicates::str::contains("flow-run"))
-        .stderr(predicates::str::contains("flow"))
-        .stderr(predicates::str::contains("step 1 of 2"))
-        .stderr(predicates::str::contains("wai pipeline next"))
-        .stderr(predicates::str::contains("wai close --force"));
+        .output()
+        .expect("command should run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(!out.status.success());
+    assert!(!(stdout.contains("Handoff created:")));
+    assert!(stderr.contains("flow-run"));
+    assert!(stderr.contains("flow"));
+    assert!(stderr.contains("step 1 of 2"));
+    assert!(stderr.contains("wai pipeline next"));
+    assert!(stderr.contains("wai close --force"));
 
     // Run state must be untouched by the refusal.
     assert_eq!(
@@ -207,11 +219,13 @@ fn close_force_overrides_incomplete_pipeline_run() {
     // current_step == 0 of 2 → run is mid-flight.
     write_pipeline_run(tmp.path(), "flow", 0);
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["close", "--project", "myproject", "--force"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Handoff created:"));
+        .output()
+        .expect("command should run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success());
+    assert!(stdout.contains("Handoff created:"));
 
     // The .last-run pointer survives a forced close: --force means "close the
     // session anyway", not "clear the run" — stale-run GC (wai-vx02.2) owns
@@ -241,11 +255,13 @@ fn close_still_clears_complete_pipeline_run_pointers() {
     let last_run = tmp.path().join(".wai/resources/pipelines/.last-run");
     assert!(last_run.exists(), "pointer exists before close");
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["close", "--project", "myproject"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Cleared complete pipeline run"));
+        .output()
+        .expect("command should run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success());
+    assert!(stdout.contains("Cleared complete pipeline run"));
 
     assert!(
         !last_run.exists(),
@@ -260,10 +276,11 @@ fn close_with_no_pipeline_run_is_unchanged() {
     create_project(tmp.path(), "myproject");
     // No pipeline run at all.
 
-    wai_cmd(tmp.path())
+    let out = wai_cmd(tmp.path())
         .args(["close", "--project", "myproject"])
-        .assert()
-        .success();
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
 
     // Nothing to clear: no run pointer was ever created, and close reports no
     // pipeline clearing.

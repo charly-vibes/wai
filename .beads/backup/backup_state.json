@@ -1,4 +1,12 @@
 {
-  "last_dolt_commit": "0it9q8oq8g3q9kj7lq7kinbgkb23mq20",
-  "timestamp": "2026-10-07T23:25:25.018982912Z"
+<<<<<<< HEAD
+  "last_dolt_commit": "7i9fkh5ugja5gb0qsecsms7j4mpja85r",
+  "timestamp": "2026-10-08T15:00:20.381485979Z"
+||||||| parent of 794431e (chore(beads): sync — wai-gkk3 progress note, file wai-abiy (src/commands pretender debt))
+  "last_dolt_commit": "6p6s02sd2h2v3kii60cifspn0dgtp0a7",
+  "timestamp": "2026-10-07T22:51:36.954614856Z"
+=======
+  "last_dolt_commit": "vr3810hc96q9b46bkfk8mv0jh6s8pefg",
+  "timestamp": "2026-10-08T14:49:04.486697469Z"
+>>>>>>> 794431e (chore(beads): sync — wai-gkk3 progress note, file wai-abiy (src/commands pretender debt))
 }
