@@ -1,33 +1,5 @@
-# Epic-orchestrator pipeline: lead orchestrates only, subagents implement.
-#
-# Encodes the orchestrator + subagents pattern (canon:
-# ~/.wai/resources/patterns/orchestrator-subagents.md) as enforceable steps.
-# Canon Invariant 8 — "Prose does not enforce": wherever the pattern is
-# load-bearing, encode the loop as a wai pipeline + brief template + status
-# recipe, and let the tooling refuse bad spawns.
-#
-# Canon invariants encoded by this loop:
-#   1. The lead orchestrates only (claim → brief → spawn → verify → ship).
-#   3. One ticket per advance — the loop ends in an explicit STOP at the
-#      ticket boundary; no chaining past it.
-#   4. Briefs are repo artifacts, committed before spawn.
-#   5. Verify before trust — reports are claims, not facts.
-#   7. Progress must be pokeable — spawns stream to a known log path.
-#
-# Usage: wai pipeline start epic-orchestrator --topic="<epic name>"
-
-[pipeline]
-name = "epic-orchestrator"
-description = "Orchestrator loop: claim one ready child, gate, brief, spawn a subagent, verify, ship, STOP"
-
-[pipeline.metadata]
-when = "Executing one ready child issue of an epic via subagent orchestration instead of inline implementation"
-skills = ["tdd", "rule-of-5-universal", "commit"]
-
-[[steps]]
-id = "claim"
-prompt = """
-{topic}: Orient and claim exactly one ready child issue from the epic.
+=== step claim ===
+SNAPSHOT_TOPIC: Orient and claim exactly one ready child issue from the epic.
 
 Run:
 - `wai prime`
@@ -52,17 +24,10 @@ Rules:
 
 Record orientation: `wai add research "ORIENT: selected <id>; why chosen; blockers checked"`
 State checkpoint: append the step id + sha (current HEAD) to the state file before advancing.
-{{block:advance-trail}}
-"""
+Advance: `wai pipeline next`
 
-[steps.gate.structural]
-min_artifacts = 1
-types = ["research"]
-
-[[steps]]
-id = "gates"
-prompt = """
-{topic}: Run pre-work gates before any implementation.
+=== step gates ===
+SNAPSHOT_TOPIC: Run pre-work gates before any implementation.
 
 Run:
 - the project's quality gates (`wai pipeline gates <pipeline>` or repo equivalent)
@@ -73,17 +38,10 @@ Do not start implementation until gates are understood and baseline is green.
 
 Record gate status: `wai add research "GATES: <commands run>; results"`
 State checkpoint: append the step id + sha (current HEAD) to the state file before advancing.
-{{block:advance-trail}}
-"""
+Advance: `wai pipeline next`
 
-[steps.gate.structural]
-min_artifacts = 1
-types = ["research"]
-
-[[steps]]
-id = "brief"
-prompt = """
-{topic}: Write the subagent brief as a committed repo artifact.
+=== step brief ===
+SNAPSHOT_TOPIC: Write the subagent brief as a committed repo artifact.
 
 Rules:
 - Briefs are repo artifacts, not /tmp files (canon Invariant 4).
@@ -105,17 +63,10 @@ Rules:
 
 Record brief: `wai add design "BRIEF: <path>; committed"`
 State checkpoint: append the step id + sha (current HEAD) to the state file before advancing.
-{{block:advance-trail}}
-"""
+Advance: `wai pipeline next`
 
-[steps.gate.structural]
-min_artifacts = 1
-types = ["design"]
-
-[[steps]]
-id = "spawn"
-prompt = """
-{topic}: Spawn a named, resumable subagent session for the brief.
+=== step spawn ===
+SNAPSHOT_TOPIC: Spawn a named, resumable subagent session for the brief.
 
 Rules:
 - Refuse to spawn without a committed brief — the brief must be committed
@@ -134,17 +85,10 @@ Rules:
 
 Record spawn: `wai add research "SPAWN: <session name>; log=<path>"`
 State checkpoint: append the step id + sha (current HEAD) to the state file before advancing.
-{{block:advance-trail}}
-"""
+Advance: `wai pipeline next`
 
-[steps.gate.structural]
-min_artifacts = 1
-types = ["research"]
-
-[[steps]]
-id = "verify"
-prompt = """
-{topic}: Verify before trust (canon Invariant 5) — isolation-based.
+=== step verify ===
+SNAPSHOT_TOPIC: Verify before trust (canon Invariant 5) — isolation-based.
 
 Primary path (a second model family is configured): spawn a read-only
 verifier as a separate NAMED session `subagent:<ticket>:verify` and have it
@@ -180,22 +124,10 @@ Lead-side checks (degradation path):
 
 Record verification: `wai add research "VERIFY: <evidence>"`
 State checkpoint: append the step id + sha (current HEAD) to the state file before advancing.
-{{block:advance-trail}}
-"""
+Advance: `wai pipeline next`
 
-[steps.gate.structural]
-min_artifacts = 1
-types = ["research"]
-
-[[steps.gate.oracles]]
-name = "tests-pass"
-description = "Relevant tests must pass after verification"
-timeout = 300
-
-[[steps]]
-id = "ship"
-prompt = """
-{topic}: Ship the completed ticket.
+=== step ship ===
+SNAPSHOT_TOPIC: Ship the completed ticket.
 
 Do:
 - inspect `git diff` and commit atomically
@@ -205,18 +137,10 @@ Do:
 
 Record ship: `wai add research "SHIP: <commit/ticket state>"`
 State checkpoint: append the step id + sha (current HEAD) to the state file before advancing.
-{{block:advance-trail}}
-"""
+Advance: `wai pipeline next`
 
-[[steps.gate.oracles]]
-name = "tests-pass"
-description = "Final tests must pass before close"
-timeout = 300
-
-[[steps]]
-id = "stop"
-prompt = """
-{topic}: STOP at the ticket boundary (canon Invariant 3).
+=== step stop ===
+SNAPSHOT_TOPIC: STOP at the ticket boundary (canon Invariant 3).
 
 One ticket per advance: claim → brief → spawn → verify → ship → STOP.
 Do not chain past the ticket boundary. Inline execution is the path of
@@ -225,15 +149,5 @@ the next ticket starts a fresh run, not this one.
 
 Record STOP: `wai add research "STOP: ticket <id> complete; next run for next ticket"`
 State checkpoint: append the step id + sha (current HEAD) to the state file; the run is complete.
-{{block:advance-trail}}
-"""
+Advance: `wai pipeline next`
 
-[steps.gate.structural]
-min_artifacts = 1
-types = ["research"]
-
-# Shared content blocks (wai-vsn6): referenced from step prompts as
-# {{block:<name>}} and expanded at load time. Rendered prompts unchanged.
-[[blocks]]
-name = "advance-trail"
-content = "Advance: `wai pipeline next`"

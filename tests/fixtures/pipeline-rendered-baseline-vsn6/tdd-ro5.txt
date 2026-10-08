@@ -1,0 +1,143 @@
+=== step orient ===
+SNAPSHOT_TOPIC: Orient before changing anything.
+
+Run:
+- `wai prime`
+- `wai status`
+- `bd ready` if beads is present
+- `openspec list` if openspec is present
+- `wai search "<topic>"`
+
+Select exactly one task. If the task is ambiguous, stop and ask. Otherwise proceed autonomously.
+
+Record orientation: `wai add research "ORIENT: ..."`
+Advance: `wai pipeline next`
+
+=== step plan ===
+SNAPSHOT_TOPIC: Produce a minimal TDD plan.
+
+Include:
+- desired behavior
+- out of scope
+- test cases to write
+- narrow test command
+- full verification command
+- files likely touched
+
+Do not edit code yet.
+
+Record plan: `wai add plan "..."`
+Advance: `wai pipeline next`
+
+=== step red ===
+SNAPSHOT_TOPIC: Write failing tests first.
+
+Rules:
+- Only test files should change unless test scaffolding requires otherwise.
+- Run the narrow test command.
+- Confirm failure is for the expected missing behavior, not setup breakage.
+
+Record evidence: `wai add research "RED: command=... expected failure=..."`
+Advance: `wai pipeline next`
+
+=== step green ===
+SNAPSHOT_TOPIC: Implement the minimum production change.
+
+Rules:
+- Make the red test pass with the smallest correct change.
+- Run the narrow test command.
+- Then run the relevant package/module test suite.
+
+Record decision: `wai add design "GREEN: ..."`
+Advance: `wai pipeline next`
+
+=== step refactor ===
+SNAPSHOT_TOPIC: Refactor safely while tests stay green.
+
+Allowed:
+- simplify names
+- remove duplication
+- clarify structure
+- improve boundaries
+
+Forbidden:
+- behavior expansion
+- unrelated cleanup
+- large architectural rewrites
+
+Run tests after refactoring.
+
+Record refactor note: `wai add design "REFACTOR: ..."`
+Advance: `wai pipeline next`
+
+=== step ro5u-review ===
+SNAPSHOT_TOPIC: Review the diff using `rule-of-5-universal`.
+
+Review only. Do not fix yet.
+
+Return findings grouped by:
+- Critical
+- High
+- Medium
+- Low
+
+Each finding must include:
+- file/location
+- evidence
+- concrete fix
+
+Record review: `wai add review "RO5U: ..."`
+Advance: `wai pipeline next`
+
+=== step fix-review ===
+SNAPSHOT_TOPIC: Fix review findings.
+
+Rules:
+- Critical/high must be fixed.
+- Medium fixed unless explicitly deferred with reason.
+- Low fixed if cheap, otherwise tracked.
+- Add tests for behavior-impacting fixes.
+- Run tests after fixes.
+
+Record fixes: `wai add research "RO5U-FIXES: ..."`
+Advance: `wai pipeline next`
+
+=== step quality-ledger ===
+SNAPSHOT_TOPIC: Produce final quality ledger.
+
+Record exactly:
+
+Changed:
+- files and purpose
+
+Verified:
+- commands run and result
+
+Review:
+- RO5U status and remaining findings
+
+Risks:
+- known remaining risks or "none known"
+
+Next:
+- exact next action
+
+Record ledger: `wai add research "QUALITY LEDGER: ..."`
+Advance: `wai pipeline next`
+
+=== step ship-close ===
+SNAPSHOT_TOPIC: Ship the completed task.
+
+Do:
+- inspect `git diff`
+- close/update beads issue if applicable
+- mark openspec task complete if applicable
+- commit atomically
+- run `wai close`
+
+Do not push unless project policy or user instruction explicitly says to push.
+
+This step requires human approval: review the ship evidence, then run `wai pipeline approve` when ready.
+
+Pipeline complete.
+
