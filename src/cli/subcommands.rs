@@ -345,6 +345,7 @@ pub enum PipelineCommands {
     /// EXAMPLES
     ///   wai pipeline init my-workflow
     ///   wai pipeline init tdd-ro5
+    ///   wai pipeline init epic-orchestrator
     Init {
         /// Name for the new pipeline (creates <name>.toml)
         name: String,

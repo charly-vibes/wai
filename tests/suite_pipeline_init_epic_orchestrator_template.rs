@@ -1,0 +1,128 @@
+//! Tests for `wai pipeline init epic-orchestrator` — the built-in
+//! epic-orchestrator template (orchestrator + subagents pattern, canon:
+//! orchestrator-subagents.md Invariant 8 "prose does not enforce").
+
+#![allow(clippy::too_many_lines)]
+
+mod common;
+
+use common::*;
+use std::fs;
+use tempfile::TempDir;
+
+#[test]
+fn pipeline_init_epic_orchestrator_scaffolds_template() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    let out = wai_cmd(tmp.path())
+        .args(["pipeline", "init", "epic-orchestrator"])
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
+
+    let toml_path = tmp
+        .path()
+        .join(".wai/resources/pipelines/epic-orchestrator.toml");
+    fs::metadata(&toml_path).expect("pipeline init epic-orchestrator should scaffold the template");
+}
+
+#[test]
+fn pipeline_init_epic_orchestrator_declares_orchestrator_loop_steps() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    let out = wai_cmd(tmp.path())
+        .args(["pipeline", "init", "epic-orchestrator"])
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
+
+    let toml_path = tmp
+        .path()
+        .join(".wai/resources/pipelines/epic-orchestrator.toml");
+    let content = fs::read_to_string(&toml_path).unwrap();
+
+    // The orchestrator loop: claim → gates → brief → spawn → verify → ship → STOP
+    for expected in [
+        "id = \"claim\"",
+        "id = \"gates\"",
+        "id = \"brief\"",
+        "id = \"spawn\"",
+        "id = \"verify\"",
+        "id = \"ship\"",
+        "id = \"stop\"",
+    ] {
+        assert!(
+            content.contains(expected),
+            "Expected {expected} step in TOML: {content}"
+        );
+    }
+}
+
+#[test]
+fn pipeline_init_epic_orchestrator_cites_canon_pattern() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    let out = wai_cmd(tmp.path())
+        .args(["pipeline", "init", "epic-orchestrator"])
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
+
+    let toml_path = tmp
+        .path()
+        .join(".wai/resources/pipelines/epic-orchestrator.toml");
+    let content = fs::read_to_string(&toml_path).unwrap();
+
+    // Header must cite the canon pattern and its tool-agnostic invariants.
+    assert!(
+        content.contains("orchestrator-subagents"),
+        "Header must cite canon orchestrator-subagents.md: {content}"
+    );
+    assert!(
+        content.contains("Invariant 8") || content.contains("prose does not enforce"),
+        "Header must cite Invariant 8 (prose does not enforce): {content}"
+    );
+}
+
+#[test]
+fn pipeline_init_epic_orchestrator_toml_is_valid() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    let out = wai_cmd(tmp.path())
+        .args(["pipeline", "init", "epic-orchestrator"])
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
+
+    let toml_path = tmp
+        .path()
+        .join(".wai/resources/pipelines/epic-orchestrator.toml");
+    let content = fs::read_to_string(&toml_path).unwrap();
+    let parsed: Result<toml::Value, _> = toml::from_str(&content);
+    assert!(
+        parsed.is_ok(),
+        "Generated TOML should be valid, but got error: {:?}",
+        parsed.err()
+    );
+}
+
+#[test]
+fn pipeline_help_lists_epic_orchestrator_builtin() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    let out = wai_cmd(tmp.path())
+        .args(["pipeline", "--help"])
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("epic-orchestrator"),
+        "pipeline help should list the epic-orchestrator built-in template: {stdout}"
+    );
+}

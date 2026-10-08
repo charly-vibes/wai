@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:epic-autonomy-tdd-ro5-2026-10-08-wai-t2ar, pipeline-step:orient-and-claim]
+---
+
+ORIENT: selected wai-t2ar (user-directed, not a fvhv child); epic-orchestrator built-in pipeline template registration (red→green). Blockers checked: none — no in_progress tickets, no file conflicts (metadata.files populated; wai-wvjz/3eo0/979g all OPEN, none claimed). Governance: ticket references openspec change add-epic-orchestrator-template which did not exist — scaffolded proposal.md + tasks.md (1.1–1.4) + pipeline-resource delta spec; openspec validate --strict PASS. Canon verified: ~/.wai/resources/patterns/orchestrator-subagents.md Invariant 8 (prose does not enforce). Relevant files: src/config.rs:31 (BUILTIN_PIPELINE_TEMPLATES), src/templates/{tdd-ro5,scientific-research}.toml (shape to mirror), src/commands/pipeline/setup.rs:157 (list-driven scaffold gate), src/cli/subcommands.rs:347, src/cli/mod.rs:347, src/help.rs:371, tests/suite_pipeline_init_tdd_ro5_*.rs (test shape to mirror). Branch feat/epic-orchestrator-template off 0e2fef4 (base_commit 2aee8e6 is ancestor). bd update wai-t2ar --claim done.
