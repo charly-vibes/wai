@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:epic-autonomy-tdd-ro5-2026-10-08-wai-sib1, pipeline-step:quality-ledger]
+---
+
+QUALITY LEDGER: wai-sib1. Changed: src/cli/mod.rs (Use gains #[arg(long)] shell override + truthful help text), src/commands/project.rs (destructure shell; ShellSyntax enum + resolve_shell with validated values + detect_shell heuristic w/ FISH_VERSION-first + export_line; 3 unit tests), tests/suite_project_use_shell_flag.rs (contract suite: fish-override, posix-override, unknown-shell rejection, hermetic posix default; header contract documented). Verified: commands run = cargo test --test suite_project_use_shell_flag --test suite_project_use_fish_shell_syntax (24+4 passed / 0 failed), cargo test full suite (all green; plugin::tests::execute_hook_no_deadlock_on_fast_command is known timing-flaky wai-z25x, passes in isolation), cargo clippy --all-targets -- -D warnings (0 warnings), cargo fmt --check (clean). Review: RO5U pass 1 CONVERGED — 0 critical, 0 high; 3 medium + 2 low found, all 5 fixed same-session (see RO5U-FIXES); no deferred findings.

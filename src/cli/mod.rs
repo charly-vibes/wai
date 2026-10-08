@@ -573,11 +573,16 @@ pub struct PhaseArgs {
 pub enum ProjectCommands {
     /// Set WAI_PROJECT for the current shell session
     ///
-    /// Prints the appropriate export statement for your shell.
+    /// Prints the appropriate export statement for your shell
+    /// (override with --shell posix|fish; bash/zsh/sh count as posix).
     /// Use with eval: eval $(wai project use my-project)
     Use {
         /// Project name (omit to list available projects)
         name: Option<String>,
+
+        /// Explicit shell override (posix or fish); beats SHELL detection
+        #[arg(long)]
+        shell: Option<String>,
     },
 
     /// Catch-all for wrong-order detection (e.g., `wai project new` → `wai new project`)
