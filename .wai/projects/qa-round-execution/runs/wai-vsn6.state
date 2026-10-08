@@ -1,0 +1,6 @@
+ticket: wai-vsn6
+branch: main
+brief_path: .wai/projects/qa-round-execution/briefs/wai-vsn6.md
+step_history: []
+- claim @ db1797b4b504e0839100f331f596908b869ea701
+- gates @ db1797b4b504e0839100f331f596908b869ea701
