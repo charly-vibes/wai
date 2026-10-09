@@ -1,0 +1,20 @@
+## REPORT
+
+**Commit made:** `d984464` — `fix(prime): suppress epics-flow suggestion under active mid-flight run (wai-xa8i.3)` — staged exactly two files: `src/commands/prime.rs` (+24/−4) and `tests/prime_test.rs` (+61). Not pushed; beads ticket `wai-xa8i.3` left open for orchestrator verify+ship, as instructed.
+
+**TDD sequence:**
+- **RED:** New test `prime_active_run_suppresses_suggested_next` in `tests/prime_test.rs` — fixtures a 2-step pipeline with an active mid-flight run (step 0 of 2) via local `write_pipeline`/`write_active_run`, plus a fake `bd ready --json` emitting one issue (`wai-1234`) via the shared `install_fake_bd_ready_json` helper from `tests/common/mod.rs` (declared as `mod common;` full-path call to avoid clashing with prime_test's local fixture helpers). Failed pre-change exactly as expected: *"prime must not suggest `bd show` when a mid-flight pipeline run is active"* — while still asserting the adopt/resume block IS present (fixture sanity).
+- **GREEN (minimal, 2 call sites):** Added `pipeline_run_mid_flight(project_root)` helper (≈5 lines) in `prime.rs` — `pipeline_current_status` is `Some` with `status.active && run_is_incomplete(&status)`, the identical predicate sync's breadcrumb uses. Terminal `render_closing_sections` skips the `→ Suggested next:` block and the JSON payload's `next_steps` fallback is suppressed under the same condition, so payload and render agree. Test also asserts the JSON output contains no `bd show wai-1234`. Total gating delta ~15 lines; no refactor needed.
+- No existing test asserted `Suggested next:` presence (grepped all of `tests/`) — the no-active-run path is untouched and covered by the unchanged suite.
+
+**Test results:**
+- `cargo test --test prime_test`: 17/17 green; `cargo test --test sync_test`: 4/4 green (wai-xa8i.2 intact).
+- Full `cargo test`: all 52 test binaries green, 0 failures. `cargo fmt --check`: clean.
+- Lefthook pre-commit: pretender-check, format-check, bd, and clippy all **passed — no `--no-verify` used, no disclosure required** (0 new complexity violations in my staged files).
+
+**Deviations / notes:**
+1. **Concurrent sibling interference (transient, not mine):** mid-verification another agent's in-flight edit to `src/commands/init.rs` briefly broke compilation (E0308) and caused one `genesis_fixture_test` runtime failure in my first full-suite run. I waited; the sibling's edit landed, the tree compiled, and the full suite then passed 100% green. The sibling's `init.rs`/`init_test.rs` work was NOT staged in my commit and has since been committed separately by its owner.
+2. `tests/prime_test.rs` previously had no `mod common;` — I added a single module declaration to reach the shared fake-bd helper rather than duplicating it. This stays within the brief's exact-files list (it's the test file itself) and required no changes to `tests/common/mod.rs`.
+3. No follow-up threshold triggers: helper worked on first try, change stayed within the two specified files.
+
+**Completion criteria:** ✅ full suite green · ✅ `cargo fmt --check` · ✅ `wai-xa8i.3` ready for orchestrator verify+ship (not closed, not pushed).

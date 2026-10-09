@@ -1,4 +1,4 @@
 ticket = "wai-xa8i.3"
 branch = "main"
-brief_path = ""
-steps = ["claim dc21e0eccf3b323d19213ee0b3578115d8324c7a"]
+brief_path = ".wai/projects/qa-round-execution/briefs/wai-xa8i.3.md"
+steps = ["claim dc21e0eccf3b323d19213ee0b3578115d8324c7a", "gates 3b7300b229e333684b96cf1690d351e804d96715", "brief 3b7300b229e333684b96cf1690d351e804d96715"]

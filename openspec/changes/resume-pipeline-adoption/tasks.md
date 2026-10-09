@@ -15,10 +15,10 @@
 
 ## 3. Authoritative over epics flow (red)
 
-- [ ] 3.1 Write failing test: prime output has no epics-flow suggestion when
+- [x] 3.1 Write failing test: prime output has no epics-flow suggestion when
       pipeline run is active
-- [ ] 3.2 Implement the precedence
-- [ ] 3.3 Run `cargo test` — verify green
+- [x] 3.2 Implement the precedence
+- [x] 3.3 Run `cargo test` — verify green
 
 ## 4. Validate (green)
 
