@@ -1,0 +1,4 @@
+ticket = "wai-xa8i.1"
+branch = "main"
+brief_path = ""
+steps = ["claim 38dd17637e9ed1bc00f782e2b8dd7eecb20ecc19", "gates 38dd17637e9ed1bc00f782e2b8dd7eecb20ecc19"]
