@@ -276,6 +276,11 @@ mod blocks_tests {
     /// to the pre-mechanism baseline (hard constraint of wai-vsn6). The
     /// baseline was captured with the pre-change engine; any drift in
     /// rendering — from block expansion or render_prompt itself — fails here.
+    ///
+    /// The baseline is a ratchet: it only moves when a template change is
+    /// DELIBERATE (e.g. wai-hjci: b5d8eed encoded new canon invariants).
+    /// Regenerate with `UPDATE_BASELINE=1 cargo test --bin wai --
+    /// builtin_templates_render`, review the fixture diff, then commit it.
     #[test]
     fn builtin_templates_render_byte_identical_to_baseline() {
         let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -285,9 +290,8 @@ mod blocks_tests {
             "baseline fixtures missing at {}",
             dir.display()
         );
+        let update = std::env::var("UPDATE_BASELINE").is_ok();
         for name in setup::builtin_template_names() {
-            let baseline = std::fs::read_to_string(dir.join(format!("{}.txt", name)))
-                .unwrap_or_else(|e| panic!("baseline for {name}: {e}"));
             let content = setup::get_builtin_template(name)
                 .unwrap_or_else(|| panic!("no built-in template {name}"));
             let f = write_toml(content);
@@ -299,6 +303,13 @@ mod blocks_tests {
                 rendered.push_str(&render_prompt(&step.prompt, "SNAPSHOT_TOPIC"));
                 rendered.push('\n');
             }
+            if update {
+                std::fs::write(dir.join(format!("{}.txt", name)), &rendered)
+                    .expect("write baseline");
+                continue;
+            }
+            let baseline = std::fs::read_to_string(dir.join(format!("{}.txt", name)))
+                .unwrap_or_else(|e| panic!("baseline for {name}: {e}"));
             assert_eq!(
                 rendered, baseline,
                 "rendered prompts for '{name}' drifted from the wai-vsn6 baseline"
