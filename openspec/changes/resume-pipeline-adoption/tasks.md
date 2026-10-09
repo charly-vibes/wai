@@ -9,9 +9,9 @@
 
 ## 2. Test the sync breadcrumb (red)
 
-- [ ] 2.1 Write failing test: `bd sync` output includes resume-the-orchestration
-- [ ] 2.2 Implement sync breadcrumb
-- [ ] 2.3 Run `cargo test` — verify green
+- [x] 2.1 Write failing test: `bd sync` output includes resume-the-orchestration
+- [x] 2.2 Implement sync breadcrumb
+- [x] 2.3 Run `cargo test` — verify green
 
 ## 3. Authoritative over epics flow (red)
 

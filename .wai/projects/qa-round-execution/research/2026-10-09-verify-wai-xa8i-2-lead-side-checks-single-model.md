@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:epic-orchestrator-2026-10-09-wai-xa8i-2, pipeline-step:verify]
+---
+
+VERIFY: wai-xa8i.2 lead-side checks (single-model degradation). Commands run: (1) git show 03f9712 --stat → sync.rs +8, sync_test.rs +69 matches REPORT; (2) cargo test --test sync_test → 4/4 green incl. new sync_active_run_includes_resume_the_orchestration; (3) cargo test --test prime_test → 16/16 green (wai-xa8i.1 intact); (4) cargo test full suite → 52 target result lines, all ok, 0 failures (wai-of8s flake did not occur); (5) pretender check --diff-only → exit 0 (CI gate); (6) pretender staged-gate --no-verify deviation verified: sync.rs complexity debt pre-existing (checked 03f9712^ version — claude_code_needs_sync cognitive 29 recurring) and in scope of standing ticket wai-abiy; (7) git show 03f9712 -- src/commands/sync.rs → breadcrumb in real-sync success path, uses pipeline/orchestration.rs helpers (brief's super::prime was a re-export pointer, disclosed). Verdict: report and reality AGREE
