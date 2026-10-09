@@ -55,6 +55,19 @@ pub fn run(name: Option<String>) -> Result<()> {
     }
 
     if already_initialized {
+        // Refuse to bless a workspace whose config cannot be parsed: ok:true
+        // here would tell a hint-blind agent the project is fixed when
+        // `.wai/config.toml` is corrupt (evallerina-00n). Repair is doctor's
+        // channel — the emitted error envelope points at `wai doctor`.
+        // A missing config file is different: `.wai/` present but config
+        // missing is a half-initialized workspace where re-creating the
+        // config is init's legitimate job (genesis_fixture recovery path).
+        let existing_config = match ProjectConfig::load(&current_dir) {
+            Ok(config) => Some(config),
+            Err(e @ crate::error::WaiError::ConfigError { .. }) => return Err(e.into()),
+            Err(_) => None,
+        };
+
         // For re-init, repair/update workspace using shared function.
         // sync_tool_commit is called explicitly here (and only here) so that
         // config.toml is only stamped during intentional init commands, not on
@@ -69,9 +82,9 @@ pub fn run(name: Option<String>) -> Result<()> {
 
         if !quiet {
             if context.json {
-                let existing_name = ProjectConfig::load(&current_dir)
-                    .map(|c| c.project.name.clone())
-                    .unwrap_or_else(|_| name.clone().unwrap_or_default());
+                let existing_name = existing_config
+                    .map(|c| c.project.name)
+                    .unwrap_or_else(|| name.clone().unwrap_or_default());
                 let payload = crate::json::InitPayload {
                     project_name: existing_name,
                     already_initialized: true,

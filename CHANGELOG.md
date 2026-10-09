@@ -7,6 +7,14 @@ and this project adheres to [Calendar Versioning](https://calver.org/) (YYYY.M.M
 
 ## [Unreleased]
 
+### Fixed
+
+- **`wai init` refuses to green-light a corrupt config** — re-init on an uninitialized
+  but malformed `.wai/config.toml` now hard-fails with the config-error envelope (exit 1,
+  remediation suggests `wai doctor`) instead of returning `ok:true` while leaving the
+  corruption untouched; parseable configs keep the normal already-initialized flow
+  (found by evallerina eval recording, evallerina-00n).
+
 ## [2026.10.5] - 2026-10-08
 
 ### Added

@@ -58,6 +58,41 @@ fn init_reinit_warns_already_initialized() {
     assert!(stdout.contains("already initialized"));
 }
 
+// ── corrupt config on re-init (evallerina-00n) ────────────────────────────────
+
+/// Re-init must not hand a hint-blind agent a green envelope when
+/// .wai/config.toml exists but is unparseable: init fails with an error
+/// envelope whose remediation points at `wai doctor` (repair is doctor's
+/// channel; init never silently overwrites the config).
+#[test]
+fn init_reinit_with_corrupt_config_fails_pointing_at_doctor() {
+    let tmp = TempDir::new().unwrap();
+    wai_cmd(tmp.path())
+        .args(["init", "--name", "my-ws"])
+        .assert()
+        .success();
+    fs::write(tmp.path().join(".wai/config.toml"), "not valid toml = [[[").unwrap();
+
+    let out = wai_cmd(tmp.path())
+        .args(["--json", "init", "--name", "my-ws"])
+        .output()
+        .expect("command should run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let payload: serde_json::Value =
+        serde_json::from_str(stdout.trim()).expect("error envelope is JSON");
+
+    assert_eq!(payload["ok"], false, "corrupt config must not be ok:true");
+    assert!(!out.status.success(), "error envelope must exit nonzero");
+    let rendered = serde_json::to_string(&payload).unwrap();
+    assert!(
+        rendered.contains("wai doctor"),
+        "remediation should point at `wai doctor`, got: {rendered}"
+    );
+    // The corrupt file is untouched — no silent overwrite.
+    let config = fs::read_to_string(tmp.path().join(".wai/config.toml")).unwrap();
+    assert_eq!(config, "not valid toml = [[[", "init must not overwrite");
+}
+
 // ── non-default flag: --json ──────────────────────────────────────────────────
 
 #[test]
