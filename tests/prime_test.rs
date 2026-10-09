@@ -2,6 +2,10 @@ use assert_cmd::Command;
 use std::fs;
 use tempfile::TempDir;
 
+// Reuses the shared fake-bd helper (wai-xa8i.3) without importing the rest of
+// `common` — this file defines its own local fixture helpers.
+mod common;
+
 #[allow(deprecated)]
 fn wai_cmd(dir: &std::path::Path) -> Command {
     let mut cmd = Command::cargo_bin("wai").unwrap();
@@ -414,6 +418,63 @@ fn prime_omits_global_patterns_section_when_empty() {
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(!stdout.contains("Global Patterns"));
+}
+
+/// When a mid-flight pipeline run is active, the epics-flow suggestion from
+/// `bd ready --json` must be suppressed (terminal AND JSON next_steps): the
+/// pipeline-run resume directive is authoritative and a competing
+/// "Suggested next: bd show <id>" confuses agents about which system to
+/// follow (wai-xa8i.3, openspec resume-pipeline-adoption).
+#[test]
+fn prime_active_run_suppresses_suggested_next() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproject");
+    write_pipeline(
+        tmp.path(),
+        "research-flow",
+        "Use for research investigation",
+        &[("gather", "Gather {topic}"), ("synth", "Synth {topic}")],
+    );
+    // Mid-flight: step 0 of 2.
+    write_active_run(tmp.path(), "research-flow", 0);
+    // Fake `bd ready --json` emits one ready issue so the epics-flow
+    // suggestion would fire on the ungated implementation.
+    let fake_bin = common::install_fake_bd_ready_json(tmp.path(), r#"[{"id":"wai-1234"}]"#);
+    let path = format!(
+        "{}:{}",
+        fake_bin.display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+
+    let out = wai_cmd(tmp.path())
+        .env("PATH", path.clone())
+        .args(["prime", "--project", "myproject", "--no-input"])
+        .output()
+        .expect("command should run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success());
+    // Fixture sanity: the run IS adopted as active and mid-flight.
+    assert!(stdout.contains("PIPELINE RUN ADOPT/RESUME"));
+    assert!(stdout.contains("wai pipeline next"));
+    // The epics-flow suggestion must NOT appear alongside the run directive.
+    assert!(
+        !stdout.contains("Suggested next:"),
+        "prime must not suggest `bd show` when a mid-flight pipeline run is active"
+    );
+
+    // The JSON payload agrees: no next_steps fallback from bd ready.
+    let out = wai_cmd(tmp.path())
+        .env("PATH", path)
+        .args(["prime", "--project", "myproject", "--no-input", "--json"])
+        .output()
+        .expect("prime --json should run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success());
+    assert!(
+        !stdout.contains("bd show wai-1234"),
+        "JSON next_steps must not carry the epics-flow suggestion under an active run"
+    );
 }
 
 /// The JSON payload carries the same list as an additive field.

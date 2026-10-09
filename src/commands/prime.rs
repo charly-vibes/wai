@@ -104,10 +104,24 @@ fn render_closing_sections(project_root: &Path, phase: &str) {
     // Doctor health summary — one line when not clean, silent when green.
     render_health_summary(project_root);
 
-    // Suggested next via bd ready --json
-    if let Some(next_id) = suggested_next(project_root) {
+    // Suggested next via bd ready --json — suppressed while a mid-flight
+    // pipeline run is active: the resume-the-orchestration directive is
+    // authoritative over the epics flow (wai-xa8i.3).
+    if !pipeline_run_mid_flight(project_root)
+        && let Some(next_id) = suggested_next(project_root)
+    {
         println!("{} Suggested next: bd show {}", "→".cyan(), next_id);
     }
+}
+
+/// True when an active pipeline run is mid-flight (`status.active` and the
+/// run is incomplete). Both prime renders (terminal and JSON) suppress the
+/// epics-flow `bd ready` suggestion under this condition (wai-xa8i.3).
+fn pipeline_run_mid_flight(project_root: &Path) -> bool {
+    pipeline_current_status(project_root)
+        .ok()
+        .flatten()
+        .is_some_and(|status| status.active && run_is_incomplete(&status))
 }
 
 /// Orientation state gathered once for both the JSON and terminal renders.
@@ -302,8 +316,10 @@ fn render_json(project_root: &Path, state: &SessionState) -> Result<()> {
         .unwrap_or_default();
 
     // Collect suggested next step from bd ready --json as a next_steps item when
-    // not resuming (resuming already has steps from the handoff).
-    let next_steps = if next_steps.is_empty() {
+    // not resuming (resuming already has steps from the handoff). Suppressed
+    // under an active mid-flight pipeline run so the payload agrees with the
+    // terminal render (wai-xa8i.3).
+    let next_steps = if next_steps.is_empty() && !pipeline_run_mid_flight(project_root) {
         suggested_next(project_root)
             .map(|id| vec![format!("bd show {}", id)])
             .unwrap_or_default()
