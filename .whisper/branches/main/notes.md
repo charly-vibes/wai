@@ -36,3 +36,8 @@
   - wai-vsn6: template shared-block mechanism landed (8b73602) — [[blocks]] + {{block:name}} resolved at load time in definition.rs, fail-loudly validation, byte-identity ratchet via committed pre-change rendered baselines (fixtures/pipeline-rendered-baseline-vsn6/); adoption scoped to Advance trail; mechanical follow-up wai-opk8 filed
   - Main now 28 commits ahead of origin — NOT pushed (awaiting authorization)
   - **Next:** push/release decision; then open P2s: wai-t3qa, wai-of8s, wai-opk8; fresh session via /renew recommended
+- 2026-10-08T22:15:39Z [id:c63621516bb04f92b0fad88fa150ffcf6e87f9e192379d74990c8147270b8b06] ### 2026-10-08 22:15 — v2026.10.5 RELEASED (epic-orchestrator train)
+  - Pushed main (30 commits, 7 epic-orchestrator runs dogfooded); release PR #42 (CHANGELOG [2026.10.5] + CalVer bump Cargo.toml/lock/.wai/config.toml) — CI caught bail!-in-expression-position in definition.rs:63 (same class as wai-sib1; newer rustc on CI; fixed with tail-expression Err(miette::miette!)), 2 local clippy iterations, then green
+  - PR #42 merged; tag v2026.10.5 → release.yml success: GitHub Release (5 binaries + checksums), crates.io wai-cli 2026.10.5 (API-confirmed), scoop-charly updated (aee0fd3), homebrew tap in same workflow; docs.yml dispatched on main, success
+  - Known wart persists: tag-ref Docs run failed again (wai-35zh env protection) — main docs deploy fine
+  - **Next:** open P2s: wai-t3qa (next exits 0 on gate block), wai-of8s (flaky gather_git_file_context test), wai-opk8 (adopt shared-blocks for remaining conventions); fresh session via /renew

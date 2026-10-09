@@ -1,4 +1,4 @@
 ticket = "wai-xa8i.1"
 branch = "main"
-brief_path = ""
-steps = ["claim 38dd17637e9ed1bc00f782e2b8dd7eecb20ecc19", "gates 38dd17637e9ed1bc00f782e2b8dd7eecb20ecc19"]
+brief_path = ".wai/projects/qa-round-execution/briefs/wai-xa8i.1.md"
+steps = ["claim 38dd17637e9ed1bc00f782e2b8dd7eecb20ecc19", "gates 38dd17637e9ed1bc00f782e2b8dd7eecb20ecc19", "brief b94950fe57993c59c8c4f4938992c317a546435d", "spawn b94950fe57993c59c8c4f4938992c317a546435d", "verify d73b96c488785a1ef7d1e0c0177ebce747d4a54d"]

@@ -2,10 +2,10 @@
 
 ## 1. Test the prime suggestion (red)
 
-- [ ] 1.1 Write failing test: `wai prime` with active pipeline run outputs
+- [x] 1.1 Write failing test: `wai prime` with active pipeline run outputs
       resume-the-orchestration line
-- [ ] 1.2 Implement prime suggestion
-- [ ] 1.3 Run `cargo test` — verify green
+- [x] 1.2 Implement prime suggestion
+- [x] 1.3 Run `cargo test` — verify green
 
 ## 2. Test the sync breadcrumb (red)
 

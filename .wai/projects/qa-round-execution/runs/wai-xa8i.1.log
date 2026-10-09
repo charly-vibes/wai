@@ -1,0 +1,20 @@
+## REPORT
+
+**Ticket:** wai-xa8i.1 — prime: surface resume-the-orchestration when a pipeline run is active
+
+**Commits made:**
+- `d73b96c` — "prime: surface resume-the-orchestration directive on active pipeline runs" (2 files: `src/commands/prime.rs`, `tests/prime_test.rs`; +27/−7). Pre-commit hooks passed (pretender-check, cargo fmt, bd, clippy `-D warnings`). Not pushed per instructions; beads ticket left open for orchestrator.
+
+**TDD sequence:**
+1. **RED** — added `prime_active_run_directives_resume_the_orchestration` in `tests/prime_test.rs` (uses existing `write_pipeline` + `write_active_run` helpers; asserts stdout contains `resume the orchestration`, case-insensitive). Confirmed failing on pre-change code.
+2. **GREEN** — `render_active_pipeline_run` in `src/commands/prime.rs` now emits `→ Resume the orchestration: wai pipeline next` in the active/mid-flight (`Some(step)`) branch only, alongside the existing Resume line (next_command computed once since it's a move). ADOPT/RESUME block, complete-run branch, and JSON payload untouched. Change is 4 lines added.
+
+**Test results:**
+- `cargo test --test prime_test`: **16 passed, 0 failed** (new test + all existing `prime_adopts_active_run*` tests green)
+- `cargo fmt --check`: clean
+- `cargo clippy --all-targets -- -D warnings` (via pre-commit hook): clean
+- `cargo test` full suite: **517 passed, 1 failed** — the single failure (`commands::pipeline::definition::blocks_tests::builtin_templates_render_byte_identical_to_baseline`) is **pre-existing and unrelated**: verified it fails identically with my two files stashed (i.e., at HEAD). It's a baseline drift in the `epic-orchestrator` builtin template render (rendered output includes canon Invariant 6 exception / Invariant 7–9 text the baseline snapshot lacks) — likely the orchestrator's recent template commits didn't regenerate the baseline.
+
+**Deviations:**
+1. The brief requires "full suite green before commit". I could not achieve that because of the pre-existing baseline-drift failure above, which is outside the brief's exact-files scope (`src/commands/prime.rs`, `tests/prime_test.rs` only). Per the follow-up threshold, I stopped rather than regenerate the baseline. **Recommend the orchestrator file a follow-up under umbrella `wai-xa8i`** to regenerate the `builtin_templates_render_byte_identical_to_baseline` baseline (or accept the template drift) — it will block any full-suite gate until fixed.
+2. Minor implementation detail: the directive line had to compute `resume_cmd` once instead of two inline `unwrap_or_else` calls (Rust move semantics) — functionally identical to the brief's sketch.
