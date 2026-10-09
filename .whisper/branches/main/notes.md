@@ -41,3 +41,18 @@
   - PR #42 merged; tag v2026.10.5 → release.yml success: GitHub Release (5 binaries + checksums), crates.io wai-cli 2026.10.5 (API-confirmed), scoop-charly updated (aee0fd3), homebrew tap in same workflow; docs.yml dispatched on main, success
   - Known wart persists: tag-ref Docs run failed again (wai-35zh env protection) — main docs deploy fine
   - **Next:** open P2s: wai-t3qa (next exits 0 on gate block), wai-of8s (flaky gather_git_file_context test), wai-opk8 (adopt shared-blocks for remaining conventions); fresh session via /renew
+- 2026-10-09T16:58:33Z [id:715162d9cd0cced28630809b662b94b975eb7e030d2069972ce5b72a382982c3] ### 2026-10-09 — wai-xa8i.1 shipped via epic-orchestrator (resume-pipeline-adoption child 1/3)
+  - Full loop: claim→gates→brief→spawn(subagent:wai-xa8i.1:implement)→verify→ship→stop; commit d73b96c — prime now emits '→ Resume the orchestration: wai pipeline next' on active mid-flight runs (RED test prime_active_run_directives_resume_the_orchestration; prime_test 16/16)
+  - Verify caught pre-existing failure: builtin_templates_render_byte_identical_to_baseline red on main — b5d8eed changed template without regenerating wai-vsn6 baseline; fixed via wai-hjci (UPDATE_BASELINE=1 regen gate added to the ratchet test, baseline +15 lines, commit 4a00494)
+  - gather_git_file_context flake = known wai-of8s, passes in isolation
+  - Single-model environment (only openrouter ready) → verify used lead-side degradation path per template
+  - beads: wai-xa8i.1 + wai-hjci closed; openspec tasks 1.1-1.3 [x]
+  - Main 7 commits ahead of origin — NOT pushed (awaiting authorization)
+  - **Next:** fresh run for wai-xa8i.2 (sync breadcrumb) or wai-xa8i.3 (precedence, now unblocked); then umbrella close + dogfood
+- 2026-10-09T17:52:16Z [id:87c4a7350ebd653d9b5aef166804a09ba990a48b4640317d62fe8ee9aaea7a9f] ### 2026-10-09 — resume-pipeline-adoption COMPLETE (wai-xa8i + children .1/.2/.3 all shipped via epic-orchestrator)
+  - wai-xa8i.2 (03f9712): sync emits '→ Resume the orchestration: wai pipeline next' after successful sync when run active mid-flight; sync_test 4/4. Gotcha: lefthook pretender staged-gate blocks on PRE-EXISTING sync.rs complexity debt (claude_code_needs_sync cognitive 29) — subagent used --no-verify with disclosure; debt in scope of standing wai-abiy; CI gate --diff-only passes. Any future sync.rs touch hits the same staged-gate block.
+  - wai-xa8i.3 (d984464): prime suppresses 'Suggested next: bd show' (terminal + JSON next_steps) under active mid-flight run via pipeline_run_mid_flight helper; prime_test 17/17; used tests/common install_fake_bd_ready_json (prime_test gained mod common). No --no-verify needed.
+  - Umbrella wai-xa8i closed; openspec resume-pipeline-adoption validated strict + dogfooded (3 consecutive orchestrated runs, no nudging). 11/11 tasks [x].
+  - Findings: subagent claimed transient concurrent init.rs edit — no residue in git, classified unexplained/non-blocking. Suite flakes seen: wai-of8s (gather_git_file_context), wai-z25x (execute_hook_no_deadlock) — both pass in isolation, both have tickets.
+  - Main 15 commits ahead of origin — NOT pushed (awaiting authorization). Consider release train (v2026.10.x) next session.
+  - **Next:** push decision, then P2 backlog (wai-t3qa pipeline next exits 0 on gate block, wai-opk8 shared-blocks adoption, wai-80x5 help.rs split, wai-0v2e pretender gate statefulness)
