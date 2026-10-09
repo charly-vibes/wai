@@ -8,6 +8,7 @@ use crate::context::{current_context, require_safe_mode};
 use crate::error::WaiError;
 use crate::sync_core::{self, Projection};
 
+use super::pipeline::{pipeline_current_status, run_is_incomplete};
 use super::require_project;
 
 #[derive(Debug, Deserialize)]
@@ -227,6 +228,13 @@ pub fn run(status_only: bool, dry_run: bool, from_main: bool) -> Result<()> {
 
     if !quiet {
         log::success("Agent configs synced").into_diagnostic()?;
+        // Resume breadcrumb for an in-flight pipeline run (wai-xa8i.2).
+        if let Some(status) = pipeline_current_status(&project_root).ok().flatten()
+            && status.active
+            && run_is_incomplete(&status)
+        {
+            println!("{} Resume the orchestration: wai pipeline next", "→".cyan());
+        }
     }
     Ok(())
 }
