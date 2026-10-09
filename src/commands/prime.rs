@@ -743,13 +743,11 @@ fn render_active_pipeline_run(status: PipelineCurrentPayload) {
             if let Some(topic) = &status.topic {
                 println!("  {} topic: {}", "•".dimmed(), topic);
             }
-            println!(
-                "  {} Resume: {}",
-                "→".cyan(),
-                status
-                    .next_command
-                    .unwrap_or_else(|| "wai pipeline next".to_string()),
-            );
+            let resume_cmd = status
+                .next_command
+                .unwrap_or_else(|| "wai pipeline next".to_string());
+            println!("  {} Resume: {}", "→".cyan(), resume_cmd);
+            println!("  {} Resume the orchestration: {}", "→".cyan(), resume_cmd);
         }
         // Run is complete — nudge the user to close it.
         None => println!(

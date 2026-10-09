@@ -227,6 +227,28 @@ fn prime_shows_active_pipeline_run_step() {
 }
 
 #[test]
+fn prime_active_run_directives_resume_the_orchestration() {
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "myproject");
+    write_pipeline(
+        tmp.path(),
+        "research-flow",
+        "Use for research investigation",
+        &[("gather", "Gather {topic}"), ("synth", "Synth {topic}")],
+    );
+    write_active_run(tmp.path(), "research-flow", 0);
+
+    let out = wai_cmd(tmp.path())
+        .args(["prime", "--project", "myproject", "--no-input"])
+        .output()
+        .expect("command should run");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success());
+    assert!(stdout.to_lowercase().contains("resume the orchestration"));
+}
+
+#[test]
 fn prime_adopts_active_run_in_json() {
     let tmp = TempDir::new().unwrap();
     init_workspace(tmp.path());
