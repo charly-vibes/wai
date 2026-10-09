@@ -22,5 +22,5 @@
 
 ## 4. Validate (green)
 
-- [ ] 4.1 `openspec validate resume-pipeline-adoption --strict`
-- [ ] 4.2 Manual verification on the wai repo itself (dogfood)
+- [x] 4.1 `openspec validate resume-pipeline-adoption --strict`
+- [x] 4.2 Manual verification on the wai repo itself (dogfood)
