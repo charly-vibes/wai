@@ -5,7 +5,15 @@ All notable changes to wai will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Calendar Versioning](https://calver.org/) (YYYY.M.MICRO).
 
-## [Unreleased]
+## [2026.10.9] - 2026-10-09
+
+### Added
+
+- **Resume-the-orchestration directives** — when a pipeline run is active mid-flight,
+  `wai prime` now surfaces `→ Resume the orchestration: wai pipeline next` (and
+  suppresses the misleading `Suggested next: bd show` epics-flow suggestion), and
+  `wai sync` emits the same breadcrumb after a successful sync — agents mid-run are
+  steered back to the pipeline instead of being nudged toward ad-hoc work.
 
 ### Fixed
 
