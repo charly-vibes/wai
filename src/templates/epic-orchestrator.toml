@@ -131,9 +131,22 @@ Rules:
 - Retry is a new named session (canon Invariant 6): zero commits = clean
   retry, partial commits = manual resume. Retry names get a `-retry`
   suffix. Never resume a wedged spawn in-place.
+  Exception (canon Invariant 6): an interrupted-but-healthy spawn (harness
+  timeout, orchestrator crash) with evidence of progress (commits or a
+  session record) resumes the existing named session via
+  `pi -c -p -n "<name>-resume"`. Re-prompting the full brief from scratch in
+  that situation re-runs finished work (observed: 30–60 min lost) and is a
+  violation of this step.
+- Wrap the spawn command in a wall-clock budget (`timeout <budget>`) sized
+  to the ticket and stated in the brief (canon Invariant 8). A wedged
+  subagent must cost minutes of orchestrator attention, not hours: bare
+  foreground `pi -p` calls that block until the harness timeout are
+  forbidden — background + tail + poll, always.
 
 Record spawn: `wai add research "SPAWN: <session name>; log=<path>"`
 State checkpoint: append the step id + sha (current HEAD) to the state file before advancing.
+If the recorded log path or session record cannot be located, the spawn
+failed regardless of what the report claims — do not pass this step.
 {{block:advance-trail}}
 """
 
@@ -199,6 +212,8 @@ prompt = """
 
 Do:
 - inspect `git diff` and commit atomically
+- never stage the beads database: `git add .beads` is a hard error (canon
+  Invariant 9) — the DB is already excluded by the global gitignore
 - close/update the beads ticket if applicable
 - mark openspec tasks complete if applicable
 - push only when project policy or user instruction explicitly says to push

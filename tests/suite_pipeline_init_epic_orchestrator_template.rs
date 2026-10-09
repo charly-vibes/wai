@@ -309,3 +309,38 @@ fn pipeline_help_lists_epic_orchestrator_builtin() {
         "pipeline help should list the epic-orchestrator built-in template: {stdout}"
     );
 }
+
+#[test]
+fn pipeline_init_epic_orchestrator_encodes_spawn_safety_invariants() {
+    // Canon invariants 6 (resume exception), 8 (wall-clock budget), 9 (.beads)
+    // — openspec change harden-orchestrator-spawn-budget, beads wai-tdnv.
+    let tmp = TempDir::new().unwrap();
+    init_workspace(tmp.path());
+
+    let out = wai_cmd(tmp.path())
+        .args(["pipeline", "init", "epic-orchestrator"])
+        .output()
+        .expect("command should run");
+    assert!(out.status.success());
+
+    let toml_path = tmp
+        .path()
+        .join(".wai/resources/pipelines/epic-orchestrator.toml");
+    let content = fs::read_to_string(&toml_path).unwrap();
+
+    // Invariant 8: spawn wrapped in a wall-clock budget, never blind-blocking.
+    assert!(
+        content.contains("timeout"),
+        "spawn step must require a wall-clock budget (timeout <budget>)"
+    );
+    // Invariant 6 exception: interrupted-but-healthy spawns resume via pi -c.
+    assert!(
+        content.contains("pi -c"),
+        "spawn step must encode the resume exception (pi -c -p -n \"<name>-resume\")"
+    );
+    // Invariant 9: beads DB is never staged.
+    assert!(
+        content.contains("git add .beads"),
+        "ship step must prohibit git add .beads"
+    );
+}
