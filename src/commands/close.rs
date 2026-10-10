@@ -190,3 +190,103 @@ fn get_uncommitted_files(project_root: &Path) -> Vec<String> {
         .map(|s| s.trim().to_string())
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::process::Command;
+    use tempfile::tempdir;
+
+    fn git(dir: &Path, args: &[&str]) {
+        let out = Command::new("git")
+            .args(args)
+            .current_dir(dir)
+            .output()
+            .expect("spawn git");
+        assert!(
+            out.status.success(),
+            "git {:?} failed: {}",
+            args,
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+
+    fn init_repo() -> std::path::PathBuf {
+        let dir = tempdir().expect("tempdir").keep();
+        git(&dir, &["init"]);
+        dir
+    }
+
+    #[test]
+    fn staged_rename_reports_new_path_not_joined_string() {
+        let dir = init_repo();
+        std::fs::write(dir.join("old.txt"), "content").unwrap();
+        git(&dir, &["add", "old.txt"]);
+        git(
+            &dir,
+            &[
+                "-c",
+                "user.email=t@t",
+                "-c",
+                "user.name=t",
+                "commit",
+                "-m",
+                "init",
+            ],
+        );
+        git(&dir, &["mv", "old.txt", "new.txt"]);
+
+        let files = get_uncommitted_files(&dir);
+        assert!(
+            files.iter().any(|f| f == "new.txt"),
+            "expected new path in {files:?}"
+        );
+        assert!(
+            files.iter().all(|f| !f.contains("->")),
+            "joined rename string leaked into {files:?}"
+        );
+    }
+
+    #[test]
+    fn modified_and_untracked_files_are_included() {
+        let dir = init_repo();
+        std::fs::write(dir.join("tracked.txt"), "v1").unwrap();
+        git(&dir, &["add", "tracked.txt"]);
+        git(
+            &dir,
+            &[
+                "-c",
+                "user.email=t@t",
+                "-c",
+                "user.name=t",
+                "commit",
+                "-m",
+                "init",
+            ],
+        );
+        std::fs::write(dir.join("tracked.txt"), "v2").unwrap();
+        std::fs::write(dir.join("untracked.txt"), "new").unwrap();
+
+        let files = get_uncommitted_files(&dir);
+        assert!(files.iter().any(|f| f.contains("tracked.txt")));
+        assert!(files.iter().any(|f| f == "untracked.txt"));
+    }
+
+    #[test]
+    fn quoted_non_ascii_paths_are_unquoted() {
+        let dir = init_repo();
+        std::fs::write(dir.join("h\u{e9}llo.txt"), "content").unwrap();
+
+        let files = get_uncommitted_files(&dir);
+        assert!(
+            files.iter().any(|f| f == "h\u{e9}llo.txt"),
+            "expected unquoted path in {files:?}"
+        );
+    }
+
+    #[test]
+    fn non_repo_directory_returns_empty() {
+        let dir = tempdir().expect("tempdir").keep();
+        assert!(get_uncommitted_files(&dir).is_empty());
+    }
+}
