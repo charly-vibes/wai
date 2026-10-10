@@ -173,22 +173,13 @@ pub fn run(project: Option<String>, remember: bool, force: bool) -> Result<()> {
 }
 
 fn get_uncommitted_files(project_root: &Path) -> Vec<String> {
-    let Ok(output) = std::process::Command::new("git")
-        .args(["status", "--porcelain"])
-        .current_dir(project_root)
-        .output()
-    else {
-        return Vec::new();
-    };
-    if !output.status.success() {
-        return Vec::new();
+    // Get uncommitted files (silently skip if git unavailable or not a repo).
+    // genesis::git parses porcelain v1 correctly: rename records (XY old -> new)
+    // report the new path, quoted/non-ASCII paths are unquoted.
+    match genesis::git::repo_root_from(project_root) {
+        Ok(root) => genesis::git::uncommitted_files_lossy(&root),
+        Err(_) => Vec::new(),
     }
-    String::from_utf8_lossy(&output.stdout)
-        .lines()
-        .filter(|line| !line.is_empty())
-        .filter_map(|line| line.get(3..))
-        .map(|s| s.trim().to_string())
-        .collect()
 }
 
 #[cfg(test)]
