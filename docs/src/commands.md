@@ -36,7 +36,7 @@ Available for all commands:
 
 ### Safe mode
 
-`--safe` prevents all write operations. Commands that modify state — `add`, `sync`, `move`, `pipeline start/next/init/approve/lock`, `phase next/back/set`, and `import` — will exit with an error. Read-only commands like `status`, `search`, `doctor`, `pipeline verify`, and `pipeline current` work normally.
+`--safe` prevents all write operations. Commands that modify state — `add`, `sync`, `move`, `pipeline start/next/init/approve/lock/bypass`, `phase next/back/set`, and `import` — will exit with an error. Read-only commands like `status`, `search`, `doctor`, `pipeline verify`, and `pipeline current` work normally.
 
 ---
 
@@ -547,6 +547,7 @@ See [Pipelines](./concepts/pipelines.md) for conceptual background on pipeline s
 | `wai pipeline check [--oracle=<name>]` | Dry-run gate evaluation without advancing |
 | `wai pipeline approve` | Record human approval for current step |
 | `wai pipeline validate [name]` | Validate pipeline TOML definitions |
+| `wai pipeline bypass <reason>` | Record a disclosed gate bypass in the active run's ledger (silent no-op with no active run) |
 | `wai pipeline lock` | Lock current step's artifacts (SHA-256 hash sidecars) |
 | `wai pipeline verify` | Verify integrity of all locked artifacts |
 

@@ -332,7 +332,7 @@ The primary verify path spawns a verifier from a *different model family*. Singl
 
 ### Oracle requirement
 
-The verify and ship steps carry a `tests-pass` oracle gate. `wai pipeline init epic-orchestrator` ships a generic `tests-pass` script (see [Oracle scripts](#oracle-scripts)) to `.wai/resources/oracles/`, so the gates resolve out of the box; if you remove it, advancing past those steps fails.
+The verify and ship steps carry a `tests-pass` oracle gate, and the verify step additionally carries a `verify-evidence` oracle: a review artifact may record CONFIRM only when it cites the artifacts it read and includes fresh test-run output — evidence gaps must be recorded as REVIEW_REQUIRED. `wai pipeline init epic-orchestrator` ships both scripts (see [Oracle scripts](#oracle-scripts)) to `.wai/resources/oracles/`, so the gates resolve out of the box; if you remove one, advancing past those steps fails.
 
 > Provenance: the evidence base and design proposal for this pipeline live in the orchestrator-tooling project (`~/.wai/projects/orchestrator-tooling/`); the openspec change is `openspec/changes/add-epic-orchestrator-template/`.
 

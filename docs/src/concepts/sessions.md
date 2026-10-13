@@ -16,7 +16,7 @@ A wai session follows a three-step loop:
      └──────────────────────────────┘
 ```
 
-1. **`wai prime`** — Orient yourself. Prime reads the latest handoff, shows active projects and their phases, surfaces plugin context (git status, open issues), and suggests next steps. If a previous session was interrupted, it detects this automatically.
+1. **`wai prime`** — Orient yourself. Prime reads the latest handoff, shows active projects and their phases, surfaces plugin context (git status, open issues), and suggests next steps. It also warns (advisory, silent when green) on cross-agent collision signals: agent-provenance stash entries and unexpired agent lock-files under `.wai/`. If a previous session was interrupted, it detects this automatically.
 
 2. **Work** — Do your actual work: add artifacts, advance phases, write code. Wai stays out of the way.
 
