@@ -2,10 +2,10 @@
 
 ## 1. Step artifact manifest gates (R1)
 
-- [ ] 1.1 RED: test that epic-orchestrator implement/ship steps declare structural gates and block without artifacts
-- [ ] 1.2 GREEN: add per-step `[steps.<step>.gate.structural]` blocks to `src/templates/epic-orchestrator.toml` (and tdd-ro5 where applicable)
-- [ ] 1.3 Tidy: extract shared gate-block boilerplate (coordinate with wai-opk8 shared-blocks adoption)
-- [ ] 1.4 Update rendered baseline fixtures (wai-vsn6 ratchet: run UPDATE_BASELINE gate)
+- [x] 1.1 RED: test that epic-orchestrator implement/ship steps declare structural gates and block without artifacts
+- [x] 1.2 GREEN: add per-step `[steps.<step>.gate.structural]` blocks to `src/templates/epic-orchestrator.toml` (and tdd-ro5 where applicable)
+- [ ] 1.3 Tidy: extract shared gate-block boilerplate (coordinate with wai-opk8 shared-blocks adoption) — deferred: `{{block:}}` expansion is prompt-only today; needs gate-table mechanism
+- [x] 1.4 Update rendered baseline fixtures (wai-vsn6 ratchet: run UPDATE_BASELINE gate) — drift = ship-close Record line only (RO5U critical fix)
 
 ## 2. Gate bypass telemetry (R2)
 

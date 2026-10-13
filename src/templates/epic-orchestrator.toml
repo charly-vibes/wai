@@ -223,6 +223,10 @@ State checkpoint: append the step id + sha (current HEAD) to the state file befo
 {{block:advance-trail}}
 """
 
+[steps.gate.structural]
+min_artifacts = 1
+types = ["research"]
+
 [[steps.gate.oracles]]
 name = "tests-pass"
 description = "Final tests must pass before close"
