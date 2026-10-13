@@ -21,9 +21,9 @@
 
 ## 4. Cross-agent collision surfacing (R4)
 
-- [ ] 4.1 RED: test prime collision warning on provenance-matching stash entry
-- [ ] 4.2 GREEN: stash-provenance scan + lock-file check in prime (advisory, silent-when-green)
-- [ ] 4.3 Extend to `wai pipeline next` when a run is active
+- [x] 4.1 RED: test prime collision warning on provenance-matching stash entry
+- [x] 4.2 GREEN: stash-provenance scan + lock-file check in prime (advisory, silent-when-green)
+- [x] 4.3 Extend to `wai pipeline next` when a run is active
 
 ## 5. Validation
 

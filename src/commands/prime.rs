@@ -90,6 +90,12 @@ fn render_terminal(project_root: &Path, state: &SessionState) -> Result<()> {
 /// Closing orientation sections: worktree sync hint, pipelines, doctor
 /// health summary, and the suggested-next issue from bd ready.
 fn render_closing_sections(project_root: &Path, phase: &str) {
+    // Cross-agent collision surfacing (wai-76dq) — heuristic, best-effort,
+    // never hard-fails (design.md Decision 4). Silent when green.
+    for warning in collision_warnings(project_root) {
+        println!("{} {}", "⚠".yellow(), warning);
+    }
+
     // Worktree sync suggestion
     if detect_main_worktree_root(project_root).is_some() {
         println!(
@@ -112,6 +118,84 @@ fn render_closing_sections(project_root: &Path, phase: &str) {
     {
         println!("{} Suggested next: bd show {}", "→".cyan(), next_id);
     }
+}
+
+/// Cross-agent collision warnings (wai-76dq, R4 of
+/// harden-orchestration-gates). Heuristic and best-effort by design:
+/// reliably detecting parallel agents is impossible, so this surfaces
+/// *signals* — a stash entry whose message carries agent provenance
+/// (`<agent> WIP`, "parked", "owns") or an unexpired agent lock-file under
+/// `.wai/`. Advisory only: callers print the warnings, never hard-fail,
+/// and the scan is silent when green.
+pub(crate) fn collision_warnings(project_root: &Path) -> Vec<String> {
+    let mut warnings = Vec::new();
+    warnings.extend(stash_provenance_warnings(project_root));
+    warnings.extend(lock_file_warnings(project_root));
+    warnings
+}
+
+/// Stash entries whose message matches a known agent-provenance pattern.
+fn stash_provenance_warnings(project_root: &Path) -> Vec<String> {
+    // Word-boundary match so prose like 'towns'/'owners' does not read as
+    // agent provenance (RO5U pass-1 medium finding).
+    let provenance = regex::Regex::new(r"(?i)\b(wip|parked|owns)\b").expect("valid regex");
+    let Ok(output) = std::process::Command::new("git")
+        .args(["stash", "list"])
+        .current_dir(project_root)
+        .output()
+    else {
+        return Vec::new(); // no git, no repo, or git unavailable: silent
+    };
+    if !output.status.success() {
+        return Vec::new();
+    }
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter(|line| provenance.is_match(line))
+        .map(|line| format!("Collision risk: agent-provenance stash entry present: {line}"))
+        .collect()
+}
+
+/// Agent lock-files under `.wai/` that are present and unexpired. A lock
+/// older than [`LOCK_EXPIRY_DAYS`] is considered expired (best-effort TTL;
+/// no formal expiry exists in the lock format).
+fn lock_file_warnings(project_root: &Path) -> Vec<String> {
+    const LOCK_EXPIRY_DAYS: i64 = 7;
+    let projects_dir = crate::config::projects_dir(project_root);
+    if !projects_dir.exists() {
+        return Vec::new();
+    }
+    let now = chrono::Utc::now();
+    let mut warnings = Vec::new();
+    let walker = walkdir::WalkDir::new(&projects_dir).into_iter().flatten();
+    for entry in walker {
+        if !entry.file_type().is_file() {
+            continue;
+        }
+        let Some(name) = entry.file_name().to_str() else {
+            continue;
+        };
+        if !name.ends_with(".lock") {
+            continue;
+        }
+        let unexpired = std::fs::read_to_string(entry.path())
+            .ok()
+            .and_then(|content| {
+                toml::from_str::<crate::commands::pipeline::ArtifactLock>(&content).ok()
+            })
+            .and_then(|lock| chrono::DateTime::parse_from_rfc3339(&lock.locked_at).ok())
+            .map(|locked_at| {
+                (now - locked_at.with_timezone(&chrono::Utc)).num_days() < LOCK_EXPIRY_DAYS
+            })
+            .unwrap_or(false);
+        if unexpired {
+            warnings.push(format!(
+                "Collision risk: unexpired agent lock-file: {}",
+                entry.path().display()
+            ));
+        }
+    }
+    warnings
 }
 
 /// True when an active pipeline run is mid-flight (`status.active` and the
@@ -174,6 +258,7 @@ fn render_empty_state(json_mode: bool) -> Result<()> {
             phase: None,
             resume: false,
             handoff_summary: None,
+            collision_warnings: Vec::new(),
             next_steps: Vec::new(),
             plans: Vec::new(),
             prior_context: Vec::new(),
@@ -344,6 +429,7 @@ fn render_json(project_root: &Path, state: &SessionState) -> Result<()> {
             .flatten()
             .filter(|status| status.active && run_is_incomplete(status)),
         global_patterns: global_patterns(),
+        collision_warnings: collision_warnings(project_root),
     };
     print_envelope(genesis::envelope::EnvelopeKind::Ok, payload, vec![], vec![])
 }

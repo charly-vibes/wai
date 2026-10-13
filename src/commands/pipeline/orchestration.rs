@@ -346,6 +346,12 @@ pub(super) fn cmd_next() -> Result<()> {
     let project_root = require_project()?;
     require_safe_mode("pipeline next")?;
 
+    // Cross-agent collision surfacing (wai-76dq): advisory warnings before
+    // any gate check so a failing gate still shows them. Never hard-fails.
+    for warning in crate::commands::prime::collision_warnings(&project_root) {
+        println!("⚠ {warning}");
+    }
+
     // 1-3. Resolve run ID, load run state and pipeline definition
     let run_id = resolve_active_run_id(&project_root)?;
     let run_path = run_state_path(&project_root, &run_id)?;

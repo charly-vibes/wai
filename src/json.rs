@@ -219,6 +219,10 @@ pub struct PrimePayload {
     /// lines (wai-gkk3) so repo-session agents discover user-level canon.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub global_patterns: Vec<String>,
+    /// Cross-agent collision warnings (wai-76dq): agent-provenance stash
+    /// entries and unexpired agent lock-files. Empty (absent) when green.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub collision_warnings: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]

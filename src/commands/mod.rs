@@ -27,7 +27,7 @@ mod new;
 mod phase;
 pub(crate) mod pipeline;
 mod plugin;
-mod prime;
+pub(crate) mod prime;
 mod project;
 pub(crate) mod reflect;
 mod resource;
