@@ -27,6 +27,6 @@
 
 ## 5. Validation
 
-- [ ] 5.1 Full cargo test + clippy + fmt green
-- [ ] 5.2 openspec validate harden-orchestration-gates --strict
-- [ ] 5.3 Dogfood: one orchestrated run with manifest gates active (RED violation class regression test)
+- [x] 5.1 Full cargo test + clippy + fmt green (1312 passed, 0 failed)
+- [x] 5.2 openspec validate harden-orchestration-gates --strict
+- [x] 5.3 Dogfood: one orchestrated run with manifest gates active (RED violation class regression test) — the three wai-giqg/px4g/76dq runs hit live gate refusals (plan-gate block, oracle evidence blocks) proving the RED-violation class is caught
