@@ -9,9 +9,9 @@
 
 ## 2. Gate bypass telemetry (R2)
 
-- [ ] 2.1 RED: test that a recorded bypass during an active run appends a ledger entry and surfaces in `wai pipeline status`
-- [ ] 2.2 GREEN: run-state ledger bypass entry + status rendering (count, last reason)
-- [ ] 2.3 Document the record path in pipelines.md (discipline: agents record reason at bypass time)
+- [x] 2.1 RED: test that a recorded bypass during an active run appends a ledger entry and surfaces in `wai pipeline status`
+- [x] 2.2 GREEN: run-state ledger bypass entry + status rendering (count, last reason)
+- [x] 2.3 Document the record path in pipelines.md (discipline: agents record reason at bypass time)
 
 ## 3. Verifier evidence contract (R3)
 
