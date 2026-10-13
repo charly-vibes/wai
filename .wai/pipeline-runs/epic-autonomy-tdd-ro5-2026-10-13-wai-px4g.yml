@@ -1,0 +1,10 @@
+run_id: epic-autonomy-tdd-ro5-2026-10-13-wai-px4g
+pipeline: epic-autonomy-tdd-ro5
+topic: wai-px4g
+created_at: '2026-10-13T15:30:49.701561805+00:00'
+current_step: 9
+approvals: {}
+epic: null
+child_issues: []
+child_runs: []
+handoff_artifact: null

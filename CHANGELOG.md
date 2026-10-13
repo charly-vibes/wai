@@ -5,6 +5,29 @@ All notable changes to wai will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Calendar Versioning](https://calver.org/) (YYYY.M.MICRO).
 
+## [Unreleased]
+
+### Added
+
+- **Artifact-manifest gates on ship-class steps** — the `epic-orchestrator` `ship`
+  step and the `tdd-ro5` `green`/`refactor`/`ship-close` steps now declare
+  structural artifact gates, so a run cannot advance past implementation or
+  shipping without a step-tagged artifact (the 2026-10-05 RED-violation class);
+  `ship-close` records a SHIP artifact by construction.
+- **Gate bypass telemetry** — `wai pipeline bypass <reason>` records a
+  timestamped, machine-readable entry in the active run's ledger (hooks cannot
+  self-record `--no-verify`); `wai pipeline status` surfaces the bypass count
+  and last disclosed reason. Ledger-only, not enforcement.
+- **Verifier evidence contract** — the `epic-orchestrator` verify step ships a
+  `verify-evidence` oracle: a review artifact may record CONFIRM only when it
+  cites the artifacts it read and includes fresh test-run output; evidence
+  gaps resolve to REVIEW_REQUIRED, and single-model degradation is always
+  REVIEW_REQUIRED.
+- **Cross-agent collision surfacing** — `wai prime` (and `wai pipeline next`)
+  warn on heuristic collision signals: agent-provenance stash entries
+  (`<agent> WIP`, "parked", "owns") and unexpired agent lock-files under
+  `.wai/`. Advisory only, silent when green.
+
 ## [2026.10.9] - 2026-10-09
 
 ### Added

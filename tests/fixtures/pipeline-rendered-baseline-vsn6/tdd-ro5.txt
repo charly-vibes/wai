@@ -137,6 +137,8 @@ Do:
 
 Do not push unless project policy or user instruction explicitly says to push.
 
+Record ship: `wai add research "SHIP: <commit/ticket state>"`
+
 This step requires human approval: review the ship evidence, then run `wai pipeline approve` when ready.
 
 Pipeline complete.

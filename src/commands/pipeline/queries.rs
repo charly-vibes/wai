@@ -83,6 +83,8 @@ pub(super) fn cmd_current(json: bool) -> Result<()> {
     let Some(status) = pipeline_current_status(&project_root)? else {
         if json {
             return print_envelope_ok(PipelineCurrentPayload {
+                bypass_count: None,
+                last_bypass_reason: None,
                 active: false,
                 message: Some(
                     "No active pipeline run. Start one with: wai pipeline start <name> --topic=<topic>"
@@ -134,6 +136,13 @@ pub(super) fn cmd_current(json: bool) -> Result<()> {
                 .next_command
                 .unwrap_or_else(|| "wai close".to_string())
         );
+    }
+
+    // Gate bypass telemetry (wai-giqg): count + last disclosed reason.
+    if let Some(count) = status.bypass_count {
+        let last = status.last_bypass_reason.as_deref().unwrap_or("");
+        println!();
+        println!("{} Gate bypasses: {} — last: {}", "◆".cyan(), count, last);
     }
 
     Ok(())

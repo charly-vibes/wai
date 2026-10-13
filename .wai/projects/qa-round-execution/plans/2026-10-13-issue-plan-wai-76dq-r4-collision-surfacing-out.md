@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:epic-autonomy-tdd-ro5-2026-10-13-wai-76dq, pipeline-step:orient-and-claim, pipeline-step:plan]
+---
+
+ISSUE PLAN: wai-76dq (R4 collision surfacing). OUTCOME: prime + pipeline next warn (advisory) on cross-agent collision signals; silent when green. DESIGN: fn collision_warnings(project_root) -> Vec<String> in prime.rs — git stash list scan (case-insensitive WIP/parked/owns match; repo-less = empty) + .lock scan under .wai/projects with locked_at <= 7 days; rendered as '⚠ Collision risk' section in prime terminal + JSON payload field collision_warnings (skip when empty); cmd_next prints same lines before advancing. OUT OF SCOPE: lock-file enforcement, git-owned mechanisms (rejected in design). FILES: src/commands/prime.rs, src/commands/pipeline/orchestration.rs, src/json.rs, tests/suite_prime_collision_warnings.rs (4 RED tests: matching stash warns, non-matching silent, unexpired lock warns, pipeline next surfaces). RED/GREEN then cargo test + clippy + fmt. FOLLOW-UP THRESHOLD: provenance-pattern tuning beyond spec → new ticket.

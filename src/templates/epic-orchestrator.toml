@@ -101,6 +101,9 @@ Rules:
 - Also include: ticket ID, desired outcome, out of scope, exact files,
   exact test/review commands, red/green/refactor sequence, follow-up
   threshold.
+- Verifier evidence contract (wai-px4g): instruct the verify session that
+  its review artifact must cite the artifacts it read and include fresh
+  test-run output before recording CONFIRM — otherwise REVIEW_REQUIRED.
 - Commit the brief before spawn so the subagent starts from a clean tree.
 
 Record brief: `wai add design "BRIEF: <path>; committed"`
@@ -175,6 +178,11 @@ Verifier rules:
     branch/worktree — do they actually exist and match the claims?
   - report claims vs ticket-tracker state (beads) — does the tracker
     reflect the claimed work?
+- Verifier evidence contract (wai-px4g): the review artifact may record
+  CONFIRM only when it cites at least one read artifact path (e.g.
+  `.wai/projects/<p>/research/...`) and includes fresh test-run output
+  (the actual command + result, pasted). Lacking either, record
+  REVIEW_REQUIRED instead — never CONFIRM on claims alone.
 - A contradiction between report and reality fails the run —
   no advance to ship. The discrepancy is a finding — fix or file it, then
   re-verify with a fresh verifier session.
@@ -182,7 +190,8 @@ Verifier rules:
 Single-model degradation: when no second model family is configured, skip
 the spawned verifier and apply the lead-side checks below instead. This
 degradation is non-blocking — the run may advance once the lead-side
-checks pass.
+checks pass — but the recorded verdict is REVIEW_REQUIRED with a note that
+verification was lead-side only, never CONFIRM.
 
 Lead-side checks (degradation path):
 - State checkpoint: record the branch head at verify entry — append the
@@ -191,7 +200,9 @@ Lead-side checks (degradation path):
 - repo gates: run the relevant test suite; reports are claims, not facts
 - ticket state: does beads reflect the claimed work?
 
-Record verification: `wai add research "VERIFY: <evidence>"`
+Record verification: `wai add research "VERIFY: <evidence>"` — the review
+artifact must cite the artifacts read and include fresh test-run output
+before any CONFIRM verdict (verify-evidence oracle enforces this).
 State checkpoint: append the step id + sha (current HEAD) to the state file before advancing.
 {{block:advance-trail}}
 """
@@ -199,6 +210,11 @@ State checkpoint: append the step id + sha (current HEAD) to the state file befo
 [steps.gate.structural]
 min_artifacts = 1
 types = ["research"]
+
+[[steps.gate.oracles]]
+name = "verify-evidence"
+description = "Verify review artifact must cite reads + fresh test-run output before CONFIRM"
+timeout = 30
 
 [[steps.gate.oracles]]
 name = "tests-pass"
@@ -222,6 +238,10 @@ Record ship: `wai add research "SHIP: <commit/ticket state>"`
 State checkpoint: append the step id + sha (current HEAD) to the state file before advancing.
 {{block:advance-trail}}
 """
+
+[steps.gate.structural]
+min_artifacts = 1
+types = ["research"]
 
 [[steps.gate.oracles]]
 name = "tests-pass"

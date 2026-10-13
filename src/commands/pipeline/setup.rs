@@ -167,10 +167,16 @@ fn bundled_oracles_for(name: &str) -> Vec<(&'static str, &'static str)> {
             "release-docs-fresh.sh",
             include_str!("../../templates/oracles/release-docs-fresh.sh"),
         )],
-        "epic-orchestrator" => vec![(
-            "tests-pass.sh",
-            include_str!("../../templates/oracles/tests-pass.sh"),
-        )],
+        "epic-orchestrator" => vec![
+            (
+                "tests-pass.sh",
+                include_str!("../../templates/oracles/tests-pass.sh"),
+            ),
+            (
+                "verify-evidence.sh",
+                include_str!("../../templates/oracles/verify-evidence.sh"),
+            ),
+        ],
         _ => Vec::new(),
     }
 }

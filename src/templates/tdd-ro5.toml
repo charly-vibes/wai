@@ -94,6 +94,10 @@ Record decision: `wai add design "GREEN: ..."`
 Advance: `wai pipeline next`
 """
 
+[steps.gate.structural]
+min_artifacts = 1
+types = ["design"]
+
 [[steps.gate.oracles]]
 name = "tests-pass"
 description = "Relevant tests must pass after green implementation"
@@ -120,6 +124,10 @@ Run tests after refactoring.
 Record refactor note: `wai add design "REFACTOR: ..."`
 Advance: `wai pipeline next`
 """
+
+[steps.gate.structural]
+min_artifacts = 1
+types = ["design"]
 
 [[steps.gate.oracles]]
 name = "tests-pass"
@@ -220,10 +228,15 @@ Do:
 
 Do not push unless project policy or user instruction explicitly says to push.
 
+Record ship: `wai add research "SHIP: <commit/ticket state>"`
+
 This step requires human approval: review the ship evidence, then run `wai pipeline approve` when ready.
 
 Pipeline complete.
 """
+
+[steps.gate.structural]
+min_artifacts = 1
 
 [[steps.gate.oracles]]
 name = "tests-pass"
