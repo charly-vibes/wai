@@ -5,8 +5,9 @@
 ### Requirement: Step Artifact Manifest Gates
 
 Orchestrator pipeline templates MUST declare structural gates on
-artifact-producing steps, requiring the step-tagged artifact types the step
-is responsible for (this includes epic-orchestrator and
+artifact-producing steps (at minimum: implement, ship, and any step whose
+output feeds a later gate), requiring the step-tagged artifact types the
+step is responsible for (this includes epic-orchestrator and
 epic-autonomy-tdd-ro5). Advancement past such a step MUST block while the
 declared artifacts are missing.
 
@@ -34,14 +35,17 @@ declared artifacts are missing.
 ### Requirement: Gate Bypass Telemetry
 
 A gate bypass via `--no-verify` during an active pipeline run MUST be
-recorded in the run-state ledger (timestamp, command, disclosed reason),
-and `wai pipeline status` MUST surface the bypass count and the most recent
-reason. Equivalent disclosed-bypass paths are treated the same way.
+recordable in the run-state ledger (timestamp, command, disclosed reason)
+via a `wai pipeline bypass` record command — hooks cannot self-record a
+bypass because `--no-verify` skips them — and agent-facing guidance MUST
+instruct recording at bypass time. `wai pipeline status` MUST surface the
+bypass count and the most recent reason. Equivalent disclosed-bypass paths
+are treated the same way.
 
 #### Scenario: Bypass during active run recorded
 
-- **WHEN** an agent runs a bypassed commit during an active pipeline run
-- **AND** the bypass is recorded (ledger entry or `wai` bypass record path)
+- **WHEN** an agent runs `wai pipeline bypass <reason>` during an active
+  pipeline run
 - **THEN** the run-state ledger contains the entry
 - **AND** `wai pipeline status` shows the bypass count and last disclosed reason
 

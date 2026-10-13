@@ -35,8 +35,9 @@ does not close:
   with per-step `types`/`min_artifacts`). A run advancing past a step whose
   declared artifacts are missing is blocked — closing the RED-violation class.
 - **Bypass telemetry.** When a pre-push/staged gate is bypassed (`--no-verify`
-  or equivalent) during an active run, an entry is appended to the run-state
-  ledger with the disclosed reason; `wai pipeline status` surfaces the count.
+  or equivalent) during an active run, the agent records it via
+  `wai pipeline bypass <reason>` (hooks can't self-record a bypass); the
+  run-state ledger entry is surfaced by `wai pipeline status`.
 - **Verifier evidence contract.** Verify briefs must require evidence: a
   minimum set of artifact reads plus a fresh test-run output echoed into the
   review artifact before CONFIRM is valid; degraded (single-model) verify

@@ -21,10 +21,13 @@ adds validation surface.
 staged gate; wai-abiy/wai-80x5 debt class). Enforcement would push agents to
 hide bypasses.
 
-**Choice:** record-only. A `wai` wrapper/hook path (or documented discipline
-entry appended to run state) records: command, timestamp, disclosed reason.
+**Choice:** record-only, via an explicit `wai pipeline bypass <reason>`
+command that appends the run-state ledger (command, timestamp, reason).
+A hook cannot self-record: `--no-verify` skips it, and git stores no record
+of a bypassed hook. So the record path is an agent-discipline command, and
+the AGENTS/skill guidance must instruct its use at bypass time.
 `wai pipeline status` shows `bypasses: N (last: <reason>)`. Surfacing, not
-blocking.
+blocking. Undisclosed bypasses remain undetected — accepted limitation.
 
 **Rejected:** blocking `--no-verify` outright — makes the gate class worse
 (agents hide it); post-hoc git shims — too fragile.
