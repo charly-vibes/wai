@@ -493,6 +493,20 @@ pub enum PipelineCommands {
     ///
     /// Computes SHA-256 hashes for all artifacts tagged with the current step,
     /// writes .lock sidecar files, and marks the step as locked in run state.
+    /// Record a disclosed gate bypass in the active run's ledger
+    ///
+    /// Hooks cannot self-record a `--no-verify` bypass — the flag skips
+    /// them — so the agent records it explicitly at bypass time. Appends
+    /// a timestamped entry to the active run's state ledger (telemetry
+    /// only, not enforcement). With no active run this is a silent no-op.
+    ///
+    /// EXAMPLES
+    ///   wai pipeline bypass "skipped pre-push hook: flaky timing test"
+    Bypass {
+        /// Disclosed reason for the bypass (recorded verbatim in the ledger)
+        reason: String,
+    },
+
     ///
     /// EXAMPLES
     ///   wai pipeline lock

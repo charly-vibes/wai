@@ -242,6 +242,13 @@ pub struct PipelineCurrentPayload {
     /// epic parent run.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub epic: Option<EpicTreePayload>,
+    /// Disclosed gate bypasses recorded in this run's ledger (wai-giqg):
+    /// count of entries. Absent when zero.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bypass_count: Option<usize>,
+    /// Reason of the most recent bypass. Present only when count > 0.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_bypass_reason: Option<String>,
 }
 
 /// Epic run tree (wai-vx02.3): a parent run's epic id and its children.

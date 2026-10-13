@@ -14,9 +14,10 @@ use crate::json::{PipelineCurrentPayload, PipelineCurrentStep};
 use super::definition::{load_pipeline_toml, validate_pipeline};
 use super::gates::{evaluate_gates, find_step_artifact_paths, format_gate_summary};
 use super::queries::print_step;
-use super::{PipelineRun, ValidationLevel, render_prompt, write_artifact_lock};
+use super::{BypassEntry, PipelineRun, ValidationLevel, render_prompt, write_artifact_lock};
 
 use crate::commands::require_project;
+use crate::context::current_context;
 
 // ─── start ────────────────────────────────────────────────────────────────────
 
@@ -285,6 +286,7 @@ fn write_run_state(
         child_issues: child_issues.to_vec(),
         child_runs: Vec::new(),
         handoff_artifact: None,
+        bypasses: Vec::new(),
     };
 
     let runs_dir = crate::config::wai_dir(project_root).join("pipeline-runs");
@@ -297,6 +299,44 @@ fn write_run_state(
     let last_run = crate::config::last_run_path(project_root);
     fs::create_dir_all(last_run.parent().unwrap()).into_diagnostic()?;
     fs::write(&last_run, run_id).into_diagnostic()?;
+    Ok(())
+}
+
+// ─── bypass ───────────────────────────────────────────────────────────────────
+
+/// Record a disclosed gate bypass in the active run's ledger (wai-giqg).
+/// Hooks cannot self-record a `--no-verify` bypass — the flag skips them —
+/// so the agent records it explicitly at bypass time. With no active run
+/// this is a silent no-op (spec: no entry written, no error raised).
+pub(crate) fn cmd_bypass(reason: &str) -> Result<()> {
+    let project_root = require_project()?;
+    require_safe_mode("pipeline bypass")?;
+
+    let Ok(run_id) = resolve_active_run_id(&project_root) else {
+        return Ok(()); // no active run: silent no-op per spec
+    };
+    let run_path = run_state_path(&project_root, &run_id)?;
+    if !run_path.exists() {
+        return Ok(()); // dangling pointer: treat as no active run
+    }
+    let mut run = load_run_state(&run_path, &run_id)?;
+    run.bypasses.push(BypassEntry {
+        timestamp: chrono::Utc::now().to_rfc3339(),
+        reason: reason.to_string(),
+    });
+    let yaml = serde_yml::to_string(&run)
+        .map_err(|e| miette::miette!("Failed to serialize run state: {}", e))?;
+    fs::write(&run_path, yaml).into_diagnostic()?;
+
+    let quiet = current_context().quiet;
+    if !quiet {
+        println!(
+            "✓ Recorded bypass #{} in run '{}': {}",
+            run.bypasses.len(),
+            run_id,
+            reason
+        );
+    }
     Ok(())
 }
 
@@ -606,6 +646,8 @@ pub fn pipeline_current_status(project_root: &Path) -> Result<Option<PipelineCur
         gate_summary,
         next_command,
         epic: epic_tree,
+        bypass_count: (!run.bypasses.is_empty()).then_some(run.bypasses.len()),
+        last_bypass_reason: run.bypasses.last().map(|b| b.reason.clone()),
     }))
 }
 

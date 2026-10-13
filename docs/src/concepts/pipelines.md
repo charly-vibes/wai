@@ -114,6 +114,22 @@ wai pipeline approve                   # Human approval for current step
 wai pipeline validate <name>           # Validate pipeline TOML and gate config
 ```
 
+### Disclosing gate bypasses
+
+Hooks cannot self-record a `--no-verify` bypass — the flag skips them. If
+you bypass a git hook while a pipeline run is active, record the bypass
+discipline at bypass time:
+
+```bash
+wai pipeline bypass "skipped pre-push hook: flaky timing test wai-z25x"
+```
+
+The command appends a timestamped entry (timestamp + reason) to the active
+run's state ledger and `wai pipeline status` surfaces the bypass count and
+the most recent reason. Bypass telemetry is a ledger, not enforcement — it
+makes disclosed bypasses pokeable instead of invisible. With no active run
+the command is a silent no-op (nothing recorded, no error).
+
 ## Built-in: Scientific Research Pipeline
 
 The `scientific-research` pipeline is designed for frontier-level theoretical or computational research where an LLM generates mathematical derivations, proofs, or data analysis across many subtasks and a human supervisor needs systematic validation.

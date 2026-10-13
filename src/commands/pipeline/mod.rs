@@ -158,6 +158,16 @@ pub struct ArtifactLock {
     pub pipeline_step: String,
 }
 
+/// One disclosed gate bypass recorded in a run's ledger (wai-giqg, R2 of
+/// harden-orchestration-gates). Hooks cannot self-record a `--no-verify`
+/// bypass — the flag skips them — so the agent records it explicitly via
+/// `wai pipeline bypass <reason>`. Ledger-only: telemetry, not enforcement.
+#[derive(Debug, serde::Serialize, Deserialize)]
+pub struct BypassEntry {
+    pub timestamp: String,
+    pub reason: String,
+}
+
 /// Run state stored at `.wai/pipeline-runs/<run-id>.yml`.
 #[derive(Debug, serde::Serialize, Deserialize)]
 pub struct PipelineRun {
@@ -184,6 +194,10 @@ pub struct PipelineRun {
     /// run's topic via `wai handoff create` (wai-vx02.5).
     #[serde(default)]
     pub handoff_artifact: Option<String>,
+    /// Disclosed gate bypasses recorded during this run (wai-giqg). Older run
+    /// state files predate the ledger — absent means empty, not error.
+    #[serde(default)]
+    pub bypasses: Vec<BypassEntry>,
 }
 
 /// Validation issue found during pipeline definition checking.
@@ -220,6 +234,7 @@ pub fn run(cmd: PipelineCommands) -> Result<()> {
         }
         PipelineCommands::Check { oracle } => queries::cmd_check(oracle.as_deref()),
         PipelineCommands::Validate { name } => queries::cmd_validate(name.as_deref()),
+        PipelineCommands::Bypass { reason } => orchestration::cmd_bypass(&reason),
         PipelineCommands::Lock => orchestration::cmd_lock(),
         PipelineCommands::Verify => cmd_verify(),
     }
@@ -678,6 +693,7 @@ prompt = "Do something else."
             child_issues: Vec::new(),
             child_runs: Vec::new(),
             handoff_artifact: None,
+            bypasses: Vec::new(),
         };
         let def = PipelineDefinition {
             name: "test".to_string(),
@@ -721,6 +737,7 @@ prompt = "Do something else."
             child_issues: Vec::new(),
             child_runs: Vec::new(),
             handoff_artifact: None,
+            bypasses: Vec::new(),
         };
         let def = PipelineDefinition {
             name: "test".to_string(),
@@ -769,6 +786,7 @@ prompt = "Do something else."
             child_issues: Vec::new(),
             child_runs: Vec::new(),
             handoff_artifact: None,
+            bypasses: Vec::new(),
         };
         let def = PipelineDefinition {
             name: "test".to_string(),
@@ -867,6 +885,7 @@ prompt = "Do {topic}."
             child_issues: Vec::new(),
             child_runs: Vec::new(),
             handoff_artifact: None,
+            bypasses: Vec::new(),
         };
         let def = PipelineDefinition {
             name: "p".to_string(),
@@ -1219,6 +1238,7 @@ require_input_manifest = true
             child_issues: Vec::new(),
             child_runs: Vec::new(),
             handoff_artifact: None,
+            bypasses: Vec::new(),
         };
         let def = PipelineDefinition {
             name: "test".to_string(),
