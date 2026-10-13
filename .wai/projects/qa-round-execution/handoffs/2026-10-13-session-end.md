@@ -38,17 +38,16 @@ phase: research
  M .beads/backup/backup_state.json
  M .whisper/branches/main/notes.usage.jsonl
  M .whisper/env.usage.jsonl
-?? .wai/pipeline-runs/epic-autonomy-tdd-ro5-2026-10-13-wai-giqg.yml
-?? .wai/projects/qa-round-execution/designs/2026-10-13-green-wai-giqg-behavior-implemented-bypassentry.md
-?? .wai/projects/qa-round-execution/designs/2026-10-13-tidy-wai-giqg-non-code-cleanup-only-no-refacto.md
-?? .wai/projects/qa-round-execution/plans/2026-10-13-issue-plan-wai-giqg-r2-bypass-telemetry-outcom.md
-?? .wai/projects/qa-round-execution/research/2026-10-13-orient-selected-wai-giqg-p2-r2-of-epic-wai-ykt1.md
-?? .wai/projects/qa-round-execution/research/2026-10-13-quality-ledger-wai-giqg-r2-bypass-telemetry-ch.md
-?? .wai/projects/qa-round-execution/research/2026-10-13-red-wai-giqg-command-cargo-test-test-suite-pip.md
-?? .wai/projects/qa-round-execution/research/2026-10-13-ro5u-fixes-wai-giqg-addendum-medium-1-fixed-asse.md
-?? .wai/projects/qa-round-execution/research/2026-10-13-ro5u-fixes-wai-giqg-fixed-medium-1-test-asserti.md
-?? .wai/projects/qa-round-execution/research/2026-10-13-ro5u-review-wai-giqg-bypass-telemetry-cri.md
-?? .wai/projects/qa-round-execution/reviews/2026-10-13-ro5u-wai-giqg-0-critical-1-medium-loose-test-as.md
+?? .wai/pipeline-runs/epic-autonomy-tdd-ro5-2026-10-13-wai-px4g.yml
+?? .wai/projects/qa-round-execution/designs/2026-10-13-green-wai-px4g-behavior-implemented-verify-evid.md
+?? .wai/projects/qa-round-execution/designs/2026-10-13-tidy-wai-px4g-non-code-cleanup-only-no-refacto.md
+?? .wai/projects/qa-round-execution/plans/2026-10-13-issue-plan-wai-px4g-r3-verifier-evidence-contrac.md
+?? .wai/projects/qa-round-execution/research/2026-10-13-orient-selected-wai-px4g-p2-r3-of-epic-wai-ykt1.md
+?? .wai/projects/qa-round-execution/research/2026-10-13-quality-ledger-wai-px4g-r3-verifier-evidence-con.md
+?? .wai/projects/qa-round-execution/research/2026-10-13-red-wai-px4g-command-cargo-test-test-suite-pip.md
+?? .wai/projects/qa-round-execution/research/2026-10-13-ro5u-fixes-wai-px4g-fixed-medium-1-word-boundar.md
+?? .wai/projects/qa-round-execution/research/2026-10-13-ro5u-review-wai-px4g-verifier-evidence-contrac.md
+?? .wai/projects/qa-round-execution/reviews/2026-10-13-ro5u-wai-px4g-0-critical-2-medium-1-fix-now-wo.md
 ?? .whisper/branches/feat--harden-orchestration-gates/
 ?? scripts/pretender-codemod.py
 ?? scripts/split-integration-tests.py
@@ -94,7 +93,6 @@ phase: research
 └── ○ wai-fvhv.110 P3 Docs: strengthen guidance for `wai plugin` management and passthrough behavior
 ○ wai-tdnv P1 epic-orchestrator: pi -p wrapper with heartbeat, background poll, and checkpoint/resume
 ○ wai-ykt1 P1 Epic: harden-orchestration-gates — orchestration-integrity capability (4 children)
-├── ○ wai-px4g P2 Verifier evidence contract: review artifact must cite reads + fresh test-run output before CONFIRM (R3 of harden-orchestration-gates)
 └── ○ wai-76dq P3 Cross-agent collision surfacing: prime warns on provenance-matching stash entries and agent lock-files (R4 of harden-orchestration-gates)
 ○ wai-0b95 P2 wai add: error messages must state the fix (filename vs path, missing --reviews)
 ○ wai-0v2e P2 investigate: pretender gate (--mode gate) is stateful — passes with cmd_init red staged, blocks with command_help red staged, flaps across runs with identical output
@@ -118,7 +116,7 @@ phase: research
 ○ wai-z25x P3 [bug] flaky test: execute_hook_no_deadlock_on_fast_command fails under parallel load
 
 --------------------------------------------------------------------------------
-Total: 59 issues (59 open, 0 in progress)
+Total: 58 issues (58 open, 0 in progress)
 
 Status: ○ open  ◐ in_progress  ● blocked  ✓ closed  ❄ deferred
 Priority: P0–P4 (label only; not a status icon)
