@@ -15,9 +15,9 @@
 
 ## 3. Verifier evidence contract (R3)
 
-- [ ] 3.1 RED: test that verify review artifacts lacking test-run output resolve to REVIEW_REQUIRED
-- [ ] 3.2 GREEN: evidence check in verify-step oracle gate; brief template requires artifact cites + fresh test-run output
-- [ ] 3.3 GREEN: single-model degradation records REVIEW_REQUIRED with note (lead-side path)
+- [x] 3.1 RED: test that verify review artifacts lacking test-run output resolve to REVIEW_REQUIRED
+- [x] 3.2 GREEN: evidence check in verify-step oracle gate; brief template requires artifact cites + fresh test-run output
+- [x] 3.3 GREEN: single-model degradation records REVIEW_REQUIRED with note (lead-side path)
 
 ## 4. Cross-agent collision surfacing (R4)
 

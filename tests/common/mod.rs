@@ -694,3 +694,11 @@ pub fn write_epic_run_fixture(
     fs::create_dir_all(&pipelines_dir).unwrap();
     fs::write(pipelines_dir.join(".last-run"), run_id).unwrap();
 }
+
+/// Hermetic wai command for suites that must not inherit an ambient
+/// WAI_PIPELINE_RUN (wai-giqg lesson: env beats the .last-run pointer).
+pub fn hermetic_wai_cmd(dir: &std::path::Path) -> Command {
+    let mut cmd = wai_cmd(dir);
+    cmd.env_remove("WAI_PIPELINE_RUN");
+    cmd
+}
