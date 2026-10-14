@@ -532,8 +532,15 @@ fn build_tags(user_tags: Option<&str>, project_root: &std::path::Path) -> Vec<St
         );
     }
 
-    // Resolve active pipeline run: env var first (backwards compat), then state file.
-    let active_run = crate::config::resolve_active_pipeline_run(project_root);
+    // Resolve active pipeline run: the env var is explicit intent — stamp
+    // unconditionally. The `.last-run` pointer is a heuristic (it records the
+    // last *started* run, not a verified active one) — stamp only when the
+    // run state confirms the run is still in progress.
+    let active_run = std::env::var("WAI_PIPELINE_RUN")
+        .ok()
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+        .or_else(|| active_pointer_run(project_root));
 
     if let Some(ref run_id) = active_run {
         tags.push(format!("pipeline-run:{}", run_id));
@@ -545,6 +552,35 @@ fn build_tags(user_tags: Option<&str>, project_root: &std::path::Path) -> Vec<St
     }
 
     tags
+}
+
+/// Resolve the `.last-run` pointer to a run that is verifiably in progress,
+/// fail-closed.
+///
+/// The pointer records the last *started* run, and only `wai close` clears it
+/// — a run that completes without `wai close` keeps its pointer, and stamping
+/// from the pointer alone produced stale `pipeline-run:` provenance on
+/// unrelated artifacts (reproduced 2026-10-14: a completed
+/// epic-orchestrator run tagged a new artifact). The run id is returned only
+/// when its state file exists, parses, and has not reached its final step.
+/// A run proven complete gets its stale pointer removed best-effort (the
+/// same clearing `wai close` would perform); an unverifiable run only
+/// suppresses the tag and leaves the pointer untouched.
+fn active_pointer_run(project_root: &std::path::Path) -> Option<String> {
+    let run_id = crate::config::read_pipeline_run_state(project_root)?;
+    let runs_dir = crate::config::wai_dir(project_root).join("pipeline-runs");
+    let run_path = runs_dir.join(format!("{}.yml", run_id));
+    let run: super::pipeline::PipelineRun =
+        serde_yml::from_str(&std::fs::read_to_string(&run_path).ok()?).ok()?;
+    let def_path =
+        crate::config::pipelines_dir(project_root).join(format!("{}.toml", run.pipeline));
+    let definition = super::pipeline::load_pipeline_toml(&def_path).ok()?;
+    if run.current_step >= definition.steps.len() {
+        // Complete: the pointer outlived the run — self-heal it.
+        let _ = std::fs::remove_file(crate::config::last_run_path(project_root));
+        return None;
+    }
+    Some(run_id)
 }
 
 /// Resolve the current step ID by reading the pipeline run state and definition.
@@ -686,6 +722,126 @@ current_step: 0
         let tags = super::build_tags(Some("custom"), dir.path());
         assert_eq!(tags, vec!["custom".to_string()]);
         assert!(!tags.iter().any(|t| t.starts_with("pipeline-step:")));
+    }
+
+    /// Regression (reproduced 2026-10-14, wild-00r): `.last-run` records the
+    /// last *started* run, and only `wai close` clears it — a completed run's
+    /// pointer survived and `wai add` stamped its stale id on a new artifact.
+    /// A pointer-resolved run must have state proving it is still in progress.
+    #[test]
+    fn stale_pointer_to_completed_run_not_stamped() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        let wai = root.join(".wai");
+        std::fs::create_dir_all(wai.join("pipeline-runs")).unwrap();
+        std::fs::create_dir_all(wai.join("resources/pipelines")).unwrap();
+
+        let toml_content = r#"[pipeline]
+name = "test-pipe"
+
+[[steps]]
+id = "research"
+prompt = "Do research on {topic}."
+
+[[steps]]
+id = "implement"
+prompt = "Implement {topic}."
+"#;
+        std::fs::write(wai.join("resources/pipelines/test-pipe.toml"), toml_content).unwrap();
+
+        // Run state at the final step index (== step count) = complete.
+        let run_yaml = r#"run_id: "test-pipe-2026-04-02-qcd"
+pipeline: "test-pipe"
+topic: "qcd"
+created_at: "2026-04-02T00:00:00Z"
+current_step: 2
+"#;
+        std::fs::write(
+            wai.join("pipeline-runs/test-pipe-2026-04-02-qcd.yml"),
+            run_yaml,
+        )
+        .unwrap();
+        std::fs::write(
+            wai.join("resources/pipelines/.last-run"),
+            "test-pipe-2026-04-02-qcd",
+        )
+        .unwrap();
+
+        let tags = super::build_tags(None, root);
+        assert!(
+            !tags.iter().any(|t| t.starts_with("pipeline-run:")),
+            "stale completed run must not be stamped as provenance, got: {:?}",
+            tags
+        );
+        assert!(!tags.iter().any(|t| t.starts_with("pipeline-step:")));
+    }
+
+    #[test]
+    fn stale_pointer_cleared_when_run_complete() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        let wai = root.join(".wai");
+        std::fs::create_dir_all(wai.join("pipeline-runs")).unwrap();
+        std::fs::create_dir_all(wai.join("resources/pipelines")).unwrap();
+
+        let toml_content = r#"[pipeline]
+name = "test-pipe"
+
+[[steps]]
+id = "research"
+prompt = "Do research on {topic}."
+
+[[steps]]
+id = "implement"
+prompt = "Implement {topic}."
+"#;
+        std::fs::write(wai.join("resources/pipelines/test-pipe.toml"), toml_content).unwrap();
+
+        let run_yaml = r#"run_id: "test-pipe-2026-04-02-qcd"
+pipeline: "test-pipe"
+topic: "qcd"
+created_at: "2026-04-02T00:00:00Z"
+current_step: 2
+"#;
+        std::fs::write(
+            wai.join("pipeline-runs/test-pipe-2026-04-02-qcd.yml"),
+            run_yaml,
+        )
+        .unwrap();
+        std::fs::write(
+            wai.join("resources/pipelines/.last-run"),
+            "test-pipe-2026-04-02-qcd",
+        )
+        .unwrap();
+
+        let _ = super::build_tags(None, root);
+        assert!(
+            !wai.join("resources/pipelines/.last-run").exists(),
+            "completed run's stale pointer must be cleared"
+        );
+    }
+
+    /// A pointer naming a run with no (or unreadable) state file cannot be
+    /// verified active — suppress the tag (fail closed) but leave the pointer
+    /// alone: removal is reserved for runs proven complete.
+    #[test]
+    fn pointer_to_missing_run_state_not_stamped_and_pointer_kept() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        let wai = root.join(".wai");
+        std::fs::create_dir_all(wai.join("resources/pipelines")).unwrap();
+        std::fs::write(wai.join("resources/pipelines/.last-run"), "ghost-run").unwrap();
+
+        let tags = super::build_tags(None, root);
+        assert!(
+            !tags.iter().any(|t| t.starts_with("pipeline-run:")),
+            "unverifiable run must not be stamped, got: {:?}",
+            tags
+        );
+        assert!(
+            wai.join("resources/pipelines/.last-run").exists(),
+            "pointer must be kept when the run is not proven complete"
+        );
     }
 
     #[test]
