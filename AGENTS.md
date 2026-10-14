@@ -49,7 +49,9 @@ Do NOT skip `wai close` — it enables resume detection.
 | Pipeline | When to Use | Start |
 |----------|-------------|-------|
 | epic-autonomy-tdd-ro5 | Use when autonomously executing one ready child issue from epic wai-fvhv without routine confirmation | `wai pipeline start epic-autonomy-tdd-ro5 --topic=<topic>` |
+| epic-orchestrator | Executing one ready child issue of an epic via subagent orchestration instead of inline implementation | `wai pipeline start epic-orchestrator --topic=<topic>` |
 | scientific-research | Frontier-level research requiring systematic validation | `wai pipeline start scientific-research --topic=<topic>` |
+| tdd-ro5 | Autonomous feature, bugfix, or refactor work where tests and review must gate progress | `wai pipeline start tdd-ro5 --topic=<topic>` |
 
 > Pipeline steps may have gates that enforce artifact creation, review coverage, and oracle checks before advancement. Run `wai pipeline gates <name>` for details.
 > **Before any edit**: run `wai pipeline current --json`; if a run is active for this project, resume it (`wai pipeline next`) rather than starting ad-hoc work.
@@ -82,7 +84,7 @@ Read it at the start of your first session or when you need detailed guidance.
 Keep this managed block so `wai init` can refresh the instructions.
 
 
-<!-- provenance: generator=wai version=0.11.1 source=WAI sha=fd7a2ae3 -->
+<!-- provenance: generator=wai version=0.12.3 source=WAI sha=7d461efa -->
 <!-- WAI:END -->
 
 ## Value Proposition
@@ -151,7 +153,7 @@ context before starting research or creating tickets.
 > check for known patterns. Do not rediscover what is already documented.
 
 
-<!-- provenance: generator=wai version=0.11.1 source=WAI:REFLECT:REF sha=73879972 -->
+<!-- provenance: generator=wai version=0.12.3 source=WAI:REFLECT:REF sha=73879972 -->
 <!-- WAI:REFLECT:REF:END -->
 
 
@@ -297,3 +299,21 @@ Run `ah check` to verify spec-test correspondence before committing.
 - `ah doctor --enable <adapter>` — write adapter config into .espectacular/config.toml
 - `ah signals` — emit dont drift signals
 <!-- ah:managed:end -->
+<!-- DDL:START -->
+
+## dulce-de-leche (ddl v0.8.0)
+
+Orchestrator for the charly-vibes tool ecosystem. Run `ddl init` to
+install and configure all tools. Run `ddl status` for a health overview.
+
+Commands:
+- init     Bootstrap the toolset
+- install  Install a single tool
+- status   Show health overview
+- doctor   Run diagnostics
+- version  Show versions
+- upgrade  Update tools
+- migrate  Migrate configs
+- scope    Show active .ddl/
+
+<!-- DDL:END -->
