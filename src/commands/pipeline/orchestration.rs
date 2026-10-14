@@ -820,7 +820,6 @@ pub fn clear_complete_pipeline_run(project_root: &Path) -> Option<String> {
     }
     let name = status.pipeline.clone();
     let _ = fs::remove_file(crate::config::last_run_path(project_root));
-    let _ = fs::remove_file(crate::config::last_run_path(project_root));
     name
 }
 
