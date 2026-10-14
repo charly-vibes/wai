@@ -24,6 +24,20 @@ Part of the charly-vibes suite. Leer en español: https://charly-vibes.github.io
 | workspace | workspace lifecycle (init, sync, doctor) |
 | commands | subcommand implementations |
 
+## Install
+
+macOS & Linux via curl (latest release binary):
+
+```bash
+V=$(basename "$(curl -fsSLI -o /dev/null -w '%{url_effective}' \
+  https://github.com/charly-vibes/wai/releases/latest)" | sed 's/^v//')
+TGT="$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/^x86_64$/amd64/; s/^aarch64$/arm64/')"
+curl -fsSL "https://github.com/charly-vibes/wai/releases/download/v${V}/wai_${V}_${TGT}.tar.gz" | tar xz
+chmod +x wai && sudo mv wai /usr/local/bin/
+```
+
+Also: `brew tap charly-vibes/charly && brew install wai` or `cargo install wai-cli`.
+
 ## Related
 
 - Repository: https://github.com/gastownhall/wai
