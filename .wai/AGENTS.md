@@ -153,7 +153,9 @@ openspec list --specs      # Capabilities
 | Pipeline | When to Use | Start |
 |----------|-------------|-------|
 | epic-autonomy-tdd-ro5 | Use when autonomously executing one ready child issue from epic wai-fvhv without routine confirmation | `wai pipeline start epic-autonomy-tdd-ro5 --topic=<topic>` |
+| epic-orchestrator | Executing one ready child issue of an epic via subagent orchestration instead of inline implementation | `wai pipeline start epic-orchestrator --topic=<topic>` |
 | scientific-research | Frontier-level research requiring systematic validation | `wai pipeline start scientific-research --topic=<topic>` |
+| tdd-ro5 | Autonomous feature, bugfix, or refactor work where tests and review must gate progress | `wai pipeline start tdd-ro5 --topic=<topic>` |
 
 > Pipeline steps may have gates that enforce artifact creation, review coverage, and oracle checks before advancement. Run `wai pipeline gates <name>` for details.
 

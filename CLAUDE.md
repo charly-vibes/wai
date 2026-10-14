@@ -49,7 +49,9 @@ Do NOT skip `wai close` — it enables resume detection.
 | Pipeline | When to Use | Start |
 |----------|-------------|-------|
 | epic-autonomy-tdd-ro5 | Use when autonomously executing one ready child issue from epic wai-fvhv without routine confirmation | `wai pipeline start epic-autonomy-tdd-ro5 --topic=<topic>` |
+| epic-orchestrator | Executing one ready child issue of an epic via subagent orchestration instead of inline implementation | `wai pipeline start epic-orchestrator --topic=<topic>` |
 | scientific-research | Frontier-level research requiring systematic validation | `wai pipeline start scientific-research --topic=<topic>` |
+| tdd-ro5 | Autonomous feature, bugfix, or refactor work where tests and review must gate progress | `wai pipeline start tdd-ro5 --topic=<topic>` |
 
 > Pipeline steps may have gates that enforce artifact creation, review coverage, and oracle checks before advancement. Run `wai pipeline gates <name>` for details.
 > **Before any edit**: run `wai pipeline current --json`; if a run is active for this project, resume it (`wai pipeline next`) rather than starting ad-hoc work.
@@ -82,7 +84,7 @@ Read it at the start of your first session or when you need detailed guidance.
 Keep this managed block so `wai init` can refresh the instructions.
 
 
-<!-- provenance: generator=wai version=0.11.1 source=WAI sha=fd7a2ae3 -->
+<!-- provenance: generator=wai version=0.12.3 source=WAI sha=7d461efa -->
 <!-- WAI:END -->
 
 <!-- WAI:REFLECT:REF:START -->
@@ -96,7 +98,7 @@ context before starting research or creating tickets.
 > check for known patterns. Do not rediscover what is already documented.
 
 
-<!-- provenance: generator=wai version=0.11.1 source=WAI:REFLECT:REF sha=73879972 -->
+<!-- provenance: generator=wai version=0.12.3 source=WAI:REFLECT:REF sha=73879972 -->
 <!-- WAI:REFLECT:REF:END -->
 
 
