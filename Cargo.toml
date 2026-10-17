@@ -53,7 +53,7 @@ reqwest = { version = "0.12", default-features = false, features = ["blocking", 
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs"], optional = true }
 
 # Directories for config/data paths
-dirs = "6"
+dirs = "7"
 
 # Slug generation for filenames
 slug = "0.1"
