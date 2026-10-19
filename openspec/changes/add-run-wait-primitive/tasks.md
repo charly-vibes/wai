@@ -27,7 +27,7 @@ review EXCL-001).
 
 ## 3. Validation
 
-- [ ] 3.1 `wai pipeline wait` against a live PR: one line, correct exit codes
+- [x] 3.1 `wai pipeline wait` against a live PR: one line, correct exit codes
 - [x] 3.2 `just test` green (1.1–1.3 included)
 - [x] 3.3 `just ci` green
 - [x] 3.4 `openspec validate add-run-wait-primitive --strict`
