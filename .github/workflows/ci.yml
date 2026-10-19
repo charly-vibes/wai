@@ -45,6 +45,7 @@ jobs:
       - name: Install ecosystem tools (§4 dogfood matrix, pinned)
         run: |
           cargo install --locked dulce-de-leche@0.7.0
+          cargo install --locked testaruda@0.5.7
           npm install -g @fission-ai/openspec@0.19.0
       - name: Install bd (beads, pinned §4)
         run: |
@@ -61,6 +62,7 @@ jobs:
         run: |
           bd --version >/dev/null
           ddl status >/dev/null
+          testaruda --version >/dev/null
       # Run the exact same command as local development
       # DDL-43g: smoke our own live Pages URL — a 404'd book must fail this
       # repo's CI immediately, not wait for the next hub conformance run.
