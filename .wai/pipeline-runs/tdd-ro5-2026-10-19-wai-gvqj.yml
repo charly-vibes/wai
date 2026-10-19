@@ -1,0 +1,12 @@
+run_id: tdd-ro5-2026-10-19-wai-gvqj
+pipeline: tdd-ro5
+topic: wai-gvqj
+created_at: '2026-10-19T18:21:16.204493794+00:00'
+current_step: 9
+approvals:
+  ship-close: '2026-10-19T18:33:14.532381044+00:00'
+epic: null
+child_issues: []
+child_runs: []
+handoff_artifact: null
+bypasses: []
