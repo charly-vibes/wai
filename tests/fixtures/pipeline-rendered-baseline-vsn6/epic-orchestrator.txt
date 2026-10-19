@@ -88,6 +88,13 @@ Rules:
   Invariant 7). One command must answer: what is running, which step, done
   or stuck, where is the log.
 - Poll or log rather than blind-blocking.
+- Waiting on CI/worktree status MUST use the canonical wait primitive:
+  `wai pipeline wait <pr> [--timeout <minutes>]`. It blocks via gh's own
+  watch mode and emits exactly one summary line — never re-poll to
+  reconstruct a result. Free-form `sleep <N>` poll loops (`sleep 300;
+  gh pr checks`) are a violation: each poll burns a tool turn plus
+  minutes of blocked wall-clock (observed: 539 sleep-poll commands,
+  ~53h in one week).
 - Retry is a new named session (canon Invariant 6): zero commits = clean
   retry, partial commits = manual resume. Retry names get a `-retry`
   suffix. Never resume a wedged spawn in-place.

@@ -2100,6 +2100,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "toml",
+ "wait-timeout",
  "walkdir",
 ]
 

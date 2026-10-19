@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5-2026-10-19-wai-63h9, pipeline-step:red]
+---
+
+RED: command=cargo test --test suite_pipeline_wait. Expected failure=missing behavior, not setup breakage: (a) error[E0432]: unresolved import wai::pipeline_wait — the pure wait-outcome module (exit_code/summary_line/WaitOutcome) does not exist yet (tests 1.2/1.3 of tasks.md); (b) test 1.1 orchestrator_template_requires_wait_primitive is written but cannot compile until the module exists — it will fail against the current epic-orchestrator template spawn step, which says only 'Poll or log rather than blind-blocking' with no 'wai pipeline wait' requirement and no sleep-poll violation language (verified src/templates/epic-orchestrator.toml). Design decision recorded: pure logic lives in new src/pipeline_wait.rs, declared pub in BOTH src/main.rs and src/lib.rs (pattern: pub mod matrix/plugin appear in both) so integration tests reach it via the lib while the gh-spawning cmd_wait stays in orchestration.rs under the bin. Test file: tests/suite_pipeline_wait.rs (3 tests, tasks.md 1.1-1.3).
