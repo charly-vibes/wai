@@ -36,7 +36,7 @@ phase: research
 
 ```
  M .beads/backup/backup_state.json
- M .wai/pipeline-runs/tdd-ro5-2026-10-19-wai-63h9.yml
+ M .wai/pipeline-runs/tdd-ro5-2026-10-19-wai-tdnv.yml
  M .whisper/branches/main/notes.md
  M .whisper/branches/main/notes.usage.jsonl
  M .whisper/env.usage.jsonl
@@ -79,7 +79,6 @@ phase: research
 ├── ○ wai-fvhv.105 P3 Docs: strengthen guidance for `wai pipeline` gates and approvals
 ├── ○ wai-fvhv.106 P3 Docs: strengthen guidance for `wai pipeline` authoring and integrity commands
 └── ○ wai-fvhv.110 P3 Docs: strengthen guidance for `wai plugin` management and passthrough behavior
-○ wai-tdnv P1 epic-orchestrator: pi -p wrapper with heartbeat, background poll, and checkpoint/resume
 ○ wai-0b95 P2 wai add: error messages must state the fix (filename vs path, missing --reviews)
 ○ wai-0v2e P2 investigate: pretender gate (--mode gate) is stateful — passes with cmd_init red staged, blocks with command_help red staged, flaps across runs with identical output
 ○ wai-42ig P2 Write ADR: command taxonomy and admission criteria
@@ -106,7 +105,7 @@ phase: research
 ○ wai-z25x P3 [bug] flaky test: execute_hook_no_deadlock_on_fast_command fails under parallel load
 
 --------------------------------------------------------------------------------
-Total: 59 issues (59 open, 0 in progress)
+Total: 58 issues (58 open, 0 in progress)
 
 Status: ○ open  ◐ in_progress  ● blocked  ✓ closed  ❄ deferred
 Priority: P0–P4 (label only; not a status icon)
