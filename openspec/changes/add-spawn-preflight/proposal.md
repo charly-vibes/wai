@@ -1,6 +1,8 @@
 # Change: Add spawn preflight for orchestrator worktree agents
 
 Tracked as: wai-gvqj (P2). Baseline measurement: `scripts/session-friction.py` (PR #53).
+Revised per Rule-of-5 review (CORR-002: preflight ordering pinned — the worktree
+must exist before the preflight can run inside it).
 
 ## Why
 
@@ -17,9 +19,11 @@ a command that fails fast with an actionable message.
 
 ## What Changes
 
-- **`wai pipeline preflight`** — a subcommand run at spawn time that verifies,
-  in the worktree: (1) lefthook executable is present, (2) `bd list` exits 0,
-  (3) testaruda local store is initialized (or auto-initializes). Each failure
+- **`wai pipeline preflight`** — a subcommand run inside the newly created
+  worktree, immediately after its creation and before the subagent launches,
+  that verifies: (1) lefthook executable is present, (2) `bd list` exits 0,
+  (3) testaruda local store is initialized (or auto-initializes). The spawn
+  sequence is: create worktree → preflight → launch agent. Each failure
   exits nonzero with a message naming the tool and its fix (install/init paths).
 - **epic-orchestrator template** — the spawn step MUST require the preflight to
   pass before spawning; a failed preflight aborts the run at spawn, not mid-flight.
