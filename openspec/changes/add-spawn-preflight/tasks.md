@@ -1,5 +1,10 @@
 # Tasks: add-spawn-preflight
 
+Sequencing: implement before `add-run-wait-primitive` (both touch
+`src/commands/pipeline/orchestration.rs` and the epic-orchestrator template —
+review EXCL-001); merge the template spawn-step edits in one pass with that
+change if they land together.
+
 ## 1. Regression tests (red-first)
 
 - [ ] 1.1 `preflight_reports_all_failures`: simulated worktree missing lefthook
