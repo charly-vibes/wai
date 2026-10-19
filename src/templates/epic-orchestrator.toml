@@ -123,6 +123,12 @@ prompt = """
 Rules:
 - Refuse to spawn without a committed brief — the brief must be committed
   at its recorded path before any spawn happens.
+- Before spawning, cd into the target worktree (or repo checkout) and run
+  `wai pipeline preflight`. It verifies lefthook, bd, and testaruda are
+  runnable there and fails fast with an actionable fix message. Refuse to
+  spawn until preflight passes — opaque mid-run lefthook/bd failures
+  (observed: 7+11+17 in one week) are the exact failure mode this prevents.
+  No auto-install at spawn; fix the environment or fix the plan.
 - Refuse to spawn without the state file — the spawn must be resumable
   through it.
 - The spawn must be resumable and discoverable (canon Invariant 2) — a spawn

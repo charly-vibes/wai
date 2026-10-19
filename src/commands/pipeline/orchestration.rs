@@ -1005,3 +1005,88 @@ pub fn cmd_gc(yes: bool) -> Result<()> {
     }
     Ok(())
 }
+
+// ─── preflight ─────────────────────────────────────────────────
+
+/// One environment check for `wai pipeline preflight`: run `tool <args>` in
+/// the current directory and report the outcome. Spawn failure means the
+/// tool is not installed; a nonzero exit means it is installed but broken.
+fn preflight_check(name: &str, args: &[&str], fix: &str) -> std::result::Result<String, String> {
+    match std::process::Command::new(name).args(args).output() {
+        Ok(out) if out.status.success() => {
+            let version = String::from_utf8_lossy(&out.stdout);
+            let first = version.lines().next().unwrap_or(name).trim();
+            Ok(first.to_string())
+        }
+        Ok(out) => Err(format!(
+            "✗ {name}: exit {} (args: {args:?}) — {fix}",
+            out.status.code().unwrap_or(-1)
+        )),
+        Err(e) => Err(format!("✗ {name}: not runnable ({e}) — {fix}")),
+    }
+}
+
+/// Verify the tool environment of the current directory before a spawn
+/// (ticket wai-gvqj). Week 2026-10-13..19 logged 7 opaque lefthook
+/// exit-2 failures, 11 wrong-prefix bd failures, and 17 testaruda failures
+/// in spawned worktrees — all discoverable in seconds before spawning.
+/// Anti-goals: no auto-install at spawn, no network calls — fail fast only.
+pub fn cmd_preflight() -> Result<()> {
+    let checks: [(&str, Vec<&str>, &str); 3] = [
+        (
+            "lefthook",
+            vec!["--version"],
+            "orchestrator pre-commit will fail mid-run. Fix: install lefthook \
+             (brew install lefthook | npm install -g lefthook | just setup)",
+        ),
+        (
+            "bd",
+            vec!["list"],
+            "beads state unreadable in this worktree. Fix: run `bd doctor` and \
+             verify .beads/ is present and initialized here",
+        ),
+        (
+            "testaruda",
+            vec!["init"],
+            "test selection unavailable; `just test` will fail at init. Fix: \
+             cargo install --locked testaruda (init is idempotent — re-running \
+             is safe; a stale store is recreated on first `just test`)",
+        ),
+    ];
+
+    println!(
+        "Preflight: verifying tool environment ({})…",
+        std::env::current_dir().unwrap_or_default().display()
+    );
+
+    let mut failures = Vec::new();
+    for (tool, args, fix) in &checks {
+        match preflight_check(tool, args, fix) {
+            Ok(version) => println!("  {} {tool}: {version}", "✓".green()),
+            Err(msg) => failures.push(msg),
+        }
+    }
+
+    if failures.is_empty() {
+        println!("{} preflight OK — environment ready for spawn", "✓".green());
+        return Ok(());
+    }
+
+    println!();
+    println!(
+        "  {} Preflight failed ({} of {} checks):",
+        "✗".red(),
+        failures.len(),
+        checks.len()
+    );
+    println!();
+    for f in &failures {
+        println!("    {f}");
+    }
+    println!();
+    println!(
+        "  {} Fix the above before spawning into this environment",
+        "→".cyan()
+    );
+    miette::bail!("preflight failed: {} check(s) broken", failures.len())
+}

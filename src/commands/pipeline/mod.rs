@@ -228,6 +228,7 @@ pub fn run(cmd: PipelineCommands) -> Result<()> {
         PipelineCommands::Suggest { description } => queries::cmd_suggest(description.as_deref()),
         PipelineCommands::Approve => orchestration::cmd_approve(),
         PipelineCommands::Gc { yes } => orchestration::cmd_gc(yes),
+        PipelineCommands::Preflight => orchestration::cmd_preflight(),
         PipelineCommands::Show { name } => queries::cmd_show(&name),
         PipelineCommands::Gates { name, step } => {
             queries::cmd_gates(name.as_deref(), step.as_deref())
