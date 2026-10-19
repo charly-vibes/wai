@@ -28,9 +28,9 @@ review EXCL-001).
 ## 3. Validation
 
 - [ ] 3.1 `wai pipeline wait` against a live PR: one line, correct exit codes
-- [ ] 3.2 `just test` green (1.1–1.3 included)
-- [ ] 3.3 `just ci` green
-- [ ] 3.4 `openspec validate add-run-wait-primitive --strict`
+- [x] 3.2 `just test` green (1.1–1.3 included)
+- [x] 3.3 `just ci` green
+- [x] 3.4 `openspec validate add-run-wait-primitive --strict`
 - [ ] 3.5 Follow-up: next weekly `scripts/session-friction.py` scan shows
       sleep_poll_ge60 < 108 (Must gate, wai-63h9) — depends on adoption beyond
       the orchestrator template (monitor sessions too)

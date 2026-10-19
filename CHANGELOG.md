@@ -5,6 +5,21 @@ All notable changes to wai will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Calendar Versioning](https://calver.org/) (YYYY.M.MICRO).
 
+## [Unreleased]
+
+### Added
+
+- **`wai pipeline wait <pr> [--timeout <minutes>]`** — canonical blocking wait
+  primitive (wai-63h9): blocks until a PR's checks reach a terminal state via
+  gh's own watch mode (no poll loop written by the agent or by wai), emits
+  exactly one summary line naming the PR, state, and check counts, and exits
+  0 on pass (zero-checks PRs count as a terminal pass) / nonzero on check
+  failure or timeout exhaustion; on timeout it makes a single re-query so
+  the waiting agent never re-polls. The epic-orchestrator template's spawn
+  step now requires the primitive for CI/worktree status waits and names
+  free-form `sleep <N>` poll loops as a violation (baseline: 539 sleep-poll
+  commands, ~53h blocked wall-clock in one week).
+
 ## [2026.10.10] - 2026-10-13
 
 ### Added
