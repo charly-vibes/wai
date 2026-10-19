@@ -1,0 +1,22 @@
+- 2026-10-13T14:20:24Z [id:ea0af8ec77256212fbdaf4d762bbc4b5e842d83bec38fb7c89a3ea2219003229] ### 2026-10-13 11:19 — snap
+  - Session: orchestration evaluation (32 pi sessions, Oct 3–13) → Rule-of-5 reviews → openspec change harden-orchestration-gates created + validated strict, 2 commits on feat/harden-orchestration-gates (bde3d61, 98dae06) — NOT pushed (awaiting authorization)
+  - Tickets: epic wai-ykt1 (P1) parenting wai-rhjp (R1 manifest gates, P1), wai-giqg (R2 bypass telemetry, P2), wai-px4g (R3 verifier evidence contract, P2), wai-76dq (R4 collision surfacing, P3) — deps flattened per review, all parallelizable, metadata.files + acceptance populated
+  - Key review fix: --no-verify bypass recording can't happen in hooks (git stores no bypass record) → 'wai pipeline bypass <reason>' record path added to spec/design; openspec validator gotcha: requirement MUST/SHALL must be on the first line of the body
+  - Pre-existing dirty state untouched: .beads/backup, .whisper usage files, untracked scripts/pretender-codemod.py + split-integration-tests.py; stale in_progress wai-jhut/wai-2am8 still unclaimed
+  - **Next:** fresh session via /renew → push/PR decision for feat/harden-orchestration-gates, then claim any of the 4 parallel children (start wai-rhjp, P1)
+- 2026-10-13T14:35:45Z [id:ae481574254fea4fbc6a9be544c3d33308f0d6d0c751f2871d7e714844a5f650] ### 2026-10-13 — wai-rhjp (R1) implemented & closed via epic-autonomy-tdd-ro5 pipeline
+  - Full 9-step TDD run: RED test in tests/suite_pipeline_template_blocks.rs (implement_and_ship_steps_declare_structural_gates parses 'wai pipeline gates' per-step via strip_ansi) → GREEN: [steps.gate.structural] added to epic-orchestrator ship (research) + tdd-ro5 green/refactor (design) + ship-close (any) → RO5U review caught 1 CRITICAL: ship-close gate was unsatisfiable (prompt had no Record line; wai close creates untagged handoff) → fixed by adding Record ship line → baseline regenerated (2-line drift, expected) → full cargo test 1302 passed 0 failed, clippy+fmt clean
+  - Commits on feat/harden-orchestration-gates: f729a93 (feat), 56643a7 (run artifacts) — NOT pushed (awaiting authorization, same as bde3d61/98dae06)
+  - bd: wai-rhjp CLOSED; epic wai-ykt1 open; children wai-giqg (R2, P2), wai-px4g (R3, P2), wai-76dq (R4, P3) all ready + parallelizable
+  - Deferred: tasks.md 1.3 shared gate-block boilerplate ({{block:}} is prompt-only; needs gate-table mechanism — coordinate with wai-opk8); strip_ansi m-remnant wart (shared helper)
+  - Note: pipeline template hardcodes epic wai-fvhv in orient step prompt — adaptation needed each run; candidate follow-up for epic wai-ykt1 scope
+  - **Next:** fresh session → claim wai-giqg or wai-px4g (P2); push/PR decision needs user authorization (4 commits now on branch)
+- 2026-10-13T15:40:47Z [id:9ca9d7365fdfc8776a2be0fa4611419aea53cc79732ee5c57ed41d4cd996e17e] ### 2026-10-13 — EPIC wai-ykt1 COMPLETE: all 4 harden-orchestration-gates children implemented, reviewed, closed
+  - R1 wai-rhjp: structural artifact gates on ship-class steps (epic-orchestrator ship; tdd-ro5 green/refactor/ship-close) + ship-close Record line (RO5U caught unsatisfiable gate) — f729a93
+  - R2 wai-giqg: 'wai pipeline bypass <reason>' ledger (BypassEntry, serde-default field, silent no-op without run) + status bypass count/last-reason + pipelines.md section — 9adfa0e. Lesson: tests must strip ambient WAI_PIPELINE_RUN (hermetic_wai_cmd in tests/common)
+  - R3 wai-px4g: verify-evidence.sh bundled oracle (CONFIRM requires .wai/ artifact citation + fresh test-run output; REVIEW_REQUIRED always passes; word-boundary verdict match) + verify/brief prompt contract — 175d69b
+  - R4 wai-76dq: prime + pipeline next collision warnings (stash provenance \b(wip|parked|owns)\b, unexpired .lock within 7-day TTL; advisory, silent-when-green; JSON payload field) — a906412
+  - openspec tasks all done incl. 5.3 dogfood (live gate refusals hit during runs); openspec validate --strict green; epic wai-ykt1 CLOSED; full cargo test 1312 passed 0 failed
+  - 10 commits on feat/harden-orchestration-gates NOT pushed — awaiting user authorization
+  - Deferred follow-ups: tasks 1.3 shared gate-block boilerplate (wai-opk8); template hardcodes wai-fvhv in orient prompt (adaptation needed each run); oracle ok-vs-failed limitation
+  - **Next:** push/PR decision (user), then openspec archive after merge
