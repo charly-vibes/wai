@@ -431,6 +431,21 @@ pub enum PipelineCommands {
         yes: bool,
     },
 
+    /// Verify the tool environment of the current directory before a spawn
+    ///
+    /// Run this inside a freshly created worktree BEFORE spawning a subagent
+    /// into it (epic-orchestrator spawn step). Checks every tool in one pass
+    /// and fails fast with an actionable fix message naming the missing
+    /// tool. No installs, no network calls.
+    ///
+    /// Checks: lefthook executable (pre-commit hooks would fail mid-run),
+    /// `bd list` exits 0 (beads state readable), testaruda executable (test
+    /// selection available for `just test`).
+    ///
+    /// EXAMPLES
+    ///   wai pipeline preflight
+    Preflight,
+
     /// Show detailed pipeline definition with steps and gate configuration
     ///
     /// Displays the pipeline name, description, metadata (when, skills),
