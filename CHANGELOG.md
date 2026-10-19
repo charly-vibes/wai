@@ -5,6 +5,20 @@ All notable changes to wai will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Calendar Versioning](https://calver.org/) (YYYY.M.MICRO).
 
+## [2026.10.19] - 2026-10-19
+
+### Added
+
+- **`wai pipeline spawn <command>` / `spawn-status` / `spawn-resume`** — canonical
+  detached spawn wrapper (wai-tdnv): runs a timeout-budgeted detached process
+  (checkpoint JSON under `.wai/pipeline-runs/spawns/`, gitignored), `spawn-status`
+  probes pid liveness and the log tail in one line, `spawn-resume` re-attaches a
+  checkpointed spawn without re-prompting the brief. The epic-orchestrator
+  template's spawn step now requires the wrapper; manual incantations are a
+  violation. Robustness: stdout/stderr are both dup'd to the log file (no
+  >64KB pipe deadlock), budget-0 guarded, pid probed via /proc (no procps
+  dependency), ENOENT mapped for the timeout binary.
+
 ## [2026.10.11] - 2026-10-19
 
 ### Added
