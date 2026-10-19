@@ -1,0 +1,11 @@
+run_id: tdd-ro5-2026-10-19-wai-tdnv
+pipeline: tdd-ro5
+topic: wai-tdnv
+created_at: '2026-10-19T20:13:07.345734664+00:00'
+current_step: 8
+approvals: {}
+epic: null
+child_issues: []
+child_runs: []
+handoff_artifact: null
+bypasses: []

@@ -470,6 +470,76 @@ pub enum PipelineCommands {
         timeout: u64,
     },
 
+    /// Spawn a named, resumable pi subagent in the background (canonical
+    /// spawn wrapper, ticket wai-tdnv)
+    ///
+    /// Launches `pi -p -n <name> <prompt>` detached (returns immediately)
+    /// under a wall-clock budget enforced by the `timeout` binary, with
+    /// output streamed to `.wai/pipeline-runs/spawns/<name>.log` and a
+    /// checkpoint file `.wai/pipeline-runs/spawns/<name>.json` recording
+    /// session, pid, log path, prompt, budget, and start time. Probe progress
+    /// with `wai pipeline spawn-status`; resume an interrupted-but-healthy
+    /// spawn with `wai pipeline spawn-resume <name>` (canon invariants 2, 6,
+    /// 7, 8). Manual `pi -p ... &` incantations are a violation.
+    ///
+    /// EXAMPLES
+    ///   wai pipeline spawn "subagent:wt-y:implement" "$(cat brief.md)"
+    ///   wai pipeline spawn "subagent:wt-y:implement" "fix the flake" --budget 20
+    ///   wai pipeline spawn-status
+    ///   wai pipeline spawn-resume "subagent:wt-y:implement"
+    Spawn {
+        /// pi session name for the spawn (also the checkpoint/log basename)
+        #[arg(value_name = "NAME")]
+        name: String,
+
+        /// Prompt/brief text handed to the subagent
+        #[arg(value_name = "PROMPT")]
+        prompt: String,
+
+        /// Wall-clock budget in minutes (enforced by the `timeout` wrapper)
+        #[arg(long, value_name = "MINUTES", default_value_t = 30)]
+        budget: u64,
+    },
+
+    /// Classify checkpointed spawns: running / exited / budget-exhausted
+    ///
+    /// Reads `.wai/pipeline-runs/spawns/*.json` (one name, or all), checks
+    /// pid liveness, and prints exactly one line per spawn: state + log path,
+    /// with a log-tail probe line for exited spawns. Never opens session
+    /// JSONLs — one command answers what is running, done or stuck, where is
+    /// the log.
+    ///
+    /// EXAMPLES
+    ///   wai pipeline spawn-status
+    ///   wai pipeline spawn-status "subagent:wt-y:implement"
+    SpawnStatus {
+        /// Restrict the probe to one spawn by session name
+        #[arg(value_name = "NAME")]
+        name: Option<String>,
+    },
+
+    /// Resume an interrupted-but-healthy spawn against its named session
+    ///
+    /// Verifies the checkpoint exists, then launches `pi -c -p -n
+    /// "<name>-resume"` detached with a fresh checkpoint and budget. Never
+    /// re-prompts the full brief (canon invariant 6: recovery-from-scratch
+    /// re-ran 30–60 min of finished work in October 2026). A wedged spawn is
+    /// NOT a resume candidate — retry as a new named session with a `-retry`
+    /// suffix instead.
+    ///
+    /// EXAMPLES
+    ///   wai pipeline spawn-resume "subagent:wt-y:implement"
+    ///   wai pipeline spawn-resume "subagent:wt-y:implement" "continue step 3"
+    SpawnResume {
+        /// Session name of the checkpointed spawn to resume
+        #[arg(value_name = "NAME")]
+        name: String,
+
+        /// Optional continuation prompt appended to the resume invocation
+        #[arg(value_name = "FOLLOWUP")]
+        followup: Option<String>,
+    },
+
     /// Show detailed pipeline definition with steps and gate configuration
     ///
     /// Displays the pipeline name, description, metadata (when, skills),

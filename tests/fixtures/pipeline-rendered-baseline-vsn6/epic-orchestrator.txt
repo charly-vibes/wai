@@ -88,7 +88,18 @@ Rules:
   Invariant 7). One command must answer: what is running, which step, done
   or stuck, where is the log.
 - Poll or log rather than blind-blocking.
-- Waiting on CI/worktree status MUST use the canonical wait primitive:
+- Spawning MUST go through the canonical spawn wrapper: `wai pipeline spawn
+  "<name>" "$(cat <brief-path>)" [--budget <minutes>]`. It launches the
+  subagent detached under a wall-clock budget, streams output to the
+  canonical log path, and writes a checkpoint — one command satisfies the
+  background/log/budget/checkpoint invariants. Improvised manual `pi -p
+  ... &` incantations are a violation of this step: they re-derive the
+  backgrounding, log path, budget, and resume syntax by hand and get them
+  wrong under pressure (October 2026: 178 blocking `pi -p` calls, ~48h;
+  several wedged until 3600–7200s bash timeouts).
+- Probe progress with `wai pipeline spawn-status [name]` — one line per
+  spawn answering running/exited/stuck + log path. Waiting on
+  CI/worktree status MUST use the canonical wait primitive:
   `wai pipeline wait <pr> [--timeout <minutes>]`. It blocks via gh's own
   watch mode and emits exactly one summary line — never re-poll to
   reconstruct a result. Free-form `sleep <N>` poll loops (`sleep 300;
@@ -101,14 +112,14 @@ Rules:
   Exception (canon Invariant 6): an interrupted-but-healthy spawn (harness
   timeout, orchestrator crash) with evidence of progress (commits or a
   session record) resumes the existing named session via
-  `pi -c -p -n "<name>-resume"`. Re-prompting the full brief from scratch in
-  that situation re-runs finished work (observed: 30–60 min lost) and is a
-  violation of this step.
-- Wrap the spawn command in a wall-clock budget (`timeout <budget>`) sized
-  to the ticket and stated in the brief (canon Invariant 8). A wedged
-  subagent must cost minutes of orchestrator attention, not hours: bare
-  foreground `pi -p` calls that block until the harness timeout are
-  forbidden — background + tail + poll, always.
+  `wai pipeline spawn-resume "<name>"`. Re-prompting the full brief from
+  scratch in that situation re-runs finished work (observed: 30–60 min
+  lost) and is a violation of this step.
+- The spawn wrapper enforces the wall-clock budget by default (30m) —
+  override with `--budget` sized to the ticket as stated in the brief
+  (canon Invariant 8). A wedged subagent must cost minutes of orchestrator
+  attention, not hours: bare foreground `pi -p` calls that block until the
+  harness timeout are forbidden — background + probe, always.
 
 Record spawn: `wai add research "SPAWN: <session name>; log=<path>"`
 State checkpoint: append the step id + sha (current HEAD) to the state file before advancing.

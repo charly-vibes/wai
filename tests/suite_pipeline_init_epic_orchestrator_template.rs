@@ -333,10 +333,13 @@ fn pipeline_init_epic_orchestrator_encodes_spawn_safety_invariants() {
         content.contains("timeout"),
         "spawn step must require a wall-clock budget (timeout <budget>)"
     );
-    // Invariant 6 exception: interrupted-but-healthy spawns resume via pi -c.
+    // Invariant 6 exception: interrupted-but-healthy spawns resume via the
+    // canonical wrapper (wai-tdnv: the wrapper carries the pi -c shape —
+    // `pi -c -p -n "<name>-resume"` — so the template names the capability,
+    // not the raw incantation).
     assert!(
-        content.contains("pi -c"),
-        "spawn step must encode the resume exception (pi -c -p -n \"<name>-resume\")"
+        content.contains("wai pipeline spawn-resume"),
+        "spawn step must encode the resume exception (wai pipeline spawn-resume)"
     );
     // Invariant 9: beads DB is never staged.
     assert!(

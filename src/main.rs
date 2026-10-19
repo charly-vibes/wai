@@ -18,6 +18,7 @@ pub mod managed_block;
 pub mod matrix;
 pub mod openspec;
 mod output;
+pub mod pipeline_spawn;
 pub mod pipeline_wait;
 pub mod plugin;
 mod reflect_block;

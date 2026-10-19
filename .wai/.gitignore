@@ -5,3 +5,6 @@
 # cleared by `wai close` when the run completes). Runtime-only, not committed.
 .pipeline-run
 .last-run
+# Spawn wrapper checkpoints and logs (ticket wai-tdnv): process-lifetime state
+# (pids, live logs) written by `wai pipeline spawn*`. Ephemeral — never commit.
+pipeline-runs/spawns/

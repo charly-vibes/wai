@@ -230,6 +230,15 @@ pub fn run(cmd: PipelineCommands) -> Result<()> {
         PipelineCommands::Gc { yes } => orchestration::cmd_gc(yes),
         PipelineCommands::Preflight => orchestration::cmd_preflight(),
         PipelineCommands::Wait { pr, timeout } => orchestration::cmd_wait(&pr, timeout),
+        PipelineCommands::Spawn {
+            name,
+            prompt,
+            budget,
+        } => orchestration::cmd_spawn(&name, &prompt, budget),
+        PipelineCommands::SpawnStatus { name } => orchestration::cmd_spawn_status(name.as_deref()),
+        PipelineCommands::SpawnResume { name, followup } => {
+            orchestration::cmd_spawn_resume(&name, followup.as_deref())
+        }
         PipelineCommands::Show { name } => queries::cmd_show(&name),
         PipelineCommands::Gates { name, step } => {
             queries::cmd_gates(name.as_deref(), step.as_deref())

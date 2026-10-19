@@ -36,14 +36,16 @@ phase: research
 
 ```
  M .beads/backup/backup_state.json
-?? .wai/pipeline-runs/tdd-ro5-2026-10-19-wai-gvqj.yml
+ M .wai/pipeline-runs/tdd-ro5-2026-10-19-wai-63h9.yml
+ M .whisper/branches/main/notes.md
+ M .whisper/branches/main/notes.usage.jsonl
+ M .whisper/env.usage.jsonl
 ```
 
 ### open_issues
 
 ```
 ○ wai-0awg P1 Invalidate hook approval when repository identity or script contents change
-○ wai-63h9 P1 friction: wait primitive for CI/worktree polling in orchestrator runs
 ○ wai-fvhv P1 [epic] QA round: 100+ wai CLI findings across usability, docs, scope, code quality, and test coverage
 ├── ○ wai-fvhv.84 P1 Scope: Define product boundary between workflow management and repository-hygiene auditing
 ├── ○ wai-fvhv.93 P1 Scope: Evaluate plugin-system scope against maintenance budget
@@ -104,7 +106,7 @@ phase: research
 ○ wai-z25x P3 [bug] flaky test: execute_hook_no_deadlock_on_fast_command fails under parallel load
 
 --------------------------------------------------------------------------------
-Total: 60 issues (60 open, 0 in progress)
+Total: 59 issues (59 open, 0 in progress)
 
 Status: ○ open  ◐ in_progress  ● blocked  ✓ closed  ❄ deferred
 Priority: P0–P4 (label only; not a status icon)
