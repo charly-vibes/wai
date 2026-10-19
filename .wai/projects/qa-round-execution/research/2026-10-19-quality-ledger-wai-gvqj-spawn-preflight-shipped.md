@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5-2026-10-19-wai-gvqj, pipeline-step:quality-ledger]
+---
+
+QUALITY LEDGER wai-gvqj spawn preflight: SHIPPED (a) wai pipeline preflight subcommand — lefthook --version, bd list, testaruda init; all-failures-one-pass; actionable fix per tool; bail nonzero; no install/no network (orchestration.rs + subcommands.rs + mod.rs dispatch). (b) epic-orchestrator spawn step requires preflight (builtin template + repo-local copy); baseline ratchet regenerated deliberately (+6 lines). Tests: tests/suite_pipeline_preflight.rs 3/3 — reports_all_failures (stub-bin: no lefthook + broken bd → both named, nonzero), passes_clean_env (exit 0, no mutation), template_requires_preflight. Full suite 1261 ingested exit 0; clippy/fmt clean; openspec validate add-spawn-preflight --strict valid. REVIEWED RO5U: 1 MEDIUM fixed (testaruda store init), 2 LOW accepted — verdict pass. Risks: real-world worktree spawn behavior unmeasured until next orchestrator run exercises it (tasks 3.4 meter: next weekly friction scan must show lefthook-exit-2 class = 0). Next: ship — commit via feature branch + PR, close ticket with meter note.
