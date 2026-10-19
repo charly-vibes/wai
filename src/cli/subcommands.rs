@@ -446,6 +446,30 @@ pub enum PipelineCommands {
     ///   wai pipeline preflight
     Preflight,
 
+    /// Wait for a PR's checks to reach a terminal state (canonical blocking
+    /// wait primitive, ticket wai-63h9)
+    ///
+    /// Blocks until the PR's checks reach a terminal state using gh's own
+    /// watch mode — no poll loop is written by the agent or by wai. Emits
+    /// exactly ONE summary line naming the PR, the terminal state, and the
+    /// check counts, then exits: 0 on pass (including zero-checks PRs),
+    /// nonzero on check failure or timeout exhaustion. On timeout, a single
+    /// re-query reports the last observed state so the agent never re-polls
+    /// to reconstruct it. Default budget: 30 minutes.
+    ///
+    /// EXAMPLES
+    ///   wai pipeline wait 123
+    ///   wai pipeline wait 123 --timeout 45
+    Wait {
+        /// PR number (or branch name) to wait on
+        #[arg(value_name = "PR")]
+        pr: String,
+
+        /// Max minutes to wait before reporting timeout
+        #[arg(long, value_name = "MINUTES", default_value_t = 30)]
+        timeout: u64,
+    },
+
     /// Show detailed pipeline definition with steps and gate configuration
     ///
     /// Displays the pipeline name, description, metadata (when, skills),

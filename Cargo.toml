@@ -43,6 +43,11 @@ chrono = { version = "0.4", features = ["serde"] }
 # Directory traversal
 walkdir = "2"
 
+# Deadline supervision for spawned processes (wai pipeline wait, wai-63h9):
+# blocks OS waitpid on a deadline — std has no wait-with-deadline and the
+# ticket's anti-goal forbids internal sleep-poll loops behind the primitive
+wait-timeout = "0.2"
+
 # Regex support for search
 regex = "1"
 

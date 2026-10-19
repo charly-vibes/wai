@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5-2026-10-19-wai-63h9, pipeline-step:orient]
+---
+
+ORIENT: wai-63h9 wait primitive — pipeline run tdd-ro5-2026-10-19-wai-63h9 step 1/9. Ticket: P1 friction wait primitive (539 sleep>=60s poll cmds, ~53h blocked wall-clock/wk). Implement against openspec change add-run-wait-primitive (PR #54 merged, REVISED per CORR-001): wai pipeline wait <pr> [--timeout <minutes>] subcommand (gh pr checks --watch core, default 30m budget, post-timeout single re-query, one summary line, no hand-written poll loop) in src/commands/pipeline/orchestration.rs + epic-orchestrator template spawn step requires wait primitive, names sleep-poll as violation. Tasks 1.1-1.3 red tests first (template scan, exit-code/summary mapping, zero-checks terminal pass), 2.1-2.2 impl, 3.1-3.5 validation (3.4 meter = next weekly scan, out of this run). Rebased onto main 32f51f8 — EXCL-001 co-modification with preflight resolved (add-spawn-preflight 8/9 done, PR #58 merged). No gate semantics change.
