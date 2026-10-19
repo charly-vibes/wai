@@ -1088,5 +1088,8 @@ pub fn cmd_preflight() -> Result<()> {
         "  {} Fix the above before spawning into this environment",
         "→".cyan()
     );
-    Err(miette::miette!("preflight failed: {} check(s) broken", failures.len()))
+    Err(miette::miette!(
+        "preflight failed: {} check(s) broken",
+        failures.len()
+    ))
 }
