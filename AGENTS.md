@@ -284,7 +284,7 @@ bd close <id>         # Complete work
 ## Git & Workflow Discipline
 
 - **Never use `git add -A`** — always stage specific files with explicit paths
-- **Per-ticket pipeline**: always follow `TDD → ro5u → fix → commit → next ticket`
+- **Per-ticket pipeline**: start a pipeline run per ticket — `wai pipeline start tdd-ro5 --topic=<topic>` (its gates enforce the TDD → ro5u → fix → commit cycle; see ADR 0002)
 
 <!-- ah:managed:start -->
 ## espectacular
