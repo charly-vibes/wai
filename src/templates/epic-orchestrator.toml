@@ -197,6 +197,13 @@ Verifier rules:
   commit, or close anything. It cannot spawn further subagents.
 - Use a different model family than the implementor when one is
   configured — independent judgment, not a second copy of the same model.
+- Default cross-family pair (2026-10-20): implementor glm-class → verifier
+  `openrouter/deepseek/deepseek-v4-flash` (1M window). Do not use
+  `moonshotai/kimi-k2.5` as verifier — it aborted 2× provider-side with
+  zero progress in a pinky-ee2 run (observed 2026-10-20). If deepseek
+  fails provider-side, fall back to the next available cross-family
+  model; do not retry the failed family more than once. If a future
+  implementor runs on deepseek, the verifier must switch family again.
 - The verifier cross-checks the implementor's report:
   - commits listed in the report vs `git log` on the ticket's
     branch/worktree — do they actually exist and match the claims?
