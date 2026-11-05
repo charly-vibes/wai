@@ -625,8 +625,9 @@ fn write_agent_flow_cells(m: &Path) {
 // ── 6.1 design → plan phase gate ─────────────────────────────────────────
 
 fn set_phase_design(dir: &Path, project: &str) {
-    run_ok(dir, &["phase", "set", "design"]);
     let _ = project;
+    let out = wai_cmd(dir).args(["phase", "set", "design"]).output().unwrap_or_else(|e| panic!("phase set should run: {e}"));
+    assert!(out.status.success());
 }
 
 #[test]

@@ -329,19 +329,29 @@ fn way_check_ai_instructions_agents_md() {
     assert!(stdout.contains("\"pass\""));
 }
 
-#[test]
-fn way_check_ai_instructions_missing() {
-    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+const WAY_MISSING_CASES: &[(&str, &str)] = &[
+    ("AI-agent context", "No AI instruction files detected"),
+    ("Agent context sync", "No agent config projections found"),
+    ("Automated verification", "No CI/CD configuration detected"),
+    ("Reproducible environments", "No dev container configuration detected"),
+    ("Extended agent capabilities", "No skills configured"),
+];
 
-    let out = wai_cmd(tmp.path())
-        .args(["way", "--json"])
-        .output()
-        .unwrap_or_else(|e| panic!("command should run: {e}"));
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(out.status.success());
-    assert!(stdout.contains("AI-agent context"));
-    assert!(stdout.contains("No AI instruction files detected"));
-    assert!(stdout.contains("\"warn\""));
+#[test]
+fn way_check_missing_configurations_warn() {
+    for (label, message) in WAY_MISSING_CASES {
+        let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+
+        let out = wai_cmd(tmp.path())
+            .args(["way", "--json"])
+            .output()
+            .unwrap_or_else(|e| panic!("command should run: {e}"));
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        assert!(out.status.success());
+        assert!(stdout.contains(label), "missing {label}");
+        assert!(stdout.contains(message), "missing {message}");
+        assert!(stdout.contains("\"warn\""));
+    }
 }
 
 #[test]
@@ -364,21 +374,6 @@ fn way_check_agent_config_sync_pass() {
     assert!(stdout.contains("Agent context sync"));
     assert!(stdout.contains("Agent config projections configured"));
     assert!(stdout.contains("\"pass\""));
-}
-
-#[test]
-fn way_check_agent_config_sync_info_missing() {
-    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-
-    let out = wai_cmd(tmp.path())
-        .args(["way", "--json"])
-        .output()
-        .unwrap_or_else(|e| panic!("command should run: {e}"));
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(out.status.success());
-    assert!(stdout.contains("Agent context sync"));
-    assert!(stdout.contains("No agent config projections found"));
-    assert!(stdout.contains("\"warn\""));
 }
 
 #[test]
@@ -456,21 +451,6 @@ fn way_check_cicd_circleci() {
 }
 
 #[test]
-fn way_check_cicd_missing() {
-    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-
-    let out = wai_cmd(tmp.path())
-        .args(["way", "--json"])
-        .output()
-        .unwrap_or_else(|e| panic!("command should run: {e}"));
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(out.status.success());
-    assert!(stdout.contains("Automated verification"));
-    assert!(stdout.contains("No CI/CD configuration detected"));
-    assert!(stdout.contains("\"warn\""));
-}
-
-#[test]
 fn way_check_devcontainer_dir() {
     let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::create_dir_all(tmp.path().join(".devcontainer"))
@@ -502,21 +482,6 @@ fn way_check_devcontainer_json() {
     assert!(stdout.contains("Reproducible environments"));
     assert!(stdout.contains(".devcontainer.json detected"));
     assert!(stdout.contains("\"pass\""));
-}
-
-#[test]
-fn way_check_devcontainer_missing() {
-    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-
-    let out = wai_cmd(tmp.path())
-        .args(["way", "--json"])
-        .output()
-        .unwrap_or_else(|e| panic!("command should run: {e}"));
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(out.status.success());
-    assert!(stdout.contains("Reproducible environments"));
-    assert!(stdout.contains("No dev container configuration detected"));
-    assert!(stdout.contains("\"warn\""));
 }
 
 // ─── wai way: new feature checks ────────────────────────────────────────────
@@ -594,21 +559,6 @@ fn way_check_agent_skills_empty_dir() {
     assert!(out.status.success());
     assert!(stdout.contains("Extended agent capabilities"));
     assert!(stdout.contains("Skills directory present but empty"));
-    assert!(stdout.contains("\"warn\""));
-}
-
-#[test]
-fn way_check_agent_skills_missing() {
-    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-
-    let out = wai_cmd(tmp.path())
-        .args(["way", "--json"])
-        .output()
-        .unwrap_or_else(|e| panic!("command should run: {e}"));
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(out.status.success());
-    assert!(stdout.contains("Extended agent capabilities"));
-    assert!(stdout.contains("No skills configured"));
     assert!(stdout.contains("\"warn\""));
 }
 

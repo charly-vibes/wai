@@ -6,6 +6,7 @@ use common::*;
 use predicates::prelude::*;
 use std::fs;
 use tempfile::TempDir;
+use std::path::Path;
 
 #[test]
 fn pipeline_init_tdd_ro5_ships_release_oracle_script() {
@@ -389,18 +390,39 @@ inject_as = "handoff_hook"
 
 // ─── wai status ─────────────────────────────────────────────────────────────
 
+fn run_status_stdout(dir: &Path, args: &[&str]) -> String {
+    let out = wai_cmd(dir)
+        .args(args)
+        .output()
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
+    assert!(out.status.success());
+    String::from_utf8_lossy(&out.stdout).into_owned()
+}
+
+fn seed_completed_change(dir: &Path) {
+    let changes_dir = dir.join("openspec/changes/done-feature");
+    fs::create_dir_all(&changes_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(
+        changes_dir.join("tasks.md"),
+        "## 1. Setup\n\n- [x] a\n- [x] b\n",
+    )
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+}
+
+fn new_project_tmp() -> TempDir {
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    init_workspace(tmp.path());
+    create_project(tmp.path(), "my-app");
+    tmp
+}
+
 #[test]
 fn status_shows_project_info() {
     let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
-    let out = wai_cmd(tmp.path())
-        .args(["status"])
-        .output()
-        .unwrap_or_else(|e| panic!("command should run: {e}"));
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(out.status.success());
+    let stdout = run_status_stdout(tmp.path(), &["status"]);
     assert!(stdout.contains("my-app"));
 }
 
@@ -425,12 +447,7 @@ fn status_without_openspec_omits_section() {
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
-    let out = wai_cmd(tmp.path())
-        .args(["status"])
-        .output()
-        .unwrap_or_else(|e| panic!("command should run: {e}"));
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(out.status.success());
+    let stdout = run_status_stdout(tmp.path(), &["status"]);
     assert!(!(stdout.contains("OpenSpec")));
 }
 
@@ -494,21 +511,9 @@ fn status_hides_completed_openspec_changes_by_default() {
     let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
+    seed_completed_change(tmp.path());
 
-    let changes_dir = tmp.path().join("openspec/changes/done-feature");
-    fs::create_dir_all(&changes_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-    fs::write(
-        changes_dir.join("tasks.md"),
-        "## 1. Setup\n\n- [x] a\n- [x] b\n",
-    )
-    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-
-    let out = wai_cmd(tmp.path())
-        .args(["status"])
-        .output()
-        .unwrap_or_else(|e| panic!("command should run: {e}"));
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(out.status.success());
+    let stdout = run_status_stdout(tmp.path(), &["status"]);
     assert!(!(stdout.contains("done-feature")));
 }
 
@@ -538,24 +543,10 @@ fn status_verbose_shows_completed_openspec_changes() {
 
 #[test]
 fn status_all_complete_shows_hint_message() {
-    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-    init_workspace(tmp.path());
-    create_project(tmp.path(), "my-app");
+    let tmp = new_project_tmp();
+    seed_completed_change(tmp.path());
 
-    let changes_dir = tmp.path().join("openspec/changes/done-feature");
-    fs::create_dir_all(&changes_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-    fs::write(
-        changes_dir.join("tasks.md"),
-        "## 1. Setup\n\n- [x] a\n- [x] b\n",
-    )
-    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-
-    let out = wai_cmd(tmp.path())
-        .args(["status"])
-        .output()
-        .unwrap_or_else(|e| panic!("command should run: {e}"));
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(out.status.success());
+    let stdout = run_status_stdout(tmp.path(), &["status"]);
     assert!(stdout.contains("all changes complete"));
 }
 
@@ -564,23 +555,11 @@ fn status_plugin_info_hidden_when_only_completed_openspec_changes() {
     let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
-
-    let changes_dir = tmp.path().join("openspec/changes/done-feature");
-    fs::create_dir_all(&changes_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-    fs::write(
-        changes_dir.join("tasks.md"),
-        "## 1. Setup\n\n- [x] a\n- [x] b\n",
-    )
-    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    seed_completed_change(tmp.path());
 
     // Plugin Info section should not appear when there are no active (incomplete) changes
     // and no other hook outputs (no beads, etc.)
-    let out = wai_cmd(tmp.path())
-        .args(["status"])
-        .output()
-        .unwrap_or_else(|e| panic!("command should run: {e}"));
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(out.status.success());
+    let stdout = run_status_stdout(tmp.path(), &["status"]);
     assert!(!(stdout.contains("Plugin Info")));
 }
 
@@ -690,17 +669,10 @@ fn status_suggests_research_needed_when_in_implement_phase_without_research() {
 
 #[test]
 fn status_shows_minimal_research_suggestion_for_new_project() {
-    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-    init_workspace(tmp.path());
-    create_project(tmp.path(), "my-app");
-
     // New project with no artifacts → NewProject pattern → suggest adding research
-    let out = wai_cmd(tmp.path())
-        .args(["status"])
-        .output()
-        .unwrap_or_else(|e| panic!("command should run: {e}"));
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(out.status.success());
+    let tmp = new_project_tmp();
+
+    let stdout = run_status_stdout(tmp.path(), &["status"]);
     assert!(stdout.contains("research"));
 }
 
