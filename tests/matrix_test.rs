@@ -435,9 +435,11 @@ fn lint_undistinguished_columns_warn() {
 // 5.7/5.8/5.9 text lints
 
 #[test]
-fn lint_judgment_words_in_fact_warn() {
+fn lint_judgment_and_link_only_cells_warn() {
     let (tmp, m) = setup_matrix();
     run_ok(tmp.path(), &["matrix", "criterion", "add", "c"]);
+
+    // judgment words lint
     fill_cell(
         &m,
         "01-status-quo",
@@ -445,19 +447,14 @@ fn lint_judgment_words_in_fact_warn() {
         "This is good and better than before.",
         Some("neutral"),
     );
-
     let out = lint_cmd(tmp.path())
         .output()
         .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success());
     assert!(stderr.contains("judgment"));
-}
 
-#[test]
-fn lint_link_only_cell_warns() {
-    let (tmp, m) = setup_matrix();
-    run_ok(tmp.path(), &["matrix", "criterion", "add", "c"]);
+    // link-only cell lint
     fill_cell(
         &m,
         "01-status-quo",
@@ -465,25 +462,19 @@ fn lint_link_only_cell_warns() {
         "https://example.com/docs/very-long-path",
         Some("neutral"),
     );
-
     let out = lint_cmd(tmp.path())
         .output()
         .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success());
     assert!(stderr.contains("link"));
-}
 
-#[test]
-fn lint_criterion_phrased_as_question_warns() {
-    let (tmp, _m) = setup_matrix();
-    run_ok(tmp.path(), &["matrix", "criterion", "add", "c"]);
+    // criterion phrased as question lint
     fs::write(
         matrix_dir(tmp.path(), "my-app").join("criteria/01-c.md"),
         "# c\n\nHow cheap is it?\n",
     )
     .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-
     let out = lint_cmd(tmp.path())
         .output()
         .unwrap_or_else(|e| panic!("command should run: {e}"));
@@ -514,11 +505,11 @@ fn lint_status_quo_without_red_warns() {
     assert!(stderr.contains("status quo"));
 }
 
-// decided with unfilled cells
+// 5.10 empty problem
 
 #[test]
-fn lint_decided_with_unfilled_cells_warns() {
-    let (tmp, _m) = setup_matrix();
+fn lint_empty_problem_md_warns() {
+    let (tmp, m) = setup_matrix();
     run_ok(tmp.path(), &["matrix", "approach", "add", "es"]);
     run_ok(tmp.path(), &["matrix", "criterion", "add", "c"]);
     run_ok(tmp.path(), &["matrix", "decide", "02-es", "because"]);
@@ -529,13 +520,8 @@ fn lint_decided_with_unfilled_cells_warns() {
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success());
     assert!(stderr.contains("unfilled"));
-}
 
-// 5.10 empty problem
-
-#[test]
-fn lint_empty_problem_md_warns() {
-    let (tmp, m) = setup_matrix();
+    // decided-with-unfilled-cells is covered above; empty problem.md also lints
     fs::write(m.join("problem.md"), "# Problem\n\n")
         .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let out = lint_cmd(tmp.path())
