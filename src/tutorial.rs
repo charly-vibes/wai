@@ -9,22 +9,28 @@ pub fn run() -> Result<()> {
     let user_config = UserConfig::load().unwrap_or_default();
     let is_first_run = !user_config.seen_tutorial;
 
+    run_steps(is_first_run)?;
+
+    // Mark tutorial as seen
+    if let Err(e) = mark_tutorial_seen() {
+        eprintln!("Warning: Could not save tutorial progress: {}", e);
+    }
+    show_summary(is_first_run)
+}
+
+fn run_steps(is_first_run: bool) -> Result<()> {
     if is_first_run {
         intro("Welcome to wai! Let's get you started.").into_diagnostic()?;
         log::info("This tutorial will show you the core wai workflow.").into_diagnostic()?;
     } else {
         intro("wai Tutorial - Quickstart Guide").into_diagnostic()?;
     }
-
-    // Step 1: What is wai?
     tutorial_step(
         "1/5",
         "What is wai?",
         "wai helps you track the *why* behind your work.",
         "It captures research, design decisions, and plans alongside your code.",
     )?;
-
-    // Step 2: PARA Structure
     tutorial_step(
         "2/5",
         "The PARA Method",
@@ -34,8 +40,6 @@ pub fn run() -> Result<()> {
          • Resources - Reference materials\n\
          • Archives - Completed work",
     )?;
-
-    // Step 3: Project Phases
     tutorial_step(
         "3/5",
         "Project Phases",
@@ -47,8 +51,6 @@ pub fn run() -> Result<()> {
          5. review → Validate against plans\n\
          6. archive → Wrap up",
     )?;
-
-    // Step 4: Core Commands
     tutorial_step(
         "4/5",
         "Core Commands",
@@ -64,8 +66,6 @@ pub fn run() -> Result<()> {
              wai why \"why use TOML for config?\"\n\
              wai why src/config.rs",
     )?;
-
-    // Step 5: Handoffs
     tutorial_step(
         "5/5",
         "Session Handoffs",
@@ -74,26 +74,21 @@ pub fn run() -> Result<()> {
          This captures what you did, decisions made, and next steps.\n\
          The next developer (or future you) can pick up where you left off.",
     )?;
+    Ok(())
+}
 
-    // Mark tutorial as seen
-    if let Err(e) = mark_tutorial_seen() {
-        eprintln!("Warning: Could not save tutorial progress: {}", e);
-    }
-
-    // Summary
+fn show_summary(is_first_run: bool) -> Result<()> {
     log::success("Tutorial complete!").into_diagnostic()?;
     println!();
     log::info("Next steps:").into_diagnostic()?;
     println!("  • Run 'wai init' to set up your first project");
     println!("  • Run 'wai status' anytime to see your project state");
     println!("  • Run 'wai tutorial' anytime to replay this tutorial");
-
     if is_first_run {
         outro("You're ready to start using wai!").into_diagnostic()?;
     } else {
         outro("Tutorial replay complete").into_diagnostic()?;
     }
-
     Ok(())
 }
 
