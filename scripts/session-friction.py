@@ -27,10 +27,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-SESSIONS_DIR = Path.home() / ".pi" / "agent" / "sessions"
-
-# ~15 tokens per redundant "cd <repo> && " prefix (review: token-waste estimate)
-TOKENS_PER_CD = 15
+TOKENS_PER_CD = 15  # ~tokens per redundant "cd <repo> && " prefix (EDGE review)
 
 
 def sh(cmd: list[str], timeout: int = 300) -> str:
