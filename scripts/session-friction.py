@@ -78,19 +78,9 @@ def rg_count(files: list[str], pattern: str) -> int:
     return sum(1 for _ in out.stdout.splitlines())
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--since", required=True, help="ISO date, e.g. 2026-10-13")
-    # terapia project names are dash-joined cwd paths, e.g.
-    # var-home-sasha-para-areas-dev-gh-charly-wai
-    ap.add_argument("--project-regex", default=r"gh-(charly|ak)-|para-tmp-tambor")
-    ap.add_argument("--min-tool-calls", type=int, default=20)
-    ap.add_argument("--out", default="/tmp/session-friction")
-    args = ap.parse_args()
-
-    out_dir = Path(args.out)
-    out_dir.mkdir(parents=True, exist_ok=True)
-
+def select_sessions(args) -> list[dict]:
+    """Selection predicate (single source of truth — review finding EDGE-002):
+    include iff START timestamp >= --since and project matches the filter."""
     sessions = load_json(sh(["terapia", "list"]))
     sel = [
         s for s in sessions
@@ -99,23 +89,22 @@ def main() -> int:
         and s["tool_calls"] >= args.min_tool_calls
     ]
     print(f"selected sessions: {len(sel)}", file=sys.stderr)
+    return sel
 
-    # --- error rows via terapia (only sessions that report errors > 0) ---
+
+def fetch_error_rows(sel: list[dict]) -> list[dict]:
+    """Error rows via terapia (only sessions that report errors > 0)."""
     err_rows = []
     with_err = [s for s in sel if s["errors"] > 0]
     for i, s in enumerate(with_err):
         err_rows.extend(parse_terapia_errors(sh(["terapia", "errors", s["id"]])))
         if (i + 1) % 25 == 0:
             print(f"  errors fetched {i+1}/{len(with_err)}", file=sys.stderr)
-    err_total_expected = sum(s["errors"] for s in sel)
-    err_total_got = len(err_rows)
-    consistency = {
-        "expected": err_total_expected, "extracted": err_total_got,
-        "ok": err_total_got >= err_total_expected,  # review EDGE-003
-    }
+    return err_rows
 
-    # --- friction signals via rg over the selected sessions' files ---
-    files = [s["file"] for s in sel]
+
+def collect_signals(files: list[str]) -> tuple[dict, int]:
+    """Shell friction signals via rg over the selected sessions' files."""
     signals = {
         "cd_prefixed_bash": rg_count(files, r'"command":"cd [/~]'),
         "sleep_poll_ge60": rg_count(files, r'"command":"sleep (60|[1-9][0-9]{2,})'),
@@ -131,8 +120,11 @@ def main() -> int:
         m = re.search(r"sleep (\d+)", line)
         if m and int(m.group(1)) >= 60:
             sleep_secs += int(m.group(1))
+    return signals, sleep_secs
 
-    # --- aggregates ---
+
+def aggregate(sel: list[dict], err_rows: list[dict], signals: dict, sleep_secs: int) -> dict:
+    """Build the final JSON-serializable report."""
     by_repo = collections.defaultdict(lambda: collections.Counter())
     for s in sel:
         repo = re.sub(r"^.*gh/", "gh/", s["project"]).rstrip("-")
@@ -142,15 +134,9 @@ def main() -> int:
     cls = collections.Counter(r.get("class", "?") for r in err_rows)
     tool = collections.Counter(r.get("tool", "?") for r in err_rows)
 
-    result = {
-        "since": args.since,
-        "selection": {
-            "project_regex": args.project_regex,
-            "min_tool_calls": args.min_tool_calls,
-            "sessions": len(sel),
-            "total_tool_calls": sum(s["tool_calls"] for s in sel),
-            "consistency": consistency,
-        },
+    err_total_expected = sum(s["errors"] for s in sel)
+    err_total_got = len(err_rows)
+    return {
         "by_repo": {
             repo: dict(c) for repo, c in
             sorted(by_repo.items(), key=lambda kv: -kv[1]["tool_calls"])
@@ -167,9 +153,45 @@ def main() -> int:
             # shell reads that duplicate the read tool
             "shell_read_turns": signals["shell_reads"],
         },
+        "consistency": {
+            "expected": err_total_expected, "extracted": err_total_got,
+            "ok": err_total_got >= err_total_expected,  # review EDGE-003
+        },
+    }
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--since", required=True, help="ISO date, e.g. 2026-10-13")
+    # terapia project names are dash-joined cwd paths, e.g.
+    # var-home-sasha-para-areas-dev-gh-charly-wai
+    ap.add_argument("--project-regex", default=r"gh-(charly|ak)-|para-tmp-tambor")
+    ap.add_argument("--min-tool-calls", type=int, default=20)
+    ap.add_argument("--out", default="/tmp/session-friction")
+    args = ap.parse_args()
+
+    out_dir = Path(args.out)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    sel = select_sessions(args)
+    err_rows = fetch_error_rows(sel)
+    files = [s["file"] for s in sel]
+    signals, sleep_secs = collect_signals(files)
+    report = aggregate(sel, err_rows, signals, sleep_secs)
+
+    result = {
+        "since": args.since,
+        "selection": {
+            "project_regex": args.project_regex,
+            "min_tool_calls": args.min_tool_calls,
+            "sessions": len(sel),
+            "total_tool_calls": sum(s["tool_calls"] for s in sel),
+            "consistency": report.pop("consistency"),
+        },
+        **report,
         "notes": [
             "Signals measured over selected sessions' files only (see selection).",
-            "edit_mismatch↔model correlation is a HYPOTHESIS: sample is ~99% one model; no control cohort in-window.",
+            "edit_mismatch\u2194model correlation is a HYPOTHESIS: sample is ~99% one model; no control cohort in-window.",
             "Waste units are estimates, not measurements, except poll_wall_clock_minutes.",
         ],
     }
@@ -177,7 +199,6 @@ def main() -> int:
     (out_dir / "friction.json").write_text(json.dumps(result, indent=2))
     print(json.dumps(result, indent=2))
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())
