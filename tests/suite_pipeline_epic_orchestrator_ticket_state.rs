@@ -417,6 +417,7 @@ fn epic_verify_state(ctx: &EpicWalk, brief_rel: &str) {
 fn pipeline_epic_orchestrator_walks_claim_gates_brief_to_ticket_state() {
     let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let mut ctx = epic_walk_setup(tmp.path());
+    assert_eq!(ctx.sha_claim.len(), 40);
     epic_walk_claim(tmp.path(), &ctx);
     epic_walk_gates(tmp.path(), &mut ctx);
     let brief_rel = epic_walk_brief(tmp.path(), &ctx);
