@@ -91,7 +91,7 @@ pub fn create_handoff(project_root: &Path, project: &str) -> Result<PathBuf> {
     let plugin_context = gather_plugin_context(project_root);
 
     // Generate handoff content
-    let mut content = handoff_content(&date, project, &state.current, &plugin_context);
+    let mut content = handoff_content(&date.to_string(), project, &state.current, &plugin_context);
 
     // 6.3 — decision matrix context: the reasoning, not just the conclusion.
     let matrix_dir = crate::matrix::matrix_dir(project_root, project);
