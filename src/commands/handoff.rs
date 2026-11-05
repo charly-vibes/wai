@@ -88,6 +88,23 @@ pub fn create_handoff(project_root: &Path, project: &str) -> Result<PathBuf> {
     let final_filename = format!("{}-session-end.md", date);
 
     // Gather plugin context via hook system
+    let plugin_context = gather_plugin_context(project_root);
+
+    // Generate handoff content
+    let mut content = handoff_content(&date, project, &state.current, &plugin_context);
+
+    // 6.3 — decision matrix context: the reasoning, not just the conclusion.
+    let matrix_dir = crate::matrix::matrix_dir(project_root, project);
+    if let Some(section) = crate::matrix::handoff_section(&matrix_dir, project) {
+        content.push_str(&section);
+    }
+
+    let path = handoffs_dir.join(&final_filename);
+    std::fs::write(&path, &content).into_diagnostic()?;
+    Ok(path)
+}
+
+fn gather_plugin_context(project_root: &Path) -> String {
     let mut plugin_context = String::new();
     let hook_outputs = plugin::run_hooks(project_root, "on_handoff_generate");
     for output in &hook_outputs {
@@ -95,9 +112,20 @@ pub fn create_handoff(project_root: &Path, project: &str) -> Result<PathBuf> {
         plugin_context.push_str(&output.content);
         plugin_context.push_str("```\n\n");
     }
+    if plugin_context.is_empty() {
+        "<!-- No plugin context available -->\n".to_string()
+    } else {
+        plugin_context
+    }
+}
 
-    // Generate handoff content
-    let content = format!(
+fn handoff_content(
+    date: &str,
+    project: &str,
+    phase: &impl std::fmt::Display,
+    plugin_context: &str,
+) -> String {
+    format!(
         "---\ndate: {date}\nproject: {project}\nphase: {phase}\n---\n\n\
          # Session Handoff\n\n\
          ## What Was Done\n\n\
@@ -116,22 +144,7 @@ pub fn create_handoff(project_root: &Path, project: &str) -> Result<PathBuf> {
          {plugin_context}",
         date = date,
         project = project,
-        phase = state.current,
-        plugin_context = if plugin_context.is_empty() {
-            "<!-- No plugin context available -->\n".to_string()
-        } else {
-            plugin_context
-        },
-    );
-
-    // 6.3 — decision matrix context: the reasoning, not just the conclusion.
-    let mut content = content;
-    let matrix_dir = crate::matrix::matrix_dir(project_root, project);
-    if let Some(section) = crate::matrix::handoff_section(&matrix_dir, project) {
-        content.push_str(&section);
-    }
-
-    let path = handoffs_dir.join(&final_filename);
-    std::fs::write(&path, &content).into_diagnostic()?;
-    Ok(path)
+        phase = phase,
+        plugin_context = plugin_context,
+    )
 }
