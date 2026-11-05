@@ -94,11 +94,15 @@ pub fn run(cli: Cli, guide: &Guide) -> Result<()> {
             reflect::run(args)
         }
         Some(Commands::Completions { shell }) => run_completions(shell),
-        Some(Commands::External(args)) => match run_external(args, guide) {
-            Ok(_) => Ok(()),
-            Err(err) => handle_external_error(err, guide),
-        },
+        Some(Commands::External(args)) => run_external_command(args, guide),
         None => show_welcome(),
+    }
+}
+
+fn run_external_command(args: Vec<String>, guide: &Guide) -> Result<()> {
+    match run_external(args, guide) {
+        Ok(_) => Ok(()),
+        Err(err) => handle_external_error(err, guide),
     }
 }
 
