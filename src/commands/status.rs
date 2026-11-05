@@ -102,75 +102,106 @@ pub fn run(verbose: u8) -> Result<()> {
         return render_json(&project_root, &config.project.name);
     }
 
-    // Determine header label based on whether projects exist
-    let proj_dir = projects_dir(&project_root);
-    let header_label = if proj_dir.exists() {
-        let mut entries: Vec<_> = std::fs::read_dir(&proj_dir)
-            .into_diagnostic()?
-            .filter_map(|e| e.ok())
-            .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
-            .collect();
-        entries.sort_by_key(|e| e.file_name());
+    intro(header_label(&project_root, &config.project.name)).into_diagnostic()?;
 
-        if let Some(first) = entries.first() {
-            let name = first.file_name().to_string_lossy().to_string();
+    // List projects and their phases
+    let project_count = render_projects(&project_root);
+
+    // Plugin status via plugin system
+    let hook_outputs = render_plugins(&project_root);
+
+    // OpenSpec status — computed here for both Plugin Info summary and the detail section
+    let spec_status = openspec::read_status(&project_root);
+    render_plugin_info(&hook_outputs, spec_status.as_ref());
+
+    // OpenSpec status — detailed section
+    render_openspec(spec_status.as_ref(), verbose);
+
+    // Pipeline status section
+    let pipeline_state = detect_pipeline_state(&project_root);
+    render_pipeline(&pipeline_state);
+
+    // Doctor health summary — one line when not clean, silent when green.
+    render_health(&project_root);
+
+    // Suggestions — phase-aware when projects exist
+    render_suggestions(&project_root, project_count);
+    append_pipeline_suggestions(&pipeline_state);
+    outro("Run 'wai show' for full overview").into_diagnostic()?;
+    Ok(())
+}
+
+/// Sorted project directory entries (dirs only).
+fn project_entries(proj_dir: &Path) -> Vec<std::path::PathBuf> {
+    if !proj_dir.exists() {
+        return Vec::new();
+    }
+    let mut entries: Vec<_> = std::fs::read_dir(proj_dir)
+        .into_diagnostic()
+        .ok()
+        .map(|rd| {
+            rd.filter_map(|e| e.ok())
+                .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    entries.sort_by_key(|e| e.file_name());
+    entries.into_iter().map(|e| e.path()).collect()
+}
+
+/// Header label: single/multiple project names, or the workspace name.
+fn header_label(project_root: &Path, workspace_name: &str) -> String {
+    let entries = project_entries(&projects_dir(project_root));
+    match entries.first() {
+        Some(first) => {
+            let name = first.to_string_lossy().to_string();
             if entries.len() == 1 {
                 format!("Project: {}", name.bold())
             } else {
                 format!("Project: {} and {} others", name.bold(), entries.len() - 1)
             }
-        } else {
-            format!("Workspace: {}", config.project.name.bold())
         }
-    } else {
-        format!("Workspace: {}", config.project.name.bold())
-    };
+        None => format!("Workspace: {}", workspace_name.bold()),
+    }
+}
 
-    intro(header_label).into_diagnostic()?;
-
-    // List projects and their phases
-    let proj_dir = projects_dir(&project_root);
+/// Render the Projects section; returns the number of projects listed.
+fn render_projects(project_root: &Path) -> usize {
     let mut project_count = 0;
-    let mut suggestions: Vec<Suggestion> = Vec::new();
-
     println!();
     println!("  {} Projects", "◆".cyan());
 
-    if proj_dir.exists() {
-        let mut entries: Vec<_> = std::fs::read_dir(&proj_dir)
-            .into_diagnostic()?
-            .filter_map(|e| e.ok())
-            .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
-            .collect();
-        entries.sort_by_key(|e| e.file_name());
-
-        for entry in entries {
-            if let Some(name) = entry.file_name().to_str() {
-                let state_path = entry.path().join(STATE_FILE);
-                let phase = if state_path.exists() {
-                    match ProjectState::load(&state_path) {
-                        Ok(state) => format_phase(state.current),
-                        Err(_) => "unknown".dimmed().to_string(),
-                    }
-                } else {
-                    "no state".dimmed().to_string()
-                };
-
-                println!("    {} {}  [{}]", "•".dimmed(), name, phase);
-                project_count += 1;
+    let entries = project_entries(&projects_dir(project_root));
+    for path in &entries {
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        let state_path = path.join(STATE_FILE);
+        let phase = if state_path.exists() {
+            match ProjectState::load(&state_path) {
+                Ok(state) => format_phase(state.current),
+                Err(_) => "unknown".dimmed().to_string(),
             }
-        }
+        } else {
+            "no state".dimmed().to_string()
+        };
+
+        println!("    {} {}  [{}]", "•".dimmed(), name, phase);
+        project_count += 1;
     }
 
     if project_count == 0 {
         println!("    {}", "(no projects yet)".dimmed());
     }
+    project_count
+}
 
-    // Plugin status via plugin system
+/// Render the Plugins section; returns the collected on_status hook outputs.
+fn render_plugins(project_root: &Path) -> Vec<plugin::HookOutput> {
     println!();
     println!("  {} Plugins", "◆".cyan());
 
-    let plugins = plugin::detect_plugins(&project_root);
+    let plugins = plugin::detect_plugins(project_root);
     let mut any_detected = false;
     for p in &plugins {
         if p.detected {
@@ -188,98 +219,107 @@ pub fn run(verbose: u8) -> Result<()> {
     }
 
     // Run on_status hooks for enrichment
-    let hook_outputs = plugin::run_hooks(&project_root, "on_status");
+    plugin::run_hooks(project_root, "on_status")
+}
 
-    // OpenSpec status — computed here for both Plugin Info summary and the detail section
-    let spec_status = openspec::read_status(&project_root);
-
+/// Render the Plugin Info summary when hooks or incomplete spec changes exist.
+fn render_plugin_info(hook_outputs: &[plugin::HookOutput], spec_status: Option<&openspec::OpenSpecStatus>) {
     let has_plugin_info = !hook_outputs.is_empty()
         || spec_status
-            .as_ref()
             .is_some_and(|s| s.changes.iter().any(|c| c.total == 0 || c.done < c.total));
-
-    if has_plugin_info {
-        println!();
-        println!("  {} Plugin Info", "◆".cyan());
-        for output in &hook_outputs {
-            if output.label == "beads_stats"
-                && let Some(summary) = beads_summary(&output.content)
-            {
-                println!("    {} beads: {}", "•".dimmed(), summary);
-                continue;
-            }
-            println!("    {} {}:", "•".dimmed(), output.label.bold());
-            for line in output.content.lines().take(5) {
-                println!("      {}", line.dimmed());
-            }
-        }
-        if let Some(ref spec) = spec_status {
-            for change in &spec.changes {
-                if change.total > 0 && change.done == change.total {
-                    continue; // hide completed changes; use --verbose to show all
-                }
-                let pct = (change.done * 100).checked_div(change.total).unwrap_or(0);
-                println!(
-                    "    {} {}: {}/{} ({}%)",
-                    "•".dimmed(),
-                    change.name,
-                    change.done,
-                    change.total,
-                    pct
-                );
-            }
-        }
+    if !has_plugin_info {
+        return;
     }
 
-    // OpenSpec status — detailed section
-    if let Some(ref spec_status) = spec_status {
-        println!();
-        println!("  {} OpenSpec", "◆".cyan());
-
-        let visible_changes: Vec<_> = spec_status
-            .changes
-            .iter()
-            .filter(|c| verbose > 0 || c.total == 0 || c.done < c.total)
-            .collect();
-        if !visible_changes.is_empty() {
-            for change in &visible_changes {
-                let ratio = if change.total > 0 {
-                    format!("{}/{}", change.done, change.total)
-                } else {
-                    "no tasks".to_string()
-                };
-                println!("    {} {}  [{}]", "•".dimmed(), change.name, ratio.cyan());
-                if verbose > 0 {
-                    for section in &change.sections {
-                        println!(
-                            "      {} {}  {}/{}",
-                            "·".dimmed(),
-                            section.name.dimmed(),
-                            section.done,
-                            section.total
-                        );
-                    }
-                }
-            }
-        } else if spec_status.changes.is_empty() {
-            println!("    {}", "(no active changes)".dimmed());
-        } else {
-            println!("    {}", "(all changes complete — use -v to show)".dimmed());
+    println!();
+    println!("  {} Plugin Info", "◆".cyan());
+    for output in hook_outputs {
+        if output.label == "beads_stats"
+            && let Some(summary) = beads_summary(&output.content)
+        {
+            println!("    {} beads: {}", "•".dimmed(), summary);
+            continue;
         }
-
-        if verbose > 0 && !spec_status.specs.is_empty() {
-            println!();
+        println!("    {} {}:", "•".dimmed(), output.label.bold());
+        for line in output.content.lines().take(5) {
+            println!("      {}", line.dimmed());
+        }
+    }
+    if let Some(spec) = spec_status {
+        for change in &spec.changes {
+            if change.total > 0 && change.done == change.total {
+                continue; // hide completed changes; use --verbose to show all
+            }
+            let pct = (change.done * 100).checked_div(change.total).unwrap_or(0);
             println!(
-                "    {} specs: {}",
-                "·".dimmed(),
-                spec_status.specs.join(", ")
+                "    {} {}: {}/{} ({}%)",
+                "•".dimmed(),
+                change.name,
+                change.done,
+                change.total,
+                pct
             );
         }
     }
+}
 
-    // Pipeline status section
-    let pipeline_state = detect_pipeline_state(&project_root);
-    match &pipeline_state {
+/// Render the detailed OpenSpec section.
+fn render_openspec(spec_status: Option<&openspec::OpenSpecStatus>, verbose: u8) {
+    let Some(spec_status) = spec_status else {
+        return;
+    };
+    println!();
+    println!("  {} OpenSpec", "◆".cyan());
+
+    let visible_changes: Vec<_> = spec_status
+        .changes
+        .iter()
+        .filter(|c| verbose > 0 || c.total == 0 || c.done < c.total)
+        .collect();
+    if !visible_changes.is_empty() {
+        for change in &visible_changes {
+            render_spec_change(change, verbose);
+        }
+    } else if spec_status.changes.is_empty() {
+        println!("    {}", "(no active changes)".dimmed());
+    } else {
+        println!("    {}", "(all changes complete — use -v to show)".dimmed());
+    }
+
+    if verbose > 0 && !spec_status.specs.is_empty() {
+        println!();
+        println!(
+            "    {} specs: {}",
+            "·".dimmed(),
+            spec_status.specs.join(", ")
+        );
+    }
+}
+
+/// Render one spec change with optional per-section detail.
+fn render_spec_change(change: &openspec::ChangeStatus, verbose: u8) {
+    let ratio = if change.total > 0 {
+        format!("{}/{}", change.done, change.total)
+    } else {
+        "no tasks".to_string()
+    };
+    println!("    {} {}  [{}]", "•".dimmed(), change.name, ratio.cyan());
+    if verbose > 0 {
+        for section in &change.sections {
+            println!(
+                "      {} {}  {}/{}",
+                "·".dimmed(),
+                section.name.dimmed(),
+                section.done,
+                section.total
+            );
+        }
+    }
+}
+
+/// Render the Pipeline section (active run or available pipelines).
+fn render_pipeline(pipeline_state: &PipelineStatusInfo) {
+    match pipeline_state {
         PipelineStatusInfo::Active { run, definition } => {
             let total = definition.steps.len();
             let step_num = run.current_step + 1;
@@ -310,177 +350,183 @@ pub fn run(verbose: u8) -> Result<()> {
         }
         PipelineStatusInfo::None => {}
     }
+}
 
-    // Doctor health summary — one line when not clean, silent when green.
-    let health = crate::commands::doctor::health_summary(&project_root);
-    if !health.is_healthy() {
-        let mut parts: Vec<String> = Vec::new();
-        if health.summary.warn > 0 {
-            parts.push(format!("{} warning(s)", health.summary.warn));
-        }
-        if health.summary.fail > 0 {
-            parts.push(format!("{} failure(s)", health.summary.fail));
-        }
-        println!();
-        println!(
-            "  {} Health: {} — run `wai doctor` for details",
-            "⚠".yellow(),
-            parts.join(", ")
-        );
+/// Render the doctor health summary — one line when not clean, silent when green.
+fn render_health(project_root: &Path) {
+    let health = crate::commands::doctor::health_summary(project_root);
+    if health.is_healthy() {
+        return;
     }
+    let mut parts: Vec<String> = Vec::new();
+    if health.summary.warn > 0 {
+        parts.push(format!("{} warning(s)", health.summary.warn));
+    }
+    if health.summary.fail > 0 {
+        parts.push(format!("{} failure(s)", health.summary.fail));
+    }
+    println!();
+    println!(
+        "  {} Health: {} — run `wai doctor` for details",
+        "⚠".yellow(),
+        parts.join(", ")
+    );
+}
 
-    // Suggestions — phase-aware when projects exist
+/// Render the Suggestions section; returns the suggestions collected.
+fn render_suggestions(project_root: &Path, project_count: usize) {
     println!();
     println!("  {} Suggestions", "◆".cyan());
 
     if project_count == 0 {
-        suggestions.push(Suggestion {
-            label: "Create your first project".to_string(),
-            command: "wai new project \"my-app\"".to_string(),
-        });
         println!(
             "    {} Create your first project: wai new project \"my-app\"",
             "→".dimmed()
         );
-    } else {
-        // Gather phase-aware suggestions from workflow detection across all projects
-        let proj_dir = projects_dir(&project_root);
-        if proj_dir.exists() {
-            let mut entries: Vec<_> = std::fs::read_dir(&proj_dir)
-                .into_diagnostic()?
-                .filter_map(|e| e.ok())
-                .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
-                .collect();
-            entries.sort_by_key(|e| e.file_name());
+        return;
+    }
 
-            for entry in &entries {
-                if let Some(name) = entry.file_name().to_str()
-                    && let Some(ctx) = workflows::scan_project(&project_root, name)
-                {
-                    // Matrix awareness (6.2): during the design phase, surface
-                    // the problem statement, completion count, and the next
-                    // unfilled cell.
-                    if ctx.phase == Phase::Design {
-                        let matrix_dir = crate::matrix::matrix_dir(&project_root, name);
-                        if let Some(progress) = crate::matrix::progress(&matrix_dir) {
-                            println!();
-                            println!(
-                                "    {} Matrix: {}",
-                                "◆".magenta(),
-                                progress.problem.dimmed()
-                            );
-                            println!(
-                                "      Matrix: {}/{} cells filled",
-                                progress.filled, progress.total
-                            );
-                            match progress.next_cell {
-                                Some(cell) => {
-                                    println!("      {} Next unfilled cell: {}", "→".dimmed(), cell);
-                                    let s = Suggestion {
-                                        label: "Fill the next matrix cell".to_string(),
-                                        command: format!(
-                                            "# write {cell}/fact.md + a judgment marker"
-                                        ),
-                                    };
-                                    suggestions.push(s);
-                                }
-                                None => {
-                                    let s = Suggestion {
-                                        label: "Record the matrix decision".to_string(),
-                                        command: "wai matrix decide <approach> <rationale>"
-                                            .to_string(),
-                                    };
-                                    suggestions.push(s);
-                                }
-                            }
-                        }
-                    }
+    let mut suggestions: Vec<Suggestion> = Vec::new();
+    gather_workflow_suggestions(project_root, &mut suggestions);
+    if suggestions.is_empty() {
+        push_fallback_suggestions(&mut suggestions);
+    }
+}
 
-                    let detections = workflows::detect_patterns(&ctx);
-                    for detection in detections {
-                        for s in detection.suggestions {
-                            println!("    {} {}: {}", "→".dimmed(), s.label, s.command);
-                            suggestions.push(s);
-                        }
-                    }
-                }
+/// Gather phase-aware suggestions from workflow detection across projects.
+fn gather_workflow_suggestions(project_root: &Path, suggestions: &mut Vec<Suggestion>) {
+    for path in project_entries(&projects_dir(project_root)) {
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        let Some(ctx) = workflows::scan_project(project_root, name) else {
+            continue;
+        };
+        if ctx.phase == Phase::Design {
+            render_matrix_suggestion(project_root, name, suggestions);
+        }
+
+        let detections = workflows::detect_patterns(&ctx);
+        for detection in detections {
+            for s in detection.suggestions {
+                println!("    {} {}: {}", "→".dimmed(), s.label, s.command);
+                suggestions.push(s);
             }
         }
+    }
+}
 
-        // Fallback suggestions if workflow detection produced nothing
-        if suggestions.is_empty() {
+/// Matrix awareness (6.2): during the design phase, surface the problem
+/// statement, completion count, and the next unfilled cell.
+fn render_matrix_suggestion(project_root: &Path, name: &str, suggestions: &mut Vec<Suggestion>) {
+    let matrix_dir = crate::matrix::matrix_dir(project_root, name);
+    let Some(progress) = crate::matrix::progress(&matrix_dir) else {
+        return;
+    };
+    println!();
+    println!("    {} Matrix: {}", "◆".magenta(), progress.problem.dimmed());
+    println!(
+        "      Matrix: {}/{} cells filled",
+        progress.filled, progress.total
+    );
+    match progress.next_cell {
+        Some(cell) => {
+            println!("      {} Next unfilled cell: {}", "→".dimmed(), cell);
             suggestions.push(Suggestion {
-                label: "View project phase".to_string(),
-                command: "wai phase".to_string(),
+                label: "Fill the next matrix cell".to_string(),
+                command: format!("# write {cell}/fact.md + a judgment marker"),
             });
+        }
+        None => {
             suggestions.push(Suggestion {
-                label: "Add artifacts".to_string(),
-                command: "wai add research \"...\"".to_string(),
+                label: "Record the matrix decision".to_string(),
+                command: "wai matrix decide <approach> <rationale>".to_string(),
             });
-            println!("    {} View project phase: wai phase", "→".dimmed());
-            println!(
-                "    {} Add artifacts: wai add research \"...\"",
-                "→".dimmed()
-            );
         }
     }
+}
 
-    // Pipeline suggestions — always appended after workflow suggestions
-    match &pipeline_state {
-        PipelineStatusInfo::Active { .. } => {
-            let s = Suggestion {
-                label: "Resume pipeline".to_string(),
-                command: "wai pipeline current".to_string(),
-            };
-            println!("    {} {}: {}", "→".dimmed(), s.label, s.command);
-            suggestions.push(s);
-        }
-        PipelineStatusInfo::Available(_) => {
-            let s = Suggestion {
-                label: "Choose a pipeline".to_string(),
-                command: "wai pipeline suggest".to_string(),
-            };
-            println!("    {} {}: {}", "→".dimmed(), s.label, s.command);
-            suggestions.push(s);
-        }
-        PipelineStatusInfo::None => {}
-    }
+/// Fallback suggestions when workflow detection produced nothing.
+fn push_fallback_suggestions(suggestions: &mut Vec<Suggestion>) {
+    suggestions.push(Suggestion {
+        label: "View project phase".to_string(),
+        command: "wai phase".to_string(),
+    });
+    suggestions.push(Suggestion {
+        label: "Add artifacts".to_string(),
+        command: "wai add research \"...\"".to_string(),
+    });
+    println!("    {} View project phase: wai phase", "→".dimmed());
+    println!("    {} Add artifacts: wai add research \"...\"", "→".dimmed());
+}
 
-    outro("Run 'wai show' for full overview").into_diagnostic()?;
-    Ok(())
+/// Append pipeline suggestions — always after workflow suggestions.
+fn append_pipeline_suggestions(pipeline_state: &PipelineStatusInfo) {
+    let s = match pipeline_state {
+        PipelineStatusInfo::Active { .. } => Suggestion {
+            label: "Resume pipeline".to_string(),
+            command: "wai pipeline current".to_string(),
+        },
+        PipelineStatusInfo::Available(_) => Suggestion {
+            label: "Choose a pipeline".to_string(),
+            command: "wai pipeline suggest".to_string(),
+        },
+        PipelineStatusInfo::None => return,
+    };
+    println!("    {} {}: {}", "→".dimmed(), s.label, s.command);
 }
 
 fn render_json(project_root: &std::path::Path, _project_name: &str) -> Result<()> {
+    let projects = json_projects(project_root);
+    let plugins = json_plugins(project_root);
+    let hook_outputs = json_hook_outputs(project_root);
+    let mut suggestions = json_suggestions(project_root, &projects);
+    let openspec = json_openspec(project_root);
+
+    // Pipeline state for JSON
+    let pipeline_state = detect_pipeline_state(project_root);
+    let pipeline = json_pipeline(&pipeline_state, &mut suggestions);
+
+    let payload = StatusPayload {
+        project_root: project_root.display().to_string(),
+        projects,
+        plugins,
+        hook_outputs,
+        openspec,
+        pipeline,
+        suggestions,
+    };
+
+    print_envelope(genesis::envelope::EnvelopeKind::Ok, payload, vec![], vec![])?;
+    Ok(())
+}
+
+/// Collect project name/phase pairs for the JSON payload.
+fn json_projects(project_root: &std::path::Path) -> Vec<StatusProject> {
     let mut projects = Vec::new();
-    let proj_dir = projects_dir(project_root);
-    if proj_dir.exists() {
-        let mut entries: Vec<_> = std::fs::read_dir(&proj_dir)
-            .into_diagnostic()?
-            .filter_map(|e| e.ok())
-            .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
-            .collect();
-        entries.sort_by_key(|e| e.file_name());
-
-        for entry in entries {
-            if let Some(name) = entry.file_name().to_str() {
-                let state_path = entry.path().join(STATE_FILE);
-                let phase = if state_path.exists() {
-                    match ProjectState::load(&state_path) {
-                        Ok(state) => state.current.to_string(),
-                        Err(_) => "unknown".to_string(),
-                    }
-                } else {
-                    "no state".to_string()
-                };
-                projects.push(StatusProject {
-                    name: name.to_string(),
-                    phase,
-                });
+    for path in project_entries(&projects_dir(project_root)) {
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        let state_path = path.join(STATE_FILE);
+        let phase = if state_path.exists() {
+            match ProjectState::load(&state_path) {
+                Ok(state) => state.current.to_string(),
+                Err(_) => "unknown".to_string(),
             }
-        }
+        } else {
+            "no state".to_string()
+        };
+        projects.push(StatusProject {
+            name: name.to_string(),
+            phase,
+        });
     }
+    projects
+}
 
-    let plugins = plugin::detect_plugins(project_root)
+fn json_plugins(project_root: &std::path::Path) -> Vec<StatusPlugin> {
+    plugin::detect_plugins(project_root)
         .into_iter()
         .map(|p| StatusPlugin {
             name: p.def.name,
@@ -491,34 +537,38 @@ fn render_json(project_root: &std::path::Path, _project_name: &str) -> Result<()
             },
             detected: p.detected,
         })
-        .collect();
+        .collect()
+}
 
-    let hook_outputs = plugin::run_hooks(project_root, "on_status")
+fn json_hook_outputs(project_root: &std::path::Path) -> Vec<HookOutput> {
+    plugin::run_hooks(project_root, "on_status")
         .into_iter()
         .map(|output| HookOutput {
             label: output.label,
             content: output.content,
         })
-        .collect();
+        .collect()
+}
 
-    // Gather workflow suggestions from pattern detection
+/// Suggestion list for the JSON payload: workflow detections with fallbacks.
+fn json_suggestions(
+    project_root: &std::path::Path,
+    projects: &[StatusProject],
+) -> Vec<Suggestion> {
     let mut workflow_suggestions: Vec<Suggestion> = Vec::new();
-    if proj_dir.exists()
-        && let Ok(entries) = std::fs::read_dir(&proj_dir)
-    {
-        for entry in entries.filter_map(|e| e.ok()) {
-            if entry.file_type().map(|t| t.is_dir()).unwrap_or(false)
-                && let Some(name) = entry.file_name().to_str()
-                && let Some(ctx) = workflows::scan_project(project_root, name)
-            {
-                for detection in workflows::detect_patterns(&ctx) {
-                    workflow_suggestions.extend(detection.suggestions);
-                }
-            }
+    for path in project_entries(&projects_dir(project_root)) {
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        let Some(ctx) = workflows::scan_project(project_root, name) else {
+            continue;
+        };
+        for detection in workflows::detect_patterns(&ctx) {
+            workflow_suggestions.extend(detection.suggestions);
         }
     }
 
-    let mut suggestions = if projects.is_empty() {
+    if projects.is_empty() {
         vec![Suggestion {
             label: "Create your first project".to_string(),
             command: "wai new project \"my-app\"".to_string(),
@@ -536,9 +586,11 @@ fn render_json(project_root: &std::path::Path, _project_name: &str) -> Result<()
                 command: "wai add research \"...\"".to_string(),
             },
         ]
-    };
+    }
+}
 
-    let openspec = openspec::read_status(project_root).map(|s| StatusOpenSpec {
+fn json_openspec(project_root: &std::path::Path) -> Option<StatusOpenSpec> {
+    openspec::read_status(project_root).map(|s| StatusOpenSpec {
         specs: s.specs,
         changes: s
             .changes
@@ -558,11 +610,15 @@ fn render_json(project_root: &std::path::Path, _project_name: &str) -> Result<()
                     .collect(),
             })
             .collect(),
-    });
+    })
+}
 
-    // Pipeline state for JSON
-    let pipeline_state = detect_pipeline_state(project_root);
-    let pipeline = match &pipeline_state {
+/// Build the pipeline JSON block, appending pipeline suggestions.
+fn json_pipeline(
+    pipeline_state: &PipelineStatusInfo,
+    suggestions: &mut Vec<Suggestion>,
+) -> Option<StatusPipeline> {
+    match pipeline_state {
         PipelineStatusInfo::Active { run, definition } => {
             suggestions.push(Suggestion {
                 label: "Resume pipeline".to_string(),
@@ -583,7 +639,7 @@ fn render_json(project_root: &std::path::Path, _project_name: &str) -> Result<()
                 command: "wai pipeline suggest".to_string(),
             });
             Some(StatusPipeline {
-                active: Option::None,
+                active: None,
                 available: pipelines
                     .iter()
                     .map(|(name, def)| StatusPipelineAvailable {
@@ -594,21 +650,8 @@ fn render_json(project_root: &std::path::Path, _project_name: &str) -> Result<()
                     .collect(),
             })
         }
-        PipelineStatusInfo::None => Option::None,
-    };
-
-    let payload = StatusPayload {
-        project_root: project_root.display().to_string(),
-        projects,
-        plugins,
-        hook_outputs,
-        openspec,
-        pipeline,
-        suggestions,
-    };
-
-    print_envelope(genesis::envelope::EnvelopeKind::Ok, payload, vec![], vec![])?;
-    Ok(())
+        PipelineStatusInfo::None => None,
+    }
 }
 
 /// Build a genesis StatusBuilder with wai's status contributors registered.

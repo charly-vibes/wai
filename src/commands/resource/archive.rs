@@ -373,7 +373,8 @@ mod tests {
         assert_eq!(imported_content, content);
     }
 
-fn test_export_import_hierarchical_round_trip() {
+    #[test]
+    fn test_export_import_hierarchical_round_trip() {
         let src_skills = tempfile::tempdir().unwrap();
         let dst_skills = tempfile::tempdir().unwrap();
         let archive_dir = tempfile::tempdir().unwrap();
