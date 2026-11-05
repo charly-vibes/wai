@@ -85,14 +85,27 @@ pub fn write_artifact(
     fs::write(path, content).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 }
 
+fn write_executable_script(bin_dir: &std::path::Path, name: &str, script: String) {
+    fs::create_dir_all(bin_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    let script_path = bin_dir.join(name);
+    fs::write(&script_path, script).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&script_path)
+            .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
+            .permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&script_path, perms).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    }
+}
+
 pub fn install_fake_bd(
     dir: &std::path::Path,
     query: &str,
     output_lines: &[&str],
 ) -> std::path::PathBuf {
     let bin_dir = dir.join("fake-bin");
-    fs::create_dir_all(&bin_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-    let script_path = bin_dir.join("bd");
 
     let escaped_lines = output_lines
         .iter()
@@ -113,24 +126,12 @@ exit 1
 "
     );
 
-    fs::write(&script_path, script).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let mut perms = fs::metadata(&script_path)
-            .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
-            .permissions();
-        perms.set_mode(0o755);
-        fs::set_permissions(&script_path, perms).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-    }
-
+    write_executable_script(&bin_dir, "bd", script);
     bin_dir
 }
 
 pub fn install_fake_bd_passthrough(dir: &std::path::Path) -> std::path::PathBuf {
     let bin_dir = dir.join("fake-bin");
-    fs::create_dir_all(&bin_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-    let script_path = bin_dir.join("bd");
     let script = "#!/bin/sh
 if [ \"$1\" = \"ready\" ]; then
     echo 'fake ready issue'
@@ -146,16 +147,7 @@ if [ \"$1\" = \"show\" ]; then
 fi
 exit 1
 ";
-    fs::write(&script_path, script).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let mut perms = fs::metadata(&script_path)
-            .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
-            .permissions();
-        perms.set_mode(0o755);
-        fs::set_permissions(&script_path, perms).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-    }
+    write_executable_script(&bin_dir, "bd", script.to_string());
     bin_dir
 }
 
@@ -368,10 +360,16 @@ _Last reflected: 2026-02-24 · 1 sessions analyzed_\n\
 
 // ─── wai pipeline start ───────────────────────────────────────────────────────
 
-/// Helper: write a minimal two-step TOML pipeline for start tests.
-pub fn write_pipeline_toml(dir: &std::path::Path, name: &str) {
+/// Helper: write pipeline TOML `content` as `<name>.toml` under resources.
+fn write_pipeline_file(dir: &std::path::Path, name: &str, content: String) {
     let pipelines_dir = dir.join(".wai/resources/pipelines");
     fs::create_dir_all(&pipelines_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(pipelines_dir.join(format!("{name}.toml")), content)
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+}
+
+/// Helper: write a minimal two-step TOML pipeline for start tests.
+pub fn write_pipeline_toml(dir: &std::path::Path, name: &str) {
     let content = format!(
         r#"[pipeline]
 name = "{name}"
@@ -387,15 +385,12 @@ prompt = "{{topic}}: do step two implementation."
 "#,
         name = name
     );
-    fs::write(pipelines_dir.join(format!("{}.toml", name)), content)
-        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    write_pipeline_file(dir, name, content);
 }
 
 // ─── wai pipeline gates and approvals ─────────────────────────────────────────
 
 pub fn write_gated_pipeline_toml(dir: &std::path::Path, name: &str) {
-    let pipelines_dir = dir.join(".wai/resources/pipelines");
-    fs::create_dir_all(&pipelines_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let content = format!(
         r#"[pipeline]
 name = "{name}"
@@ -425,8 +420,7 @@ prompt = "{{{{topic}}}}: ship it."
 "#,
         name = name
     );
-    fs::write(pipelines_dir.join(format!("{}.toml", name)), content)
-        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    write_pipeline_file(dir, name, content);
 }
 
 pub fn write_artifact_with_tags(
@@ -451,8 +445,6 @@ pub fn write_artifact_with_tags(
 // ─── wai pipeline authoring and integrity ────────────────────────────────────
 
 pub fn write_pipeline_toml_with_metadata(dir: &std::path::Path, name: &str) {
-    let pipelines_dir = dir.join(".wai/resources/pipelines");
-    fs::create_dir_all(&pipelines_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let content = format!(
         r#"[pipeline]
 name = "{name}"
@@ -477,8 +469,7 @@ prompt = "{{topic}}: review."
 "#,
         name = name
     );
-    fs::write(pipelines_dir.join(format!("{}.toml", name)), content)
-        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    write_pipeline_file(dir, name, content);
 }
 
 // ─── wai-vx02.4: approval + release oracle gates in shipped tdd-ro5 ─────────
@@ -556,15 +547,12 @@ pub fn release_oracle_sandbox(cargo_version: &str, changelog_version: Option<&st
 
 /// Helper: write a pipeline TOML with a specific name and description.
 pub fn write_pipeline_toml_with_desc(dir: &std::path::Path, name: &str, description: &str) {
-    let pipelines_dir = dir.join(".wai/resources/pipelines");
-    fs::create_dir_all(&pipelines_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let content = format!(
         "[pipeline]\nname = \"{name}\"\ndescription = \"{description}\"\n\n[[steps]]\nid = \"step-one\"\nprompt = \"{{topic}}: do the thing.\"\n",
         name = name,
         description = description
     );
-    fs::write(pipelines_dir.join(format!("{}.toml", name)), content)
-        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    write_pipeline_file(dir, name, content);
 }
 
 // ─── wai status: pipeline integration ────────────────────────────────────────
@@ -644,16 +632,7 @@ fi
 exit 1
 "
     );
-    fs::write(&script_path, script).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let mut perms = fs::metadata(&script_path)
-            .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
-            .permissions();
-        perms.set_mode(0o755);
-        let _ = fs::set_permissions(&script_path, perms);
-    }
+    write_executable_script(&bin_dir, "bd", script);
     bin_dir
 }
 
