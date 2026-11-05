@@ -52,46 +52,61 @@ pub fn run(root: Option<PathBuf>, depth: Option<usize>, timeout_secs: u64) -> Re
         }
     }
 
-    let mut rows: Vec<Row> = Vec::new();
-    let mut any_beads = false;
+    let beads_results = fetch_beads_parallel(&workspaces);
+    let mut rows = build_rows(&workspaces, &beads_results);
+    let any_beads = beads_results.values().any(|c| c.is_some());
 
-    // Fetch beads stats for all workspaces in parallel, capped at MAX_PARALLEL_BD.
-    let beads_results: HashMap<PathBuf, Option<(u64, u64)>> = {
-        let semaphore = Arc::new(Semaphore::new(MAX_PARALLEL_BD));
-        let results = Arc::new(Mutex::new(HashMap::new()));
-        let handles: Vec<_> = workspaces
-            .iter()
-            .filter(|ws| ws.join(".beads").exists())
-            .map(|ws| {
-                let ws = ws.clone();
-                let results = Arc::clone(&results);
-                let semaphore: Arc<Semaphore> = Arc::clone(&semaphore);
-                std::thread::spawn(move || {
-                    // Acquire a permit before running bd — this caps concurrency.
-                    let _permit = semaphore.acquire();
-                    let counts = fetch_beads_counts(&ws);
-                    results.lock().unwrap().insert(ws, counts);
-                })
+    // Sort rows by project name
+    rows.sort_by(|a, b| a.name.cmp(&b.name));
+
+    if rows.is_empty() {
+        println!("No wai workspaces found under {}", root.display());
+        return Ok(());
+    }
+
+    render_rows(&rows, any_beads);
+    Ok(())
+}
+
+/// Fetch beads stats for all workspaces in parallel, capped at MAX_PARALLEL_BD.
+fn fetch_beads_parallel(workspaces: &[PathBuf]) -> HashMap<PathBuf, Option<(u64, u64)>> {
+    let semaphore = Arc::new(Semaphore::new(MAX_PARALLEL_BD));
+    let results = Arc::new(Mutex::new(HashMap::new()));
+    let handles: Vec<_> = workspaces
+        .iter()
+        .filter(|ws| ws.join(".beads").exists())
+        .map(|ws| {
+            let ws = ws.clone();
+            let results = Arc::clone(&results);
+            let semaphore: Arc<Semaphore> = Arc::clone(&semaphore);
+            std::thread::spawn(move || {
+                // Acquire a permit before running bd — this caps concurrency.
+                let _permit = semaphore.acquire();
+                let counts = fetch_beads_counts(&ws);
+                results.lock().unwrap().insert(ws, counts);
             })
-            .collect();
-        for handle in handles {
-            let _ = handle.join();
-        }
-        Arc::try_unwrap(results).unwrap().into_inner().unwrap()
-    };
+        })
+        .collect();
+    for handle in handles {
+        let _ = handle.join();
+    }
+    Arc::try_unwrap(results).unwrap().into_inner().unwrap()
+}
 
-    for workspace in &workspaces {
+/// Enumerate projects (with phase + beads counts) per workspace.
+fn build_rows(
+    workspaces: &[PathBuf],
+    beads_results: &HashMap<PathBuf, Option<(u64, u64)>>,
+) -> Vec<Row> {
+    let mut rows: Vec<Row> = Vec::new();
+    for workspace in workspaces {
         let counts = beads_results.get(workspace).copied().flatten();
-        if counts.is_some() {
-            any_beads = true;
-        }
 
         // Enumerate project names from .wai/projects/ subdirectories
         let proj_dir = projects_dir(workspace);
         if !proj_dir.exists() {
             continue;
         }
-
         let Ok(entries) = std::fs::read_dir(&proj_dir) else {
             continue;
         };
@@ -117,19 +132,13 @@ pub fn run(root: Option<PathBuf>, depth: Option<usize>, timeout_secs: u64) -> Re
             });
         }
     }
+    rows
+}
 
-    // Sort rows by project name
-    rows.sort_by(|a, b| a.name.cmp(&b.name));
-
-    // Empty case
-    if rows.is_empty() {
-        println!("No wai workspaces found under {}", root.display());
-        return Ok(());
-    }
-
+fn render_rows(rows: &[Row], any_beads: bool) {
     // Duplicate name detection
     let mut name_freq: HashMap<&str, usize> = HashMap::new();
-    for row in &rows {
+    for row in rows {
         *name_freq.entry(row.name.as_str()).or_insert(0) += 1;
     }
 
@@ -137,23 +146,7 @@ pub fn run(root: Option<PathBuf>, depth: Option<usize>, timeout_secs: u64) -> Re
 
     let display_names: Vec<String> = rows
         .iter()
-        .map(|row| {
-            if name_freq.get(row.name.as_str()).copied().unwrap_or(0) > 1 {
-                let ws_str = match &home {
-                    Some(h) => {
-                        if let Ok(rel) = row.workspace.strip_prefix(h) {
-                            format!("~/{}", rel.display())
-                        } else {
-                            row.workspace.display().to_string()
-                        }
-                    }
-                    None => row.workspace.display().to_string(),
-                };
-                format!("{} ({})", row.name, ws_str)
-            } else {
-                row.name.clone()
-            }
-        })
+        .map(|row| display_name_for(row, &name_freq, &home))
         .collect();
 
     // Compute column widths based on raw (uncolored) strings
@@ -175,8 +168,23 @@ pub fn run(root: Option<PathBuf>, depth: Option<usize>, timeout_secs: u64) -> Re
             println!("{}  {}", name_col, phase_col);
         }
     }
+}
 
-    Ok(())
+fn display_name_for(row: &Row, name_freq: &HashMap<&str, usize>, home: &Option<PathBuf>) -> String {
+    if name_freq.get(row.name.as_str()).copied().unwrap_or(0) <= 1 {
+        return row.name.clone();
+    }
+    let ws_str = match home {
+        Some(h) => {
+            if let Ok(rel) = row.workspace.strip_prefix(h) {
+                format!("~/{}", rel.display())
+            } else {
+                row.workspace.display().to_string()
+            }
+        }
+        None => row.workspace.display().to_string(),
+    };
+    format!("{} ({})", row.name, ws_str)
 }
 
 /// Walk the filesystem from `root` up to `max_depth` levels, returning paths of
@@ -198,36 +206,11 @@ fn discover_workspaces(root: &Path, max_depth: usize, deadline: Instant) -> Vec<
         .max_depth(max_depth)
         .follow_links(false)
         .into_iter()
-        .filter_entry(|e| {
-            // Always include the root entry
-            if e.depth() == 0 {
-                return true;
-            }
-            // Skip hidden directories during traversal
-            if e.file_type().is_dir() {
-                let name = e.file_name().to_string_lossy();
-                if name.starts_with('.') {
-                    return false;
-                }
-            }
-            true
-        })
+        .filter_entry(is_visible_entry)
     {
         // Check deadline before processing each entry.
         if Instant::now() >= deadline {
-            // Clear the progress line first (only matters on a tty).
-            if stderr_is_tty && progress_shown {
-                eprint!("\r\x1b[K");
-                let _ = std::io::stderr().flush();
-            }
-            // Always warn — on a non-tty the user still needs to know results
-            // are partial (e.g. CI logs, redirected stderr).
-            eprintln!(
-                "  warning: scan timed out after {}s — showing {} workspaces found so far \
-                 (use --timeout to increase)",
-                start.elapsed().as_secs(),
-                workspaces.len()
-            );
+            report_scan_timeout(&start, workspaces.len(), stderr_is_tty, progress_shown);
             break;
         }
 
@@ -237,15 +220,7 @@ fn discover_workspaces(root: &Path, max_depth: usize, deadline: Instant) -> Vec<
         }
 
         dirs_scanned += 1;
-
-        // Show or update progress indicator after 1 second.
-        if stderr_is_tty && !progress_shown && start.elapsed() >= show_progress_after {
-            progress_shown = true;
-        }
-        if stderr_is_tty && progress_shown {
-            eprint!("\r  Scanning... {} dirs", dirs_scanned);
-            let _ = std::io::stderr().flush();
-        }
+        progress_shown = maybe_show_progress(stderr_is_tty, progress_shown, start, dirs_scanned);
 
         let path = entry.path();
         if path.join(".wai").join("config.toml").exists() {
@@ -260,6 +235,49 @@ fn discover_workspaces(root: &Path, max_depth: usize, deadline: Instant) -> Vec<
     }
 
     workspaces
+}
+
+// Always include the root entry; skip hidden directories during traversal.
+fn is_visible_entry(e: &walkdir::DirEntry) -> bool {
+    if e.depth() == 0 {
+        return true;
+    }
+    if e.file_type().is_dir() {
+        let name = e.file_name().to_string_lossy();
+        if name.starts_with('.') {
+            return false;
+        }
+    }
+    true
+}
+
+// Clear progress line, then warn about partial results (matters for CI logs too).
+fn report_scan_timeout(start: &Instant, found: usize, stderr_is_tty: bool, progress_shown: bool) {
+    if stderr_is_tty && progress_shown {
+        eprint!("\r\x1b[K");
+        let _ = std::io::stderr().flush();
+    }
+    eprintln!(
+        "  warning: scan timed out after {}s — showing {} workspaces found so far \
+         (use --timeout to increase)",
+        start.elapsed().as_secs(),
+        found
+    );
+}
+
+// Show or update progress indicator after 1 second; returns updated visibility.
+fn maybe_show_progress(
+    stderr_is_tty: bool,
+    progress_shown: bool,
+    start: Instant,
+    dirs_scanned: u64,
+) -> bool {
+    let shown = progress_shown || (stderr_is_tty && start.elapsed() >= Duration::from_secs(1));
+    if stderr_is_tty && shown {
+        eprint!("\r  Scanning... {} dirs", dirs_scanned);
+        let _ = std::io::stderr().flush();
+    }
+    shown
 }
 
 /// Walk up from `cwd` and collect every ancestor directory that contains `.wai/config.toml`.
