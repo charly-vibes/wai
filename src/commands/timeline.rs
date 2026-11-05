@@ -1,5 +1,6 @@
 use miette::Result;
 use owo_colors::OwoColorize;
+use std::path::Path;
 use walkdir::WalkDir;
 
 use crate::config::projects_dir;
@@ -28,9 +29,27 @@ pub fn run(project: String, from: Option<String>, to: Option<String>, reverse: b
         .into());
     }
 
+    let mut entries =
+        collect_timeline_entries(&proj_dir, &project_root, from.as_deref(), to.as_deref());
+    sort_entries(&mut entries, reverse);
+
+    if context.json {
+        return print_timeline_json(&project, &entries);
+    }
+
+    print_timeline(&project, &entries);
+    Ok(())
+}
+
+fn collect_timeline_entries(
+    proj_dir: &Path,
+    project_root: &Path,
+    from: Option<&str>,
+    to: Option<&str>,
+) -> Vec<TimelineEntry> {
     let mut entries: Vec<TimelineEntry> = Vec::new();
 
-    for entry in WalkDir::new(&proj_dir)
+    for entry in WalkDir::new(proj_dir)
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file())
@@ -52,80 +71,93 @@ pub fn run(project: String, from: Option<String>, to: Option<String>, reverse: b
         };
 
         // Apply date range filters
-        if let Some(ref from_date) = from
-            && date.as_str() < from_date.as_str()
+        if let Some(from_date) = from
+            && date.as_str() < from_date
         {
             continue;
         }
-        if let Some(ref to_date) = to
-            && date.as_str() > to_date.as_str()
+        if let Some(to_date) = to
+            && date.as_str() > to_date
         {
             continue;
         }
 
-        // Determine artifact type from parent directory
-        let parent = entry
-            .path()
-            .parent()
-            .and_then(|p| p.file_name())
-            .and_then(|n| n.to_str())
-            .unwrap_or("unknown");
-
-        let artifact_type = match parent {
-            "research" => "research",
-            "plans" => "plan",
-            "designs" => "design",
-            "handoffs" => "handoff",
-            "reviews" => "review",
-            _ => "other",
-        };
-
-        // Title from filename (strip date and extension)
-        let title = filename
-            .strip_prefix(&format!("{}-", date))
-            .unwrap_or(&filename)
-            .strip_suffix(".md")
-            .unwrap_or(&filename)
-            .replace('-', " ");
-
-        let path = entry
-            .path()
-            .strip_prefix(&project_root)
-            .unwrap_or(entry.path())
-            .display()
-            .to_string();
-
-        entries.push(TimelineEntry {
-            date,
-            artifact_type: artifact_type.to_string(),
-            title,
-            path,
-        });
+        entries.push(timeline_entry(entry.path(), project_root, filename, date));
     }
 
+    entries
+}
+
+fn timeline_entry(
+    path: &Path,
+    project_root: &Path,
+    filename: String,
+    date: String,
+) -> TimelineEntry {
+    // Determine artifact type from parent directory
+    let parent = path
+        .parent()
+        .and_then(|p| p.file_name())
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown");
+
+    let artifact_type = match parent {
+        "research" => "research",
+        "plans" => "plan",
+        "designs" => "design",
+        "handoffs" => "handoff",
+        "reviews" => "review",
+        _ => "other",
+    };
+
+    // Title from filename (strip date and extension)
+    let title = filename
+        .strip_prefix(&format!("{}-", date))
+        .unwrap_or(&filename)
+        .strip_suffix(".md")
+        .unwrap_or(&filename)
+        .replace('-', " ");
+
+    let rel_path = path
+        .strip_prefix(project_root)
+        .unwrap_or(path)
+        .display()
+        .to_string();
+
+    TimelineEntry {
+        date,
+        artifact_type: artifact_type.to_string(),
+        title,
+        path: rel_path,
+    }
+}
+
+fn sort_entries(entries: &mut [TimelineEntry], reverse: bool) {
     // Sort by date
     if reverse {
         entries.sort_by(|a, b| a.date.cmp(&b.date));
     } else {
         entries.sort_by(|a, b| b.date.cmp(&a.date));
     }
+}
 
-    if context.json {
-        let payload = TimelinePayload {
-            project: project.clone(),
-            entries: entries
-                .iter()
-                .map(|entry| JsonTimelineEntry {
-                    date: entry.date.clone(),
-                    artifact_type: entry.artifact_type.clone(),
-                    title: entry.title.clone(),
-                    path: entry.path.clone(),
-                })
-                .collect(),
-        };
-        return print_envelope_list(payload);
-    }
+fn print_timeline_json(project: &str, entries: &[TimelineEntry]) -> Result<()> {
+    let payload = TimelinePayload {
+        project: project.to_string(),
+        entries: entries
+            .iter()
+            .map(|entry| JsonTimelineEntry {
+                date: entry.date.clone(),
+                artifact_type: entry.artifact_type.clone(),
+                title: entry.title.clone(),
+                path: entry.path.clone(),
+            })
+            .collect(),
+    };
+    print_envelope_list(payload)
+}
 
+fn print_timeline(project: &str, entries: &[TimelineEntry]) {
     if entries.is_empty() {
         println!();
         println!(
@@ -138,7 +170,7 @@ pub fn run(project: String, from: Option<String>, to: Option<String>, reverse: b
             "→".dimmed()
         );
         println!();
-        return Ok(());
+        return;
     }
 
     println!();
@@ -146,7 +178,7 @@ pub fn run(project: String, from: Option<String>, to: Option<String>, reverse: b
     println!();
 
     let mut current_date = String::new();
-    for entry in &entries {
+    for entry in entries {
         if entry.date != current_date {
             current_date = entry.date.clone();
             println!("  {}", current_date.bold());
@@ -157,7 +189,6 @@ pub fn run(project: String, from: Option<String>, to: Option<String>, reverse: b
     }
 
     println!();
-    Ok(())
 }
 
 fn format_type(t: &str) -> String {
