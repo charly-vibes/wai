@@ -7,13 +7,14 @@ use std::path::Path;
 use crate::config::{DESIGNS_DIR, PLANS_DIR, projects_dir};
 use crate::context::{current_context, require_safe_mode};
 
+use super::super::resolve_project;
 use super::helpers;
-use super::super::{resolve_project};
 use super::helpers::process_corrects;
 use super::tags::build_tags;
 
-/// Handle `wai add plan`.
-pub(super) fn handle_plan(
+/// Handle `wai add plan` / `wai add design`; `design` picks the artifact dir.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn handle(
     project_root: &Path,
     content: Option<String>,
     file: Option<String>,
@@ -21,26 +22,24 @@ pub(super) fn handle_plan(
     tags: Option<String>,
     corrects: Option<String>,
     tracks: Option<String>,
+    design: bool,
 ) -> Result<()> {
+    let (safe_mode_label, artifact_dir, label) = if design {
+        ("add design", DESIGNS_DIR, "design")
+    } else {
+        ("add plan", PLANS_DIR, "plan")
+    };
     add_simple_artifact(
-        project_root, "add plan", PLANS_DIR, "plan",
-        content, file, project, tags, corrects, tracks,
-    )
-}
-
-/// Handle `wai add design`.
-pub(super) fn handle_design(
-    project_root: &Path,
-    content: Option<String>,
-    file: Option<String>,
-    project: Option<String>,
-    tags: Option<String>,
-    corrects: Option<String>,
-    tracks: Option<String>,
-) -> Result<()> {
-    add_simple_artifact(
-        project_root, "add design", DESIGNS_DIR, "design",
-        content, file, project, tags, corrects, tracks,
+        project_root,
+        safe_mode_label,
+        artifact_dir,
+        label,
+        content,
+        file,
+        project,
+        tags,
+        corrects,
+        tracks,
     )
 }
 

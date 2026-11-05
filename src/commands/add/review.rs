@@ -7,8 +7,8 @@ use std::path::Path;
 use crate::config::{REVIEWS_DIR, projects_dir};
 use crate::context::current_context;
 
-use super::helpers;
 use super::super::resolve_project;
+use super::helpers;
 use super::helpers::process_corrects;
 use super::tags::build_tags;
 

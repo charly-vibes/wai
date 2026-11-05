@@ -3,7 +3,9 @@ use std::path::Path;
 
 use miette::{IntoDiagnostic, Result};
 
-use crate::commands::pipeline::{load_pipeline_toml, render_prompt, PipelineDefinition, PipelineRun};
+use crate::commands::pipeline::{
+    PipelineDefinition, PipelineRun, load_pipeline_toml, render_prompt,
+};
 use crate::json::{PipelineCurrentPayload, PipelineCurrentStep};
 
 use crate::commands::pipeline::gates::format_gate_summary;
@@ -61,7 +63,10 @@ fn child_def_steps(project_root: &Path, run: &PipelineRun) -> Option<usize> {
 
 /// Child run ids of an epic parent run that are still mid-flight. Unreadable
 /// or unknown runs are skipped, not treated as blockers.
-pub(crate) fn epic_parent_midflight_children(project_root: &Path, run: &PipelineRun) -> Vec<String> {
+pub(crate) fn epic_parent_midflight_children(
+    project_root: &Path,
+    run: &PipelineRun,
+) -> Vec<String> {
     let mut midflight = Vec::new();
     let runs_dir = crate::config::wai_dir(project_root).join("pipeline-runs");
     for child_run_id in &run.child_runs {
@@ -245,7 +250,6 @@ pub(crate) fn resolve_active_run_id(project_root: &Path) -> Result<String> {
     ))
 }
 
-
 /// Build (step, gate_summary, next_command, message) for the active run.
 fn current_step_fields(
     run: &PipelineRun,
@@ -261,7 +265,10 @@ fn current_step_fields(
             None,
             None,
             Some("wai close".to_string()),
-            Some(format!("Pipeline '{}' is already complete!", definition.name)),
+            Some(format!(
+                "Pipeline '{}' is already complete!",
+                definition.name
+            )),
         );
     }
     let current_step = &definition.steps[run.current_step];

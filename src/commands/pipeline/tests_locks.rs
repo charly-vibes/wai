@@ -1,11 +1,9 @@
 //! Unit tests for artifact hashing, lock sidecars, addenda, and cmd_next/cmd_verify.
 
 use crate::commands::pipeline::gates::find_step_artifact_paths;
-use crate::commands::pipeline::queries::find_step_addenda;
 use crate::commands::pipeline::model::{ArtifactLock, PipelineStep};
-use crate::commands::pipeline::{
-    artifact_hash, read_artifact_lock, write_artifact_lock,
-};
+use crate::commands::pipeline::queries::find_step_addenda;
+use crate::commands::pipeline::{artifact_hash, read_artifact_lock, write_artifact_lock};
 use std::fs;
 
 // ── artifact_hash ─────────────────────────────────────────────────────
@@ -343,8 +341,16 @@ fn locked_step_artifacts_fixture(
         "---\ntags: [pipeline-run:{}, pipeline-step:{}]\n---\n\n",
         run_id, step_id
     );
-    fs::write(research_dir.join("2026-04-14-findings.md"), format!("{}Findings.", tag_line)).unwrap();
-    fs::write(research_dir.join("2026-04-14-analysis.md"), format!("{}Analysis.", tag_line)).unwrap();
+    fs::write(
+        research_dir.join("2026-04-14-findings.md"),
+        format!("{}Findings.", tag_line),
+    )
+    .unwrap();
+    fs::write(
+        research_dir.join("2026-04-14-analysis.md"),
+        format!("{}Analysis.", tag_line),
+    )
+    .unwrap();
 
     PipelineStep {
         id: step_id.to_string(),
@@ -392,7 +398,6 @@ fn cmd_next_lock_skipped_when_lock_is_false() {
     );
 }
 
-
 /// Create a locked artifact under `.wai/projects/test-project/research/notes.md`
 /// and return the tempdir root.
 fn locked_artifact_fixture(content: &str) -> tempfile::TempDir {
@@ -425,7 +430,10 @@ fn locked_artifact_fixture(content: &str) -> tempfile::TempDir {
 fn walk_locks(projects_dir: &std::path::Path) -> (usize, Vec<String>) {
     let mut mismatches: Vec<String> = Vec::new();
     let mut lock_count: usize = 0;
-    for entry in walkdir::WalkDir::new(projects_dir).into_iter().filter_map(|e| e.ok()) {
+    for entry in walkdir::WalkDir::new(projects_dir)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
         let path = entry.path();
         if !path.is_file() || path.extension().and_then(|e| e.to_str()) != Some("lock") {
             continue;

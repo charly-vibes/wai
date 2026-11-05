@@ -262,11 +262,19 @@ fn epic_walk_claim(tmp: &std::path::Path, ctx: &EpicWalk) {
             "ORIENT: claimed wai-test-child; no blockers",
         ],
     );
-    assert!(out.status.success(), "add research failed: {:?}", out.stderr);
+    assert!(
+        out.status.success(),
+        "add research failed: {:?}",
+        out.stderr
+    );
 
     // Advancing past claim prints the gates prompt.
     let out = wai_out(tmp, &["pipeline", "next"]);
-    assert!(out.status.success(), "pipeline next failed: {:?}", out.stderr);
+    assert!(
+        out.status.success(),
+        "pipeline next failed: {:?}",
+        out.stderr
+    );
     let stdout = strip_ansi(&String::from_utf8_lossy(&out.stdout));
     assert!(
         stdout.contains("gates"),
@@ -285,10 +293,18 @@ fn epic_walk_gates(tmp: &std::path::Path, ctx: &mut EpicWalk) {
             "GATES: baseline suite green",
         ],
     );
-    assert!(out.status.success(), "add research failed: {:?}", out.stderr);
+    assert!(
+        out.status.success(),
+        "add research failed: {:?}",
+        out.stderr
+    );
 
     let out = wai_out(tmp, &["pipeline", "next"]);
-    assert!(out.status.success(), "pipeline next failed: {:?}", out.stderr);
+    assert!(
+        out.status.success(),
+        "pipeline next failed: {:?}",
+        out.stderr
+    );
 
     // Simulate the agent committing claim/gates work so the brief checkpoint
     // lands on a new HEAD.
@@ -341,7 +357,11 @@ fn epic_walk_brief(tmp: &std::path::Path, ctx: &EpicWalk) -> String {
 
     // Advancing past brief hands off to spawn.
     let out = wai_out(tmp, &["pipeline", "next"]);
-    assert!(out.status.success(), "pipeline next failed: {:?}", out.stderr);
+    assert!(
+        out.status.success(),
+        "pipeline next failed: {:?}",
+        out.stderr
+    );
     let stdout = strip_ansi(&String::from_utf8_lossy(&out.stdout));
     assert!(
         stdout.contains("Spawn"),

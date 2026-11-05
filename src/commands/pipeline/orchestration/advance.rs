@@ -1,14 +1,14 @@
-use std::path::PathBuf;
 use std::fs;
 use std::path::Path;
+use std::path::PathBuf;
 
 use cliclack::log;
 use miette::{IntoDiagnostic, Result};
 use owo_colors::OwoColorize;
 
 use crate::commands::pipeline::{
-    BypassEntry, PipelineDefinition, PipelineRun, PipelineStep,
-    load_pipeline_toml, write_artifact_lock,
+    BypassEntry, PipelineDefinition, PipelineRun, PipelineStep, load_pipeline_toml,
+    write_artifact_lock,
 };
 use crate::commands::require_project;
 use crate::context::{current_context, require_safe_mode};
@@ -67,7 +67,7 @@ pub(crate) fn cmd_next() -> Result<()> {
         println!("⚠ {warning}");
     }
 
-    let (run_id, run_path, run, definition) = load_advance_context(&project_root)?;
+    let (_run_id, run_path, run, definition) = load_advance_context(&project_root)?;
 
     // 5. Evaluate gates (if configured) before allowing advancement
     let current_step = &definition.steps[run.current_step];
@@ -291,7 +291,6 @@ pub(crate) fn cmd_lock() -> Result<()> {
 
     Ok(())
 }
-
 
 /// Resolve the active run and its definition, refusing to advance when the
 /// run is an epic parent with mid-flight children or is already complete.

@@ -249,7 +249,6 @@ prompt = "Do something else."
     assert!(!def.steps[1].lock, "step2 lock should default to false");
 }
 
-
 // ── frontmatter parsing ──────────────────────────────────────────────
 
 #[test]
@@ -276,4 +275,3 @@ fn parse_frontmatter_handles_no_frontmatter() {
     assert!(fm.tags.is_empty());
     assert!(fm.reviews.is_none());
 }
-

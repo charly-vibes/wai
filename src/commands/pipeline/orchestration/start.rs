@@ -6,8 +6,7 @@ use cliclack::log;
 use miette::{IntoDiagnostic, Result};
 
 use crate::commands::pipeline::{
-    PipelineDefinition, PipelineRun, ValidationLevel,
-    load_pipeline_toml,
+    PipelineDefinition, PipelineRun, ValidationLevel, load_pipeline_toml,
 };
 use crate::commands::require_project;
 use crate::context::require_safe_mode;
@@ -297,4 +296,3 @@ fn write_run_state(
     fs::write(&last_run, run_id).into_diagnostic()?;
     Ok(())
 }
-

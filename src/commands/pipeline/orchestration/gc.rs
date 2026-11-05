@@ -1,15 +1,11 @@
-use std::path::PathBuf;
 use std::fs;
 use std::path::Path;
+use std::path::PathBuf;
 
 use miette::{IntoDiagnostic, Result};
 
-use crate::commands::pipeline::{
-    PipelineDefinition, PipelineRun,
-    load_pipeline_toml,
-};
+use crate::commands::pipeline::{PipelineDefinition, PipelineRun, load_pipeline_toml};
 use crate::commands::require_project;
-
 
 // ─── stale-run GC (wai-vx02.2) ────────────────────────────────────────────────
 
@@ -166,4 +162,3 @@ pub fn cmd_gc(yes: bool) -> Result<()> {
     }
     Ok(())
 }
-

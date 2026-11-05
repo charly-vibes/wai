@@ -88,16 +88,16 @@ pub(super) fn assemble_artifact(
     let tags_line = (!all_tags.is_empty()).then(|| format!("tags: [{}]", all_tags.join(", ")));
     let bead_line = bead.map(|b| format!("bead: {}", b));
     let corrects_line = corrects.map(|c| format!("corrects: {}", c));
-    let tracks_lines = (!tracks.is_empty())
-        .then(|| {
-            let mut s = String::from("tracks:");
-            for t in tracks {
-                s.push_str(&format!("\n  - {}", t));
-            }
-            s
-        });
+    let tracks_lines = (!tracks.is_empty()).then(|| {
+        let mut s = String::from("tracks:");
+        for t in tracks {
+            s.push_str(&format!("\n  - {}", t));
+        }
+        s
+    });
 
-    let mut file_content = render_frontmatter(vec![tags_line, bead_line, corrects_line, tracks_lines]);
+    let mut file_content =
+        render_frontmatter(vec![tags_line, bead_line, corrects_line, tracks_lines]);
     file_content.push_str(body);
     file_content.push('\n');
     file_content

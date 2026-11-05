@@ -56,7 +56,9 @@ pub(super) fn cmd_verify() -> Result<()> {
 /// Emit the verify summary; exits the process with status 1 on mismatch.
 fn report_verify_outcome(lock_count: usize, mismatches: &[String]) {
     if lock_count == 0 {
-        cliclack::log::info("No locked artifacts found.").into_diagnostic().ok();
+        cliclack::log::info("No locked artifacts found.")
+            .into_diagnostic()
+            .ok();
         return;
     }
 
@@ -139,4 +141,3 @@ pub fn read_artifact_lock(lock_path: &Path) -> Result<ArtifactLock> {
 }
 
 // ─── Unit tests ───────────────────────────────────────────────────────────────
-

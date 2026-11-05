@@ -5,11 +5,9 @@ use crate::commands::pipeline::definition::load_pipeline_toml;
 use crate::commands::pipeline::gates::{
     evaluate_gates, execute_oracle, format_gate_summary, resolve_oracle_command,
 };
-use crate::commands::pipeline::setup::{builtin_template_names, get_builtin_template};
 use crate::commands::pipeline::model::CoverageGate;
-use crate::commands::pipeline::{
-    PipelineDefinition, PipelineRun, PipelineStep, StepGate,
-};
+use crate::commands::pipeline::setup::{builtin_template_names, get_builtin_template};
+use crate::commands::pipeline::{PipelineDefinition, PipelineRun, PipelineStep, StepGate};
 use std::fs;
 
 use std::collections::HashMap;
@@ -349,4 +347,3 @@ fn all_builtin_template_names_resolve_to_templates() {
         );
     }
 }
-

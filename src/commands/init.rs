@@ -3,7 +3,7 @@ use miette::{IntoDiagnostic, Result};
 use std::path::Path;
 
 use crate::config::{CONFIG_DIR, LlmConfig, ProjectConfig, ProjectSettings};
-use crate::context::{current_context, CliContext};
+use crate::context::{CliContext, current_context};
 use crate::workspace::{ensure_workspace_current, sync_tool_commit};
 
 /// Register wai in the shared genesis tool manifest (.genesis/tools.toml).
@@ -151,11 +151,7 @@ fn print_reinit_envelope(
 }
 
 /// Fresh-init path: create config and workspace, register, auto-commit.
-fn init_fresh(
-    current_dir: &Path,
-    context: &CliContext,
-    name: Option<String>,
-) -> Result<()> {
+fn init_fresh(current_dir: &Path, context: &CliContext, name: Option<String>) -> Result<()> {
     let quiet = context.quiet;
     let project_name = resolve_project_name(current_dir, context, name)?;
 

@@ -5,8 +5,8 @@ mod common;
 use common::*;
 use predicates::prelude::*;
 use std::fs;
-use tempfile::TempDir;
 use std::path::Path;
+use tempfile::TempDir;
 
 #[test]
 fn pipeline_init_tdd_ro5_ships_release_oracle_script() {

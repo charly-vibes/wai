@@ -10,9 +10,9 @@ use crate::json::Suggestion;
 use crate::state::Phase;
 use crate::workflows;
 
-use super::helpers;
 use super::super::print_suggestions;
 use super::super::resolve_project;
+use super::helpers;
 use super::helpers::process_corrects;
 use super::tags::build_tags;
 

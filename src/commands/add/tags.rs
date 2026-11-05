@@ -251,9 +251,7 @@ current_step: {}
         write_pipeline_fixture(dir.path(), 2);
 
         let _ = build_tags(None, dir.path());
-        let pointer = dir
-            .path()
-            .join(".wai/resources/pipelines/.last-run");
+        let pointer = dir.path().join(".wai/resources/pipelines/.last-run");
         assert!(
             !pointer.exists(),
             "completed run's stale pointer must be cleared"

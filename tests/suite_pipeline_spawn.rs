@@ -299,7 +299,11 @@ fn spawn_status_classifies_liveness() {
         done_checkpoint.pid
     );
 
-    let status_out = run_status(&tmp, &args_log, &["pipeline", "spawn-status", "subagent:test:done"]);
+    let status_out = run_status(
+        &tmp,
+        &args_log,
+        &["pipeline", "spawn-status", "subagent:test:done"],
+    );
     let stdout = String::from_utf8_lossy(&status_out.stdout);
     assert!(
         stdout.to_lowercase().contains("exited"),

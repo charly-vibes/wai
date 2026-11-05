@@ -7,8 +7,8 @@ use crate::context::current_context;
 
 mod definition;
 mod gates;
-pub(crate) mod orchestration;
 mod model;
+pub(crate) mod orchestration;
 mod queries;
 mod setup;
 mod verify;
@@ -25,9 +25,9 @@ mod tests_locks;
 // Re-export public items that other modules reference
 pub use definition::load_pipeline_toml;
 pub use model::{
-    ApprovalGate, ArtifactLock, BypassEntry, OracleGate, PipelineDefinition, PipelineMetadataSection,
-    PipelineRun, PipelineStep, ProceduralGate, StructuralGate, StepGate, ValidationIssue,
-    ValidationLevel,
+    ApprovalGate, ArtifactLock, BypassEntry, OracleGate, PipelineDefinition,
+    PipelineMetadataSection, PipelineRun, PipelineStep, ProceduralGate, StepGate, StructuralGate,
+    ValidationIssue, ValidationLevel,
 };
 pub(crate) use orchestration::{
     clear_complete_pipeline_run, find_stale_runs, pipeline_current_status, run_is_incomplete,
@@ -50,9 +50,11 @@ pub fn run(cmd: PipelineCommands) -> Result<()> {
         PipelineCommands::Gc { yes } => orchestration::cmd_gc(yes),
         PipelineCommands::Preflight => orchestration::cmd_preflight(),
         PipelineCommands::Wait { pr, timeout } => orchestration::cmd_wait(&pr, timeout),
-        PipelineCommands::Spawn { name, prompt, budget } => {
-            orchestration::cmd_spawn(&name, &prompt, budget)
-        }
+        PipelineCommands::Spawn {
+            name,
+            prompt,
+            budget,
+        } => orchestration::cmd_spawn(&name, &prompt, budget),
         PipelineCommands::SpawnStatus { name } => orchestration::cmd_spawn_status(name.as_deref()),
         PipelineCommands::SpawnResume { name, followup } => {
             orchestration::cmd_spawn_resume(&name, followup.as_deref())

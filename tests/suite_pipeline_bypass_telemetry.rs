@@ -41,7 +41,10 @@ fn bypass_during_active_run_recorded_and_surfaced() {
     let init = run_pipeline(tmp.path(), &["pipeline", "init", "tdd-ro5"]);
     assert!(init.status.success(), "init failed");
 
-    let start = run_pipeline(tmp.path(), &["pipeline", "start", "tdd-ro5", "--topic=bypass-test"]);
+    let start = run_pipeline(
+        tmp.path(),
+        &["pipeline", "start", "tdd-ro5", "--topic=bypass-test"],
+    );
     assert!(start.status.success(), "start failed");
 
     let bypass = run_pipeline(
@@ -80,7 +83,10 @@ fn bypass_during_active_run_recorded_and_surfaced() {
     );
 
     // Second bypass: count accumulates.
-    let bypass2 = run_pipeline(tmp.path(), &["pipeline", "bypass", "second disclosed reason"]);
+    let bypass2 = run_pipeline(
+        tmp.path(),
+        &["pipeline", "bypass", "second disclosed reason"],
+    );
     assert!(bypass2.status.success(), "second bypass failed");
 
     // Status surfaces count + last reason.

@@ -1,8 +1,5 @@
-
 use miette::Result;
 use owo_colors::OwoColorize;
-
-
 
 // ─── preflight ─────────────────────────────────────────────────
 
@@ -231,4 +228,3 @@ fn emit_wait_outcome(pr: &str, outcome: &crate::pipeline_wait::WaitOutcome) -> R
         code => std::process::exit(code),
     }
 }
-

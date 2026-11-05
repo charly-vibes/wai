@@ -333,7 +333,10 @@ const WAY_MISSING_CASES: &[(&str, &str)] = &[
     ("AI-agent context", "No AI instruction files detected"),
     ("Agent context sync", "No agent config projections found"),
     ("Automated verification", "No CI/CD configuration detected"),
-    ("Reproducible environments", "No dev container configuration detected"),
+    (
+        "Reproducible environments",
+        "No dev container configuration detected",
+    ),
     ("Extended agent capabilities", "No skills configured"),
 ];
 

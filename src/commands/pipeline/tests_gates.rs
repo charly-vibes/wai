@@ -1,8 +1,8 @@
 //! Unit tests for gate evaluation, metadata parsing, and validate_pipeline.
 
 use crate::commands::pipeline::definition::{load_pipeline_toml, validate_pipeline};
-use crate::commands::pipeline::gates::format_gate_summary;
 use crate::commands::pipeline::gates::evaluate_gates;
+use crate::commands::pipeline::gates::format_gate_summary;
 
 use crate::commands::pipeline::model::CoverageGate;
 use crate::commands::pipeline::model::{
@@ -329,8 +329,7 @@ fn validate_warns_on_missing_oracle() {
     assert!(
         issues
             .iter()
-            .any(|i| i.level == ValidationLevel::Warn
-                && i.message.contains("nonexistent-oracle")),
+            .any(|i| i.level == ValidationLevel::Warn && i.message.contains("nonexistent-oracle")),
         "expected warning about missing oracle"
     );
 }
@@ -503,4 +502,3 @@ fn format_gate_summary_all_tiers() {
         "[structural + procedural + coverage + oracle + approval]"
     );
 }
-

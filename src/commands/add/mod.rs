@@ -13,6 +13,9 @@ mod research;
 mod review;
 mod tags;
 
+// rustfmt::skip keeps the per-variant destructuring compact — an expanded
+// form pushes this dispatcher over the function_lines budget.
+#[rustfmt::skip]
 pub fn run(cmd: AddCommands) -> Result<()> {
     let project_root = require_project()?;
 
@@ -21,10 +24,10 @@ pub fn run(cmd: AddCommands) -> Result<()> {
             research::handle(&project_root, content, file, project, tags, bead, corrects, tracks)
         }
         AddCommands::Plan { content, file, project, tags, corrects, tracks } => {
-            artifact::handle_plan(&project_root, content, file, project, tags, corrects, tracks)
+            artifact::handle(&project_root, content, file, project, tags, corrects, tracks, false)
         }
         AddCommands::Design { content, file, project, tags, corrects, tracks } => {
-            artifact::handle_design(&project_root, content, file, project, tags, corrects, tracks)
+            artifact::handle(&project_root, content, file, project, tags, corrects, tracks, true)
         }
         AddCommands::Review { content, file, project, tags, reviews, verdict, severity, produced_by, corrects } => {
             review::handle(
