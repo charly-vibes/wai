@@ -23,6 +23,14 @@ fn hermetic_wai_cmd(dir: &std::path::Path) -> Command {
     cmd
 }
 
+/// Run a hermetic pipeline subcommand, asserting the child spawned.
+fn run_pipeline(dir: &std::path::Path, args: &[&str]) -> std::process::Output {
+    hermetic_wai_cmd(dir)
+        .args(args)
+        .output()
+        .unwrap_or_else(|e| panic!("command should run: {e}"))
+}
+
 /// A bypass recorded during an active run appends a ledger entry to the run
 /// state and is surfaced by `wai pipeline status` (count + last reason).
 #[test]
@@ -30,26 +38,20 @@ fn bypass_during_active_run_recorded_and_surfaced() {
     let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
-    let init = hermetic_wai_cmd(tmp.path())
-        .args(["pipeline", "init", "tdd-ro5"])
-        .output()
-        .unwrap_or_else(|e| panic!("init should run: {e}"));
+    let init = run_pipeline(tmp.path(), &["pipeline", "init", "tdd-ro5"]);
     assert!(init.status.success(), "init failed");
 
-    let start = hermetic_wai_cmd(tmp.path())
-        .args(["pipeline", "start", "tdd-ro5", "--topic=bypass-test"])
-        .output()
-        .unwrap_or_else(|e| panic!("start should run: {e}"));
+    let start = run_pipeline(tmp.path(), &["pipeline", "start", "tdd-ro5", "--topic=bypass-test"]);
     assert!(start.status.success(), "start failed");
 
-    let bypass = hermetic_wai_cmd(tmp.path())
-        .args([
+    let bypass = run_pipeline(
+        tmp.path(),
+        &[
             "pipeline",
             "bypass",
             "skipped pre-push hook: flaky under parallel load",
-        ])
-        .output()
-        .unwrap_or_else(|e| panic!("bypass should run: {e}"));
+        ],
+    );
     assert!(
         bypass.status.success(),
         "bypass during active run must succeed: {}{}",
@@ -78,17 +80,11 @@ fn bypass_during_active_run_recorded_and_surfaced() {
     );
 
     // Second bypass: count accumulates.
-    let bypass2 = hermetic_wai_cmd(tmp.path())
-        .args(["pipeline", "bypass", "second disclosed reason"])
-        .output()
-        .unwrap_or_else(|e| panic!("second bypass should run: {e}"));
+    let bypass2 = run_pipeline(tmp.path(), &["pipeline", "bypass", "second disclosed reason"]);
     assert!(bypass2.status.success(), "second bypass failed");
 
     // Status surfaces count + last reason.
-    let status = hermetic_wai_cmd(tmp.path())
-        .args(["pipeline", "status"])
-        .output()
-        .unwrap_or_else(|e| panic!("status should run: {e}"));
+    let status = run_pipeline(tmp.path(), &["pipeline", "status"]);
     let combined = format!(
         "{}{}",
         String::from_utf8_lossy(&status.stdout),
