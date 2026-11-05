@@ -106,34 +106,19 @@ pub fn read_handoffs(project_root: &Path, budget: usize) -> Vec<HandoffEntry> {
             Ok(c) => c,
             Err(_) => continue,
         };
-        let mtime = entry
-            .metadata()
-            .ok()
-            .and_then(|m| m.modified().ok())
-            .unwrap_or(SystemTime::UNIX_EPOCH);
-        let rel_path = path
-            .strip_prefix(project_root)
-            .unwrap_or(path)
-            .to_string_lossy()
-            .to_string();
-        entries.push((mtime, rel_path, content));
+        entries.push((mtime_of(&entry), rel_path_of(path, project_root), content));
     }
 
     // Sort newest-first.
     entries.sort_by_key(|e| Reverse(e.0));
 
-    // Fill up to budget.
     let mut result = Vec::new();
     let mut used = 0usize;
     for (_, rel_path, content) in entries {
-        if used >= budget {
-            break;
-        }
-        let mut take = content.len().min(budget - used);
-        while take > 0 && !content.is_char_boundary(take) {
-            take -= 1;
-        }
-        let trimmed = content[..take].to_string();
+        let trimmed = match take_budget(&content, used, budget) {
+            Some(t) => t,
+            None => break,
+        };
         used += trimmed.len();
         result.push(HandoffEntry {
             rel_path,
@@ -155,49 +140,20 @@ pub fn read_secondary_artifacts(project_root: &Path, budget: usize) -> Vec<Secon
         .filter(|e| e.file_type().is_file())
     {
         let path = entry.path();
-        if path.extension().and_then(|x| x.to_str()) != Some("md") {
+        let Some(kind) = classify_secondary_kind(path) else {
             continue;
-        }
-        // Skip hidden files.
-        if path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .map(|n| n.starts_with('.'))
-            .unwrap_or(false)
-        {
-            continue;
-        }
-
-        let path_str = path.to_string_lossy();
-        let kind: Option<&'static str> = if path_str.contains("/research/") {
-            Some("research")
-        } else if path_str.contains("/designs/") {
-            Some("design")
-        } else if path_str.contains("/plans/") {
-            Some("plan")
-        } else {
-            None
-        };
-        let kind = match kind {
-            Some(k) => k,
-            None => continue,
         };
 
         let content = match std::fs::read_to_string(path) {
             Ok(c) => c,
             Err(_) => continue,
         };
-        let mtime = entry
-            .metadata()
-            .ok()
-            .and_then(|m| m.modified().ok())
-            .unwrap_or(SystemTime::UNIX_EPOCH);
-        let rel_path = path
-            .strip_prefix(project_root)
-            .unwrap_or(path)
-            .to_string_lossy()
-            .to_string();
-        entries.push((mtime, rel_path, kind, content));
+        entries.push((
+            mtime_of(&entry),
+            rel_path_of(path, project_root),
+            kind,
+            content,
+        ));
     }
 
     entries.sort_by_key(|e| Reverse(e.0));
@@ -205,14 +161,10 @@ pub fn read_secondary_artifacts(project_root: &Path, budget: usize) -> Vec<Secon
     let mut result = Vec::new();
     let mut used = 0usize;
     for (_, rel_path, kind, content) in entries {
-        if used >= budget {
-            break;
-        }
-        let mut take = content.len().min(budget - used);
-        while take > 0 && !content.is_char_boundary(take) {
-            take -= 1;
-        }
-        let trimmed = content[..take].to_string();
+        let trimmed = match take_budget(&content, used, budget) {
+            Some(t) => t,
+            None => break,
+        };
         used += trimmed.len();
         result.push(SecondaryEntry {
             rel_path,
@@ -257,17 +209,7 @@ pub fn read_previous_reflections(project_root: &Path, budget: usize) -> Vec<Refl
             Ok(c) => c,
             Err(_) => continue,
         };
-        let mtime = entry
-            .metadata()
-            .ok()
-            .and_then(|m| m.modified().ok())
-            .unwrap_or(SystemTime::UNIX_EPOCH);
-        let rel_path = path
-            .strip_prefix(project_root)
-            .unwrap_or(path)
-            .to_string_lossy()
-            .to_string();
-        entries.push((mtime, rel_path, content));
+        entries.push((mtime_of(&entry), rel_path_of(path, project_root), content));
     }
 
     entries.sort_by_key(|e| Reverse(e.0));
@@ -275,14 +217,10 @@ pub fn read_previous_reflections(project_root: &Path, budget: usize) -> Vec<Refl
     let mut result = Vec::new();
     let mut used = 0usize;
     for (_, rel_path, content) in entries {
-        if used >= budget {
-            break;
-        }
-        let mut take = content.len().min(budget - used);
-        while take > 0 && !content.is_char_boundary(take) {
-            take -= 1;
-        }
-        let trimmed = content[..take].to_string();
+        let trimmed = match take_budget(&content, used, budget) {
+            Some(t) => t,
+            None => break,
+        };
         used += trimmed.len();
         result.push(ReflectionEntry {
             rel_path,
@@ -609,4 +547,55 @@ mod tests {
         assert_eq!(ctx.handoff_count, 2);
         assert_eq!(ctx.handoff_count, ctx.handoffs.len());
     }
+}
+
+fn classify_secondary_kind(path: &Path) -> Option<&'static str> {
+    if path.extension().and_then(|x| x.to_str()) != Some("md") {
+        return None;
+    }
+    // Skip hidden files.
+    if path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .map(|n| n.starts_with('.'))
+        .unwrap_or(false)
+    {
+        return None;
+    }
+    let path_str = path.to_string_lossy();
+    if path_str.contains("/research/") {
+        Some("research")
+    } else if path_str.contains("/designs/") {
+        Some("design")
+    } else if path_str.contains("/plans/") {
+        Some("plan")
+    } else {
+        None
+    }
+}
+
+fn mtime_of(entry: &walkdir::DirEntry) -> SystemTime {
+    entry
+        .metadata()
+        .ok()
+        .and_then(|m| m.modified().ok())
+        .unwrap_or(SystemTime::UNIX_EPOCH)
+}
+
+fn rel_path_of(path: &Path, project_root: &Path) -> String {
+    path.strip_prefix(project_root)
+        .unwrap_or(path)
+        .to_string_lossy()
+        .to_string()
+}
+
+fn take_budget(content: &str, used: usize, budget: usize) -> Option<String> {
+    if used >= budget {
+        return None;
+    }
+    let mut take = content.len().min(budget - used);
+    while take > 0 && !content.is_char_boundary(take) {
+        take -= 1;
+    }
+    Some(content[..take].to_string())
 }
