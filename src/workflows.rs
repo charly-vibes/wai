@@ -88,206 +88,252 @@ pub fn scan_project(project_root: &Path, project_name: &str) -> Option<ProjectCo
 pub fn detect_patterns(ctx: &ProjectContext) -> Vec<WorkflowDetection> {
     let mut detections = Vec::new();
 
-    let total_artifacts = ctx.research_count + ctx.plan_count + ctx.design_count;
-
-    // Stale phase: project has been in same phase for more than STALE_PHASE_DAYS
-    // (checked first, before early returns, so it fires even for new/minimal projects)
-    if ctx.phase != Phase::Archive {
-        let days = (Utc::now() - ctx.phase_started).num_days();
-        if days > STALE_PHASE_DAYS {
-            detections.push(WorkflowDetection {
-                pattern: WorkflowPattern::StalePhase { days },
-                message: format!(
-                    "Project has been in {} phase for {} days — consider advancing or archiving",
-                    ctx.phase, days
-                ),
-                suggestions: vec![
-                    Suggestion {
-                        label: "Advance phase".to_string(),
-                        command: "wai phase next".to_string(),
-                    },
-                    Suggestion {
-                        label: "Archive project".to_string(),
-                        command: format!("wai move {} archives", ctx.name),
-                    },
-                ],
-            });
-        }
-    }
+    // Stale phase: checked first, before early returns, so it fires even for
+    // new/minimal projects
+    push_stale_phase(ctx, &mut detections);
 
     // New project: no artifacts at all, still in research phase
-    if total_artifacts == 0 && ctx.phase == Phase::Research {
-        detections.push(WorkflowDetection {
-            pattern: WorkflowPattern::NewProject,
-            message: "New project — start by adding research".to_string(),
-            suggestions: vec![
-                Suggestion {
-                    label: "Add research".to_string(),
-                    command: "wai add research \"...\"".to_string(),
-                },
-                Suggestion {
-                    label: "Check project phase".to_string(),
-                    command: "wai phase".to_string(),
-                },
-            ],
-        });
+    if push_new_project(ctx, &mut detections) {
         return detections;
     }
 
-    // Research phase with minimal research (0-1 artifacts)
-    if ctx.phase == Phase::Research && ctx.research_count <= 1 {
-        detections.push(WorkflowDetection {
-            pattern: WorkflowPattern::ResearchPhaseMinimal,
-            message: "Research phase — add more research before advancing".to_string(),
-            suggestions: vec![
-                Suggestion {
-                    label: "Add research".to_string(),
-                    command: "wai add research \"...\"".to_string(),
-                },
-                Suggestion {
-                    label: "Search existing artifacts".to_string(),
-                    command: "wai search \"...\"".to_string(),
-                },
-            ],
-        });
-    }
-
-    // Research phase with enough research to advance
-    if ctx.phase == Phase::Research && ctx.research_count >= 2 {
-        detections.push(WorkflowDetection {
-            pattern: WorkflowPattern::ResearchReadyToAdvance,
-            message: "Enough research collected — consider advancing to design".to_string(),
-            suggestions: vec![
-                Suggestion {
-                    label: "Advance to design phase".to_string(),
-                    command: "wai phase set design".to_string(),
-                },
-                Suggestion {
-                    label: "Add a design artifact".to_string(),
-                    command: "wai add design \"...\"".to_string(),
-                },
-            ],
-        });
-    }
-
-    // Non-research phase with no research artifacts — context may be thin
-    if matches!(ctx.phase, Phase::Design | Phase::Plan | Phase::Implement)
-        && ctx.research_count == 0
-    {
-        detections.push(WorkflowDetection {
-            pattern: WorkflowPattern::NeedsResearch,
-            message: "No research found — consider adding context before continuing".to_string(),
-            suggestions: vec![
-                Suggestion {
-                    label: "Add research".to_string(),
-                    command: "wai add research \"...\"".to_string(),
-                },
-                Suggestion {
-                    label: "Search existing artifacts".to_string(),
-                    command: "wai search \"...\"".to_string(),
-                },
-            ],
-        });
-    }
-
-    // In Design phase but no designs yet
-    if ctx.phase == Phase::Design && ctx.design_count == 0 && ctx.research_count > 0 {
-        detections.push(WorkflowDetection {
-            pattern: WorkflowPattern::NewProject, // Reuse or add new pattern
-            message: "In Design phase — start by adding a design artifact".to_string(),
-            suggestions: vec![
-                Suggestion {
-                    label: "Add design".to_string(),
-                    command: "wai add design \"...\"".to_string(),
-                },
-                Suggestion {
-                    label: "Review research".to_string(),
-                    command: "wai search --type research".to_string(),
-                },
-            ],
-        });
-    }
-
-    // In Plan phase but no plans yet
-    if ctx.phase == Phase::Plan
-        && ctx.plan_count == 0
-        && (ctx.research_count > 0 || ctx.design_count > 0)
-    {
-        detections.push(WorkflowDetection {
-            pattern: WorkflowPattern::NewProject,
-            message: "In Plan phase — start by adding a plan artifact".to_string(),
-            suggestions: vec![
-                Suggestion {
-                    label: "Add plan".to_string(),
-                    command: "wai add plan \"...\"".to_string(),
-                },
-                Suggestion {
-                    label: "Review designs".to_string(),
-                    command: "wai search --type design".to_string(),
-                },
-            ],
-        });
-    }
-
-    // Ready to implement: in plan or design phase with at least one design
-    if matches!(ctx.phase, Phase::Plan | Phase::Design) && ctx.design_count > 0 {
-        detections.push(WorkflowDetection {
-            pattern: WorkflowPattern::ReadyToImplement,
-            message: "Ready to implement — designs are in place".to_string(),
-            suggestions: vec![
-                Suggestion {
-                    label: "Advance to implement phase".to_string(),
-                    command: "wai phase set implement".to_string(),
-                },
-                Suggestion {
-                    label: "Review designs".to_string(),
-                    command: "wai search \"design\"".to_string(),
-                },
-            ],
-        });
-    }
-
-    // Actively implementing
-    if ctx.phase == Phase::Implement {
-        detections.push(WorkflowDetection {
-            pattern: WorkflowPattern::ImplementPhaseActive,
-            message: "Implementation in progress".to_string(),
-            suggestions: vec![
-                Suggestion {
-                    label: "Show project details".to_string(),
-                    command: "wai show".to_string(),
-                },
-                Suggestion {
-                    label: "Add implementation notes".to_string(),
-                    command: "wai add plan \"...\"".to_string(),
-                },
-                Suggestion {
-                    label: "Check status".to_string(),
-                    command: "wai status".to_string(),
-                },
-            ],
-        });
-    }
-
-    // LooksComplete: in review phase with at least one handoff
-    if ctx.phase == Phase::Review && ctx.handoff_count >= 1 {
-        detections.push(WorkflowDetection {
-            pattern: WorkflowPattern::LooksComplete,
-            message: "Project looks complete — handoff created while in review phase".to_string(),
-            suggestions: vec![
-                Suggestion {
-                    label: "Archive project".to_string(),
-                    command: format!("wai move {} archives", ctx.name),
-                },
-                Suggestion {
-                    label: "Advance to archive phase".to_string(),
-                    command: "wai phase next".to_string(),
-                },
-            ],
-        });
-    }
+    push_minimal_research(ctx, &mut detections);
+    push_research_ready(ctx, &mut detections);
+    push_needs_research(ctx, &mut detections);
+    push_design_missing(ctx, &mut detections);
+    push_plan_missing(ctx, &mut detections);
+    push_ready_to_implement(ctx, &mut detections);
+    push_implementing(ctx, &mut detections);
+    push_looks_complete(ctx, &mut detections);
 
     detections
+}
+
+fn push_stale_phase(ctx: &ProjectContext, out: &mut Vec<WorkflowDetection>) {
+    if ctx.phase == Phase::Archive {
+        return;
+    }
+    let days = (Utc::now() - ctx.phase_started).num_days();
+    if days <= STALE_PHASE_DAYS {
+        return;
+    }
+    out.push(WorkflowDetection {
+        pattern: WorkflowPattern::StalePhase { days },
+        message: format!(
+            "Project has been in {} phase for {} days — consider advancing or archiving",
+            ctx.phase, days
+        ),
+        suggestions: vec![
+            Suggestion {
+                label: "Advance phase".to_string(),
+                command: "wai phase next".to_string(),
+            },
+            Suggestion {
+                label: "Archive project".to_string(),
+                command: format!("wai move {} archives", ctx.name),
+            },
+        ],
+    });
+}
+
+/// Returns true when the early-return branch (new/minimal project) fired.
+fn push_new_project(ctx: &ProjectContext, out: &mut Vec<WorkflowDetection>) -> bool {
+    let total_artifacts = ctx.research_count + ctx.plan_count + ctx.design_count;
+    if !(total_artifacts == 0 && ctx.phase == Phase::Research) {
+        return false;
+    }
+    out.push(WorkflowDetection {
+        pattern: WorkflowPattern::NewProject,
+        message: "New project — start by adding research".to_string(),
+        suggestions: vec![
+            Suggestion {
+                label: "Add research".to_string(),
+                command: "wai add research \"...\"".to_string(),
+            },
+            Suggestion {
+                label: "Check project phase".to_string(),
+                command: "wai phase".to_string(),
+            },
+        ],
+    });
+    true
+}
+
+// Research phase with minimal research (0-1 artifacts)
+fn push_minimal_research(ctx: &ProjectContext, out: &mut Vec<WorkflowDetection>) {
+    if !(ctx.phase == Phase::Research && ctx.research_count <= 1) {
+        return;
+    }
+    out.push(WorkflowDetection {
+        pattern: WorkflowPattern::ResearchPhaseMinimal,
+        message: "Research phase — add more research before advancing".to_string(),
+        suggestions: vec![
+            Suggestion {
+                label: "Add research".to_string(),
+                command: "wai add research \"...\"".to_string(),
+            },
+            Suggestion {
+                label: "Search existing artifacts".to_string(),
+                command: "wai search \"...\"".to_string(),
+            },
+        ],
+    });
+}
+
+// Research phase with enough research to advance
+fn push_research_ready(ctx: &ProjectContext, out: &mut Vec<WorkflowDetection>) {
+    if !(ctx.phase == Phase::Research && ctx.research_count >= 2) {
+        return;
+    }
+    out.push(WorkflowDetection {
+        pattern: WorkflowPattern::ResearchReadyToAdvance,
+        message: "Enough research collected — consider advancing to design".to_string(),
+        suggestions: vec![
+            Suggestion {
+                label: "Advance to design phase".to_string(),
+                command: "wai phase set design".to_string(),
+            },
+            Suggestion {
+                label: "Add a design artifact".to_string(),
+                command: "wai add design \"...\"".to_string(),
+            },
+        ],
+    });
+}
+
+// Non-research phase with no research artifacts — context may be thin
+fn push_needs_research(ctx: &ProjectContext, out: &mut Vec<WorkflowDetection>) {
+    if !(matches!(ctx.phase, Phase::Design | Phase::Plan | Phase::Implement)
+        && ctx.research_count == 0)
+    {
+        return;
+    }
+    out.push(WorkflowDetection {
+        pattern: WorkflowPattern::NeedsResearch,
+        message: "No research found — consider adding context before continuing".to_string(),
+        suggestions: vec![
+            Suggestion {
+                label: "Add research".to_string(),
+                command: "wai add research \"...\"".to_string(),
+            },
+            Suggestion {
+                label: "Search existing artifacts".to_string(),
+                command: "wai search \"...\"".to_string(),
+            },
+        ],
+    });
+}
+
+// In Design phase but no designs yet
+fn push_design_missing(ctx: &ProjectContext, out: &mut Vec<WorkflowDetection>) {
+    if !(ctx.phase == Phase::Design && ctx.design_count == 0 && ctx.research_count > 0) {
+        return;
+    }
+    out.push(WorkflowDetection {
+        pattern: WorkflowPattern::NewProject, // Reuse or add new pattern
+        message: "In Design phase — start by adding a design artifact".to_string(),
+        suggestions: vec![
+            Suggestion {
+                label: "Add design".to_string(),
+                command: "wai add design \"...\"".to_string(),
+            },
+            Suggestion {
+                label: "Review research".to_string(),
+                command: "wai search --type research".to_string(),
+            },
+        ],
+    });
+}
+
+// In Plan phase but no plans yet
+fn push_plan_missing(ctx: &ProjectContext, out: &mut Vec<WorkflowDetection>) {
+    if !(ctx.phase == Phase::Plan
+        && ctx.plan_count == 0
+        && (ctx.research_count > 0 || ctx.design_count > 0))
+    {
+        return;
+    }
+    out.push(WorkflowDetection {
+        pattern: WorkflowPattern::NewProject,
+        message: "In Plan phase — start by adding a plan artifact".to_string(),
+        suggestions: vec![
+            Suggestion {
+                label: "Add plan".to_string(),
+                command: "wai add plan \"...\"".to_string(),
+            },
+            Suggestion {
+                label: "Review designs".to_string(),
+                command: "wai search --type design".to_string(),
+            },
+        ],
+    });
+}
+
+// Ready to implement: in plan or design phase with at least one design
+fn push_ready_to_implement(ctx: &ProjectContext, out: &mut Vec<WorkflowDetection>) {
+    if !(matches!(ctx.phase, Phase::Plan | Phase::Design) && ctx.design_count > 0) {
+        return;
+    }
+    out.push(WorkflowDetection {
+        pattern: WorkflowPattern::ReadyToImplement,
+        message: "Ready to implement — designs are in place".to_string(),
+        suggestions: vec![
+            Suggestion {
+                label: "Advance to implement phase".to_string(),
+                command: "wai phase set implement".to_string(),
+            },
+            Suggestion {
+                label: "Review designs".to_string(),
+                command: "wai search \"design\"".to_string(),
+            },
+        ],
+    });
+}
+
+// Actively implementing
+fn push_implementing(ctx: &ProjectContext, out: &mut Vec<WorkflowDetection>) {
+    if ctx.phase != Phase::Implement {
+        return;
+    }
+    out.push(WorkflowDetection {
+        pattern: WorkflowPattern::ImplementPhaseActive,
+        message: "Implementation in progress".to_string(),
+        suggestions: vec![
+            Suggestion {
+                label: "Show project details".to_string(),
+                command: "wai show".to_string(),
+            },
+            Suggestion {
+                label: "Add implementation notes".to_string(),
+                command: "wai add plan \"...\"".to_string(),
+            },
+            Suggestion {
+                label: "Check status".to_string(),
+                command: "wai status".to_string(),
+            },
+        ],
+    });
+}
+
+// LooksComplete: in review phase with at least one handoff
+fn push_looks_complete(ctx: &ProjectContext, out: &mut Vec<WorkflowDetection>) {
+    if !(ctx.phase == Phase::Review && ctx.handoff_count >= 1) {
+        return;
+    }
+    out.push(WorkflowDetection {
+        pattern: WorkflowPattern::LooksComplete,
+        message: "Project looks complete — handoff created while in review phase".to_string(),
+        suggestions: vec![
+            Suggestion {
+                label: "Archive project".to_string(),
+                command: format!("wai move {} archives", ctx.name),
+            },
+            Suggestion {
+                label: "Advance to archive phase".to_string(),
+                command: "wai phase next".to_string(),
+            },
+        ],
+    });
 }
 
 /// Count files in a directory (non-recursive, files only).
