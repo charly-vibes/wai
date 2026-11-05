@@ -125,13 +125,14 @@ fn walk(root: &Path) -> Vec<std::path::PathBuf> {
     let mut out = Vec::new();
     let mut stack = vec![root.to_path_buf()];
     while let Some(dir) = stack.pop() {
-        if let Ok(entries) = fs::read_dir(&dir) {
-            for e in entries.flatten() {
-                out.push(e.path());
-                if e.path().is_dir() {
-                    stack.push(e.path());
-                }
+        let paths: Vec<_> = fs::read_dir(&dir)
+            .map(|entries| entries.flatten().map(|e| e.path()).collect())
+            .unwrap_or_default();
+        for path in paths {
+            if path.is_dir() {
+                stack.push(path.clone());
             }
+            out.push(path);
         }
     }
     out.sort();
