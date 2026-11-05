@@ -105,26 +105,124 @@ pub fn run(args: SearchArgs) -> Result<()> {
     let project_root = require_project()?;
     let context = current_context();
 
-    let search_root = if let Some(ref proj_name) = project {
-        let dir = projects_dir(&project_root).join(proj_name);
-        if !dir.exists() {
-            return Err(crate::error::WaiError::ProjectNotFound {
-                name: proj_name.clone(),
-            }
-            .into());
-        }
-        dir
+    let search_root = resolve_search_root(&project_root, project.as_ref())?;
+    let matcher = build_matcher(&query, regex)?;
+
+    let mut results = gather_search_results(
+        &project_root,
+        &search_root,
+        project.is_none(),
+        &matcher,
+        type_filter.as_deref(),
+        &tag,
+        context_size,
+    );
+
+    // Apply --latest: keep only matches from the file with the greatest date prefix.
+    if latest && !results.is_empty() {
+        apply_latest_filter(&mut results);
+    }
+
+    let memory_matches = if include_memories && !context.json {
+        fetch_memories_for_query(&project_root, &query)
+            .map(|raw| parse_memory_matches(&raw))
+            .unwrap_or_default()
     } else {
-        wai_dir(&project_root)
+        Vec::new()
     };
 
-    let matcher: Matcher = if regex {
-        let re = regex::Regex::new(&query)
+    if context.json {
+        return print_search_json(&query, &results, display_limit);
+    }
+
+    print_search_human(
+        &query,
+        &results,
+        display_limit,
+        context_size,
+        &memory_matches,
+        context.verbose,
+    );
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn gather_search_results(
+    project_root: &Path,
+    search_root: &Path,
+    include_global: bool,
+    matcher: &Matcher,
+    type_filter: Option<&str>,
+    tag: &[String],
+    context_size: usize,
+) -> Vec<RawMatch> {
+    // results: (file_path, line_num, line, start, end, context_lines)
+    let mut results: Vec<RawMatch> = Vec::new();
+
+    // Canonical paths already scanned, so the global resources walk (wai-gkk3)
+    // never duplicates a hit for a file also present in the repo scope (they
+    // can coincide when the workspace lives under $HOME/.wai).
+    let mut scanned: HashSet<PathBuf> = HashSet::new();
+
+    // Managed files that should not appear in artifact search results.
+    let agents_md = search_root.join("AGENTS.md");
+
+    collect_matches(
+        search_root,
+        project_root,
+        &agents_md,
+        matcher,
+        type_filter,
+        tag,
+        context_size,
+        "",
+        &mut scanned,
+        &mut results,
+    );
+
+    // Global scope (wai-gkk3): ~/.wai/resources is searchable from any repo
+    // workspace, with hits tagged `global:<rel-path>`. Skipped when --in
+    // scopes the search to a single project.
+    if include_global {
+        collect_global_matches(
+            matcher,
+            type_filter,
+            tag,
+            context_size,
+            &mut scanned,
+            &mut results,
+        );
+    }
+
+    results
+}
+
+fn resolve_search_root(project_root: &Path, project: Option<&String>) -> Result<PathBuf> {
+    match project {
+        Some(proj_name) => {
+            let dir = projects_dir(project_root).join(proj_name);
+            if !dir.exists() {
+                return Err(crate::error::WaiError::ProjectNotFound {
+                    name: proj_name.clone(),
+                }
+                .into());
+            }
+            Ok(dir)
+        }
+        None => Ok(wai_dir(project_root)),
+    }
+}
+
+fn build_matcher(query: &str, regex: bool) -> Result<Matcher> {
+    if regex {
+        let re = regex::Regex::new(query)
             .map_err(|e| miette::miette!("Invalid regex '{}': {}", query, e))?;
-        Box::new(move |line: &str| re.find(line).map(|m| (m.start(), m.end())))
+        Ok(Box::new(move |line: &str| {
+            re.find(line).map(|m| (m.start(), m.end()))
+        }))
     } else {
         let query_lower = query.to_lowercase();
-        Box::new(move |line: &str| {
+        Ok(Box::new(move |line: &str| {
             let lower = line.to_lowercase();
             let lower_start = lower.find(&query_lower)?;
             let lower_end = lower_start + query_lower.len();
@@ -142,96 +240,78 @@ pub fn run(args: SearchArgs) -> Result<()> {
                 .nth(char_end)
                 .map_or(line.len(), |(i, _)| i);
             Some((byte_start, byte_end))
-        })
-    };
+        }))
+    }
+}
 
-    // results: (file_path, line_num, line, start, end, context_lines)
-    let mut results: Vec<RawMatch> = Vec::new();
-
-    // Canonical paths already scanned, so the global resources walk (wai-gkk3)
-    // never duplicates a hit for a file also present in the repo scope (they
-    // can coincide when the workspace lives under $HOME/.wai).
-    let mut scanned: HashSet<PathBuf> = HashSet::new();
-
-    // Managed files that should not appear in artifact search results.
-    let agents_md = search_root.join("AGENTS.md");
-
+#[allow(clippy::too_many_arguments)]
+fn collect_global_matches(
+    matcher: &Matcher,
+    type_filter: Option<&str>,
+    tag: &[String],
+    context_size: usize,
+    scanned: &mut HashSet<PathBuf>,
+    results: &mut Vec<RawMatch>,
+) {
+    let global_dir = crate::config::global_resources_dir();
+    let global_agents_md = global_dir.join("AGENTS.md");
     collect_matches(
-        &search_root,
-        &project_root,
-        &agents_md,
-        &matcher,
-        type_filter.as_deref(),
-        &tag,
+        &global_dir,
+        &global_dir,
+        &global_agents_md,
+        matcher,
+        type_filter,
+        tag,
         context_size,
-        "",
-        &mut scanned,
-        &mut results,
+        "global:",
+        scanned,
+        results,
     );
+}
 
-    // Global scope (wai-gkk3): ~/.wai/resources is searchable from any repo
-    // workspace, with hits tagged `global:<rel-path>`. Skipped when --in
-    // scopes the search to a single project.
-    if project.is_none() {
-        let global_dir = crate::config::global_resources_dir();
-        let global_agents_md = global_dir.join("AGENTS.md");
-        collect_matches(
-            &global_dir,
-            &global_dir,
-            &global_agents_md,
-            &matcher,
-            type_filter.as_deref(),
-            &tag,
-            context_size,
-            "global:",
-            &mut scanned,
-            &mut results,
-        );
-    }
+fn apply_latest_filter(results: &mut Vec<RawMatch>) {
+    let best_path = results
+        .iter()
+        .map(|(path, ..)| path.clone())
+        .max_by(|a, b| date_prefix(a).cmp(date_prefix(b)))
+        .unwrap_or_default();
+    results.retain(|(path, ..)| *path == best_path);
+}
 
-    // Apply --latest: keep only matches from the file with the greatest date prefix.
-    if latest && !results.is_empty() {
-        let best_path = results
+fn print_search_json(query: &str, results: &[RawMatch], display_limit: usize) -> Result<()> {
+    let total = results.len();
+    let limited_results = &results[..total.min(display_limit)];
+    let payload = SearchPayload {
+        query: query.to_string(),
+        results: limited_results
             .iter()
-            .map(|(path, ..)| path.clone())
-            .max_by(|a, b| date_prefix(a).cmp(date_prefix(b)))
-            .unwrap_or_default();
-        results.retain(|(path, ..)| *path == best_path);
-    }
-
-    let memory_matches = if include_memories && !context.json {
-        fetch_memories_for_query(&project_root, &query)
-            .map(|raw| parse_memory_matches(&raw))
-            .unwrap_or_default()
-    } else {
-        Vec::new()
+            .map(
+                |(path, line_num, line, _start, _end, context_lines)| SearchResult {
+                    path: path.clone(),
+                    line_number: *line_num,
+                    line: line.clone(),
+                    context: context_lines.clone(),
+                },
+            )
+            .collect(),
     };
+    print_envelope_list(payload)
+}
 
-    if context.json {
-        let total = results.len();
-        let limited_results = &results[..total.min(display_limit)];
-        let payload = SearchPayload {
-            query: query.clone(),
-            results: limited_results
-                .iter()
-                .map(
-                    |(path, line_num, line, _start, _end, context_lines)| SearchResult {
-                        path: path.clone(),
-                        line_number: *line_num,
-                        line: line.clone(),
-                        context: context_lines.clone(),
-                    },
-                )
-                .collect(),
-        };
-        return print_envelope_list(payload);
-    }
-
+#[allow(clippy::too_many_arguments)]
+fn print_search_human(
+    query: &str,
+    results: &[RawMatch],
+    display_limit: usize,
+    context_size: usize,
+    memory_matches: &[MemoryMatch],
+    verbose: u8,
+) {
     if results.is_empty() && memory_matches.is_empty() {
         println!();
         println!("  {} No results found for '{}'", "○".dimmed(), query);
         println!();
-        return Ok(());
+        return;
     }
 
     if results.is_empty() {
@@ -245,99 +325,127 @@ pub fn run(args: SearchArgs) -> Result<()> {
     }
 
     if !results.is_empty() {
-        let total = results.len();
-        let truncated = total > display_limit;
-        let display_results = &results[..total.min(display_limit)];
+        print_result_blocks(results, display_limit, context_size, query);
+    }
 
-        println!();
-        println!(
-            "  {} Search results for '{}' ({} matches)",
-            "◆".cyan(),
-            query.bold(),
-            total,
+    render_memory_matches(memory_matches, verbose);
+}
+
+fn print_result_blocks(
+    results: &[RawMatch],
+    display_limit: usize,
+    context_size: usize,
+    query: &str,
+) {
+    let total = results.len();
+    let truncated = total > display_limit;
+    let display_results = &results[..total.min(display_limit)];
+
+    println!();
+    println!(
+        "  {} Search results for '{}' ({} matches)",
+        "◆".cyan(),
+        query.bold(),
+        total,
+    );
+    println!();
+
+    // Compute the width needed to pad line numbers for alignment.
+    // When context is shown, also account for surrounding line numbers.
+    let max_line_num = display_results
+        .iter()
+        .map(|(_, line_num, ..)| line_num + context_size)
+        .max()
+        .unwrap_or(1);
+    let line_num_width = max_line_num.to_string().len();
+
+    print_match_lines(display_results, context_size, line_num_width);
+    println!();
+
+    if truncated {
+        eprintln!(
+            "Showing first {} of {} results. Use -n to see more.",
+            display_limit, total
         );
-        println!();
+    }
+}
 
-        // Compute the width needed to pad line numbers for alignment.
-        // When context is shown, also account for surrounding line numbers.
-        let max_line_num = display_results
-            .iter()
-            .map(|(_, line_num, ..)| line_num + context_size)
-            .max()
-            .unwrap_or(1);
-        let line_num_width = max_line_num.to_string().len();
+fn print_match_lines(display_results: &[RawMatch], context_size: usize, line_num_width: usize) {
+    let mut current_file = String::new();
+    // last_shown_end tracks the last line number (1-based) printed for the current file,
+    // so we can insert "--" separators between non-adjacent context blocks.
+    let mut last_shown_end: Option<usize> = None;
 
-        let mut current_file = String::new();
-        // last_shown_end tracks the last line number (1-based) printed for the current file,
-        // so we can insert "--" separators between non-adjacent context blocks.
-        let mut last_shown_end: Option<usize> = None;
-
-        for (path, line_num, line, start, end, context_lines) in display_results {
-            if *path != current_file {
-                current_file = path.clone();
-                last_shown_end = None;
-                println!("  {}", path.cyan());
-            }
-
-            if context_size > 0 {
-                // extract_context_lines uses `line_num` (0-based) as the center, so
-                // the number of pre-context lines actually collected is
-                // min(context_size, line_num_0based) = min(context_size, line_num - 1).
-                let pre_count = context_size.min(line_num.saturating_sub(1));
-                let first_line_num = line_num.saturating_sub(pre_count); // 1-based number of first context line
-
-                // Insert separator when this block is not adjacent to the previous one.
-                if let Some(prev_end) = last_shown_end
-                    && first_line_num > prev_end + 1
-                {
-                    println!("    {}", "--".dimmed());
-                }
-
-                // Print pre-context lines (dim).
-                for (i, ctx_line) in context_lines.iter().enumerate() {
-                    let abs_line_num = first_line_num + i;
-                    if abs_line_num == *line_num {
-                        // This is the match line — print highlighted.
-                        let padded_num =
-                            format!("{:>width$}", abs_line_num, width = line_num_width);
-                        println!(
-                            "    {}:  {}",
-                            padded_num.dimmed(),
-                            highlight_match(ctx_line, *start, *end),
-                        );
-                    } else {
-                        // Context line — print dim.
-                        let padded_num =
-                            format!("{:>width$}", abs_line_num, width = line_num_width);
-                        println!("    {}:  {}", padded_num.dimmed(), ctx_line.dimmed(),);
-                    }
-                }
-
-                let last_line_num = first_line_num + context_lines.len().saturating_sub(1);
-                last_shown_end = Some(last_line_num);
-            } else {
-                let padded_num = format!("{:>width$}", line_num, width = line_num_width);
-                println!(
-                    "    {}:  {}",
-                    padded_num.dimmed(),
-                    highlight_match(line, *start, *end),
-                );
-            }
+    for (path, line_num, line, start, end, context_lines) in display_results {
+        if *path != current_file {
+            current_file = path.clone();
+            last_shown_end = None;
+            println!("  {}", path.cyan());
         }
 
-        println!();
-
-        if truncated {
-            eprintln!(
-                "Showing first {} of {} results. Use -n to see more.",
-                display_limit, total
+        if context_size > 0 {
+            last_shown_end = print_context_block(
+                context_size,
+                *line_num,
+                line_num_width,
+                last_shown_end,
+                context_lines,
+                *start,
+                *end,
+            );
+        } else {
+            let padded_num = format!("{:>width$}", line_num, width = line_num_width);
+            println!(
+                "    {}:  {}",
+                padded_num.dimmed(),
+                highlight_match(line, *start, *end),
             );
         }
     }
+}
 
-    render_memory_matches(&memory_matches, context.verbose);
+#[allow(clippy::too_many_arguments)]
+fn print_context_block(
+    context_size: usize,
+    line_num: usize,
+    line_num_width: usize,
+    last_shown_end: Option<usize>,
+    context_lines: &[String],
+    start: usize,
+    end: usize,
+) -> Option<usize> {
+    // extract_context_lines uses `line_num` (0-based) as the center, so
+    // the number of pre-context lines actually collected is
+    // min(context_size, line_num_0based) = min(context_size, line_num - 1).
+    let pre_count = context_size.min(line_num.saturating_sub(1));
+    let first_line_num = line_num.saturating_sub(pre_count); // 1-based number of first context line
 
-    Ok(())
+    // Insert separator when this block is not adjacent to the previous one.
+    if let Some(prev_end) = last_shown_end
+        && first_line_num > prev_end + 1
+    {
+        println!("    {}", "--".dimmed());
+    }
+
+    // Print pre-context lines (dim).
+    for (i, ctx_line) in context_lines.iter().enumerate() {
+        let abs_line_num = first_line_num + i;
+        let padded_num = format!("{:>width$}", abs_line_num, width = line_num_width);
+        if abs_line_num == line_num {
+            // This is the match line — print highlighted.
+            println!(
+                "    {}:  {}",
+                padded_num.dimmed(),
+                highlight_match(ctx_line, start, end),
+            );
+        } else {
+            // Context line — print dim.
+            println!("    {}:  {}", padded_num.dimmed(), ctx_line.dimmed(),);
+        }
+    }
+
+    let last_line_num = first_line_num + context_lines.len().saturating_sub(1);
+    Some(last_line_num)
 }
 
 /// Walk `dir` collecting text/regex matches, appending to `results`.
@@ -452,17 +560,7 @@ fn parse_frontmatter_tags(content: &str) -> Vec<String> {
     for line in frontmatter.lines() {
         let line = line.trim();
         if let Some(value) = line.strip_prefix("tags:") {
-            let value = value.trim();
-            if value.starts_with('[') {
-                // Inline list: tags: [a, b, c]
-                let inner = value.trim_start_matches('[').trim_end_matches(']');
-                for tag in inner.split(',') {
-                    let t = tag.trim().to_string();
-                    if !t.is_empty() {
-                        tags.push(t);
-                    }
-                }
-            }
+            append_inline_tags(value, &mut tags);
         } else if line.starts_with("- ") && !tags.is_empty() {
             // Block list items that follow a `tags:` key
             // (simple heuristic: accumulate while we're still in a list context)
@@ -470,6 +568,21 @@ fn parse_frontmatter_tags(content: &str) -> Vec<String> {
         }
     }
     tags
+}
+
+// Inline list form: tags: [a, b, c]
+fn append_inline_tags(value: &str, tags: &mut Vec<String>) {
+    let value = value.trim();
+    if !value.starts_with('[') {
+        return;
+    }
+    let inner = value.trim_start_matches('[').trim_end_matches(']');
+    for tag in inner.split(',') {
+        let t = tag.trim().to_string();
+        if !t.is_empty() {
+            tags.push(t);
+        }
+    }
 }
 
 /// Extract the YYYY-MM-DD date prefix from a file path, if present.
