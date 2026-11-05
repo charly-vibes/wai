@@ -7,17 +7,17 @@ use tempfile::TempDir;
 
 #[test]
 fn way_check_test_coverage_vitest_with_thresholds() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         tmp.path().join("vitest.config.ts"),
         "export default { test: { coverage: { thresholds: { lines: 80 } } } }\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Test coverage"));
@@ -27,12 +27,12 @@ fn way_check_test_coverage_vitest_with_thresholds() {
 
 #[test]
 fn way_check_test_coverage_not_configured() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Test coverage"));
@@ -44,13 +44,13 @@ fn way_check_test_coverage_not_configured() {
 
 #[test]
 fn way_check_beads_present() {
-    let tmp = TempDir::new().unwrap();
-    fs::create_dir_all(tmp.path().join(".beads")).unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::create_dir_all(tmp.path().join(".beads")).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Issue tracking"));
@@ -60,12 +60,12 @@ fn way_check_beads_present() {
 
 #[test]
 fn way_check_beads_absent() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Issue tracking"));
@@ -76,13 +76,14 @@ fn way_check_beads_absent() {
 
 #[test]
 fn way_check_openspec_present() {
-    let tmp = TempDir::new().unwrap();
-    fs::create_dir_all(tmp.path().join("openspec")).unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::create_dir_all(tmp.path().join("openspec"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Change proposals"));
@@ -92,12 +93,12 @@ fn way_check_openspec_present() {
 
 #[test]
 fn way_check_openspec_absent() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Change proposals"));
@@ -108,13 +109,13 @@ fn way_check_openspec_absent() {
 
 #[test]
 fn new_project_shows_suggestions() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["new", "project", "test-proj"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Add research: wai add research"));
@@ -124,7 +125,7 @@ fn new_project_shows_suggestions() {
 
 #[test]
 fn add_research_shows_context_aware_suggestions() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "test-proj");
 
@@ -132,7 +133,7 @@ fn add_research_shows_context_aware_suggestions() {
     let out = wai_cmd(tmp.path())
         .args(["add", "research", "Initial research"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Add more research: wai add research"));
@@ -142,7 +143,7 @@ fn add_research_shows_context_aware_suggestions() {
     let out = wai_cmd(tmp.path())
         .args(["add", "research", "More detailed findings"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Add more research: wai add research"));
@@ -152,7 +153,7 @@ fn add_research_shows_context_aware_suggestions() {
 
 #[test]
 fn phase_next_shows_phase_specific_suggestions() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "test-proj");
 
@@ -160,7 +161,7 @@ fn phase_next_shows_phase_specific_suggestions() {
     let out = wai_cmd(tmp.path())
         .args(["phase", "next"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Add design: wai add design"));
@@ -170,7 +171,7 @@ fn phase_next_shows_phase_specific_suggestions() {
 
 #[test]
 fn phase_set_shows_phase_specific_suggestions() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "test-proj");
 
@@ -178,7 +179,7 @@ fn phase_set_shows_phase_specific_suggestions() {
     let out = wai_cmd(tmp.path())
         .args(["phase", "set", "implement"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Show project details: wai show"));
@@ -192,13 +193,13 @@ fn phase_set_shows_phase_specific_suggestions() {
 fn typo_suggestion_shown_outside_workspace() {
     // Outside any workspace, a typo should still show "Did you mean?" rather
     // than just "No project initialized".
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     // NOT calling init_workspace — this dir has no .wai/
 
     let out = wai_cmd(tmp.path())
         .args(["statu"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!((stderr.contains("Did you mean 'status'") || stderr.contains("did you mean 'status'")));
@@ -206,12 +207,12 @@ fn typo_suggestion_shown_outside_workspace() {
 
 #[test]
 fn wrong_order_shown_outside_workspace() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["project", "new"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("new project"));
@@ -220,14 +221,14 @@ fn wrong_order_shown_outside_workspace() {
 
 #[test]
 fn wrong_order_project_new_suggests_correction() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     // "wai project new" should suggest "wai new project"
     let out = wai_cmd(tmp.path())
         .args(["project", "new"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("new project"));
@@ -236,14 +237,14 @@ fn wrong_order_project_new_suggests_correction() {
 
 #[test]
 fn wrong_order_research_add_suggests_correction() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     // "wai research add" should suggest "wai add research"
     let out = wai_cmd(tmp.path())
         .args(["research", "add"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("add research"));
@@ -254,14 +255,14 @@ fn wrong_order_research_add_suggests_correction() {
 
 #[test]
 fn typo_suggests_closest_command() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     // "statu" is a typo of "status"
     let out = wai_cmd(tmp.path())
         .args(["statu"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!((stderr.contains("Did you mean 'status'") || stderr.contains("did you mean 'status'")));
@@ -269,13 +270,13 @@ fn typo_suggests_closest_command() {
 
 #[test]
 fn typo_suggests_doctor_for_doctr() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["doctr"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!((stderr.contains("Did you mean 'doctor'") || stderr.contains("did you mean 'doctor'")));
@@ -283,14 +284,14 @@ fn typo_suggests_doctor_for_doctr() {
 
 #[test]
 fn completely_unknown_command_shows_help_hint() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     // "xyz" is not similar to any command
     let out = wai_cmd(tmp.path())
         .args(["xyz"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("wai --help"));
@@ -299,7 +300,7 @@ fn completely_unknown_command_shows_help_hint() {
 /// 7.5 — `--no-llm` flag bypasses LLM and falls back to `wai search` output.
 #[test]
 fn why_no_llm_flag_falls_back_to_search() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproj");
     write_artifact(
@@ -314,7 +315,7 @@ fn why_no_llm_flag_falls_back_to_search() {
     let out = wai_cmd(tmp.path())
         .args(["why", "--no-llm", "TOML"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("TOML"));
@@ -322,7 +323,7 @@ fn why_no_llm_flag_falls_back_to_search() {
 
 #[test]
 fn why_no_llm_ignores_missing_llm_config_and_error_fallback() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproj");
     write_artifact(
@@ -334,18 +335,19 @@ fn why_no_llm_ignores_missing_llm_config_and_error_fallback() {
     );
 
     let config_path = tmp.path().join(".wai").join("config.toml");
-    let existing = fs::read_to_string(&config_path).unwrap();
+    let existing =
+        fs::read_to_string(&config_path).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let updated = format!(
         "{}\n[llm]\nllm = \"claude\"\nfallback = \"error\"\n",
         existing.trim_end()
     );
-    fs::write(&config_path, updated).unwrap();
+    fs::write(&config_path, updated).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["why", "--no-llm", "TOML"])
         .env_remove("ANTHROPIC_API_KEY")
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success());
@@ -355,14 +357,14 @@ fn why_no_llm_ignores_missing_llm_config_and_error_fallback() {
 
 #[test]
 fn why_with_no_artifacts_prints_guidance_and_exits_cleanly() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproj");
 
     let out = wai_cmd(tmp.path())
         .args(["why", "TOML"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("No artifacts found in .wai/"));
@@ -372,7 +374,7 @@ fn why_with_no_artifacts_prints_guidance_and_exits_cleanly() {
 /// and automatically falls back to `wai search`.
 #[test]
 fn why_auto_fallback_to_search_when_no_llm_available() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproj");
     write_artifact(
@@ -390,7 +392,7 @@ fn why_auto_fallback_to_search_when_no_llm_available() {
         .args(["why", "TOML"])
         .env_remove("ANTHROPIC_API_KEY")
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success());
     assert!(stderr.contains("Falling back to"));
@@ -402,7 +404,7 @@ fn why_auto_fallback_to_search_when_no_llm_available() {
 /// return None gracefully. The command falls back to `wai search`.
 #[test]
 fn why_file_query_in_non_git_repo_does_not_crash() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproj");
     write_artifact(
@@ -421,7 +423,7 @@ fn why_file_query_in_non_git_repo_does_not_crash() {
         .args(["why", "src/main.rs"])
         .env_remove("ANTHROPIC_API_KEY")
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 }
 
@@ -431,7 +433,7 @@ fn why_file_query_in_non_git_repo_does_not_crash() {
 /// wai why prints [AGENT CONTEXT] block to stdout and exits 0.
 #[test]
 fn why_agent_mode_autodetect_when_claudecode_set() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproj");
     write_artifact(
@@ -450,7 +452,7 @@ fn why_agent_mode_autodetect_when_claudecode_set() {
         .env("CLAUDECODE", "1")
         .env_remove("ANTHROPIC_API_KEY")
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("[AGENT CONTEXT]"));
@@ -460,7 +462,7 @@ fn why_agent_mode_autodetect_when_claudecode_set() {
 /// auto-detect finds no backend; wai why falls back to wai search and exits 0.
 #[test]
 fn why_fallback_to_search_when_no_agent_no_api_key_no_cli() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproj");
     write_artifact(
@@ -473,7 +475,7 @@ fn why_fallback_to_search_when_no_agent_no_api_key_no_cli() {
 
     // Create an empty bin directory so that `claude` and `ollama` are not found.
     let empty_bin = tmp.path().join("empty_bin");
-    fs::create_dir_all(&empty_bin).unwrap();
+    fs::create_dir_all(&empty_bin).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["why", "TOML"])
@@ -481,7 +483,7 @@ fn why_fallback_to_search_when_no_agent_no_api_key_no_cli() {
         .env_remove("CLAUDECODE")
         .env("PATH", &empty_bin)
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success());
     assert!(stderr.contains("No LLM available"));
@@ -492,7 +494,7 @@ fn why_fallback_to_search_when_no_agent_no_api_key_no_cli() {
 /// exits 0, and emits a warning that no Claude Code session is active.
 #[test]
 fn why_explicit_agent_backend_ignores_claudecode() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproj");
     write_artifact(
@@ -511,7 +513,7 @@ fn why_explicit_agent_backend_ignores_claudecode() {
         .env_remove("CLAUDECODE") // no active Claude Code session
         .env_remove("ANTHROPIC_API_KEY")
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success());
@@ -528,12 +530,12 @@ fn error_not_initialized_is_conversational() {
         let _ = fs::remove_dir_all(stale_wai);
     }
 
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["status"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("No project initialized"));
@@ -541,13 +543,13 @@ fn error_not_initialized_is_conversational() {
 
 #[test]
 fn error_project_not_found_is_conversational() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["add", "research", "--project", "nonexistent", "notes"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("not found"));
@@ -557,13 +559,13 @@ fn error_project_not_found_is_conversational() {
 
 #[test]
 fn resource_add_skill_creates_directory_and_skill_md() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["resource", "add", "skill", "my-skill"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let skill_dir = tmp
@@ -574,7 +576,7 @@ fn resource_add_skill_creates_directory_and_skill_md() {
     let skill_md = skill_dir.join("SKILL.md");
     assert!(skill_md.is_file(), "SKILL.md should be created");
 
-    let content = fs::read_to_string(&skill_md).unwrap();
+    let content = fs::read_to_string(&skill_md).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         content.contains("---"),
         "SKILL.md should have frontmatter delimiters"
@@ -591,20 +593,20 @@ fn resource_add_skill_creates_directory_and_skill_md() {
 
 #[test]
 fn resource_add_skill_fails_on_duplicate() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["resource", "add", "skill", "dup-skill"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     // Deprecated path: succeeds with informational message instead of raw error
     let out = wai_cmd(tmp.path())
         .args(["resource", "add", "skill", "dup-skill"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success());
     assert!(stderr.contains("already exists"));
@@ -612,13 +614,13 @@ fn resource_add_skill_fails_on_duplicate() {
 
 #[test]
 fn resource_add_skill_fails_on_uppercase_name() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["resource", "add", "skill", "MySkill"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!((stderr.contains("Invalid character") || stderr.contains("Invalid skill")));
@@ -626,13 +628,13 @@ fn resource_add_skill_fails_on_uppercase_name() {
 
 #[test]
 fn resource_add_skill_fails_on_consecutive_hyphens() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["resource", "add", "skill", "my--skill"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("consecutive hyphens"));
@@ -640,14 +642,14 @@ fn resource_add_skill_fails_on_consecutive_hyphens() {
 
 #[test]
 fn resource_add_skill_fails_on_too_long_name() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let long_name = "a".repeat(65);
     let out = wai_cmd(tmp.path())
         .args(["resource", "add", "skill", &long_name])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("too long"));
@@ -655,13 +657,13 @@ fn resource_add_skill_fails_on_too_long_name() {
 
 #[test]
 fn resource_add_skill_fails_on_dot_prefix() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["resource", "add", "skill", ".hidden"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!((stderr.contains("cannot start with '.'") || stderr.contains("Invalid skill")));
@@ -669,13 +671,13 @@ fn resource_add_skill_fails_on_dot_prefix() {
 
 #[test]
 fn resource_add_skill_refuses_in_safe_mode() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["--safe", "resource", "add", "skill", "my-skill"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!((stderr.contains("add skill") || stderr.contains("Safe mode")));
@@ -685,13 +687,13 @@ fn resource_add_skill_refuses_in_safe_mode() {
 
 #[test]
 fn resource_add_hierarchical_skill_creates_nested_directory() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["resource", "add", "skill", "issue/gather"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let skill_dir = tmp
@@ -708,7 +710,7 @@ fn resource_add_hierarchical_skill_creates_nested_directory() {
         "SKILL.md should be created in nested directory"
     );
 
-    let content = fs::read_to_string(&skill_md).unwrap();
+    let content = fs::read_to_string(&skill_md).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         content.contains("name: issue/gather"),
         "SKILL.md should include full hierarchical name"
@@ -717,25 +719,25 @@ fn resource_add_hierarchical_skill_creates_nested_directory() {
 
 #[test]
 fn resource_list_skills_shows_hierarchical_and_flat() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["resource", "add", "skill", "issue/gather"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let out = wai_cmd(tmp.path())
         .args(["resource", "add", "skill", "plain-skill"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let output = wai_cmd(tmp.path())
         .args(["resource", "list", "skills"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(output.status.success());
     let output = output.stdout.clone();
     let stdout = String::from_utf8_lossy(&output);
@@ -754,21 +756,21 @@ fn resource_list_skills_shows_hierarchical_and_flat() {
 
 #[test]
 fn resource_add_hierarchical_skill_conflicts_with_flat_skill() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     // Create a flat skill named "issue"
     let out = wai_cmd(tmp.path())
         .args(["resource", "add", "skill", "issue"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     // Deprecated path: succeeds with informational message
     let out = wai_cmd(tmp.path())
         .args(["resource", "add", "skill", "issue/gather"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success());
     assert!(stderr.contains("already exists"));
@@ -778,7 +780,7 @@ fn resource_add_hierarchical_skill_conflicts_with_flat_skill() {
 
 #[test]
 fn resource_add_skill_template_gather_contains_wai_search() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
@@ -791,13 +793,13 @@ fn resource_add_skill_template_gather_contains_wai_search() {
             "gather",
         ])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let skill_md = tmp
         .path()
         .join(".wai/resources/agent-config/skills/my-gather/SKILL.md");
-    let content = fs::read_to_string(&skill_md).unwrap();
+    let content = fs::read_to_string(&skill_md).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         content.contains("wai search"),
         "gather template should contain wai search"

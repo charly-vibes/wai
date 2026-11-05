@@ -25,7 +25,7 @@ fn test_envelope_wraps_payload() {
         }],
     );
 
-    let json = serde_json::to_value(&env).unwrap();
+    let json = serde_json::to_value(&env).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert_eq!(json["ok"], true);
     assert_eq!(json["envelope_version"], "0.1");
     assert_eq!(json["envelope_kind"], "ok");
@@ -46,7 +46,7 @@ fn test_envelope_round_trips() {
         vec![],
         vec![],
     );
-    let json = serde_json::to_value(&env).unwrap();
+    let json = serde_json::to_value(&env).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert_eq!(json["ok"], true);
     assert_eq!(json["envelope_kind"], "ok");
     assert_eq!(json["data"]["value"], "world");
@@ -72,7 +72,7 @@ fn test_envelope_status_fields() {
         vec![],
     );
 
-    let json = serde_json::to_value(&env).unwrap();
+    let json = serde_json::to_value(&env).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert_eq!(json["ok"], true);
     assert_eq!(json["envelope_kind"], "ok");
     assert_eq!(json["data"]["phase"], "research");
@@ -96,10 +96,10 @@ fn test_envelope_error() {
             description: "run the fix".into(),
         }],
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let env = Envelope::error(env!("CARGO_PKG_VERSION"), err, vec![]);
-    let json = serde_json::to_value(&env).unwrap();
+    let json = serde_json::to_value(&env).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert_eq!(json["ok"], false);
     assert_eq!(json["envelope_kind"], "error");
     assert_eq!(json["data"]["code"], "E001");
@@ -112,19 +112,21 @@ fn test_wai_status_json_has_envelope_shape() {
     use assert_cmd::Command;
 
     // Need a workspace to run status
-    let dir = TempDir::new().unwrap();
-    let mut init_cmd = Command::cargo_bin("wai").unwrap();
+    let dir = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    let mut init_cmd = Command::cargo_bin("wai").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_cmd.current_dir(dir.path());
     init_cmd.env("NO_COLOR", "1");
     // Update notice off in tests: existing assertions expect quiet stderr and
     // must not depend on real ~/.cache state (wai-r3p0 tidy).
     init_cmd.env("GENESIS_NO_UPDATE_CHECK", "1");
     init_cmd.args(["init", "--name", "shape-test"]);
-    let out = init_cmd.output().expect("command should run");
+    let out = init_cmd
+        .output()
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     // Check wai status --json
-    let mut cmd = Command::cargo_bin("wai").unwrap();
+    let mut cmd = Command::cargo_bin("wai").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     cmd.current_dir(dir.path());
     cmd.env("NO_COLOR", "1");
     // Update notice off in tests: existing assertions expect quiet stderr and
@@ -132,11 +134,13 @@ fn test_wai_status_json_has_envelope_shape() {
     cmd.env("GENESIS_NO_UPDATE_CHECK", "1");
     cmd.arg("status").arg("--json");
 
-    let output = cmd.output().expect("command should run");
+    let output = cmd
+        .output()
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let parsed: serde_json::Value =
-        serde_json::from_str(&stdout).expect("status --json should be valid JSON");
+    let parsed: serde_json::Value = serde_json::from_str(&stdout)
+        .unwrap_or_else(|e| panic!("status --json should be valid JSON: {e}"));
 
     // Verify envelope shape
     assert!(
@@ -173,18 +177,20 @@ fn test_wai_status_json_has_envelope_shape() {
 fn test_wai_prime_json_has_envelope_shape() {
     use assert_cmd::Command;
 
-    let dir = TempDir::new().unwrap();
-    let mut init_cmd = Command::cargo_bin("wai").unwrap();
+    let dir = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    let mut init_cmd = Command::cargo_bin("wai").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_cmd.current_dir(dir.path());
     init_cmd.env("NO_COLOR", "1");
     // Update notice off in tests: existing assertions expect quiet stderr and
     // must not depend on real ~/.cache state (wai-r3p0 tidy).
     init_cmd.env("GENESIS_NO_UPDATE_CHECK", "1");
     init_cmd.args(["init", "--name", "shape-test"]);
-    let out = init_cmd.output().expect("command should run");
+    let out = init_cmd
+        .output()
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
-    let mut cmd = Command::cargo_bin("wai").unwrap();
+    let mut cmd = Command::cargo_bin("wai").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     cmd.current_dir(dir.path());
     cmd.env("NO_COLOR", "1");
     // Update notice off in tests: existing assertions expect quiet stderr and
@@ -192,11 +198,13 @@ fn test_wai_prime_json_has_envelope_shape() {
     cmd.env("GENESIS_NO_UPDATE_CHECK", "1");
     cmd.arg("prime").arg("--json");
 
-    let output = cmd.output().expect("command should run");
+    let output = cmd
+        .output()
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let parsed: serde_json::Value =
-        serde_json::from_str(&stdout).expect("prime --json should be valid JSON");
+    let parsed: serde_json::Value = serde_json::from_str(&stdout)
+        .unwrap_or_else(|e| panic!("prime --json should be valid JSON: {e}"));
 
     // Verify envelope shape
     assert!(
@@ -233,18 +241,20 @@ fn test_wai_prime_json_has_envelope_shape() {
 fn test_wai_version_json_envelope_shape() {
     use assert_cmd::Command;
 
-    let mut cmd = Command::cargo_bin("wai").unwrap();
+    let mut cmd = Command::cargo_bin("wai").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     cmd.env("NO_COLOR", "1");
     // Update notice off in tests: existing assertions expect quiet stderr and
     // must not depend on real ~/.cache state (wai-r3p0 tidy).
     cmd.env("GENESIS_NO_UPDATE_CHECK", "1");
     cmd.arg("--version").arg("--json");
 
-    let output = cmd.output().expect("command should run");
+    let output = cmd
+        .output()
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let parsed: serde_json::Value =
-        serde_json::from_str(&stdout).expect("--version --json should be valid JSON");
+    let parsed: serde_json::Value = serde_json::from_str(&stdout)
+        .unwrap_or_else(|e| panic!("--version --json should be valid JSON: {e}"));
 
     assert_eq!(parsed["ok"], true, "version envelope should have ok=true");
     assert_eq!(
@@ -266,12 +276,12 @@ fn test_output_has_envelope_shape() {
         vec![],
         vec![],
     );
-    let json = serde_json::to_value(&env).unwrap();
+    let json = serde_json::to_value(&env).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // Verify the top-level envelope shape
     let keys: Vec<&str> = json
         .as_object()
-        .unwrap()
+        .unwrap_or_else(|| panic!("unwrap failed"))
         .keys()
         .map(|k| k.as_str())
         .collect();

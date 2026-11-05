@@ -4,7 +4,7 @@ use tempfile::TempDir;
 
 #[allow(deprecated)]
 fn wai_cmd(dir: &std::path::Path) -> Command {
-    let mut cmd = Command::cargo_bin("wai").unwrap();
+    let mut cmd = Command::cargo_bin("wai").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     cmd.current_dir(dir);
     cmd.env("NO_COLOR", "1");
     // Update notice off in tests: existing assertions expect quiet stderr and
@@ -17,12 +17,12 @@ fn wai_cmd(dir: &std::path::Path) -> Command {
 
 #[test]
 fn init_creates_wai_directory_structure() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["init", "--name", "my-ws"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     assert!(tmp.path().join(".wai/projects").is_dir());
@@ -30,7 +30,8 @@ fn init_creates_wai_directory_structure() {
     assert!(tmp.path().join(".wai/resources").is_dir());
     assert!(tmp.path().join(".wai/archives").is_dir());
 
-    let config = fs::read_to_string(tmp.path().join(".wai/config.toml")).unwrap();
+    let config = fs::read_to_string(tmp.path().join(".wai/config.toml"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         config.contains("my-ws"),
         "config.toml should contain workspace name"
@@ -41,18 +42,18 @@ fn init_creates_wai_directory_structure() {
 
 #[test]
 fn init_reinit_warns_already_initialized() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["init", "--name", "my-ws"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let out = wai_cmd(tmp.path())
         .args(["init", "--name", "my-ws"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("already initialized"));
@@ -66,30 +67,32 @@ fn init_reinit_warns_already_initialized() {
 /// channel; init never silently overwrites the config).
 #[test]
 fn init_reinit_with_corrupt_config_fails_pointing_at_doctor() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     wai_cmd(tmp.path())
         .args(["init", "--name", "my-ws"])
         .assert()
         .success();
-    fs::write(tmp.path().join(".wai/config.toml"), "not valid toml = [[[").unwrap();
+    fs::write(tmp.path().join(".wai/config.toml"), "not valid toml = [[[")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["--json", "init", "--name", "my-ws"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
-    let payload: serde_json::Value =
-        serde_json::from_str(stdout.trim()).expect("error envelope is JSON");
+    let payload: serde_json::Value = serde_json::from_str(stdout.trim())
+        .unwrap_or_else(|e| panic!("error envelope is JSON: {e}"));
 
     assert_eq!(payload["ok"], false, "corrupt config must not be ok:true");
     assert!(!out.status.success(), "error envelope must exit nonzero");
-    let rendered = serde_json::to_string(&payload).unwrap();
+    let rendered = serde_json::to_string(&payload).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         rendered.contains("wai doctor"),
         "remediation should point at `wai doctor`, got: {rendered}"
     );
     // The corrupt file is untouched — no silent overwrite.
-    let config = fs::read_to_string(tmp.path().join(".wai/config.toml")).unwrap();
+    let config = fs::read_to_string(tmp.path().join(".wai/config.toml"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert_eq!(config, "not valid toml = [[[", "init must not overwrite");
 }
 
@@ -97,7 +100,7 @@ fn init_reinit_with_corrupt_config_fails_pointing_at_doctor() {
 
 #[test]
 fn init_json_flag_emits_structured_output() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["--json", "init", "--name", "my-ws", "--yes"])
@@ -108,7 +111,8 @@ fn init_json_flag_emits_structured_output() {
         .clone();
 
     let stdout = String::from_utf8_lossy(&out);
-    let payload: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    let payload: serde_json::Value =
+        serde_json::from_str(stdout.trim()).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // Wrapped in genesis envelope
     assert_eq!(payload["ok"], true, "envelope should have ok=true");

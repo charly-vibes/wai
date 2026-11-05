@@ -19,18 +19,19 @@ use tempfile::TempDir;
 /// PATH points only at the stub dir).
 fn stub_bin(dir: &Path, tools: &[(&str, i32, &str)]) -> std::path::PathBuf {
     let bin = dir.join("bin");
-    fs::create_dir_all(&bin).unwrap();
+    fs::create_dir_all(&bin).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     for (name, code, stdout) in tools {
         let script = bin.join(name);
         fs::write(
             &script,
             format!("#!/bin/sh\necho '{stdout}'\nexit {}\n", *code),
         )
-        .unwrap();
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
+            fs::set_permissions(&script, fs::Permissions::from_mode(0o755))
+                .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
         }
     }
     bin
@@ -43,7 +44,7 @@ fn preflight_in(dir: &Path, bin: &Path) -> std::process::Output {
         .args(["pipeline", "preflight"])
         .env("PATH", format!("{}:/usr/bin:/bin", bin.display()))
         .output()
-        .expect("preflight should run")
+        .unwrap_or_else(|e| panic!("preflight should run: {e}"))
 }
 
 /// Ticket wai-gvqj tasks 1.1: a worktree missing lefthook with broken bd
@@ -51,7 +52,7 @@ fn preflight_in(dir: &Path, bin: &Path) -> std::process::Output {
 /// actionable fix hint.
 #[test]
 fn preflight_reports_all_failures() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let bin = stub_bin(
@@ -89,7 +90,7 @@ fn preflight_reports_all_failures() {
 /// nothing (anti-goal: no auto-install, no store creation at preflight).
 #[test]
 fn preflight_passes_clean_env() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let bin = stub_bin(
@@ -143,25 +144,25 @@ fn walk(root: &Path) -> Vec<std::path::PathBuf> {
 /// mid-run via opaque lefthook failures.
 #[test]
 fn orchestrator_template_requires_preflight() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let init = hermetic_wai_cmd(tmp.path())
         .args(["pipeline", "init", "epic-orchestrator"])
         .output()
-        .expect("init should run");
+        .unwrap_or_else(|e| panic!("init should run: {e}"));
     assert!(init.status.success(), "init epic-orchestrator failed");
 
     let template = tmp
         .path()
         .join(".wai/resources/pipelines/epic-orchestrator.toml");
-    let content =
-        fs::read_to_string(&template).expect("epic-orchestrator template should exist after init");
+    let content = fs::read_to_string(&template)
+        .unwrap_or_else(|e| panic!("epic-orchestrator template should exist after init: {e}"));
 
     // Locate the spawn step section.
     let spawn_pos = content
         .find("id = \"spawn\"")
-        .expect("template must have a spawn step");
+        .unwrap_or_else(|| panic!("template must have a spawn step"));
     let next_step = content[spawn_pos..]
         .find("[[steps]]")
         .map(|i| spawn_pos + i)

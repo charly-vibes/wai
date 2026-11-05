@@ -4,7 +4,7 @@ use tempfile::TempDir;
 
 #[allow(deprecated)]
 fn wai_cmd(dir: &std::path::Path) -> Command {
-    let mut cmd = Command::cargo_bin("wai").unwrap();
+    let mut cmd = Command::cargo_bin("wai").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     cmd.current_dir(dir);
     cmd.env("NO_COLOR", "1");
     // Update notice off in tests: existing assertions expect quiet stderr and
@@ -20,7 +20,7 @@ fn init_workspace(dir: &std::path::Path) {
     let out = wai_cmd(dir)
         .args(["init", "--name", "test-ws"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 }
 
@@ -28,7 +28,7 @@ fn create_project(dir: &std::path::Path, name: &str) {
     let out = wai_cmd(dir)
         .args(["new", "project", name])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 }
 
@@ -45,14 +45,14 @@ fn write_artifact(
         .join(project)
         .join(subdir)
         .join(filename);
-    fs::write(path, content).unwrap();
+    fs::write(path, content).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 }
 
 // ── plain-text query ──────────────────────────────────────────────────────────
 
 #[test]
 fn search_finds_content_by_plain_query() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     write_artifact(
@@ -66,7 +66,7 @@ fn search_finds_content_by_plain_query() {
     let out = wai_cmd(tmp.path())
         .args(["search", "GraphQL"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Search results"));
@@ -77,7 +77,7 @@ fn search_finds_content_by_plain_query() {
 
 #[test]
 fn search_type_filter_limits_to_matching_artifact_type() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     write_artifact(
@@ -98,7 +98,7 @@ fn search_type_filter_limits_to_matching_artifact_type() {
     let out = wai_cmd(tmp.path())
         .args(["search", "keyword_hit", "--type", "research"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("research/"));
@@ -109,14 +109,14 @@ fn search_type_filter_limits_to_matching_artifact_type() {
 
 #[test]
 fn search_no_results_reports_empty_message() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
     let out = wai_cmd(tmp.path())
         .args(["search", "zzz_no_match_zzz"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("No results found"));
@@ -124,13 +124,13 @@ fn search_no_results_reports_empty_message() {
 
 #[test]
 fn search_invalid_regex_fails_with_diagnostic() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["search", "[invalid", "--regex"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("Invalid regex"));
@@ -142,23 +142,23 @@ fn search_invalid_regex_fails_with_diagnostic() {
 /// with hits tagged by their global path (e.g. global:patterns/x.md).
 #[test]
 fn search_returns_global_resource_hits_tagged() {
-    let ws = TempDir::new().unwrap();
-    let home = TempDir::new().unwrap();
+    let ws = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    let home = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(ws.path());
     create_project(ws.path(), "my-app");
     let patterns = home.path().join(".wai/resources/patterns");
-    fs::create_dir_all(&patterns).unwrap();
+    fs::create_dir_all(&patterns).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         patterns.join("orchestrator-subagents.md"),
         "# Orchestrator\n\nthe pokeable canon lives here\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(ws.path())
         .env("HOME", home.path())
         .args(["search", "pokeable"])
         .output()
-        .expect("search should succeed");
+        .unwrap_or_else(|e| panic!("search should succeed: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("global:patterns/orchestrator-subagents.md"));
@@ -167,23 +167,23 @@ fn search_returns_global_resource_hits_tagged() {
 /// --in scopes the search to a project; global resources are not included.
 #[test]
 fn search_with_project_scope_excludes_global_resources() {
-    let ws = TempDir::new().unwrap();
-    let home = TempDir::new().unwrap();
+    let ws = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    let home = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(ws.path());
     create_project(ws.path(), "my-app");
     let patterns = home.path().join(".wai/resources/patterns");
-    fs::create_dir_all(&patterns).unwrap();
+    fs::create_dir_all(&patterns).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         patterns.join("orchestrator-subagents.md"),
         "pokeable canon\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(ws.path())
         .env("HOME", home.path())
         .args(["search", "pokeable", "--in", "my-app"])
         .output()
-        .expect("search should succeed");
+        .unwrap_or_else(|e| panic!("search should succeed: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("No results found"));

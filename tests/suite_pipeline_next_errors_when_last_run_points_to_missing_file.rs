@@ -7,23 +7,23 @@ use tempfile::TempDir;
 
 #[test]
 fn pipeline_next_errors_when_last_run_points_to_missing_file() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     // Write a .last-run that points to a non-existent run file
     let pipelines_dir = tmp.path().join(".wai/resources/pipelines");
-    fs::create_dir_all(&pipelines_dir).unwrap();
+    fs::create_dir_all(&pipelines_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         pipelines_dir.join(".last-run"),
         "ghost-run-2026-01-01-does-not-exist",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "next"])
         .env_remove("WAI_PIPELINE_RUN")
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(
@@ -35,24 +35,24 @@ fn pipeline_next_errors_when_last_run_points_to_missing_file() {
 
 #[test]
 fn pipeline_current_treats_stale_last_run_as_no_active_run() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     // Point .last-run to a non-existent run file
     let pipelines_dir = tmp.path().join(".wai/resources/pipelines");
-    fs::create_dir_all(&pipelines_dir).unwrap();
+    fs::create_dir_all(&pipelines_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         pipelines_dir.join(".last-run"),
         "ghost-run-2026-01-01-does-not-exist",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // current uses a gentle resolution path — stale .last-run is treated as "no active run"
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "current"])
         .env_remove("WAI_PIPELINE_RUN")
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!((stderr.contains("No active pipeline run") || stderr.contains("pipeline start")));
@@ -60,26 +60,26 @@ fn pipeline_current_treats_stale_last_run_as_no_active_run() {
 
 #[test]
 fn pipeline_run_yaml_has_all_required_fields_after_start() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     write_pipeline_toml(tmp.path(), "my-pipe");
 
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "start", "my-pipe", "--topic=yaml-check"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let last_run_path = tmp.path().join(".wai/resources/pipelines/.last-run");
     let run_id = fs::read_to_string(&last_run_path)
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .trim()
         .to_string();
     let run_file = tmp
         .path()
         .join(".wai/pipeline-runs")
         .join(format!("{}.yml", run_id));
-    let content = fs::read_to_string(&run_file).unwrap();
+    let content = fs::read_to_string(&run_file).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     assert!(
         content.contains("run_id:"),
@@ -106,19 +106,19 @@ fn pipeline_run_yaml_has_all_required_fields_after_start() {
 
 #[test]
 fn pipeline_run_yaml_updates_correctly_through_lifecycle() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     write_pipeline_toml(tmp.path(), "my-pipe");
 
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "start", "my-pipe", "--topic=lifecycle"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let last_run_path = tmp.path().join(".wai/resources/pipelines/.last-run");
     let run_id = fs::read_to_string(&last_run_path)
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .trim()
         .to_string();
     let run_file = tmp
@@ -127,16 +127,16 @@ fn pipeline_run_yaml_updates_correctly_through_lifecycle() {
         .join(format!("{}.yml", run_id));
 
     // After start: step 0
-    let content = fs::read_to_string(&run_file).unwrap();
+    let content = fs::read_to_string(&run_file).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(content.contains("current_step: 0"), "Step 0 after start");
 
     // After first next: step 1
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "next"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
-    let content = fs::read_to_string(&run_file).unwrap();
+    let content = fs::read_to_string(&run_file).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         content.contains("current_step: 1"),
         "Step 1 after first next"
@@ -146,9 +146,9 @@ fn pipeline_run_yaml_updates_correctly_through_lifecycle() {
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "next"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
-    let content = fs::read_to_string(&run_file).unwrap();
+    let content = fs::read_to_string(&run_file).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         content.contains("current_step: 2"),
         "Step 2 (complete) after second next"
@@ -157,7 +157,7 @@ fn pipeline_run_yaml_updates_correctly_through_lifecycle() {
 
 #[test]
 fn pipeline_start_overwrites_last_run_when_starting_new_run() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     write_pipeline_toml(tmp.path(), "my-pipe");
 
@@ -165,12 +165,12 @@ fn pipeline_start_overwrites_last_run_when_starting_new_run() {
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "start", "my-pipe", "--topic=first-run"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let last_run_path = tmp.path().join(".wai/resources/pipelines/.last-run");
     let first_id = fs::read_to_string(&last_run_path)
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .trim()
         .to_string();
 
@@ -178,11 +178,11 @@ fn pipeline_start_overwrites_last_run_when_starting_new_run() {
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "start", "my-pipe", "--topic=second-run"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let second_id = fs::read_to_string(&last_run_path)
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .trim()
         .to_string();
 
@@ -210,18 +210,18 @@ fn pipeline_start_overwrites_last_run_when_starting_new_run() {
 
 #[test]
 fn pipeline_gates_shows_definitions_for_named_pipeline() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     write_gated_pipeline_toml(tmp.path(), "gated");
 
     let output = wai_cmd(tmp.path())
         .args(["pipeline", "gates", "gated"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(output.status.success());
     let output = output.stdout.clone();
 
-    let stdout = String::from_utf8(output).unwrap();
+    let stdout = String::from_utf8(output).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let stripped = strip_ansi(&stdout);
 
     assert!(
@@ -244,18 +244,18 @@ fn pipeline_gates_shows_definitions_for_named_pipeline() {
 
 #[test]
 fn pipeline_gates_filters_by_step() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     write_gated_pipeline_toml(tmp.path(), "gated");
 
     let output = wai_cmd(tmp.path())
         .args(["pipeline", "gates", "gated", "--step=review"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(output.status.success());
     let output = output.stdout.clone();
 
-    let stdout = String::from_utf8(output).unwrap();
+    let stdout = String::from_utf8(output).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let stripped = strip_ansi(&stdout);
 
     assert!(
@@ -274,18 +274,18 @@ fn pipeline_gates_filters_by_step() {
 
 #[test]
 fn pipeline_gates_errors_for_unknown_step() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     write_gated_pipeline_toml(tmp.path(), "gated");
 
     let output = wai_cmd(tmp.path())
         .args(["pipeline", "gates", "gated", "--step=nonexistent"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(!output.status.success());
     let output = output.stderr.clone();
 
-    let stderr = String::from_utf8(output).unwrap();
+    let stderr = String::from_utf8(output).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         stderr.contains("nonexistent") && stderr.contains("not found"),
         "Should report unknown step, got:\n{stderr}"
@@ -294,19 +294,19 @@ fn pipeline_gates_errors_for_unknown_step() {
 
 #[test]
 fn pipeline_gates_errors_for_unknown_pipeline() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "gates", "no-such-pipe"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(!out.status.success());
 }
 
 #[test]
 fn pipeline_approve_records_timestamp_in_run_state() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-proj");
     write_gated_pipeline_toml(tmp.path(), "gated");
@@ -314,13 +314,13 @@ fn pipeline_approve_records_timestamp_in_run_state() {
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "start", "gated", "--topic=test-approve"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     // Advance to step 2 (review) which has the approval gate — need to bypass step 1 gates first
     // Step 1 has structural gate requiring 2 research artifacts, so we create them
     let run_id = fs::read_to_string(tmp.path().join(".wai/resources/pipelines/.last-run"))
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .trim()
         .to_string();
 
@@ -340,14 +340,14 @@ fn pipeline_approve_records_timestamp_in_run_state() {
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "next"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     // Now on step 2 (review) which has approval gate. Run approve.
     let cmd_output = wai_cmd(tmp.path())
         .args(["pipeline", "approve"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(cmd_output.status.success());
     assert_approval_confirmed(&cmd_output);
 
@@ -356,7 +356,7 @@ fn pipeline_approve_records_timestamp_in_run_state() {
         .path()
         .join(".wai/pipeline-runs")
         .join(format!("{}.yml", run_id));
-    let yaml = fs::read_to_string(&run_path).unwrap();
+    let yaml = fs::read_to_string(&run_path).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         yaml.contains("approvals"),
         "Run state YAML should contain approvals section, got:\n{yaml}"
@@ -369,18 +369,18 @@ fn pipeline_approve_records_timestamp_in_run_state() {
 
 #[test]
 fn pipeline_approve_errors_when_run_is_complete() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     write_gated_pipeline_toml(tmp.path(), "gated");
 
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "start", "gated", "--topic=test-complete"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let run_id = fs::read_to_string(tmp.path().join(".wai/resources/pipelines/.last-run"))
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .trim()
         .to_string();
 
@@ -392,18 +392,18 @@ fn pipeline_approve_errors_when_run_is_complete() {
     let yaml = format!(
         "run_id: {run_id}\npipeline: gated\ntopic: test-complete\ncreated_at: \"2026-01-01T00:00:00Z\"\ncurrent_step: 3\napprovals: {{}}\n"
     );
-    fs::write(&run_path, yaml).unwrap();
+    fs::write(&run_path, yaml).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "approve"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(!out.status.success());
 }
 
 #[test]
 fn pipeline_check_passes_when_structural_gate_satisfied() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-proj");
     write_gated_pipeline_toml(tmp.path(), "gated");
@@ -411,11 +411,11 @@ fn pipeline_check_passes_when_structural_gate_satisfied() {
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "start", "gated", "--topic=test-check"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let run_id = fs::read_to_string(tmp.path().join(".wai/resources/pipelines/.last-run"))
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .trim()
         .to_string();
 
@@ -444,11 +444,11 @@ fn pipeline_check_passes_when_structural_gate_satisfied() {
     let output = wai_cmd(tmp.path())
         .args(["pipeline", "check"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(output.status.success());
     let output = output.stdout.clone();
 
-    let stdout = String::from_utf8(output).unwrap();
+    let stdout = String::from_utf8(output).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let stripped = strip_ansi(&stdout);
     assert!(
         stripped.contains("PASS"),
@@ -458,7 +458,7 @@ fn pipeline_check_passes_when_structural_gate_satisfied() {
 
 #[test]
 fn pipeline_check_fails_when_structural_gate_unsatisfied() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-proj");
     write_gated_pipeline_toml(tmp.path(), "gated");
@@ -466,12 +466,12 @@ fn pipeline_check_fails_when_structural_gate_unsatisfied() {
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "start", "gated", "--topic=test-check-fail"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     // Only create 1 artifact (need 2)
     let run_id = fs::read_to_string(tmp.path().join(".wai/resources/pipelines/.last-run"))
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .trim()
         .to_string();
 
@@ -489,11 +489,11 @@ fn pipeline_check_fails_when_structural_gate_unsatisfied() {
     let output = wai_cmd(tmp.path())
         .args(["pipeline", "check"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(output.status.success());
     let output = output.stdout.clone();
 
-    let stdout = String::from_utf8(output).unwrap();
+    let stdout = String::from_utf8(output).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let stripped = strip_ansi(&stdout);
     assert!(
         stripped.contains("requires at least 2"),
@@ -503,7 +503,7 @@ fn pipeline_check_fails_when_structural_gate_unsatisfied() {
 
 #[test]
 fn pipeline_next_blocked_by_unsatisfied_gate() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-proj");
     write_gated_pipeline_toml(tmp.path(), "gated");
@@ -511,7 +511,7 @@ fn pipeline_next_blocked_by_unsatisfied_gate() {
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "start", "gated", "--topic=test-blocked"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     // Try to advance without any artifacts — structural gate should block
@@ -519,11 +519,11 @@ fn pipeline_next_blocked_by_unsatisfied_gate() {
     let output = wai_cmd(tmp.path())
         .args(["pipeline", "next"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(output.status.success());
     let output = output.stdout.clone();
 
-    let stdout = String::from_utf8(output).unwrap();
+    let stdout = String::from_utf8(output).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let stripped = strip_ansi(&stdout);
     assert!(
         stripped.contains("Gate check failed") || stripped.contains("requires at least"),
@@ -532,7 +532,7 @@ fn pipeline_next_blocked_by_unsatisfied_gate() {
 
     // Verify step was NOT advanced (still at step 0)
     let run_id = fs::read_to_string(tmp.path().join(".wai/resources/pipelines/.last-run"))
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .trim()
         .to_string();
     let run_yaml = fs::read_to_string(
@@ -540,7 +540,7 @@ fn pipeline_next_blocked_by_unsatisfied_gate() {
             .join(".wai/pipeline-runs")
             .join(format!("{}.yml", run_id)),
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         run_yaml.contains("current_step: 0"),
         "Step should NOT have advanced, got:\n{run_yaml}"
@@ -549,7 +549,7 @@ fn pipeline_next_blocked_by_unsatisfied_gate() {
 
 #[test]
 fn pipeline_check_reports_missing_approval() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-proj");
     write_gated_pipeline_toml(tmp.path(), "gated");
@@ -557,11 +557,11 @@ fn pipeline_check_reports_missing_approval() {
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "start", "gated", "--topic=test-approval-check"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let run_id = fs::read_to_string(tmp.path().join(".wai/resources/pipelines/.last-run"))
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .trim()
         .to_string();
 
@@ -590,18 +590,18 @@ fn pipeline_check_reports_missing_approval() {
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "next"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     // Now on step 2 (review) with approval gate. Check without approving.
     let output = wai_cmd(tmp.path())
         .args(["pipeline", "check"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(output.status.success());
     let output = output.stdout.clone();
 
-    let stdout = String::from_utf8(output).unwrap();
+    let stdout = String::from_utf8(output).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let stripped = strip_ansi(&stdout);
     assert!(
         stripped.contains("Human must approve") || stripped.contains("approval"),
@@ -611,7 +611,7 @@ fn pipeline_check_reports_missing_approval() {
 
 #[test]
 fn pipeline_gates_live_status_shows_current_step() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-proj");
     write_gated_pipeline_toml(tmp.path(), "gated");
@@ -619,18 +619,18 @@ fn pipeline_gates_live_status_shows_current_step() {
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "start", "gated", "--topic=test-live-gates"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     // Run gates with no name (should show live status for current step)
     let output = wai_cmd(tmp.path())
         .args(["pipeline", "gates"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(output.status.success());
     let output = output.stdout.clone();
 
-    let stdout = String::from_utf8(output).unwrap();
+    let stdout = String::from_utf8(output).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let stripped = strip_ansi(&stdout);
 
     assert!(
@@ -641,7 +641,7 @@ fn pipeline_gates_live_status_shows_current_step() {
 
 #[test]
 fn pipeline_check_no_gates_reports_pass() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     // Use the basic pipeline TOML (no gates)
     write_pipeline_toml(tmp.path(), "basic");
@@ -649,17 +649,17 @@ fn pipeline_check_no_gates_reports_pass() {
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "start", "basic", "--topic=no-gates"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let output = wai_cmd(tmp.path())
         .args(["pipeline", "check"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(output.status.success());
     let output = output.stdout.clone();
 
-    let stdout = String::from_utf8(output).unwrap();
+    let stdout = String::from_utf8(output).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let stripped = strip_ansi(&stdout);
     assert!(
         stripped.contains("PASS") || stripped.contains("No gates configured"),
@@ -669,7 +669,7 @@ fn pipeline_check_no_gates_reports_pass() {
 
 #[test]
 fn pipeline_list_shows_defined_pipelines() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     write_pipeline_toml(tmp.path(), "beta");
     write_pipeline_toml(tmp.path(), "alpha");
@@ -677,11 +677,11 @@ fn pipeline_list_shows_defined_pipelines() {
     let output = wai_cmd(tmp.path())
         .args(["pipeline", "list"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(output.status.success());
     let output = output.stdout.clone();
 
-    let stdout = String::from_utf8(output).unwrap();
+    let stdout = String::from_utf8(output).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let stripped = strip_ansi(&stdout);
 
     assert!(
@@ -693,8 +693,12 @@ fn pipeline_list_shows_defined_pipelines() {
         "Should list both pipelines, got:\n{stripped}"
     );
 
-    let alpha_pos = stripped.find("alpha").unwrap();
-    let beta_pos = stripped.find("beta").unwrap();
+    let alpha_pos = stripped
+        .find("alpha")
+        .unwrap_or_else(|| panic!("unwrap failed"));
+    let beta_pos = stripped
+        .find("beta")
+        .unwrap_or_else(|| panic!("unwrap failed"));
     assert!(
         alpha_pos < beta_pos,
         "Pipelines should be listed alphabetically, got:\n{stripped}"
@@ -703,18 +707,18 @@ fn pipeline_list_shows_defined_pipelines() {
 
 #[test]
 fn pipeline_show_displays_metadata_and_steps() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     write_pipeline_toml_with_metadata(tmp.path(), "meta-pipe");
 
     let output = wai_cmd(tmp.path())
         .args(["pipeline", "show", "meta-pipe"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(output.status.success());
     let output = output.stdout.clone();
 
-    let stdout = String::from_utf8(output).unwrap();
+    let stdout = String::from_utf8(output).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let stripped = strip_ansi(&stdout);
 
     for expected in [
@@ -737,20 +741,24 @@ fn pipeline_show_displays_metadata_and_steps() {
 
 #[test]
 fn pipeline_validate_succeeds_for_valid_definition() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     write_pipeline_toml_with_metadata(tmp.path(), "valid-pipe");
 
     let output = wai_cmd(tmp.path())
         .args(["pipeline", "validate", "valid-pipe"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(output.status.success());
 
     let combined = format!(
         "{}{}",
-        strip_ansi(&String::from_utf8(output.stdout).unwrap()),
-        strip_ansi(&String::from_utf8(output.stderr).unwrap())
+        strip_ansi(
+            &String::from_utf8(output.stdout).unwrap_or_else(|e| panic!("unwrap failed: {e}"))
+        ),
+        strip_ansi(
+            &String::from_utf8(output.stderr).unwrap_or_else(|e| panic!("unwrap failed: {e}"))
+        )
     );
     assert!(
         combined.contains("valid-pipe") && combined.contains("steps"),
@@ -760,26 +768,30 @@ fn pipeline_validate_succeeds_for_valid_definition() {
 
 #[test]
 fn pipeline_validate_fails_for_invalid_toml() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     let pipelines_dir = tmp.path().join(".wai/resources/pipelines");
-    fs::create_dir_all(&pipelines_dir).unwrap();
+    fs::create_dir_all(&pipelines_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         pipelines_dir.join("broken.toml"),
         "[pipeline]\nname = \"broken\"\n[[steps]]\nid = ",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let output = wai_cmd(tmp.path())
         .args(["pipeline", "validate", "broken"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(!output.status.success());
 
     let combined = format!(
         "{}{}",
-        strip_ansi(&String::from_utf8(output.stdout).unwrap()),
-        strip_ansi(&String::from_utf8(output.stderr).unwrap())
+        strip_ansi(
+            &String::from_utf8(output.stdout).unwrap_or_else(|e| panic!("unwrap failed: {e}"))
+        ),
+        strip_ansi(
+            &String::from_utf8(output.stderr).unwrap_or_else(|e| panic!("unwrap failed: {e}"))
+        )
     );
     assert!(
         combined.contains("broken") && (combined.contains("parse") || combined.contains("TOML")),
@@ -800,8 +812,10 @@ fn write_step_artifacts(tmp: &std::path::Path, project: &str, run_id: &str) {
 
 /// Assert the approve command confirmed the review step.
 fn assert_approval_confirmed(cmd_output: &std::process::Output) {
-    let stdout = String::from_utf8(cmd_output.stdout.clone()).unwrap();
-    let stderr = String::from_utf8(cmd_output.stderr.clone()).unwrap();
+    let stdout = String::from_utf8(cmd_output.stdout.clone())
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    let stderr = String::from_utf8(cmd_output.stderr.clone())
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let all_output = format!("{}{}", strip_ansi(&stdout), strip_ansi(&stderr));
     assert!(
         all_output.contains("Approved step") || all_output.contains("review"),

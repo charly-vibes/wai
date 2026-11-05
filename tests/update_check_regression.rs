@@ -18,8 +18,9 @@ fn seed_stale_latest_cache(cache_dir: &std::path::Path, latest: &str) {
             .as_secs(),
         latest,
     );
-    std::fs::create_dir_all(cache_dir).expect("create cache dir");
-    std::fs::write(cache_dir.join("wai-cli.json"), entry).expect("write cache fixture");
+    std::fs::create_dir_all(cache_dir).unwrap_or_else(|e| panic!("create cache dir: {e}"));
+    std::fs::write(cache_dir.join("wai-cli.json"), entry)
+        .unwrap_or_else(|e| panic!("write cache fixture: {e}"));
 }
 
 fn tmp_cache_dir(tag: &str) -> PathBuf {
@@ -61,7 +62,7 @@ fn notice_when_cached_latest_is_newer() {
         &cache_dir,
         update_check::CRATES_IO_API,
     );
-    let info = info.expect("newer cached latest must produce UpdateInfo");
+    let info = info.unwrap_or_else(|| panic!("newer cached latest must produce UpdateInfo"));
     assert_eq!(info.latest, "2026.10.4");
     assert_eq!(info.current, "2026.9.28");
 }

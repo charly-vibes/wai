@@ -7,14 +7,14 @@ use tempfile::TempDir;
 
 #[test]
 fn search_no_results() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
     let out = wai_cmd(tmp.path())
         .args(["search", "zzz_nonexistent_zzz"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("No results found"));
@@ -22,7 +22,7 @@ fn search_no_results() {
 
 #[test]
 fn search_json_outputs_results() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     write_artifact(
@@ -36,7 +36,7 @@ fn search_json_outputs_results() {
     let out = wai_cmd(tmp.path())
         .args(["search", "JSON", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("\"results\""));
@@ -44,7 +44,7 @@ fn search_json_outputs_results() {
 
 #[test]
 fn search_with_type_filter() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     write_artifact(
@@ -66,7 +66,7 @@ fn search_with_type_filter() {
     let out = wai_cmd(tmp.path())
         .args(["search", "keyword_match", "--type", "research"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("research/"));
@@ -76,7 +76,7 @@ fn search_with_type_filter() {
 
 #[test]
 fn phase_show_displays_via_wai_project_indicator() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "alpha");
     create_project(tmp.path(), "beta");
@@ -99,7 +99,7 @@ fn phase_show_displays_via_wai_project_indicator() {
 
 #[test]
 fn phase_show_displays_via_project_flag_indicator() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "alpha");
     create_project(tmp.path(), "beta");
@@ -107,7 +107,7 @@ fn phase_show_displays_via_project_flag_indicator() {
     let out = wai_cmd(tmp.path())
         .args(["phase", "--project", "alpha", "show"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
     let out = out.stdout.clone();
     let stdout = strip_ansi(&String::from_utf8_lossy(&out));
@@ -120,14 +120,14 @@ fn phase_show_displays_via_project_flag_indicator() {
 
 #[test]
 fn phase_show_no_indicator_for_auto_detect() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "only");
 
     let out = wai_cmd(tmp.path())
         .args(["phase", "show"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
     let out = out.stdout.clone();
     let stdout = strip_ansi(&String::from_utf8_lossy(&out));
@@ -142,7 +142,7 @@ fn phase_show_no_indicator_for_auto_detect() {
 
 #[test]
 fn doctor_warns_wai_project_nonexistent() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproj");
 
@@ -163,7 +163,7 @@ fn doctor_warns_wai_project_nonexistent() {
 
 #[test]
 fn doctor_warns_wai_project_empty() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproj");
 
@@ -190,13 +190,13 @@ fn doctor_warns_wai_project_empty() {
 fn cli_format_human_flag_is_accepted() {
     // `--human` is provided by genesis CliFormat; it must parse and behave as
     // the default human output (no JSON envelope) in an initialized workspace.
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["--human", "status"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
     let out = out.stdout.clone();
     let stdout = strip_ansi(&String::from_utf8_lossy(&out));
@@ -211,13 +211,13 @@ fn cli_format_human_flag_is_accepted() {
 fn cli_format_json_and_human_conflict() {
     // CliFormat declares --json/--human as mutually exclusive; clap must reject
     // passing both together.
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["--json", "--human", "status"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(!out.status.success());
 }
 
@@ -225,17 +225,18 @@ fn cli_format_json_and_human_conflict() {
 fn cli_verbosity_counts_with_format_flags() {
     // CliVerbosity (-v/-vv) and CliFormat (--json) must coexist as global
     // flags: a verbose JSON status call still emits a parseable envelope.
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["-vv", "--json", "status"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
     let out = out.stdout.clone();
     let stdout = String::from_utf8_lossy(&out);
-    let payload: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    let payload: serde_json::Value =
+        serde_json::from_str(stdout.trim()).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert_eq!(
         payload["ok"], true,
         "verbose --json status should be valid envelope"
@@ -246,28 +247,29 @@ fn cli_verbosity_counts_with_format_flags() {
 fn cli_verbosity_quiet_and_verbose_coexist() {
     // CliVerbosity accepts -q and -v together; --quiet takes precedence over
     // the -v count, but both must parse as valid global flags.
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["-q", "-v", "status"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 }
 
 #[test]
 fn stale_run_doctor_flags_old_midflight_run() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace_with_project(tmp.path(), "my-app");
     write_stale_run_fixture(tmp.path(), "my-pipe", "my-pipe-old-run", 0, 30);
 
     let output = wai_cmd(tmp.path())
         .args(["doctor"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(output.status.success());
-    let stdout = String::from_utf8(output.stdout.clone()).unwrap();
+    let stdout =
+        String::from_utf8(output.stdout.clone()).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         stdout.contains("stale") && stdout.contains("my-pipe-old-run"),
         "doctor must flag a 30-day-old mid-flight run as stale, got: {stdout}"
@@ -280,16 +282,17 @@ fn stale_run_doctor_flags_old_midflight_run() {
 
 #[test]
 fn stale_run_doctor_ignores_fresh_run() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace_with_project(tmp.path(), "my-app");
     write_stale_run_fixture(tmp.path(), "my-pipe", "my-pipe-fresh-run", 0, 2);
 
     let output = wai_cmd(tmp.path())
         .args(["doctor"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(output.status.success());
-    let stdout = String::from_utf8(output.stdout.clone()).unwrap();
+    let stdout =
+        String::from_utf8(output.stdout.clone()).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         !stdout.contains("my-pipe-fresh-run"),
         "doctor must not flag a 2-day-old run as stale, got: {stdout}"
@@ -298,7 +301,7 @@ fn stale_run_doctor_ignores_fresh_run() {
 
 #[test]
 fn stale_run_doctor_ignores_old_complete_run() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace_with_project(tmp.path(), "my-app");
     // current_step == 2 (total) → complete, not mid-flight → not GC material.
     write_stale_run_fixture(tmp.path(), "my-pipe", "my-pipe-done-run", 2, 30);
@@ -306,9 +309,10 @@ fn stale_run_doctor_ignores_old_complete_run() {
     let output = wai_cmd(tmp.path())
         .args(["doctor"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(output.status.success());
-    let stdout = String::from_utf8(output.stdout.clone()).unwrap();
+    let stdout =
+        String::from_utf8(output.stdout.clone()).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         !stdout.contains("my-pipe-done-run"),
         "doctor must not flag an old COMPLETE run as stale, got: {stdout}"
@@ -317,7 +321,7 @@ fn stale_run_doctor_ignores_old_complete_run() {
 
 #[test]
 fn stale_run_gc_dry_run_lists_without_moving() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace_with_project(tmp.path(), "my-app");
     write_stale_run_fixture(tmp.path(), "my-pipe", "my-pipe-old-run", 1, 30);
     let run_path = tmp.path().join(".wai/pipeline-runs/my-pipe-old-run.yml");
@@ -325,7 +329,7 @@ fn stale_run_gc_dry_run_lists_without_moving() {
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "gc"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("my-pipe-old-run"));
@@ -342,7 +346,7 @@ fn stale_run_gc_dry_run_lists_without_moving() {
 
 #[test]
 fn stale_run_gc_yes_quarantines_under_stale_dir() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace_with_project(tmp.path(), "my-app");
     write_stale_run_fixture(tmp.path(), "my-pipe", "my-pipe-old-run", 1, 30);
     let run_path = tmp.path().join(".wai/pipeline-runs/my-pipe-old-run.yml");
@@ -350,7 +354,7 @@ fn stale_run_gc_yes_quarantines_under_stale_dir() {
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "gc", "--yes"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("my-pipe-old-run"));
@@ -361,7 +365,7 @@ fn stale_run_gc_yes_quarantines_under_stale_dir() {
     );
     let stale_dir = tmp.path().join(".wai/pipeline-runs/stale");
     let quarantined: Vec<_> = fs::read_dir(&stale_dir)
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .filter_map(|e| e.ok())
         .map(|e| e.file_name().to_string_lossy().into_owned())
         .collect();
@@ -382,7 +386,7 @@ fn stale_run_gc_yes_quarantines_under_stale_dir() {
     let out = wai_cmd(tmp.path())
         .args(["prime", "--project", "my-app", "--no-input"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(!(stdout.contains("ADOPT/RESUME")));
@@ -390,7 +394,7 @@ fn stale_run_gc_yes_quarantines_under_stale_dir() {
 
 #[test]
 fn stale_run_gc_leaves_fresh_runs_untouched() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace_with_project(tmp.path(), "my-app");
     write_stale_run_fixture(tmp.path(), "my-pipe", "my-pipe-fresh-run", 1, 2);
     let run_path = tmp.path().join(".wai/pipeline-runs/my-pipe-fresh-run.yml");
@@ -398,7 +402,7 @@ fn stale_run_gc_leaves_fresh_runs_untouched() {
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "gc", "--yes"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("No stale runs"));
@@ -414,7 +418,7 @@ fn stale_run_gc_leaves_fresh_runs_untouched() {
 
 #[test]
 fn stale_run_config_stale_days_override() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace_with_project(tmp.path(), "my-app");
     write_stale_run_fixture(tmp.path(), "my-pipe", "my-pipe-old-run", 1, 30);
     // Raise the threshold: a 30-day-old run is no longer stale at staleDays=60.
@@ -422,14 +426,15 @@ fn stale_run_config_stale_days_override() {
         tmp.path().join(".wai/config.toml"),
         "[project]\nname = \"test-ws\"\n\n[pipeline]\nstaleDays = 60\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let output = wai_cmd(tmp.path())
         .args(["doctor"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(output.status.success());
-    let stdout = String::from_utf8(output.stdout.clone()).unwrap();
+    let stdout =
+        String::from_utf8(output.stdout.clone()).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         !stdout.contains("my-pipe-old-run"),
         "staleDays=60 must keep a 30-day-old run under threshold, got: {stdout}"
@@ -438,7 +443,7 @@ fn stale_run_config_stale_days_override() {
 
 #[test]
 fn pipeline_start_epic_discovers_children_creates_parent_run() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     write_pipeline_toml(tmp.path(), "my-pipe");
     let fake_bin = install_fake_bd_ready_json(
@@ -455,7 +460,7 @@ fn pipeline_start_epic_discovers_children_creates_parent_run() {
         .args(["pipeline", "start", "my-pipe", "--epic=epic-1"])
         .env("PATH", path.clone())
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     assert_parent_run_state(tmp.path());
@@ -465,11 +470,11 @@ fn pipeline_start_epic_discovers_children_creates_parent_run() {
         .args(["pipeline", "start", "my-pipe", "--epic=epic-1"])
         .env("PATH", path)
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
     let runs_dir = tmp.path().join(".wai/pipeline-runs");
     let ymls2: Vec<_> = fs::read_dir(&runs_dir)
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .flatten()
         .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("yml"))
         .collect();
@@ -482,7 +487,7 @@ fn pipeline_start_epic_discovers_children_creates_parent_run() {
 
 #[test]
 fn pipeline_start_epic_skips_when_no_ready_children() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     write_pipeline_toml(tmp.path(), "my-pipe");
     let fake_bin = install_fake_bd_ready_json(tmp.path(), r#"[{"id":"other","parent":"epic-2"}]"#);
@@ -496,7 +501,7 @@ fn pipeline_start_epic_skips_when_no_ready_children() {
         .args(["pipeline", "start", "my-pipe", "--epic=epic-1"])
         .env("PATH", path)
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("no ready children"));
@@ -504,7 +509,7 @@ fn pipeline_start_epic_skips_when_no_ready_children() {
     let runs_dir = tmp.path().join(".wai/pipeline-runs");
     if runs_dir.exists() {
         let ymls: Vec<_> = fs::read_dir(&runs_dir)
-            .unwrap()
+            .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
             .flatten()
             .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("yml"))
             .collect();
@@ -523,7 +528,7 @@ fn pipeline_start_epic_skips_when_no_ready_children() {
 
 #[test]
 fn pipeline_start_child_appends_run_to_epic_parent() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     write_pipeline_toml(tmp.path(), "my-pipe");
     write_epic_run_fixture(
@@ -538,20 +543,27 @@ fn pipeline_start_child_appends_run_to_epic_parent() {
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "start", "my-pipe", "--topic=child-a"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     // Find the child run file just created (the one that is not the parent).
     let runs_dir = tmp.path().join(".wai/pipeline-runs");
     let child_run: String = fs::read_dir(&runs_dir)
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .flatten()
         .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("yml"))
-        .map(|e| e.path().file_stem().unwrap().to_string_lossy().to_string())
+        .map(|e| {
+            e.path()
+                .file_stem()
+                .unwrap_or_else(|| panic!("unwrap failed"))
+                .to_string_lossy()
+                .to_string()
+        })
         .find(|stem| stem != "my-pipe-parent")
-        .expect("child run state must exist");
+        .unwrap_or_else(|| panic!("child run state must exist"));
 
-    let parent = fs::read_to_string(runs_dir.join("my-pipe-parent.yml")).unwrap();
+    let parent = fs::read_to_string(runs_dir.join("my-pipe-parent.yml"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         parent.contains(&child_run),
         "epic parent state must record the child run id '{child_run}', got: {parent}"
@@ -560,7 +572,7 @@ fn pipeline_start_child_appends_run_to_epic_parent() {
 
 #[test]
 fn pipeline_next_epic_parent_blocked_while_children_midflight() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     write_pipeline_toml(tmp.path(), "my-pipe");
     write_epic_run_fixture(
@@ -577,13 +589,13 @@ fn pipeline_next_epic_parent_blocked_while_children_midflight() {
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "next"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("child-run"));
 
-    let parent =
-        fs::read_to_string(tmp.path().join(".wai/pipeline-runs/my-pipe-parent.yml")).unwrap();
+    let parent = fs::read_to_string(tmp.path().join(".wai/pipeline-runs/my-pipe-parent.yml"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         parent.contains("current_step: 0"),
         "refused parent advance must not modify parent state, got: {parent}"
@@ -592,7 +604,7 @@ fn pipeline_next_epic_parent_blocked_while_children_midflight() {
 
 #[test]
 fn pipeline_current_json_renders_epic_tree() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     write_pipeline_toml(tmp.path(), "my-pipe");
     write_epic_run_fixture(
@@ -608,7 +620,7 @@ fn pipeline_current_json_renders_epic_tree() {
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "current", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("epic-1"));
@@ -624,7 +636,7 @@ fn pipeline_current_json_renders_epic_tree() {
 
 #[test]
 fn epic_handoff_terminal_child_marks_handoff_ready() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     write_pipeline_toml(tmp.path(), "my-pipe");
     write_epic_run_fixture(
@@ -649,7 +661,7 @@ fn epic_handoff_terminal_child_marks_handoff_ready() {
         .args(["pipeline", "current", "--json"])
         .env_remove("WAI_PIPELINE_RUN")
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("\"handoff_ready\": true"));
@@ -658,7 +670,7 @@ fn epic_handoff_terminal_child_marks_handoff_ready() {
 
 #[test]
 fn epic_handoff_midflight_child_not_handoff_ready() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     write_pipeline_toml(tmp.path(), "my-pipe");
     write_epic_run_fixture(
@@ -684,7 +696,7 @@ fn epic_handoff_midflight_child_not_handoff_ready() {
         .args(["pipeline", "current", "--json"])
         .env_remove("WAI_PIPELINE_RUN")
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("\"handoff_ready\": false"));
@@ -693,7 +705,7 @@ fn epic_handoff_midflight_child_not_handoff_ready() {
 
 #[test]
 fn epic_handoff_create_records_artifact_on_active_run() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     write_pipeline_toml(tmp.path(), "my-pipe");
@@ -701,26 +713,33 @@ fn epic_handoff_create_records_artifact_on_active_run() {
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "start", "my-pipe", "--topic=child-a"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let out = wai_cmd(tmp.path())
         .args(["handoff", "create", "my-app"])
         .env_remove("WAI_PIPELINE_RUN")
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     // The active (child) run state must record the created handoff artifact.
     let runs_dir = tmp.path().join(".wai/pipeline-runs");
     let child_run: String = fs::read_dir(&runs_dir)
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .flatten()
         .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("yml"))
-        .map(|e| e.path().file_stem().unwrap().to_string_lossy().to_string())
+        .map(|e| {
+            e.path()
+                .file_stem()
+                .unwrap_or_else(|| panic!("unwrap failed"))
+                .to_string_lossy()
+                .to_string()
+        })
         .find(|stem| stem != "my-pipe-parent")
-        .expect("child run state must exist");
-    let state = fs::read_to_string(runs_dir.join(format!("{child_run}.yml"))).unwrap();
+        .unwrap_or_else(|| panic!("child run state must exist"));
+    let state = fs::read_to_string(runs_dir.join(format!("{child_run}.yml")))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         state.contains(".wai/projects/my-app/handoffs/2026-"),
         "child run state must record the handoff artifact path, got: {state}"
@@ -729,7 +748,7 @@ fn epic_handoff_create_records_artifact_on_active_run() {
 
 #[test]
 fn epic_handoff_next_child_surfaces_prior_sibling_handoff() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     write_pipeline_toml(tmp.path(), "my-pipe");
     write_epic_run_fixture(
@@ -754,7 +773,7 @@ fn epic_handoff_next_child_surfaces_prior_sibling_handoff() {
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "start", "my-pipe", "--topic=child-b"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     // ...and `pipeline current` must surface the prior child's handoff path.
@@ -762,7 +781,7 @@ fn epic_handoff_next_child_surfaces_prior_sibling_handoff() {
         .args(["pipeline", "current", "--json"])
         .env_remove("WAI_PIPELINE_RUN")
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("handoffs/2026-10-05-session-end.md"));
@@ -773,7 +792,7 @@ fn epic_handoff_next_child_surfaces_prior_sibling_handoff() {
 fn assert_parent_run_state(tmp: &std::path::Path) {
     let runs_dir = tmp.join(".wai/pipeline-runs");
     let ymls: Vec<_> = fs::read_dir(&runs_dir)
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .flatten()
         .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("yml"))
         .collect();
@@ -781,7 +800,7 @@ fn assert_parent_run_state(tmp: &std::path::Path) {
     let stem = ymls[0]
         .path()
         .file_stem()
-        .unwrap()
+        .unwrap_or_else(|| panic!("unwrap failed"))
         .to_string_lossy()
         .to_string();
     assert!(
@@ -789,7 +808,8 @@ fn assert_parent_run_state(tmp: &std::path::Path) {
         "parent run id must end in -parent, got: {stem}"
     );
 
-    let content = fs::read_to_string(ymls[0].path()).unwrap();
+    let content =
+        fs::read_to_string(ymls[0].path()).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         content.contains("epic: epic-1"),
         "parent run must record the epic id, got: {content}"

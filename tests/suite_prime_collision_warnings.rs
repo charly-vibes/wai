@@ -20,16 +20,16 @@ fn seed_repo_with_stash(dir: &std::path::Path, stash_message: &str) {
             .args(args)
             .current_dir(dir)
             .output()
-            .expect("git should run");
+            .unwrap_or_else(|e| panic!("git should run: {e}"));
         assert!(out.status.success(), "git {args:?} failed");
     };
     run(&["init", "-q"]);
     run(&["config", "user.email", "test@example.com"]);
     run(&["config", "user.name", "test"]);
-    fs::write(dir.join("tracked.txt"), "one\n").unwrap();
+    fs::write(dir.join("tracked.txt"), "one\n").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     run(&["add", "tracked.txt"]);
     run(&["commit", "-q", "-m", "initial"]);
-    fs::write(dir.join("tracked.txt"), "two\n").unwrap();
+    fs::write(dir.join("tracked.txt"), "two\n").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     run(&["stash", "push", "-m", stash_message]);
 }
 
@@ -37,7 +37,7 @@ fn seed_repo_with_stash(dir: &std::path::Path, stash_message: &str) {
 /// stash is invisible to other agents — the evallerina-00n failure mode).
 #[test]
 fn prime_warns_on_provenance_matching_stash_entry() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "test-ws");
     seed_repo_with_stash(tmp.path(), "codex WIP on main: parked refactor");
@@ -45,7 +45,7 @@ fn prime_warns_on_provenance_matching_stash_entry() {
     let prime = hermetic_wai_cmd(tmp.path())
         .args(["prime"])
         .output()
-        .expect("prime should run");
+        .unwrap_or_else(|e| panic!("prime should run: {e}"));
     let combined = format!(
         "{}{}",
         String::from_utf8_lossy(&prime.stdout),
@@ -65,14 +65,14 @@ fn prime_warns_on_provenance_matching_stash_entry() {
 /// the feature is silent-when-green.
 #[test]
 fn prime_is_silent_on_non_matching_stash_entry() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     seed_repo_with_stash(tmp.path(), "fix readme wording typos");
 
     let prime = hermetic_wai_cmd(tmp.path())
         .args(["prime"])
         .output()
-        .expect("prime should run");
+        .unwrap_or_else(|e| panic!("prime should run: {e}"));
     let combined = format!(
         "{}{}",
         String::from_utf8_lossy(&prime.stdout),
@@ -91,10 +91,10 @@ fn prime_is_silent_on_non_matching_stash_entry() {
 /// An unexpired agent lock-file under .wai/ triggers the warning.
 #[test]
 fn prime_warns_on_unexpired_agent_lock_file() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     let locks_dir = tmp.path().join(".wai/projects/test-ws/research");
-    fs::create_dir_all(&locks_dir).unwrap();
+    fs::create_dir_all(&locks_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         locks_dir.join("some-artifact.md.lock"),
         format!(
@@ -102,12 +102,12 @@ fn prime_warns_on_unexpired_agent_lock_file() {
             chrono::Utc::now().to_rfc3339()
         ),
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let prime = hermetic_wai_cmd(tmp.path())
         .args(["prime"])
         .output()
-        .expect("prime should run");
+        .unwrap_or_else(|e| panic!("prime should run: {e}"));
     let combined = format!(
         "{}{}",
         String::from_utf8_lossy(&prime.stdout),
@@ -127,14 +127,14 @@ fn prime_warns_on_unexpired_agent_lock_file() {
 /// (task 4.3) — before the gate check, so a failing gate still shows them.
 #[test]
 fn pipeline_next_surfaces_collision_warnings_when_run_active() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "test-ws");
     seed_repo_with_stash(tmp.path(), "claude owns the ledger work right now");
     hermetic_wai_cmd(tmp.path())
         .args(["pipeline", "init", "epic-orchestrator"])
         .output()
-        .expect("init should run");
+        .unwrap_or_else(|e| panic!("init should run: {e}"));
     hermetic_wai_cmd(tmp.path())
         .args([
             "pipeline",
@@ -143,12 +143,12 @@ fn pipeline_next_surfaces_collision_warnings_when_run_active() {
             "--topic=collision",
         ])
         .output()
-        .expect("start should run");
+        .unwrap_or_else(|e| panic!("start should run: {e}"));
 
     let next = hermetic_wai_cmd(tmp.path())
         .args(["pipeline", "next"])
         .output()
-        .expect("next should run");
+        .unwrap_or_else(|e| panic!("next should run: {e}"));
     let combined = format!(
         "{}{}",
         String::from_utf8_lossy(&next.stdout),
@@ -164,7 +164,7 @@ fn pipeline_next_surfaces_collision_warnings_when_run_active() {
 /// provenance warning (RO5U pass-1 medium finding: word-boundary match).
 #[test]
 fn prime_is_silent_on_provenance_lookalike_words() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "test-ws");
     seed_repo_with_stash(
@@ -175,7 +175,7 @@ fn prime_is_silent_on_provenance_lookalike_words() {
     let prime = hermetic_wai_cmd(tmp.path())
         .args(["prime"])
         .output()
-        .expect("prime should run");
+        .unwrap_or_else(|e| panic!("prime should run: {e}"));
     let combined = format!(
         "{}{}",
         String::from_utf8_lossy(&prime.stdout),

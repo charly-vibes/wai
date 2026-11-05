@@ -7,19 +7,24 @@ use tempfile::TempDir;
 
 #[test]
 fn way_check_documentation_complete() {
-    let tmp = TempDir::new().unwrap();
-    fs::write(tmp.path().join("README.md"), "# Test").unwrap();
-    fs::write(tmp.path().join("LICENSE"), "MIT").unwrap();
-    fs::write(tmp.path().join("CONTRIBUTING.md"), "# Contributing").unwrap();
-    fs::write(tmp.path().join(".gitignore"), "*.tmp").unwrap();
-    fs::write(tmp.path().join("Cargo.toml"), "[package]\nname = \"test\"").unwrap();
-    fs::create_dir(tmp.path().join("docs")).unwrap();
-    fs::write(tmp.path().join("docs").join("index.md"), "# Docs").unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(tmp.path().join("README.md"), "# Test")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(tmp.path().join("LICENSE"), "MIT").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(tmp.path().join("CONTRIBUTING.md"), "# Contributing")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(tmp.path().join(".gitignore"), "*.tmp")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(tmp.path().join("Cargo.toml"), "[package]\nname = \"test\"")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::create_dir(tmp.path().join("docs")).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(tmp.path().join("docs").join("index.md"), "# Docs")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Project documentation"));
@@ -29,12 +34,12 @@ fn way_check_documentation_complete() {
 
 #[test]
 fn way_check_documentation_not_configured() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Project documentation"));
@@ -44,15 +49,16 @@ fn way_check_documentation_not_configured() {
 
 #[test]
 fn way_check_documentation_missing_critical() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     // Only LICENSE and CONTRIBUTING (missing critical README and .gitignore)
-    fs::write(tmp.path().join("LICENSE"), "MIT").unwrap();
-    fs::write(tmp.path().join("CONTRIBUTING.md"), "# Contributing").unwrap();
+    fs::write(tmp.path().join("LICENSE"), "MIT").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(tmp.path().join("CONTRIBUTING.md"), "# Contributing")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Project documentation"));
@@ -62,7 +68,7 @@ fn way_check_documentation_missing_critical() {
 
 #[test]
 fn init_creates_para_structure() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     // Verify PARA directories
@@ -95,20 +101,21 @@ fn init_creates_para_structure() {
     );
 
     // Verify config.toml exists and contains project name
-    let config = fs::read_to_string(tmp.path().join(".wai/config.toml")).unwrap();
+    let config = fs::read_to_string(tmp.path().join(".wai/config.toml"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(config.contains("test-ws"));
 }
 
 #[test]
 fn init_warns_if_already_initialized() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     // Second init outputs warning to stdout (plain println, not cliclack log)
     let out = wai_cmd(tmp.path())
         .args(["init", "--name", "test-ws"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("already initialized"));
@@ -116,15 +123,16 @@ fn init_warns_if_already_initialized() {
 
 #[test]
 fn init_json_fresh_includes_wai_way_suggestion() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let out = wai_cmd(tmp.path())
         .args(["--json", "init", "--name", "test-ws", "--yes"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
     let out = out.stdout.clone();
     let stdout = String::from_utf8_lossy(&out);
-    let payload: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    let payload: serde_json::Value =
+        serde_json::from_str(stdout.trim()).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert_eq!(
         payload["data"]["already_initialized"], false,
         "fresh init should report already_initialized: false"
@@ -133,10 +141,16 @@ fn init_json_fresh_includes_wai_way_suggestion() {
         payload["data"]["project_name"], "test-ws",
         "JSON should include the workspace name"
     );
-    let suggestions = payload["data"]["suggestions"].as_array().unwrap();
+    let suggestions = payload["data"]["suggestions"]
+        .as_array()
+        .unwrap_or_else(|| panic!("unwrap failed"));
     let commands: Vec<&str> = suggestions
         .iter()
-        .map(|s| s["command"].as_str().unwrap())
+        .map(|s| {
+            s["command"]
+                .as_str()
+                .unwrap_or_else(|| panic!("unwrap failed"))
+        })
         .collect();
     assert!(
         commands.contains(&"wai way"),
@@ -147,24 +161,31 @@ fn init_json_fresh_includes_wai_way_suggestion() {
 
 #[test]
 fn init_json_reinit_includes_wai_way_suggestion() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     let out = wai_cmd(tmp.path())
         .args(["--json", "init", "--name", "test-ws", "--yes"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
     let out = out.stdout.clone();
     let stdout = String::from_utf8_lossy(&out);
-    let payload: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    let payload: serde_json::Value =
+        serde_json::from_str(stdout.trim()).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert_eq!(
         payload["data"]["already_initialized"], true,
         "reinit should report already_initialized: true"
     );
-    let suggestions = payload["data"]["suggestions"].as_array().unwrap();
+    let suggestions = payload["data"]["suggestions"]
+        .as_array()
+        .unwrap_or_else(|| panic!("unwrap failed"));
     let commands: Vec<&str> = suggestions
         .iter()
-        .map(|s| s["command"].as_str().unwrap())
+        .map(|s| {
+            s["command"]
+                .as_str()
+                .unwrap_or_else(|| panic!("unwrap failed"))
+        })
         .collect();
     assert!(
         commands.contains(&"wai way"),
@@ -177,24 +198,24 @@ fn init_json_reinit_includes_wai_way_suggestion() {
 
 #[test]
 fn doctor_detects_version_mismatch_and_fix_repairs_it() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     // Write a config.toml with a stale commit to simulate version mismatch.
     // Doctor now uses tool_commit for version checking (takes priority over version string),
     // so we must stale the commit hash, not just the version.
     let config_path = tmp.path().join(".wai/config.toml");
-    let config = fs::read_to_string(&config_path).unwrap();
+    let config = fs::read_to_string(&config_path).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let stale_config = config
         .replace(env!("CARGO_PKG_VERSION"), "0.0.0-stale")
         .replace(env!("WAI_GIT_COMMIT"), "deadbeef-stale");
-    fs::write(&config_path, stale_config).unwrap();
+    fs::write(&config_path, stale_config).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // Doctor should detect the mismatch (Warn status) — exits 0 with warnings
     let out = wai_cmd(tmp.path())
         .args(["doctor"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(
@@ -206,11 +227,12 @@ fn doctor_detects_version_mismatch_and_fix_repairs_it() {
     let out = wai_cmd(tmp.path())
         .args(["doctor", "--fix", "--yes"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     // Config should now have the current version
-    let repaired = fs::read_to_string(&config_path).unwrap();
+    let repaired =
+        fs::read_to_string(&config_path).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         repaired.contains(env!("CARGO_PKG_VERSION")),
         "config.toml should have current version after fix"
@@ -219,18 +241,20 @@ fn doctor_detects_version_mismatch_and_fix_repairs_it() {
 
 #[test]
 fn doctor_detects_missing_agent_config_subdirs_and_fix_creates_them() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     // Remove agent-config subdirectories
-    fs::remove_dir_all(tmp.path().join(".wai/resources/agent-config/skills")).unwrap();
-    fs::remove_dir_all(tmp.path().join(".wai/resources/agent-config/rules")).unwrap();
+    fs::remove_dir_all(tmp.path().join(".wai/resources/agent-config/skills"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::remove_dir_all(tmp.path().join(".wai/resources/agent-config/rules"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // Doctor should detect them as missing — exits 1 on failures
     let out = wai_cmd(tmp.path())
         .args(["doctor"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(!out.status.success());
     assert!((stdout.contains("skills") || stdout.contains("Missing")));
@@ -239,7 +263,7 @@ fn doctor_detects_missing_agent_config_subdirs_and_fix_creates_them() {
     let out = wai_cmd(tmp.path())
         .args(["doctor", "--fix", "--yes"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success());
     assert!(stderr.contains("Fixed"));
@@ -260,23 +284,25 @@ fn doctor_detects_missing_agent_config_subdirs_and_fix_creates_them() {
 
 #[test]
 fn reinit_creates_missing_directories_and_updates_version() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     // Simulate damage: remove directories and stale version
-    fs::remove_dir_all(tmp.path().join(".wai/archives")).unwrap();
-    fs::remove_dir_all(tmp.path().join(".wai/resources/agent-config/context")).unwrap();
+    fs::remove_dir_all(tmp.path().join(".wai/archives"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::remove_dir_all(tmp.path().join(".wai/resources/agent-config/context"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let config_path = tmp.path().join(".wai/config.toml");
-    let config = fs::read_to_string(&config_path).unwrap();
+    let config = fs::read_to_string(&config_path).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let stale_config = config.replace(env!("CARGO_PKG_VERSION"), "0.0.0-stale");
-    fs::write(&config_path, stale_config).unwrap();
+    fs::write(&config_path, stale_config).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // Re-init should repair without prompting (--name reuses existing workspace)
     let out = wai_cmd(tmp.path())
         .args(["init", "--name", "test-ws"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     // Missing directories should be restored
@@ -292,7 +318,8 @@ fn reinit_creates_missing_directories_and_updates_version() {
     );
 
     // Version should be updated
-    let repaired = fs::read_to_string(&config_path).unwrap();
+    let repaired =
+        fs::read_to_string(&config_path).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         repaired.contains(env!("CARGO_PKG_VERSION")),
         "config.toml should have current version after reinit"
@@ -301,27 +328,29 @@ fn reinit_creates_missing_directories_and_updates_version() {
 
 #[test]
 fn reinit_is_idempotent() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     // Capture state after first init
-    let config_before = fs::read_to_string(tmp.path().join(".wai/config.toml")).unwrap();
+    let config_before = fs::read_to_string(tmp.path().join(".wai/config.toml"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // Re-init twice
     let out = wai_cmd(tmp.path())
         .args(["init", "--name", "test-ws"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let out = wai_cmd(tmp.path())
         .args(["init", "--name", "test-ws"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     // Config content should be stable (no duplicates, no corruption)
-    let config_after = fs::read_to_string(tmp.path().join(".wai/config.toml")).unwrap();
+    let config_after = fs::read_to_string(tmp.path().join(".wai/config.toml"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert_eq!(
         config_before.trim(),
         config_after.trim(),
@@ -354,7 +383,7 @@ fn reinit_is_idempotent() {
 
 #[test]
 fn new_project_creates_structure_with_state() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
@@ -366,20 +395,21 @@ fn new_project_creates_structure_with_state() {
     assert!(proj.join(".state").is_file());
 
     // Verify state file is valid YAML with research phase
-    let state = fs::read_to_string(proj.join(".state")).unwrap();
+    let state =
+        fs::read_to_string(proj.join(".state")).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(state.contains("current: research"));
 }
 
 #[test]
 fn new_project_fails_if_exists() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
     let out = wai_cmd(tmp.path())
         .args(["new", "project", "my-app"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("already exists"));
@@ -389,13 +419,13 @@ fn new_project_fails_if_exists() {
 
 #[test]
 fn new_area_creates_directory() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["new", "area", "dev-standards"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     assert!(
@@ -408,13 +438,13 @@ fn new_area_creates_directory() {
 
 #[test]
 fn new_resource_creates_directory() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["new", "resource", "cheatsheets"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     assert!(tmp.path().join(".wai/resources/cheatsheets").is_dir());
@@ -424,14 +454,14 @@ fn new_resource_creates_directory() {
 
 #[test]
 fn phase_show_displays_current_phase() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
     let out = wai_cmd(tmp.path())
         .args(["phase", "show"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("research"));
@@ -439,26 +469,27 @@ fn phase_show_displays_current_phase() {
 
 #[test]
 fn phase_next_advances_phase() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
     let out = wai_cmd(tmp.path())
         .args(["phase", "next"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success());
     assert!(stderr.contains("design"));
 
     // Verify state persisted
-    let state = fs::read_to_string(tmp.path().join(".wai/projects/my-app/.state")).unwrap();
+    let state = fs::read_to_string(tmp.path().join(".wai/projects/my-app/.state"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(state.contains("current: design"));
 }
 
 #[test]
 fn phase_back_goes_to_previous() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
@@ -466,14 +497,14 @@ fn phase_back_goes_to_previous() {
     let out = wai_cmd(tmp.path())
         .args(["phase", "next"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     // Go back to research (cliclack outputs to stderr)
     let out = wai_cmd(tmp.path())
         .args(["phase", "back"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success());
     assert!(stderr.contains("research"));
@@ -481,14 +512,14 @@ fn phase_back_goes_to_previous() {
 
 #[test]
 fn phase_back_fails_at_research() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
     let out = wai_cmd(tmp.path())
         .args(["phase", "back"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("already at first phase"));
@@ -496,32 +527,33 @@ fn phase_back_fails_at_research() {
 
 #[test]
 fn phase_set_jumps_to_target() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
     let out = wai_cmd(tmp.path())
         .args(["phase", "set", "implement"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success());
     assert!(stderr.contains("implement"));
 
-    let state = fs::read_to_string(tmp.path().join(".wai/projects/my-app/.state")).unwrap();
+    let state = fs::read_to_string(tmp.path().join(".wai/projects/my-app/.state"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(state.contains("current: implement"));
 }
 
 #[test]
 fn phase_set_rejects_invalid_phase() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
     let out = wai_cmd(tmp.path())
         .args(["phase", "set", "banana"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("Unknown phase"));
@@ -531,7 +563,7 @@ fn phase_set_rejects_invalid_phase() {
 
 #[test]
 fn add_research_creates_dated_file() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
@@ -544,31 +576,32 @@ fn add_research_creates_dated_file() {
             "my-app",
         ])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let research_dir = tmp.path().join(".wai/projects/my-app/research");
     let files: Vec<_> = fs::read_dir(&research_dir)
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .filter_map(|e| e.ok())
         .filter(|e| e.file_name().to_str().unwrap_or("").ends_with(".md"))
         .collect();
 
     assert_eq!(files.len(), 1);
     let filename = files[0].file_name();
-    let name = filename.to_str().unwrap();
+    let name = filename.to_str().unwrap_or_else(|| panic!("unwrap failed"));
     // Should start with YYYY-MM-DD
     assert!(name.len() >= 10);
     assert_eq!(&name[4..5], "-");
     assert_eq!(&name[7..8], "-");
 
-    let content = fs::read_to_string(files[0].path()).unwrap();
+    let content =
+        fs::read_to_string(files[0].path()).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(content.contains("Initial findings on the topic"));
 }
 
 #[test]
 fn add_research_with_tags_includes_frontmatter() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
@@ -583,16 +616,17 @@ fn add_research_with_tags_includes_frontmatter() {
             "api,design",
         ])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let research_dir = tmp.path().join(".wai/projects/my-app/research");
     let files: Vec<_> = fs::read_dir(&research_dir)
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .filter_map(|e| e.ok())
         .collect();
 
-    let content = fs::read_to_string(files[0].path()).unwrap();
+    let content =
+        fs::read_to_string(files[0].path()).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(content.contains("---"));
     assert!(content.contains("tags:"));
     assert!(content.contains("api"));
@@ -602,14 +636,14 @@ fn add_research_with_tags_includes_frontmatter() {
 
 #[test]
 fn show_overview_lists_para_categories() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
     let out = wai_cmd(tmp.path())
         .args(["show"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Projects"));
@@ -621,7 +655,7 @@ fn show_overview_lists_para_categories() {
 
 #[test]
 fn show_specific_project_lists_contents() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
@@ -629,7 +663,7 @@ fn show_specific_project_lists_contents() {
     let out = wai_cmd(tmp.path())
         .args(["show", "my-app"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Project:"));
@@ -640,13 +674,13 @@ fn show_specific_project_lists_contents() {
 
 #[test]
 fn show_nonexistent_item_fails() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["show", "nonexistent"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("not found"));
@@ -656,14 +690,14 @@ fn show_nonexistent_item_fails() {
 
 #[test]
 fn move_project_to_archives() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "old-project");
 
     let out = wai_cmd(tmp.path())
         .args(["move", "old-project", "archives"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success());
     assert!(stderr.contains("Moved"));
@@ -674,13 +708,13 @@ fn move_project_to_archives() {
 
 #[test]
 fn move_nonexistent_fails() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["move", "ghost", "archives"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("not found"));
@@ -690,7 +724,7 @@ fn move_nonexistent_fails() {
 
 #[test]
 fn search_finds_content_in_artifacts() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     write_artifact(
@@ -704,7 +738,7 @@ fn search_finds_content_in_artifacts() {
     let out = wai_cmd(tmp.path())
         .args(["search", "JSON"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Search results"));
@@ -713,7 +747,7 @@ fn search_finds_content_in_artifacts() {
 
 #[test]
 fn search_case_insensitive() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     write_artifact(
@@ -728,7 +762,7 @@ fn search_case_insensitive() {
     let out = wai_cmd(tmp.path())
         .args(["search", "hello"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Search results"));
@@ -737,14 +771,14 @@ fn search_case_insensitive() {
 
 #[test]
 fn search_rejects_unknown_type() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
     let out = wai_cmd(tmp.path())
         .args(["search", "x", "--type", "blogposts"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("Valid --type values"));
@@ -753,7 +787,7 @@ fn search_rejects_unknown_type() {
 
 #[test]
 fn search_accepts_canonical_type_values() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     write_artifact(
@@ -767,7 +801,7 @@ fn search_accepts_canonical_type_values() {
     let out = wai_cmd(tmp.path())
         .args(["search", "canonical_type_match", "--type", "research"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("canonical_type_match"));
@@ -775,7 +809,7 @@ fn search_accepts_canonical_type_values() {
 
 #[test]
 fn search_accepts_plural_type_aliases() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     write_artifact(
@@ -789,7 +823,7 @@ fn search_accepts_plural_type_aliases() {
     let out = wai_cmd(tmp.path())
         .args(["search", "alias_type_match", "--type", "plans"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("alias_type_match"));
@@ -797,7 +831,7 @@ fn search_accepts_plural_type_aliases() {
 
 #[test]
 fn search_json_honors_limit() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     write_artifact(
@@ -811,10 +845,17 @@ fn search_json_honors_limit() {
     let out = wai_cmd(tmp.path())
         .args(["search", "match_", "--json", "-n", "1"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
     let out = out.stdout.clone();
-    let out_str = String::from_utf8(out).unwrap();
-    let results: serde_json::Value = serde_json::from_str(&out_str).unwrap();
-    assert_eq!(results["data"]["results"].as_array().unwrap().len(), 1);
+    let out_str = String::from_utf8(out).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    let results: serde_json::Value =
+        serde_json::from_str(&out_str).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    assert_eq!(
+        results["data"]["results"]
+            .as_array()
+            .unwrap_or_else(|| panic!("unwrap failed"))
+            .len(),
+        1
+    );
 }

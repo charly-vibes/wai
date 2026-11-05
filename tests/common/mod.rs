@@ -37,7 +37,7 @@ fn skip_escape_sequence(chars: &mut std::iter::Peekable<std::str::Chars<'_>>, ou
 /// Helper: create a wai command that runs in the given directory.
 #[allow(deprecated)]
 pub fn wai_cmd(dir: &std::path::Path) -> Command {
-    let mut cmd = Command::cargo_bin("wai").unwrap();
+    let mut cmd = Command::cargo_bin("wai").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     cmd.current_dir(dir);
     // Disable color output for predictable assertions
     cmd.env("NO_COLOR", "1");
@@ -55,7 +55,7 @@ pub fn init_workspace(dir: &std::path::Path) {
     let out = wai_cmd(dir)
         .args(["init", "--name", "test-ws"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 }
 
@@ -64,7 +64,7 @@ pub fn create_project(dir: &std::path::Path, name: &str) {
     let out = wai_cmd(dir)
         .args(["new", "project", name])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 }
 
@@ -82,7 +82,7 @@ pub fn write_artifact(
         .join(project)
         .join(subdir)
         .join(filename);
-    fs::write(path, content).unwrap();
+    fs::write(path, content).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 }
 
 pub fn install_fake_bd(
@@ -91,7 +91,7 @@ pub fn install_fake_bd(
     output_lines: &[&str],
 ) -> std::path::PathBuf {
     let bin_dir = dir.join("fake-bin");
-    fs::create_dir_all(&bin_dir).unwrap();
+    fs::create_dir_all(&bin_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let script_path = bin_dir.join("bd");
 
     let escaped_lines = output_lines
@@ -113,13 +113,15 @@ exit 1
 "
     );
 
-    fs::write(&script_path, script).unwrap();
+    fs::write(&script_path, script).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let mut perms = fs::metadata(&script_path).unwrap().permissions();
+        let mut perms = fs::metadata(&script_path)
+            .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
+            .permissions();
         perms.set_mode(0o755);
-        fs::set_permissions(&script_path, perms).unwrap();
+        fs::set_permissions(&script_path, perms).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     }
 
     bin_dir
@@ -127,7 +129,7 @@ exit 1
 
 pub fn install_fake_bd_passthrough(dir: &std::path::Path) -> std::path::PathBuf {
     let bin_dir = dir.join("fake-bin");
-    fs::create_dir_all(&bin_dir).unwrap();
+    fs::create_dir_all(&bin_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let script_path = bin_dir.join("bd");
     let script = "#!/bin/sh
 if [ \"$1\" = \"ready\" ]; then
@@ -144,13 +146,15 @@ if [ \"$1\" = \"show\" ]; then
 fi
 exit 1
 ";
-    fs::write(&script_path, script).unwrap();
+    fs::write(&script_path, script).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let mut perms = fs::metadata(&script_path).unwrap().permissions();
+        let mut perms = fs::metadata(&script_path)
+            .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
+            .permissions();
         perms.set_mode(0o755);
-        fs::set_permissions(&script_path, perms).unwrap();
+        fs::set_permissions(&script_path, perms).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     }
     bin_dir
 }
@@ -160,7 +164,7 @@ exit 1
 /// Write a minimal custom plugin that runs a marker-creating hook.
 pub fn write_malicious_plugin(dir: &std::path::Path, marker: &str) {
     let plugin_dir = dir.join(".wai/plugins");
-    fs::create_dir_all(&plugin_dir).unwrap();
+    fs::create_dir_all(&plugin_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         plugin_dir.join("evil.toml"),
         format!(
@@ -174,7 +178,7 @@ inject_as = "evil_marker"
 "#
         ),
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 }
 
 pub fn wai_cmd_with_data_dir(
@@ -195,7 +199,8 @@ pub fn write_stale_state(project_dir: &std::path::Path, phase: &str, days_ago: u
         "current: {phase}\nhistory:\n- phase: {phase}\n  started: '{}'\n",
         started.to_rfc3339_opts(SecondsFormat::Nanos, true)
     );
-    fs::write(project_dir.join(".state"), state_yaml).unwrap();
+    fs::write(project_dir.join(".state"), state_yaml)
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 }
 
 // ─── wai why ─────────────────────────────────────────────────────────────────
@@ -216,7 +221,7 @@ pub fn set_privacy_notice_shown(dir: &std::path::Path) {
         .unwrap_or(&existing)
         .trim_end();
     let updated = format!("{}\n[llm]\nprivacy_notice_shown = true\n", base);
-    fs::write(&config_path, updated).unwrap();
+    fs::write(&config_path, updated).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 }
 
 /// Helper: add an [llm] section to .wai/config.toml forcing a specific backend.
@@ -239,7 +244,7 @@ pub fn force_why_llm(dir: &std::path::Path, llm: &str) {
         "{}\n[llm]\nllm = \"{}\"\nprivacy_notice_shown = true\n",
         base, llm
     );
-    fs::write(&config_path, updated).unwrap();
+    fs::write(&config_path, updated).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 }
 
 // ─── wai-933: Integration tests for resource management ──────────────────────
@@ -247,17 +252,18 @@ pub fn force_why_llm(dir: &std::path::Path, llm: &str) {
 // Helper: write a projections.yml into an initialized workspace
 pub fn write_projections_yml(dir: &std::path::Path, content: &str) {
     let path = dir.join(".wai/resources/agent-config/.projections.yml");
-    fs::write(path, content).unwrap();
+    fs::write(path, content).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 }
 
 pub fn doctor_detects_stale_symlink_projection() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     // Create a source directory with a file
     let source_dir = tmp.path().join(".wai/resources/agent-config/link-source");
-    fs::create_dir_all(&source_dir).unwrap();
-    fs::write(source_dir.join("rule.md"), "# A rule").unwrap();
+    fs::create_dir_all(&source_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(source_dir.join("rule.md"), "# A rule")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // Configure and sync a symlink projection
     write_projections_yml(
@@ -267,16 +273,16 @@ pub fn doctor_detects_stale_symlink_projection() {
     let out = wai_cmd(tmp.path())
         .args(["sync"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     // Remove the source file to create a broken symlink
-    fs::remove_file(source_dir.join("rule.md")).unwrap();
+    fs::remove_file(source_dir.join("rule.md")).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let output = wai_cmd(tmp.path())
         .args(["doctor", "--json"])
         .output()
-        .unwrap();
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let stdout = String::from_utf8_lossy(&output.stdout);
 
     assert!(
@@ -295,14 +301,15 @@ pub fn write_handoff(dir: &std::path::Path, project: &str, filename: &str, conte
         .join("projects")
         .join(project)
         .join("handoffs");
-    fs::create_dir_all(&handoffs).unwrap();
-    fs::write(handoffs.join(filename), content).unwrap();
+    fs::create_dir_all(&handoffs).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(handoffs.join(filename), content).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 }
 
 /// Helper: write a `.pending-resume` file pointing to a handoff in the project dir.
 pub fn write_pending_resume(dir: &std::path::Path, project: &str, handoff_relative: &str) {
     let proj_dir = dir.join(".wai/projects").join(project);
-    fs::write(proj_dir.join(".pending-resume"), handoff_relative).unwrap();
+    fs::write(proj_dir.join(".pending-resume"), handoff_relative)
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 }
 
 // ─── wai ls ──────────────────────────────────────────────────────────────────
@@ -310,24 +317,24 @@ pub fn write_pending_resume(dir: &std::path::Path, project: &str, handoff_relati
 /// Helper: write a minimal .wai/config.toml in a directory so it is detected
 /// as a wai workspace.
 pub fn make_workspace(dir: &std::path::Path, ws_name: &str) {
-    fs::create_dir_all(dir.join(".wai/projects")).unwrap();
+    fs::create_dir_all(dir.join(".wai/projects")).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         dir.join(".wai/config.toml"),
         format!("[project]\nname = \"{}\"\n", ws_name),
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 }
 
 /// Helper: create a project directory with an optional phase state file.
 pub fn make_project(workspace: &std::path::Path, project_name: &str, phase: Option<&str>) {
     let proj_dir = workspace.join(".wai/projects").join(project_name);
-    fs::create_dir_all(&proj_dir).unwrap();
+    fs::create_dir_all(&proj_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     if let Some(p) = phase {
         fs::write(
             proj_dir.join(".state"),
             format!("current: {}\nhistory: []\n", p),
         )
-        .unwrap();
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     }
 }
 
@@ -349,7 +356,7 @@ pub fn reflect_workspace(dir: &std::path::Path) {
 
     init_workspace(dir);
     create_project(dir, "test-proj");
-    fs::write(dir.join("CLAUDE.md"), "# Claude\n").unwrap();
+    fs::write(dir.join("CLAUDE.md"), "# Claude\n").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 }
 
 pub const MOCK_REFLECT_CONTENT: &str = "\
@@ -364,7 +371,7 @@ _Last reflected: 2026-02-24 · 1 sessions analyzed_\n\
 /// Helper: write a minimal two-step TOML pipeline for start tests.
 pub fn write_pipeline_toml(dir: &std::path::Path, name: &str) {
     let pipelines_dir = dir.join(".wai/resources/pipelines");
-    fs::create_dir_all(&pipelines_dir).unwrap();
+    fs::create_dir_all(&pipelines_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let content = format!(
         r#"[pipeline]
 name = "{name}"
@@ -380,14 +387,15 @@ prompt = "{{topic}}: do step two implementation."
 "#,
         name = name
     );
-    fs::write(pipelines_dir.join(format!("{}.toml", name)), content).unwrap();
+    fs::write(pipelines_dir.join(format!("{}.toml", name)), content)
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 }
 
 // ─── wai pipeline gates and approvals ─────────────────────────────────────────
 
 pub fn write_gated_pipeline_toml(dir: &std::path::Path, name: &str) {
     let pipelines_dir = dir.join(".wai/resources/pipelines");
-    fs::create_dir_all(&pipelines_dir).unwrap();
+    fs::create_dir_all(&pipelines_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let content = format!(
         r#"[pipeline]
 name = "{name}"
@@ -417,7 +425,8 @@ prompt = "{{{{topic}}}}: ship it."
 "#,
         name = name
     );
-    fs::write(pipelines_dir.join(format!("{}.toml", name)), content).unwrap();
+    fs::write(pipelines_dir.join(format!("{}.toml", name)), content)
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 }
 
 pub fn write_artifact_with_tags(
@@ -428,21 +437,22 @@ pub fn write_artifact_with_tags(
     tags: &[&str],
 ) {
     let artifact_dir = dir.join(".wai").join("projects").join(project).join(subdir);
-    fs::create_dir_all(&artifact_dir).unwrap();
+    fs::create_dir_all(&artifact_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let tag_list = tags
         .iter()
         .map(|t| t.to_string())
         .collect::<Vec<_>>()
         .join(", ");
     let content = format!("---\ntags: [{tag_list}]\n---\n\nTest artifact content.\n");
-    fs::write(artifact_dir.join(filename), content).unwrap();
+    fs::write(artifact_dir.join(filename), content)
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 }
 
 // ─── wai pipeline authoring and integrity ────────────────────────────────────
 
 pub fn write_pipeline_toml_with_metadata(dir: &std::path::Path, name: &str) {
     let pipelines_dir = dir.join(".wai/resources/pipelines");
-    fs::create_dir_all(&pipelines_dir).unwrap();
+    fs::create_dir_all(&pipelines_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let content = format!(
         r#"[pipeline]
 name = "{name}"
@@ -467,7 +477,8 @@ prompt = "{{topic}}: review."
 "#,
         name = name
     );
-    fs::write(pipelines_dir.join(format!("{}.toml", name)), content).unwrap();
+    fs::write(pipelines_dir.join(format!("{}.toml", name)), content)
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 }
 
 // ─── wai-vx02.4: approval + release oracle gates in shipped tdd-ro5 ─────────
@@ -483,7 +494,7 @@ pub fn git_repo_init_and_commit(dir: &std::path::Path, message: &str) {
             .env("GIT_COMMITTER_NAME", "test")
             .env("GIT_COMMITTER_EMAIL", "test@example.com")
             .output()
-            .unwrap();
+            .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
         assert!(
             output.status.success(),
             "git {:?} failed: {}",
@@ -503,7 +514,7 @@ pub fn run_release_oracle(dir: &std::path::Path) -> (i32, String) {
         .arg("artifact.md")
         .current_dir(dir)
         .output()
-        .expect("release-docs-fresh.sh should exist and be executable");
+        .unwrap_or_else(|e| panic!("release-docs-fresh.sh should exist and be executable: {e}"));
     (
         output.status.code().unwrap_or(-1),
         String::from_utf8_lossy(&output.stderr).to_string(),
@@ -513,19 +524,19 @@ pub fn run_release_oracle(dir: &std::path::Path) -> (i32, String) {
 /// Helper: init workspace, init the built-in tdd-ro5 pipeline, and set up a
 /// demo repo whose Cargo.toml version and CHANGELOG heading both say `cargo_version`.
 pub fn release_oracle_sandbox(cargo_version: &str, changelog_version: Option<&str>) -> TempDir {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "init", "tdd-ro5"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     fs::write(
         tmp.path().join("Cargo.toml"),
         format!("[package]\nname = \"demo\"\nversion = \"{cargo_version}\"\n"),
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let changelog_heading = changelog_version
         .map(|v| format!("## [{v}] - 2026-09-01\n\n- older release\n"))
         .unwrap_or_else(|| "## [Unreleased]\n\n(nothing yet)\n".to_string());
@@ -533,9 +544,10 @@ pub fn release_oracle_sandbox(cargo_version: &str, changelog_version: Option<&st
         tmp.path().join("CHANGELOG.md"),
         format!("# Changelog\n\n{changelog_heading}"),
     )
-    .unwrap();
-    fs::create_dir_all(tmp.path().join("docs")).unwrap();
-    fs::write(tmp.path().join("docs/index.md"), "docs").unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::create_dir_all(tmp.path().join("docs")).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(tmp.path().join("docs/index.md"), "docs")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     git_repo_init_and_commit(tmp.path(), "initial");
     tmp
 }
@@ -545,13 +557,14 @@ pub fn release_oracle_sandbox(cargo_version: &str, changelog_version: Option<&st
 /// Helper: write a pipeline TOML with a specific name and description.
 pub fn write_pipeline_toml_with_desc(dir: &std::path::Path, name: &str, description: &str) {
     let pipelines_dir = dir.join(".wai/resources/pipelines");
-    fs::create_dir_all(&pipelines_dir).unwrap();
+    fs::create_dir_all(&pipelines_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let content = format!(
         "[pipeline]\nname = \"{name}\"\ndescription = \"{description}\"\n\n[[steps]]\nid = \"step-one\"\nprompt = \"{{topic}}: do the thing.\"\n",
         name = name,
         description = description
     );
-    fs::write(pipelines_dir.join(format!("{}.toml", name)), content).unwrap();
+    fs::write(pipelines_dir.join(format!("{}.toml", name)), content)
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 }
 
 // ─── wai status: pipeline integration ────────────────────────────────────────
@@ -564,16 +577,18 @@ pub fn write_pipeline_run(
     current_step: usize,
 ) {
     let runs_dir = dir.join(".wai/pipeline-runs");
-    fs::create_dir_all(&runs_dir).unwrap();
+    fs::create_dir_all(&runs_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let yaml = format!(
         "run_id: {run_id}\npipeline: {pipeline_name}\ntopic: test-topic\ncreated_at: \"2026-01-01T00:00:00Z\"\ncurrent_step: {current_step}\n"
     );
-    fs::write(runs_dir.join(format!("{run_id}.yml")), yaml).unwrap();
+    fs::write(runs_dir.join(format!("{run_id}.yml")), yaml)
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // Write .last-run pointer
     let pipelines_dir = dir.join(".wai/resources/pipelines");
-    fs::create_dir_all(&pipelines_dir).unwrap();
-    fs::write(pipelines_dir.join(".last-run"), run_id).unwrap();
+    fs::create_dir_all(&pipelines_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(pipelines_dir.join(".last-run"), run_id)
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 }
 
 // ─── stale-run GC (wai-vx02.2) ────────────────────────────────────────────────
@@ -593,9 +608,12 @@ pub fn write_stale_run_fixture(
 
     let run_path = dir.join(".wai/pipeline-runs").join(format!("{run_id}.yml"));
     let mtime = std::time::SystemTime::now() - std::time::Duration::from_secs(age_days * 86_400);
-    let file = fs::OpenOptions::new().write(true).open(&run_path).unwrap();
+    let file = fs::OpenOptions::new()
+        .write(true)
+        .open(&run_path)
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     file.set_times(fs::FileTimes::new().set_accessed(mtime).set_modified(mtime))
-        .unwrap();
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 }
 
 pub fn init_workspace_with_project(dir: &std::path::Path, name: &str) {
@@ -614,7 +632,7 @@ pub fn init_workspace_with_project(dir: &std::path::Path, name: &str) {
 /// (exactly the real fixture style: fake-bin/bd + PATH injection).
 pub fn install_fake_bd_ready_json(dir: &std::path::Path, issues_json: &str) -> std::path::PathBuf {
     let bin_dir = dir.join("fake-bin");
-    fs::create_dir_all(&bin_dir).unwrap();
+    fs::create_dir_all(&bin_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let script_path = bin_dir.join("bd");
     let escaped = issues_json.replace('\'', "'\"'\"'");
     let script = format!(
@@ -626,11 +644,13 @@ fi
 exit 1
 "
     );
-    fs::write(&script_path, script).unwrap();
+    fs::write(&script_path, script).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let mut perms = fs::metadata(&script_path).unwrap().permissions();
+        let mut perms = fs::metadata(&script_path)
+            .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
+            .permissions();
         perms.set_mode(0o755);
         let _ = fs::set_permissions(&script_path, perms);
     }
@@ -650,7 +670,7 @@ pub fn write_child_run_fixture(
     handoff_artifact: Option<&str>,
 ) {
     let runs_dir = dir.join(".wai/pipeline-runs");
-    fs::create_dir_all(&runs_dir).unwrap();
+    fs::create_dir_all(&runs_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let artifact = handoff_artifact
         .map(|a| format!("handoff_artifact: {a}\n"))
         .unwrap_or_default();
@@ -660,7 +680,7 @@ pub fn write_child_run_fixture(
             "run_id: {run_id}\npipeline: {pipeline}\ntopic: {issue}\ncreated_at: '2026-10-05T00:00:00Z'\ncurrent_step: {current_step}\napprovals: {{}}\n{artifact}"
         ),
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 }
 
 /// Write an epic parent run state fixture + `.last-run` pointer
@@ -674,7 +694,7 @@ pub fn write_epic_run_fixture(
     child_runs: &[&str],
 ) {
     let runs_dir = dir.join(".wai/pipeline-runs");
-    fs::create_dir_all(&runs_dir).unwrap();
+    fs::create_dir_all(&runs_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let issues = child_issues
         .iter()
         .map(|i| format!("    - {i}\n"))
@@ -689,10 +709,11 @@ pub fn write_epic_run_fixture(
             "run_id: {run_id}\npipeline: {pipeline}\ntopic: {epic}\ncreated_at: '2026-10-05T00:00:00Z'\ncurrent_step: 0\napprovals: {{}}\nepic: {epic}\nchild_issues:\n{issues}child_runs:\n{runs}"
         ),
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let pipelines_dir = dir.join(".wai/resources/pipelines");
-    fs::create_dir_all(&pipelines_dir).unwrap();
-    fs::write(pipelines_dir.join(".last-run"), run_id).unwrap();
+    fs::create_dir_all(&pipelines_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(pipelines_dir.join(".last-run"), run_id)
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 }
 
 /// Hermetic wai command for suites that must not inherit an ambient

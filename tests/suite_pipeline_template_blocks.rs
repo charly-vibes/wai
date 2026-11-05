@@ -18,19 +18,19 @@ use tempfile::TempDir;
 #[test]
 fn validate_passes_for_all_builtin_templates() {
     for name in ["epic-orchestrator", "scientific-research", "tdd-ro5"] {
-        let tmp = TempDir::new().unwrap();
+        let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
         init_workspace(tmp.path());
 
         let init = wai_cmd(tmp.path())
             .args(["pipeline", "init", name])
             .output()
-            .expect("init should run");
+            .unwrap_or_else(|e| panic!("init should run: {e}"));
         assert!(init.status.success(), "init {name} failed");
 
         let out = wai_cmd(tmp.path())
             .args(["pipeline", "validate"])
             .output()
-            .expect("validate should run");
+            .unwrap_or_else(|e| panic!("validate should run: {e}"));
         let combined = format!(
             "{}{}",
             String::from_utf8_lossy(&out.stdout),
@@ -51,11 +51,16 @@ fn validate_passes_for_all_builtin_templates() {
 /// with a clear error naming the missing block (ratchet test 3b).
 #[test]
 fn validate_fails_on_unknown_block_reference() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let toml_path = tmp.path().join(".wai/resources/pipelines/badblocks.toml");
-    fs::create_dir_all(toml_path.parent().unwrap()).unwrap();
+    fs::create_dir_all(
+        toml_path
+            .parent()
+            .unwrap_or_else(|| panic!("unwrap failed")),
+    )
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         &toml_path,
         r#"
@@ -71,12 +76,12 @@ Do the thing.
 """
 "#,
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "validate", "badblocks"])
         .output()
-        .expect("validate should run");
+        .unwrap_or_else(|e| panic!("validate should run: {e}"));
     assert!(
         !out.status.success(),
         "validate must fail on unknown block reference"
@@ -100,11 +105,16 @@ Do the thing.
 /// must validate cleanly (the mechanism must not be flagged as an error).
 #[test]
 fn validate_passes_with_defined_blocks() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let toml_path = tmp.path().join(".wai/resources/pipelines/goodblocks.toml");
-    fs::create_dir_all(toml_path.parent().unwrap()).unwrap();
+    fs::create_dir_all(
+        toml_path
+            .parent()
+            .unwrap_or_else(|| panic!("unwrap failed")),
+    )
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         &toml_path,
         r#"
@@ -124,12 +134,12 @@ name = "trail"
 content = "Advance: `wai pipeline next`"
 "#,
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "validate", "goodblocks"])
         .output()
-        .expect("validate should run");
+        .unwrap_or_else(|e| panic!("validate should run: {e}"));
     let combined = format!(
         "{}{}",
         String::from_utf8_lossy(&out.stdout),
@@ -154,19 +164,19 @@ fn implement_and_ship_steps_declare_structural_gates() {
         ("tdd-ro5", &["green", "refactor", "ship-close"]),
     ];
     for (template, steps) in cases {
-        let tmp = TempDir::new().unwrap();
+        let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
         init_workspace(tmp.path());
 
         let init = wai_cmd(tmp.path())
             .args(["pipeline", "init", template])
             .output()
-            .expect("init should run");
+            .unwrap_or_else(|e| panic!("init should run: {e}"));
         assert!(init.status.success(), "init {template} failed");
 
         let out = wai_cmd(tmp.path())
             .args(["pipeline", "gates", template])
             .output()
-            .expect("gates should run");
+            .unwrap_or_else(|e| panic!("gates should run: {e}"));
         let combined = format!(
             "{}{}",
             String::from_utf8_lossy(&out.stdout),

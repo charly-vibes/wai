@@ -3,7 +3,7 @@ use tempfile::TempDir;
 
 #[allow(deprecated)]
 fn wai_cmd(dir: &std::path::Path) -> Command {
-    let mut cmd = Command::cargo_bin("wai").unwrap();
+    let mut cmd = Command::cargo_bin("wai").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     cmd.current_dir(dir);
     cmd.env("NO_COLOR", "1");
     // Update notice off in tests: existing assertions expect quiet stderr and
@@ -16,7 +16,7 @@ fn init_workspace(dir: &std::path::Path) {
     let out = wai_cmd(dir)
         .args(["init", "--name", "test-ws"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 }
 
@@ -24,7 +24,7 @@ fn create_project(dir: &std::path::Path, name: &str) {
     let out = wai_cmd(dir)
         .args(["new", "project", name])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 }
 
@@ -32,14 +32,14 @@ fn create_project(dir: &std::path::Path, name: &str) {
 
 #[test]
 fn show_overview_lists_para_categories() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
     let out = wai_cmd(tmp.path())
         .args(["show"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Projects"));
@@ -52,14 +52,14 @@ fn show_overview_lists_para_categories() {
 
 #[test]
 fn show_specific_project_displays_details() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
     let out = wai_cmd(tmp.path())
         .args(["show", "my-app"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("my-app"));
@@ -71,13 +71,13 @@ fn show_specific_project_displays_details() {
 
 #[test]
 fn show_nonexistent_item_fails_with_diagnostic() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["show", "nonexistent"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("not found"));

@@ -4,7 +4,7 @@ use tempfile::TempDir;
 
 #[allow(deprecated)]
 fn wai_cmd(dir: &std::path::Path) -> Command {
-    let mut cmd = Command::cargo_bin("wai").unwrap();
+    let mut cmd = Command::cargo_bin("wai").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     cmd.current_dir(dir);
     cmd.env("NO_COLOR", "1");
     // Update notice off in tests: existing assertions expect quiet stderr and
@@ -17,7 +17,7 @@ fn init_workspace(dir: &std::path::Path) {
     let out = wai_cmd(dir)
         .args(["init", "--name", "test-ws"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 }
 
@@ -25,13 +25,13 @@ fn init_workspace(dir: &std::path::Path) {
 
 #[test]
 fn config_list_shows_empty_sections_on_fresh_workspace() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["config", "list"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Agent Configuration"));
@@ -39,22 +39,29 @@ fn config_list_shows_empty_sections_on_fresh_workspace() {
 
 #[test]
 fn config_list_shows_added_skill_file() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let skill_file = tmp.path().join("my-skill.md");
-    fs::write(&skill_file, "# My Skill").unwrap();
+    fs::write(&skill_file, "# My Skill").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
-        .args(["config", "add", "skill", skill_file.to_str().unwrap()])
+        .args([
+            "config",
+            "add",
+            "skill",
+            skill_file
+                .to_str()
+                .unwrap_or_else(|| panic!("unwrap failed")),
+        ])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let out = wai_cmd(tmp.path())
         .args(["config", "list"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("my-skill.md"));
@@ -64,16 +71,23 @@ fn config_list_shows_added_skill_file() {
 
 #[test]
 fn config_add_skill_copies_file_to_agent_config_dir() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let skill_file = tmp.path().join("my-skill.md");
-    fs::write(&skill_file, "# My Skill").unwrap();
+    fs::write(&skill_file, "# My Skill").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
-        .args(["config", "add", "skill", skill_file.to_str().unwrap()])
+        .args([
+            "config",
+            "add",
+            "skill",
+            skill_file
+                .to_str()
+                .unwrap_or_else(|| panic!("unwrap failed")),
+        ])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success());
     assert!(stderr.contains("my-skill.md"));
@@ -89,16 +103,23 @@ fn config_add_skill_copies_file_to_agent_config_dir() {
 
 #[test]
 fn config_add_rule_copies_file_to_rules_dir() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let rule_file = tmp.path().join("my-rule.md");
-    fs::write(&rule_file, "# My Rule").unwrap();
+    fs::write(&rule_file, "# My Rule").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
-        .args(["config", "add", "rule", rule_file.to_str().unwrap()])
+        .args([
+            "config",
+            "add",
+            "rule",
+            rule_file
+                .to_str()
+                .unwrap_or_else(|| panic!("unwrap failed")),
+        ])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let dest = tmp
@@ -114,16 +135,21 @@ fn config_add_rule_copies_file_to_rules_dir() {
 
 #[test]
 fn config_add_unknown_type_fails_with_diagnostic() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let file = tmp.path().join("stuff.md");
-    fs::write(&file, "content").unwrap();
+    fs::write(&file, "content").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
-        .args(["config", "add", "unknown-type", file.to_str().unwrap()])
+        .args([
+            "config",
+            "add",
+            "unknown-type",
+            file.to_str().unwrap_or_else(|| panic!("unwrap failed")),
+        ])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("Unknown config type"));

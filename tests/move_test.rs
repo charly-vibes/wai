@@ -3,7 +3,7 @@ use tempfile::TempDir;
 
 #[allow(deprecated)]
 fn wai_cmd(dir: &std::path::Path) -> Command {
-    let mut cmd = Command::cargo_bin("wai").unwrap();
+    let mut cmd = Command::cargo_bin("wai").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     cmd.current_dir(dir);
     cmd.env("NO_COLOR", "1");
     // Update notice off in tests: existing assertions expect quiet stderr and
@@ -16,7 +16,7 @@ fn init_workspace(dir: &std::path::Path) {
     let out = wai_cmd(dir)
         .args(["init", "--name", "test-ws"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 }
 
@@ -24,7 +24,7 @@ fn create_project(dir: &std::path::Path, name: &str) {
     let out = wai_cmd(dir)
         .args(["new", "project", name])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 }
 
@@ -32,14 +32,14 @@ fn create_project(dir: &std::path::Path, name: &str) {
 
 #[test]
 fn move_project_to_archives() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "old-proj");
 
     let out = wai_cmd(tmp.path())
         .args(["move", "old-proj", "archives"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success());
     assert!(stderr.contains("Moved"));
@@ -56,14 +56,14 @@ fn move_project_to_archives() {
 
 #[test]
 fn move_project_to_areas() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-proj");
 
     let out = wai_cmd(tmp.path())
         .args(["move", "my-proj", "areas"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success());
     assert!(stderr.contains("Moved"));
@@ -82,13 +82,13 @@ fn move_project_to_areas() {
 
 #[test]
 fn move_nonexistent_item_fails_with_diagnostic() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["move", "ghost", "archives"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("not found"));

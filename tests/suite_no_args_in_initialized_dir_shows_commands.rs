@@ -9,10 +9,12 @@ use tempfile::TempDir;
 
 #[test]
 fn no_args_in_initialized_dir_shows_commands() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
-    let out = wai_cmd(tmp.path()).output().expect("command should run");
+    let out = wai_cmd(tmp.path())
+        .output()
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("wai status"));
@@ -22,13 +24,13 @@ fn no_args_in_initialized_dir_shows_commands() {
 
 #[test]
 fn doctor_healthy_workspace_all_pass() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["doctor", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("\"fail\": 0"));
@@ -38,15 +40,16 @@ fn doctor_healthy_workspace_all_pass() {
 
 #[test]
 fn doctor_missing_directories_fails_with_fix() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
-    fs::remove_dir_all(tmp.path().join(".wai/archives")).unwrap();
+    fs::remove_dir_all(tmp.path().join(".wai/archives"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["doctor", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert_eq!(out.status.code(), Some(1));
     assert!(stdout.contains("\"status\": \"fail\""));
@@ -56,15 +59,16 @@ fn doctor_missing_directories_fails_with_fix() {
 
 #[test]
 fn doctor_invalid_config_toml_fails() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
-    fs::write(tmp.path().join(".wai/config.toml"), "{{invalid toml!!!").unwrap();
+    fs::write(tmp.path().join(".wai/config.toml"), "{{invalid toml!!!")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["doctor", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert_eq!(out.status.code(), Some(1));
     assert!(stdout.contains("\"status\": \"fail\""));
@@ -73,17 +77,17 @@ fn doctor_invalid_config_toml_fails() {
 
 #[test]
 fn doctor_missing_plugin_tool_warns() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     // Create .git dir so the git plugin is detected
-    fs::create_dir(tmp.path().join(".git")).unwrap();
+    fs::create_dir(tmp.path().join(".git")).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let output = wai_cmd(tmp.path())
         .args(["doctor", "--json"])
         .env("PATH", "/nonexistent")
         .output()
-        .unwrap();
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("\"status\": \"warn\""));
@@ -92,7 +96,7 @@ fn doctor_missing_plugin_tool_warns() {
 
 #[test]
 fn prime_project_flag_selects_correct_project() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "alpha");
     create_project(tmp.path(), "beta");
@@ -100,7 +104,7 @@ fn prime_project_flag_selects_correct_project() {
     let out = wai_cmd(tmp.path())
         .args(["prime", "--project", "alpha", "--no-input"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Project: alpha"));
@@ -108,13 +112,13 @@ fn prime_project_flag_selects_correct_project() {
 
 #[test]
 fn prime_zero_projects_shows_suggestion() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["prime", "--no-input"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("wai new project"));
@@ -122,7 +126,7 @@ fn prime_zero_projects_shows_suggestion() {
 
 #[test]
 fn prime_multiple_projects_no_input_fails() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "alpha");
     create_project(tmp.path(), "beta");
@@ -130,7 +134,7 @@ fn prime_multiple_projects_no_input_fails() {
     let out = wai_cmd(tmp.path())
         .args(["prime", "--no-input"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("--project <name>"));
@@ -138,14 +142,14 @@ fn prime_multiple_projects_no_input_fails() {
 
 #[test]
 fn prime_unknown_project_fails_with_available() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
 
     let out = wai_cmd(tmp.path())
         .args(["prime", "--project", "doesnotexist", "--no-input"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("doesnotexist"));
@@ -154,7 +158,7 @@ fn prime_unknown_project_fails_with_available() {
 
 #[test]
 fn prime_all_headings_handoff_shows_no_summary_yet() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
     write_handoff(
@@ -167,7 +171,7 @@ fn prime_all_headings_handoff_shows_no_summary_yet() {
     let out = wai_cmd(tmp.path())
         .args(["prime", "--project", "myproject", "--no-input"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("no summary yet"));
@@ -177,7 +181,7 @@ fn prime_all_headings_handoff_shows_no_summary_yet() {
 fn prime_handoff_code_fence_content_not_used_as_snippet() {
     // Regression: find_first_paragraph used to leak code-fence content (e.g. git
     // status lines) as the handoff snippet when all real sections were empty.
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
     write_handoff(
@@ -192,24 +196,28 @@ fn prime_handoff_code_fence_content_not_used_as_snippet() {
     let out = wai_cmd(tmp.path())
         .args(["prime", "--project", "myproject", "--no-input"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("no summary yet"));
-    assert!(regex::Regex::new("(?s).*").unwrap().is_match(&stdout));
+    assert!(
+        regex::Regex::new("(?s).*")
+            .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
+            .is_match(&stdout)
+    );
     // Must NOT show the raw git-status line as the snippet
     assert!(!stdout.contains("M  src/main.rs"));
 }
 
 #[test]
 fn prime_outside_workspace_fails() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     // No wai init — no .wai/ directory
 
     let out = wai_cmd(tmp.path())
         .args(["prime", "--no-input"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("wai init"));
@@ -217,7 +225,7 @@ fn prime_outside_workspace_fails() {
 
 #[test]
 fn prime_shows_resuming_block_when_pending_resume_present_today() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
 
@@ -236,10 +244,10 @@ fn prime_shows_resuming_block_when_pending_resume_present_today() {
     let stdout = wai_cmd(tmp.path())
         .args(["prime", "--project", "myproject", "--no-input"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(stdout.status.success());
     let stdout = stdout.stdout.clone();
-    let out = String::from_utf8(stdout).unwrap();
+    let out = String::from_utf8(stdout).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     assert!(
         out.contains("RESUMING"),
@@ -261,7 +269,7 @@ fn prime_shows_resuming_block_when_pending_resume_present_today() {
 
 #[test]
 fn prime_resuming_signal_not_consumed_on_second_call() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
 
@@ -277,7 +285,7 @@ fn prime_resuming_signal_not_consumed_on_second_call() {
     let out = wai_cmd(tmp.path())
         .args(["prime", "--project", "myproject", "--no-input"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("RESUMING"));
@@ -286,7 +294,7 @@ fn prime_resuming_signal_not_consumed_on_second_call() {
     let out = wai_cmd(tmp.path())
         .args(["prime", "--project", "myproject", "--no-input"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("RESUMING"));
@@ -294,7 +302,7 @@ fn prime_resuming_signal_not_consumed_on_second_call() {
 
 #[test]
 fn prime_ignores_stale_pending_resume_dated_yesterday() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
 
@@ -312,7 +320,7 @@ fn prime_ignores_stale_pending_resume_dated_yesterday() {
     let out = wai_cmd(tmp.path())
         .args(["prime", "--project", "myproject", "--no-input"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(!(stdout.contains("RESUMING")));
@@ -321,7 +329,7 @@ fn prime_ignores_stale_pending_resume_dated_yesterday() {
 
 #[test]
 fn prime_renders_normally_without_pending_resume() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
 
@@ -336,7 +344,7 @@ fn prime_renders_normally_without_pending_resume() {
     let out = wai_cmd(tmp.path())
         .args(["prime", "--project", "myproject", "--no-input"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(!(stdout.contains("RESUMING")));
@@ -345,7 +353,7 @@ fn prime_renders_normally_without_pending_resume() {
 
 #[test]
 fn prime_resuming_empty_next_steps_shows_only_header() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
 
@@ -362,10 +370,10 @@ fn prime_resuming_empty_next_steps_shows_only_header() {
     let stdout = wai_cmd(tmp.path())
         .args(["prime", "--project", "myproject", "--no-input"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(stdout.status.success());
     let stdout = stdout.stdout.clone();
-    let out = String::from_utf8(stdout).unwrap();
+    let out = String::from_utf8(stdout).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     assert!(out.contains("RESUMING"), "expected RESUMING header: {out}");
     assert!(
@@ -376,7 +384,7 @@ fn prime_resuming_empty_next_steps_shows_only_header() {
 
 #[test]
 fn prime_close_prime_close_prime_end_to_end_resume_loop() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
 
@@ -384,11 +392,12 @@ fn prime_close_prime_close_prime_end_to_end_resume_loop() {
     let out = wai_cmd(tmp.path())
         .args(["close", "--project", "myproject"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let proj_dir = tmp.path().join(".wai/projects/myproject");
-    let signal1 = fs::read_to_string(proj_dir.join(".pending-resume")).unwrap();
+    let signal1 = fs::read_to_string(proj_dir.join(".pending-resume"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         !signal1.trim().is_empty(),
         ".pending-resume written after first close"
@@ -398,11 +407,13 @@ fn prime_close_prime_close_prime_end_to_end_resume_loop() {
     let out1 = wai_cmd(tmp.path())
         .args(["prime", "--project", "myproject", "--no-input"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out1.status.success());
     let out1 = out1.stdout.clone();
     assert!(
-        String::from_utf8(out1).unwrap().contains("RESUMING"),
+        String::from_utf8(out1)
+            .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
+            .contains("RESUMING"),
         "first prime after close should show RESUMING"
     );
 
@@ -410,10 +421,11 @@ fn prime_close_prime_close_prime_end_to_end_resume_loop() {
     let out = wai_cmd(tmp.path())
         .args(["close", "--project", "myproject"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
-    let signal2 = fs::read_to_string(proj_dir.join(".pending-resume")).unwrap();
+    let signal2 = fs::read_to_string(proj_dir.join(".pending-resume"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     // Second close updates the same file in place, so .pending-resume still
     // points to the same (only) handoff for this day.
     assert_eq!(
@@ -430,27 +442,35 @@ fn prime_close_prime_close_prime_end_to_end_resume_loop() {
     let out2 = wai_cmd(tmp.path())
         .args(["prime", "--project", "myproject", "--no-input"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out2.status.success());
     let out2 = out2.stdout.clone();
     assert!(
-        String::from_utf8(out2).unwrap().contains("RESUMING"),
+        String::from_utf8(out2)
+            .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
+            .contains("RESUMING"),
         "second prime after close should still show RESUMING"
     );
 }
 
 #[test]
 fn ls_single_workspace_one_project() {
-    let root = TempDir::new().unwrap();
+    let root = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let ws = root.path().join("my-repo");
     make_workspace(&ws, "my-ws");
     make_project(&ws, "my-proj", Some("implement"));
 
     let out = wai_cmd(root.path())
-        .args(["ls", "--root", root.path().to_str().unwrap()])
+        .args([
+            "ls",
+            "--root",
+            root.path()
+                .to_str()
+                .unwrap_or_else(|| panic!("unwrap failed")),
+        ])
         .env("NO_COLOR", "1")
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("my-proj"));
@@ -459,7 +479,7 @@ fn ls_single_workspace_one_project() {
 
 #[test]
 fn ls_multiple_workspaces_sorted_by_name() {
-    let root = TempDir::new().unwrap();
+    let root = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let ws_a = root.path().join("alpha-repo");
     make_workspace(&ws_a, "alpha");
@@ -470,10 +490,16 @@ fn ls_multiple_workspaces_sorted_by_name() {
     make_project(&ws_b, "apple", Some("research"));
 
     let out = wai_cmd(root.path())
-        .args(["ls", "--root", root.path().to_str().unwrap()])
+        .args([
+            "ls",
+            "--root",
+            root.path()
+                .to_str()
+                .unwrap_or_else(|| panic!("unwrap failed")),
+        ])
         .env("NO_COLOR", "1")
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
     let out = out.stdout.clone();
 
@@ -483,8 +509,12 @@ fn ls_multiple_workspaces_sorted_by_name() {
     assert!(output.contains("zebra"), "zebra missing: {}", output);
 
     // apple (a) appears before zebra (z) when sorted
-    let pos_apple = output.find("apple").unwrap();
-    let pos_zebra = output.find("zebra").unwrap();
+    let pos_apple = output
+        .find("apple")
+        .unwrap_or_else(|| panic!("unwrap failed"));
+    let pos_zebra = output
+        .find("zebra")
+        .unwrap_or_else(|| panic!("unwrap failed"));
     assert!(
         pos_apple < pos_zebra,
         "projects not sorted: apple at {} vs zebra at {}",
@@ -495,14 +525,20 @@ fn ls_multiple_workspaces_sorted_by_name() {
 
 #[test]
 fn ls_no_workspaces_prints_message() {
-    let root = TempDir::new().unwrap();
+    let root = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     // No workspaces — plain empty directory
 
     let out = wai_cmd(root.path())
-        .args(["ls", "--root", root.path().to_str().unwrap()])
+        .args([
+            "ls",
+            "--root",
+            root.path()
+                .to_str()
+                .unwrap_or_else(|| panic!("unwrap failed")),
+        ])
         .env("NO_COLOR", "1")
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("No wai workspaces found"));
@@ -510,17 +546,23 @@ fn ls_no_workspaces_prints_message() {
 
 #[test]
 fn ls_no_beads_omits_counts_column() {
-    let root = TempDir::new().unwrap();
+    let root = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let ws = root.path().join("proj");
     make_workspace(&ws, "my-ws");
     make_project(&ws, "my-proj", Some("review"));
     // No .beads/ directory
 
     let out = wai_cmd(root.path())
-        .args(["ls", "--root", root.path().to_str().unwrap()])
+        .args([
+            "ls",
+            "--root",
+            root.path()
+                .to_str()
+                .unwrap_or_else(|| panic!("unwrap failed")),
+        ])
         .env("NO_COLOR", "1")
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("my-proj"));
@@ -532,20 +574,26 @@ fn ls_no_beads_omits_counts_column() {
 fn ls_beads_present_but_unavailable_is_graceful() {
     // When .beads/ exists but `bd` is not available (or returns no data),
     // the command must still succeed without crashing.
-    let root = TempDir::new().unwrap();
+    let root = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let ws = root.path().join("proj");
     make_workspace(&ws, "my-ws");
     make_project(&ws, "my-proj", Some("implement"));
     // Create .beads/ dir to trigger beads detection
-    fs::create_dir_all(ws.join(".beads")).unwrap();
+    fs::create_dir_all(ws.join(".beads")).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // Use an empty PATH so 'bd' cannot be found — graceful skip
     let out = wai_cmd(root.path())
-        .args(["ls", "--root", root.path().to_str().unwrap()])
+        .args([
+            "ls",
+            "--root",
+            root.path()
+                .to_str()
+                .unwrap_or_else(|| panic!("unwrap failed")),
+        ])
         .env("PATH", "")
         .env("NO_COLOR", "1")
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("my-proj"));
@@ -553,7 +601,7 @@ fn ls_beads_present_but_unavailable_is_graceful() {
 
 #[test]
 fn ls_depth_limits_recursion() {
-    let root = TempDir::new().unwrap();
+    let root = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // Workspace at depth 1 (root/shallow-repo)
     let shallow = root.path().join("shallow-repo");
@@ -570,13 +618,15 @@ fn ls_depth_limits_recursion() {
         .args([
             "ls",
             "--root",
-            root.path().to_str().unwrap(),
+            root.path()
+                .to_str()
+                .unwrap_or_else(|| panic!("unwrap failed")),
             "--depth",
             "1",
         ])
         .env("NO_COLOR", "1")
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("shallow-proj"));
@@ -587,13 +637,15 @@ fn ls_depth_limits_recursion() {
         .args([
             "ls",
             "--root",
-            root.path().to_str().unwrap(),
+            root.path()
+                .to_str()
+                .unwrap_or_else(|| panic!("unwrap failed")),
             "--depth",
             "2",
         ])
         .env("NO_COLOR", "1")
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("shallow-proj"));
@@ -602,13 +654,13 @@ fn ls_depth_limits_recursion() {
 
 #[test]
 fn ls_invalid_root_fails_with_diagnostic() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["ls", "--root", "/nonexistent-path-that-does-not-exist"])
         .env("NO_COLOR", "1")
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("/nonexistent-path-that-does-not-exist"));
@@ -616,7 +668,7 @@ fn ls_invalid_root_fails_with_diagnostic() {
 
 #[test]
 fn reflect_with_mock_llm_writes_claude_md_and_reflect_meta() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     reflect_workspace(tmp.path());
 
     // Write a research artifact so context gathering has something.
@@ -627,7 +679,7 @@ fn reflect_with_mock_llm_writes_claude_md_and_reflect_meta() {
         .env("WAI_REFLECT_MOCK_RESPONSE", MOCK_REFLECT_CONTENT)
         .env("NO_COLOR", "1")
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Wrote"));
@@ -636,7 +688,7 @@ fn reflect_with_mock_llm_writes_claude_md_and_reflect_meta() {
     let refl_dir = tmp.path().join(".wai/resources/reflections");
     assert!(refl_dir.exists(), "reflections dir should exist");
     let entries: Vec<_> = fs::read_dir(&refl_dir)
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .filter_map(|e| e.ok())
         .collect();
     assert_eq!(
@@ -644,7 +696,8 @@ fn reflect_with_mock_llm_writes_claude_md_and_reflect_meta() {
         1,
         "expected exactly one reflection resource file"
     );
-    let resource_content = fs::read_to_string(entries[0].path()).unwrap();
+    let resource_content =
+        fs::read_to_string(entries[0].path()).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         resource_content.contains("Use TDD always"),
         "resource file should contain reflect content"
@@ -657,28 +710,30 @@ fn reflect_with_mock_llm_writes_claude_md_and_reflect_meta() {
 
 #[test]
 fn reflect_dry_run_does_not_modify_claude_md() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     reflect_workspace(tmp.path());
 
-    let original = fs::read_to_string(tmp.path().join("CLAUDE.md")).unwrap();
+    let original = fs::read_to_string(tmp.path().join("CLAUDE.md"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["reflect", "--project", "test-proj", "--dry-run"])
         .env("WAI_REFLECT_MOCK_RESPONSE", MOCK_REFLECT_CONTENT)
         .env("NO_COLOR", "1")
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Dry run"));
 
-    let after = fs::read_to_string(tmp.path().join("CLAUDE.md")).unwrap();
+    let after = fs::read_to_string(tmp.path().join("CLAUDE.md"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert_eq!(original, after, "CLAUDE.md must not change in dry-run");
 }
 
 #[test]
 fn reflect_repeated_call_updates_existing_resource_file() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     reflect_workspace(tmp.path());
 
     // Run reflect twice with the same mock content.
@@ -695,7 +750,7 @@ fn reflect_repeated_call_updates_existing_resource_file() {
             .env("WAI_REFLECT_MOCK_RESPONSE", MOCK_REFLECT_CONTENT)
             .env("NO_COLOR", "1")
             .output()
-            .expect("command should run");
+            .unwrap_or_else(|e| panic!("command should run: {e}"));
         let stdout = String::from_utf8_lossy(&out.stdout);
         assert!(out.status.success());
         assert!(stdout.contains("Wrote"));
@@ -704,7 +759,7 @@ fn reflect_repeated_call_updates_existing_resource_file() {
     // Only one resource file should exist (idempotent — second call updates in place).
     let refl_dir = tmp.path().join(".wai/resources/reflections");
     let entries: Vec<_> = fs::read_dir(&refl_dir)
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .filter_map(|e| e.ok())
         .collect();
     assert_eq!(
@@ -717,7 +772,7 @@ fn reflect_repeated_call_updates_existing_resource_file() {
 
 #[test]
 fn reflect_diff_shown_for_existing_reflect_block() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     reflect_workspace(tmp.path());
 
     // Pre-populate with old content.
@@ -726,14 +781,14 @@ fn reflect_diff_shown_for_existing_reflect_block() {
         tmp.path().join("CLAUDE.md"),
         format!("# Claude\n{}", old_block),
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["reflect", "--project", "test-proj", "--dry-run"])
         .env("WAI_REFLECT_MOCK_RESPONSE", MOCK_REFLECT_CONTENT)
         .env("NO_COLOR", "1")
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Dry run"));
@@ -741,11 +796,11 @@ fn reflect_diff_shown_for_existing_reflect_block() {
 
 #[test]
 fn close_nudge_fires_at_five_plus_handoffs() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     reflect_workspace(tmp.path());
 
     let handoffs_dir = tmp.path().join(".wai/projects/test-proj/handoffs");
-    fs::create_dir_all(&handoffs_dir).unwrap();
+    fs::create_dir_all(&handoffs_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // Write 5 handoff files.
     for i in 1..=5 {
@@ -753,7 +808,7 @@ fn close_nudge_fires_at_five_plus_handoffs() {
             handoffs_dir.join(format!("2026-02-{:02}-session.md", i)),
             "# Session Handoff\n## What Was Done\nWork.",
         )
-        .unwrap();
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     }
 
     // wai close should produce the nudge.
@@ -761,7 +816,7 @@ fn close_nudge_fires_at_five_plus_handoffs() {
         .args(["close", "--project", "test-proj"])
         .env("NO_COLOR", "1")
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("sessions since last reflect"));
@@ -769,11 +824,11 @@ fn close_nudge_fires_at_five_plus_handoffs() {
 
 #[test]
 fn close_nudge_does_not_fire_for_fewer_than_five_handoffs() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     reflect_workspace(tmp.path());
 
     let handoffs_dir = tmp.path().join(".wai/projects/test-proj/handoffs");
-    fs::create_dir_all(&handoffs_dir).unwrap();
+    fs::create_dir_all(&handoffs_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // Write only 3 handoff files — below the threshold.
     for i in 1..=3 {
@@ -781,14 +836,14 @@ fn close_nudge_does_not_fire_for_fewer_than_five_handoffs() {
             handoffs_dir.join(format!("2026-02-{:02}-session.md", i)),
             "# Session Handoff\n",
         )
-        .unwrap();
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     }
 
     let output = wai_cmd(tmp.path())
         .args(["close", "--project", "test-proj"])
         .env("NO_COLOR", "1")
         .output()
-        .unwrap();
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
         !stdout.contains("sessions since last reflect"),

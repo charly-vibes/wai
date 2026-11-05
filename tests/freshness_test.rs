@@ -4,7 +4,7 @@ use tempfile::TempDir;
 
 #[allow(deprecated)]
 fn wai_cmd(dir: &std::path::Path) -> Command {
-    let mut cmd = Command::cargo_bin("wai").unwrap();
+    let mut cmd = Command::cargo_bin("wai").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     cmd.current_dir(dir);
     cmd.env("NO_COLOR", "1");
     // Update notice off in tests: existing assertions expect quiet stderr and
@@ -17,7 +17,7 @@ fn init_workspace(dir: &std::path::Path) {
     let out = wai_cmd(dir)
         .args(["init", "--name", "test-ws"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 }
 
@@ -25,7 +25,7 @@ fn create_project(dir: &std::path::Path, name: &str) {
     let out = wai_cmd(dir)
         .args(["new", "project", name])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 }
 
@@ -33,7 +33,7 @@ fn create_project(dir: &std::path::Path, name: &str) {
 
 #[test]
 fn artifacts_stale_clean_workspace_exits_zero_with_no_stale() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "proj");
 
@@ -41,13 +41,13 @@ fn artifacts_stale_clean_workspace_exits_zero_with_no_stale() {
     let out = wai_cmd(tmp.path())
         .args(["artifacts", "stale"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 }
 
 #[test]
 fn artifacts_stale_json_on_clean_workspace_is_valid_json() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "proj");
 
@@ -59,9 +59,9 @@ fn artifacts_stale_json_on_clean_workspace_is_valid_json() {
         .stdout
         .clone();
 
-    let text = String::from_utf8(output).unwrap();
-    let parsed: serde_json::Value =
-        serde_json::from_str(&text).expect("artifacts stale --json must emit valid JSON");
+    let text = String::from_utf8(output).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    let parsed: serde_json::Value = serde_json::from_str(&text)
+        .unwrap_or_else(|e| panic!("artifacts stale --json must emit valid JSON: {e}"));
 
     assert!(parsed.get("stale").is_some(), "JSON missing 'stale' key");
     assert!(parsed.get("clean").is_some(), "JSON missing 'clean' key");
@@ -73,14 +73,20 @@ fn artifacts_stale_json_on_clean_workspace_is_valid_json() {
 
 #[test]
 fn artifacts_stale_detects_changed_tracked_file() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "proj");
 
     // Create a tracked file
     let tracked_file = tmp.path().join("src/commands/target.rs");
-    fs::create_dir_all(tracked_file.parent().unwrap()).unwrap();
-    fs::write(&tracked_file, "// original content").unwrap();
+    fs::create_dir_all(
+        tracked_file
+            .parent()
+            .unwrap_or_else(|| panic!("unwrap failed")),
+    )
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(&tracked_file, "// original content")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // Add a research artifact that tracks the file
     let out = wai_cmd(tmp.path())
@@ -94,17 +100,17 @@ fn artifacts_stale_detects_changed_tracked_file() {
             "src/commands/target.rs",
         ])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     // Modify the tracked file
-    fs::write(&tracked_file, "// changed content").unwrap();
+    fs::write(&tracked_file, "// changed content").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // wai artifacts stale should report the artifact as stale
     let out = wai_cmd(tmp.path())
         .args(["artifacts", "stale"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("stale"));
@@ -112,14 +118,19 @@ fn artifacts_stale_detects_changed_tracked_file() {
 
 #[test]
 fn artifacts_stale_reports_untracked_artifact_separately() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "proj");
 
     // Create a tracked file
     let tracked_file = tmp.path().join("src/thing.rs");
-    fs::create_dir_all(tracked_file.parent().unwrap()).unwrap();
-    fs::write(&tracked_file, "// content").unwrap();
+    fs::create_dir_all(
+        tracked_file
+            .parent()
+            .unwrap_or_else(|| panic!("unwrap failed")),
+    )
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(&tracked_file, "// content").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // Add a research artifact with tracks
     let out = wai_cmd(tmp.path())
@@ -133,7 +144,7 @@ fn artifacts_stale_reports_untracked_artifact_separately() {
             "src/thing.rs",
         ])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     // Manually delete the sidecar to simulate "untracked" state
@@ -148,9 +159,12 @@ fn artifacts_stale_reports_untracked_artifact_separately() {
         .stdout
         .clone();
 
-    let text = String::from_utf8(output).unwrap();
-    let parsed: serde_json::Value = serde_json::from_str(&text).unwrap();
-    let untracked = parsed["untracked"].as_array().unwrap();
+    let text = String::from_utf8(output).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    let parsed: serde_json::Value =
+        serde_json::from_str(&text).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    let untracked = parsed["untracked"]
+        .as_array()
+        .unwrap_or_else(|| panic!("unwrap failed"));
     assert!(!untracked.is_empty(), "expected untracked artifact in JSON");
 }
 
@@ -158,13 +172,13 @@ fn artifacts_stale_reports_untracked_artifact_separately() {
 /// untracked (freshness-lost) artifact.
 fn delete_fresh_sidecars(research_dir: &std::path::Path) {
     let sidecars: Vec<_> = fs::read_dir(research_dir)
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .filter_map(|e| e.ok())
         .filter(|e| e.file_name().to_string_lossy().ends_with(".fresh.lock"))
         .collect();
 
     for sidecar in &sidecars {
-        fs::remove_file(sidecar.path()).unwrap();
+        fs::remove_file(sidecar.path()).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     }
 }
 
@@ -172,14 +186,20 @@ fn delete_fresh_sidecars(research_dir: &std::path::Path) {
 
 #[test]
 fn add_research_with_tracks_writes_frontmatter_and_sidecar() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "proj");
 
     // Create the tracked file so the sidecar can hash it
     let tracked_file = tmp.path().join("src/commands/status.rs");
-    fs::create_dir_all(tracked_file.parent().unwrap()).unwrap();
-    fs::write(&tracked_file, "// status implementation").unwrap();
+    fs::create_dir_all(
+        tracked_file
+            .parent()
+            .unwrap_or_else(|| panic!("unwrap failed")),
+    )
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(&tracked_file, "// status implementation")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args([
@@ -192,21 +212,25 @@ fn add_research_with_tracks_writes_frontmatter_and_sidecar() {
             "src/commands/status.rs",
         ])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let research_dir = tmp.path().join(".wai/projects/proj/research");
     let artifacts: Vec<_> = fs::read_dir(&research_dir)
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .filter_map(|e| e.ok())
         .filter(|e| {
-            let name = e.file_name().into_string().unwrap();
+            let name = e
+                .file_name()
+                .into_string()
+                .unwrap_or_else(|e| panic!("unwrap failed: {e:?}"));
             name.ends_with(".md")
         })
         .collect();
     assert_eq!(artifacts.len(), 1, "expected one artifact");
 
-    let content = fs::read_to_string(artifacts[0].path()).unwrap();
+    let content =
+        fs::read_to_string(artifacts[0].path()).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         content.contains("tracks:"),
         "artifact frontmatter must contain 'tracks:'"
@@ -218,7 +242,7 @@ fn add_research_with_tracks_writes_frontmatter_and_sidecar() {
 
     // Sidecar must exist
     let sidecars: Vec<_> = fs::read_dir(&research_dir)
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .filter_map(|e| e.ok())
         .filter(|e| e.file_name().to_string_lossy().ends_with(".fresh.lock"))
         .collect();

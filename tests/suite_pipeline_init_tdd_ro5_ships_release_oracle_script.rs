@@ -9,20 +9,20 @@ use tempfile::TempDir;
 
 #[test]
 fn pipeline_init_tdd_ro5_ships_release_oracle_script() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "init", "tdd-ro5"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let script = tmp
         .path()
         .join(".wai/resources/oracles/release-docs-fresh.sh");
-    let meta =
-        fs::metadata(&script).expect("pipeline init tdd-ro5 should ship release-docs-fresh.sh");
+    let meta = fs::metadata(&script)
+        .unwrap_or_else(|e| panic!("pipeline init tdd-ro5 should ship release-docs-fresh.sh: {e}"));
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -59,7 +59,8 @@ fn release_oracle_rejects_lagging_changelog() {
 fn release_oracle_rejects_dirty_docs() {
     let tmp = release_oracle_sandbox("2026.10.3", Some("2026.10.3"));
     // Uncommitted docs change after the initial commit -> docs drift
-    fs::write(tmp.path().join("docs/index.md"), "uncommitted edit").unwrap();
+    fs::write(tmp.path().join("docs/index.md"), "uncommitted edit")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let (code, stderr) = run_release_oracle(tmp.path());
     assert_eq!(code, 1, "expected reject for dirty docs/, stderr: {stderr}");
     assert!(
@@ -73,13 +74,13 @@ fn run_ok_wdd(dir: &std::path::Path, data_dir: &std::path::Path, args: &[&str]) 
     let out = wai_cmd_with_data_dir(dir, data_dir)
         .args(args)
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success(), "wai {:?} failed", args);
 }
 
 #[test]
 fn plugin_trust_list_shows_approved() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let data_dir = tmp.path().join("wai-data");
     init_workspace(tmp.path());
     create_project(tmp.path(), "test-p");
@@ -90,7 +91,7 @@ fn plugin_trust_list_shows_approved() {
     let out = wai_cmd_with_data_dir(tmp.path(), &data_dir)
         .args(["plugin", "trust", "--list"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("evil"));
@@ -98,7 +99,7 @@ fn plugin_trust_list_shows_approved() {
 
 #[test]
 fn plugin_trust_approve_json_outputs_state() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let data_dir = tmp.path().join("wai-data");
     init_workspace(tmp.path());
     create_project(tmp.path(), "test-p");
@@ -107,7 +108,7 @@ fn plugin_trust_approve_json_outputs_state() {
     let out = wai_cmd_with_data_dir(tmp.path(), &data_dir)
         .args(["plugin", "trust", "evil", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("\"plugin\""));
@@ -116,14 +117,14 @@ fn plugin_trust_approve_json_outputs_state() {
 
 #[test]
 fn plugin_trust_unknown_plugin_fails() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let data_dir = tmp.path().join("wai-data");
     init_workspace(tmp.path());
 
     let out = wai_cmd_with_data_dir(tmp.path(), &data_dir)
         .args(["plugin", "trust", "nonexistent"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("not found"));
@@ -131,14 +132,14 @@ fn plugin_trust_unknown_plugin_fails() {
 
 #[test]
 fn plugin_trust_builtin_plugin_fails() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let data_dir = tmp.path().join("wai-data");
     init_workspace(tmp.path());
 
     let out = wai_cmd_with_data_dir(tmp.path(), &data_dir)
         .args(["plugin", "trust", "git"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("is a built-in plugin"));
@@ -146,7 +147,7 @@ fn plugin_trust_builtin_plugin_fails() {
 
 #[test]
 fn plugin_trust_revoke_disables_hook() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let data_dir = tmp.path().join("wai-data");
     init_workspace(tmp.path());
     create_project(tmp.path(), "test-p");
@@ -156,7 +157,7 @@ fn plugin_trust_revoke_disables_hook() {
     let output = wai_cmd_with_data_dir(tmp.path(), &data_dir)
         .args(["plugin", "trust", "evil", "--json"])
         .output()
-        .unwrap();
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let stdout = String::from_utf8_lossy(&output.stdout);
 
     // Extract the 64-char hex digest from the JSON output.
@@ -193,7 +194,7 @@ fn plugin_trust_revoke_disables_hook() {
 
 #[test]
 fn plugin_trust_non_interactive_fail_closed() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let data_dir = tmp.path().join("wai-data");
     init_workspace(tmp.path());
     create_project(tmp.path(), "test-p");
@@ -214,7 +215,7 @@ fn plugin_trust_non_interactive_fail_closed() {
 
 #[test]
 fn plugin_trust_prime_skips_unapproved_hook() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let data_dir = tmp.path().join("wai-data");
     init_workspace(tmp.path());
     create_project(tmp.path(), "test-p");
@@ -234,13 +235,13 @@ fn plugin_trust_prime_skips_unapproved_hook() {
 
 #[test]
 fn plugin_trust_content_modification_invalidates_approval() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let data_dir = tmp.path().join("wai-data");
     init_workspace(tmp.path());
     create_project(tmp.path(), "test-p");
 
     let plugin_dir = tmp.path().join(".wai/plugins");
-    fs::create_dir_all(&plugin_dir).unwrap();
+    fs::create_dir_all(&plugin_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         plugin_dir.join("evil.toml"),
         r#"
@@ -252,7 +253,7 @@ command = "touch marker-v1"
 inject_as = "evil_marker"
 "#,
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // Approve the plugin.
     run_ok_wdd(tmp.path(), &data_dir, &["plugin", "trust", "evil"]);
@@ -276,7 +277,7 @@ command = "touch marker-v2"
 inject_as = "evil_marker"
 "#,
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // Run status: the new hook must NOT execute (digest changed).
     let _ = fs::remove_file(tmp.path().join("marker-v2"));
@@ -294,13 +295,13 @@ inject_as = "evil_marker"
 
 #[test]
 fn plugin_trust_new_skips_unapproved_hook() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let data_dir = tmp.path().join("wai-data");
     init_workspace(tmp.path());
 
     // Create a plugin with an on_project_create hook.
     let plugin_dir = tmp.path().join(".wai/plugins");
-    fs::create_dir_all(&plugin_dir).unwrap();
+    fs::create_dir_all(&plugin_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let new_marker = tmp.path().join("new-marker");
     fs::write(
         plugin_dir.join("evil.toml"),
@@ -313,10 +314,12 @@ description = "malicious"
 command = "touch {}"
 inject_as = "evil_marker"
 "#,
-            new_marker.to_str().unwrap()
+            new_marker
+                .to_str()
+                .unwrap_or_else(|| panic!("unwrap failed"))
         ),
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // `wai new` should NOT execute the unapproved on_project_create hook.
     wai_cmd_with_data_dir(tmp.path(), &data_dir)
@@ -332,14 +335,14 @@ inject_as = "evil_marker"
 
 #[test]
 fn plugin_trust_approve_specific_hook() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let data_dir = tmp.path().join("wai-data");
     init_workspace(tmp.path());
     create_project(tmp.path(), "test-p");
 
     // Plugin with two hooks.
     let plugin_dir = tmp.path().join(".wai/plugins");
-    fs::create_dir_all(&plugin_dir).unwrap();
+    fs::create_dir_all(&plugin_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         plugin_dir.join("evil.toml"),
         r#"
@@ -355,7 +358,7 @@ command = "echo 'handoff'"
 inject_as = "handoff_hook"
 "#,
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // Only approve the on_status hook.
     wai_cmd_with_data_dir(tmp.path(), &data_dir)
@@ -375,7 +378,7 @@ inject_as = "handoff_hook"
     let output = wai_cmd_with_data_dir(tmp.path(), &data_dir)
         .args(["plugin", "trust", "--list", "--json"])
         .output()
-        .unwrap();
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let stdout = String::from_utf8_lossy(&output.stdout);
     // There should be exactly one entry (on_status).
     assert!(
@@ -388,14 +391,14 @@ inject_as = "handoff_hook"
 
 #[test]
 fn status_shows_project_info() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
     let out = wai_cmd(tmp.path())
         .args(["status"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("my-app"));
@@ -403,14 +406,14 @@ fn status_shows_project_info() {
 
 #[test]
 fn status_json_outputs_suggestions() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
     let out = wai_cmd(tmp.path())
         .args(["status", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("\"suggestions\""));
@@ -418,14 +421,14 @@ fn status_json_outputs_suggestions() {
 
 #[test]
 fn status_without_openspec_omits_section() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
     let out = wai_cmd(tmp.path())
         .args(["status"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(!(stdout.contains("OpenSpec")));
@@ -433,23 +436,23 @@ fn status_without_openspec_omits_section() {
 
 #[test]
 fn status_with_openspec_shows_change_counts() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
     // Set up an openspec directory with a change
     let changes_dir = tmp.path().join("openspec/changes/add-feature");
-    fs::create_dir_all(&changes_dir).unwrap();
+    fs::create_dir_all(&changes_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         changes_dir.join("tasks.md"),
         "## 1. Setup\n\n- [x] done\n- [ ] todo\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["status"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("OpenSpec"));
@@ -459,25 +462,26 @@ fn status_with_openspec_shows_change_counts() {
 
 #[test]
 fn status_verbose_shows_section_breakdown() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
     let changes_dir = tmp.path().join("openspec/changes/add-feature");
-    fs::create_dir_all(&changes_dir).unwrap();
+    fs::create_dir_all(&changes_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         changes_dir.join("tasks.md"),
         "## 1. Setup\n\n- [x] done\n- [ ] todo\n\n## 2. Implement\n\n- [ ] a\n- [ ] b\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // Also add a spec
-    fs::create_dir_all(tmp.path().join("openspec/specs/core")).unwrap();
+    fs::create_dir_all(tmp.path().join("openspec/specs/core"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["status", "-v"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Setup"));
@@ -487,22 +491,22 @@ fn status_verbose_shows_section_breakdown() {
 
 #[test]
 fn status_hides_completed_openspec_changes_by_default() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
     let changes_dir = tmp.path().join("openspec/changes/done-feature");
-    fs::create_dir_all(&changes_dir).unwrap();
+    fs::create_dir_all(&changes_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         changes_dir.join("tasks.md"),
         "## 1. Setup\n\n- [x] a\n- [x] b\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["status"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(!(stdout.contains("done-feature")));
@@ -510,22 +514,22 @@ fn status_hides_completed_openspec_changes_by_default() {
 
 #[test]
 fn status_verbose_shows_completed_openspec_changes() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
     let changes_dir = tmp.path().join("openspec/changes/done-feature");
-    fs::create_dir_all(&changes_dir).unwrap();
+    fs::create_dir_all(&changes_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         changes_dir.join("tasks.md"),
         "## 1. Setup\n\n- [x] a\n- [x] b\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["status", "-v"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("done-feature"));
@@ -534,22 +538,22 @@ fn status_verbose_shows_completed_openspec_changes() {
 
 #[test]
 fn status_all_complete_shows_hint_message() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
     let changes_dir = tmp.path().join("openspec/changes/done-feature");
-    fs::create_dir_all(&changes_dir).unwrap();
+    fs::create_dir_all(&changes_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         changes_dir.join("tasks.md"),
         "## 1. Setup\n\n- [x] a\n- [x] b\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["status"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("all changes complete"));
@@ -557,24 +561,24 @@ fn status_all_complete_shows_hint_message() {
 
 #[test]
 fn status_plugin_info_hidden_when_only_completed_openspec_changes() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
     let changes_dir = tmp.path().join("openspec/changes/done-feature");
-    fs::create_dir_all(&changes_dir).unwrap();
+    fs::create_dir_all(&changes_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         changes_dir.join("tasks.md"),
         "## 1. Setup\n\n- [x] a\n- [x] b\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // Plugin Info section should not appear when there are no active (incomplete) changes
     // and no other hook outputs (no beads, etc.)
     let out = wai_cmd(tmp.path())
         .args(["status"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(!(stdout.contains("Plugin Info")));
@@ -582,22 +586,22 @@ fn status_plugin_info_hidden_when_only_completed_openspec_changes() {
 
 #[test]
 fn status_json_with_openspec_includes_field() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
     let changes_dir = tmp.path().join("openspec/changes/my-change");
-    fs::create_dir_all(&changes_dir).unwrap();
+    fs::create_dir_all(&changes_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         changes_dir.join("tasks.md"),
         "## 1. Work\n\n- [x] a\n- [ ] b\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["status", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("\"openspec\":"));
@@ -607,7 +611,7 @@ fn status_json_with_openspec_includes_field() {
 
 #[test]
 fn status_json_without_openspec_omits_field() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
@@ -615,7 +619,7 @@ fn status_json_without_openspec_omits_field() {
     let out = wai_cmd(tmp.path())
         .args(["status", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(!(stdout.contains("\"openspec\":")));
@@ -625,7 +629,7 @@ fn status_json_without_openspec_omits_field() {
 
 #[test]
 fn status_suggests_advance_when_enough_research() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
@@ -655,7 +659,7 @@ fn status_suggests_advance_when_enough_research() {
     let out = wai_cmd(tmp.path())
         .args(["status"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("design"));
@@ -664,7 +668,7 @@ fn status_suggests_advance_when_enough_research() {
 
 #[test]
 fn status_suggests_research_needed_when_in_implement_phase_without_research() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
@@ -672,13 +676,13 @@ fn status_suggests_research_needed_when_in_implement_phase_without_research() {
     let out = wai_cmd(tmp.path())
         .args(["phase", "set", "implement"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let out = wai_cmd(tmp.path())
         .args(["status"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("research"));
@@ -686,7 +690,7 @@ fn status_suggests_research_needed_when_in_implement_phase_without_research() {
 
 #[test]
 fn status_shows_minimal_research_suggestion_for_new_project() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
@@ -694,7 +698,7 @@ fn status_shows_minimal_research_suggestion_for_new_project() {
     let out = wai_cmd(tmp.path())
         .args(["status"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("research"));
@@ -702,7 +706,7 @@ fn status_shows_minimal_research_suggestion_for_new_project() {
 
 #[test]
 fn status_flags_stale_project() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
@@ -712,7 +716,7 @@ fn status_flags_stale_project() {
     let out = wai_cmd(tmp.path())
         .args(["status"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!((stdout.contains("phase next") || stdout.contains("move")));
@@ -720,7 +724,7 @@ fn status_flags_stale_project() {
 
 #[test]
 fn status_does_not_flag_recent_project() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
@@ -731,10 +735,10 @@ fn status_does_not_flag_recent_project() {
     let stdout = wai_cmd(tmp.path())
         .args(["status"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(stdout.status.success());
     let stdout = stdout.stdout.clone();
-    let output = String::from_utf8(stdout).unwrap();
+    let output = String::from_utf8(stdout).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         !output.contains("phase next") || !output.contains("20 days"),
         "should not show stale-phase suggestion for recent project"
@@ -743,7 +747,7 @@ fn status_does_not_flag_recent_project() {
 
 #[test]
 fn status_flags_complete_review_project() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
@@ -754,12 +758,12 @@ fn status_flags_complete_review_project() {
         project_dir.join("handoffs/2026-01-01-handoff.md"),
         "Session handoff",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["status"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!((stdout.contains("move") || stdout.contains("archive")));
@@ -767,7 +771,7 @@ fn status_flags_complete_review_project() {
 
 #[test]
 fn status_json_includes_stale_suggestion() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
@@ -777,7 +781,7 @@ fn status_json_includes_stale_suggestion() {
     let out = wai_cmd(tmp.path())
         .args(["status", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!((stdout.contains("phase next") || stdout.contains("move")));
@@ -785,7 +789,7 @@ fn status_json_includes_stale_suggestion() {
 
 #[test]
 fn status_json_includes_complete_suggestion() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
@@ -795,12 +799,12 @@ fn status_json_includes_complete_suggestion() {
         project_dir.join("handoffs/2026-01-01-handoff.md"),
         "Session handoff",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["status", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!((stdout.contains("move") || stdout.contains("archive")));
@@ -815,9 +819,11 @@ fn no_args_shows_welcome() {
         let _ = fs::remove_dir_all(stale_wai);
     }
 
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
-    let out = wai_cmd(tmp.path()).output().expect("command should run");
+    let out = wai_cmd(tmp.path())
+        .output()
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("wai init"));

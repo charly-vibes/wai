@@ -4,7 +4,7 @@ use tempfile::TempDir;
 
 #[allow(deprecated)]
 fn wai_cmd(dir: &std::path::Path) -> Command {
-    let mut cmd = Command::cargo_bin("wai").unwrap();
+    let mut cmd = Command::cargo_bin("wai").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     cmd.current_dir(dir);
     cmd.env("NO_COLOR", "1");
     // Update notice off in tests: existing assertions expect quiet stderr and
@@ -17,7 +17,7 @@ fn init_workspace(dir: &std::path::Path) {
     let out = wai_cmd(dir)
         .args(["init", "--name", "test-ws"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 }
 
@@ -25,7 +25,7 @@ fn create_project(dir: &std::path::Path, name: &str) {
     let out = wai_cmd(dir)
         .args(["new", "project", name])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 }
 
@@ -33,13 +33,13 @@ fn create_project(dir: &std::path::Path, name: &str) {
 
 #[test]
 fn doctor_healthy_workspace_reports_zero_failures() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["doctor", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("\"fail\": 0"));
@@ -51,15 +51,16 @@ fn doctor_healthy_workspace_reports_zero_failures() {
 
 #[test]
 fn doctor_missing_required_directory_reports_fail() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
-    fs::remove_dir_all(tmp.path().join(".wai/archives")).unwrap();
+    fs::remove_dir_all(tmp.path().join(".wai/archives"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["doctor", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert_eq!(out.status.code(), Some(1));
     assert!(stdout.contains("\"status\": \"fail\""));
@@ -68,15 +69,16 @@ fn doctor_missing_required_directory_reports_fail() {
 
 #[test]
 fn doctor_invalid_config_toml_reports_fail() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
-    fs::write(tmp.path().join(".wai/config.toml"), "{{invalid toml!!!").unwrap();
+    fs::write(tmp.path().join(".wai/config.toml"), "{{invalid toml!!!")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["doctor", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert_eq!(out.status.code(), Some(1));
     assert!(stdout.contains("\"status\": \"fail\""));
@@ -85,7 +87,7 @@ fn doctor_invalid_config_toml_reports_fail() {
 
 #[test]
 fn doctor_corrupted_project_state_reports_fail() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "broken");
 
@@ -93,12 +95,12 @@ fn doctor_corrupted_project_state_reports_fail() {
         tmp.path().join(".wai/projects/broken/.state"),
         "{{not valid yaml",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["doctor", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert_eq!(out.status.code(), Some(1));
     assert!(stdout.contains("\"status\": \"fail\""));
@@ -109,15 +111,16 @@ fn doctor_corrupted_project_state_reports_fail() {
 
 #[test]
 fn doctor_fix_with_yes_repairs_missing_directory() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
-    fs::remove_dir_all(tmp.path().join(".wai/archives")).unwrap();
+    fs::remove_dir_all(tmp.path().join(".wai/archives"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["doctor", "--fix", "--yes"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success());
     assert!(stderr.contains("Fixed"));
@@ -127,15 +130,16 @@ fn doctor_fix_with_yes_repairs_missing_directory() {
 
 #[test]
 fn doctor_fix_with_safe_flag_refuses_to_apply_fixes() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
-    fs::remove_dir_all(tmp.path().join(".wai/archives")).unwrap();
+    fs::remove_dir_all(tmp.path().join(".wai/archives"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["doctor", "--fix", "--safe"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!((stderr.contains("apply doctor fixes") || stderr.contains("--safe")));
@@ -145,14 +149,14 @@ fn doctor_fix_with_safe_flag_refuses_to_apply_fixes() {
 
 #[test]
 fn doctor_pi_hook_omitted_when_no_pi_dir() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     // No `.pi/` → the pi session hook check must not appear at all.
     let out = wai_cmd(tmp.path())
         .args(["doctor"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(!(stdout.contains("Pi session hook")));
@@ -160,19 +164,20 @@ fn doctor_pi_hook_omitted_when_no_pi_dir() {
 
 #[test]
 fn doctor_pi_hook_warns_when_pi_present_without_wai_extension() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
-    fs::create_dir_all(tmp.path().join(".pi/extensions")).unwrap();
+    fs::create_dir_all(tmp.path().join(".pi/extensions"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         tmp.path().join(".pi/extensions/other.ts"),
         "pi.on(\"session_start\", async (_e, ctx) => { ctx.ui.notify(\"hi\"); });\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["doctor"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Pi session hook"));
@@ -181,19 +186,20 @@ fn doctor_pi_hook_warns_when_pi_present_without_wai_extension() {
 
 #[test]
 fn doctor_pi_hook_passes_when_wai_prime_extension_present() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
-    fs::create_dir_all(tmp.path().join(".pi/extensions")).unwrap();
+    fs::create_dir_all(tmp.path().join(".pi/extensions"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         tmp.path().join(".pi/extensions/wai-prime.ts"),
         "pi.on(\"session_start\", async () => { await pi.exec(\"wai\", [\"prime\"]); });\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["doctor"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Pi session hook"));

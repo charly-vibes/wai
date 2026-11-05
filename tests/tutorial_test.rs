@@ -4,7 +4,7 @@ use tempfile::TempDir;
 
 #[allow(deprecated)]
 fn wai_cmd(dir: &std::path::Path) -> Command {
-    let mut cmd = Command::cargo_bin("wai").unwrap();
+    let mut cmd = Command::cargo_bin("wai").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     cmd.current_dir(dir);
     cmd.env("NO_COLOR", "1");
     // Update notice off in tests: existing assertions expect quiet stderr and
@@ -17,14 +17,14 @@ fn wai_cmd(dir: &std::path::Path) -> Command {
 
 #[test]
 fn tutorial_first_run_shows_welcome_message() {
-    let tmp_config = TempDir::new().unwrap();
-    let tmp_project = TempDir::new().unwrap();
+    let tmp_config = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    let tmp_project = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp_project.path())
         .env("XDG_CONFIG_HOME", tmp_config.path())
         .args(["tutorial"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 }
 
@@ -32,14 +32,14 @@ fn tutorial_first_run_shows_welcome_message() {
 
 #[test]
 fn tutorial_marks_seen_after_completion() {
-    let tmp_config = TempDir::new().unwrap();
-    let tmp_project = TempDir::new().unwrap();
+    let tmp_config = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    let tmp_project = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp_project.path())
         .env("XDG_CONFIG_HOME", tmp_config.path())
         .args(["tutorial"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let config_content =
@@ -54,19 +54,20 @@ fn tutorial_marks_seen_after_completion() {
 
 #[test]
 fn tutorial_repeat_run_shows_replay_message() {
-    let tmp_config = TempDir::new().unwrap();
-    let tmp_project = TempDir::new().unwrap();
+    let tmp_config = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    let tmp_project = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let wai_config_dir = tmp_config.path().join("wai");
-    fs::create_dir_all(&wai_config_dir).unwrap();
-    let mut config_file = fs::File::create(wai_config_dir.join("config.toml")).unwrap();
-    writeln!(config_file, "seen_tutorial = true").unwrap();
+    fs::create_dir_all(&wai_config_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    let mut config_file = fs::File::create(wai_config_dir.join("config.toml"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    writeln!(config_file, "seen_tutorial = true").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp_project.path())
         .env("XDG_CONFIG_HOME", tmp_config.path())
         .args(["tutorial"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 }
 
@@ -108,8 +109,10 @@ mod tests {
             version: "2026.2.0".to_string(),
         };
 
-        let toml_string = toml::to_string_pretty(&config).expect("Should serialize");
-        let deserialized: UserConfig = toml::from_str(&toml_string).expect("Should deserialize");
+        let toml_string =
+            toml::to_string_pretty(&config).unwrap_or_else(|e| panic!("Should serialize: {e}"));
+        let deserialized: UserConfig =
+            toml::from_str(&toml_string).unwrap_or_else(|e| panic!("Should deserialize: {e}"));
 
         assert_eq!(deserialized.seen_tutorial, config.seen_tutorial);
         assert_eq!(deserialized.version, config.version);

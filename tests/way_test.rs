@@ -4,7 +4,7 @@ use tempfile::TempDir;
 
 #[allow(deprecated)]
 fn wai_cmd(dir: &std::path::Path) -> Command {
-    let mut cmd = Command::cargo_bin("wai").unwrap();
+    let mut cmd = Command::cargo_bin("wai").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     cmd.current_dir(dir);
     cmd.env("NO_COLOR", "1");
     // Update notice off in tests: existing assertions expect quiet stderr and
@@ -15,13 +15,14 @@ fn wai_cmd(dir: &std::path::Path) -> Command {
 
 #[test]
 fn way_minimal_repo_reports_partial_adoption() {
-    let tmp = TempDir::new().unwrap();
-    fs::write(tmp.path().join("README.md"), "# Test Project").unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(tmp.path().join("README.md"), "# Test Project")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success());
@@ -31,13 +32,14 @@ fn way_minimal_repo_reports_partial_adoption() {
 
 #[test]
 fn way_json_output_includes_checks_and_summary() {
-    let tmp = TempDir::new().unwrap();
-    fs::write(tmp.path().join("README.md"), "# Test").unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(tmp.path().join("README.md"), "# Test")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("\"checks\""));
@@ -47,13 +49,14 @@ fn way_json_output_includes_checks_and_summary() {
 
 #[test]
 fn way_partial_repo_emits_fix_suggestions() {
-    let tmp = TempDir::new().unwrap();
-    fs::write(tmp.path().join("README.md"), "# Test").unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(tmp.path().join("README.md"), "# Test")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("→"));
@@ -62,13 +65,14 @@ fn way_partial_repo_emits_fix_suggestions() {
 
 #[test]
 fn way_pretender_check_recommends_when_no_config() {
-    let tmp = TempDir::new().unwrap();
-    fs::write(tmp.path().join("README.md"), "# Test").unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(tmp.path().join("README.md"), "# Test")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("pretender"));
@@ -77,18 +81,19 @@ fn way_pretender_check_recommends_when_no_config() {
 
 #[test]
 fn way_pretender_check_passes_when_config_present() {
-    let tmp = TempDir::new().unwrap();
-    fs::write(tmp.path().join("README.md"), "# Test").unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(tmp.path().join("README.md"), "# Test")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         tmp.path().join("pretender.toml"),
         "[pretender]\nmode = \"tiered\"\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("pretender"));
@@ -97,12 +102,12 @@ fn way_pretender_check_passes_when_config_present() {
 
 #[test]
 fn way_code_quality_topic_prints_guide() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "code-quality"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Code Quality Guide"));

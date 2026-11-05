@@ -11,18 +11,19 @@ use tempfile::TempDir;
 
 #[test]
 fn pipeline_init_epic_orchestrator_ships_tests_pass_oracle_script() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "init", "epic-orchestrator"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let script = tmp.path().join(".wai/resources/oracles/tests-pass.sh");
-    let meta =
-        fs::metadata(&script).expect("pipeline init epic-orchestrator should ship tests-pass.sh");
+    let meta = fs::metadata(&script).unwrap_or_else(|e| {
+        panic!("pipeline init epic-orchestrator should ship tests-pass.sh: {e}")
+    });
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -36,12 +37,12 @@ fn pipeline_init_epic_orchestrator_ships_tests_pass_oracle_script() {
 
 /// Helper: init workspace, init the built-in epic-orchestrator pipeline.
 fn tests_pass_oracle_sandbox() -> TempDir {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "init", "epic-orchestrator"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
     tmp
 }
@@ -49,13 +50,13 @@ fn tests_pass_oracle_sandbox() -> TempDir {
 /// Helper: write an artifact and run the shipped tests-pass oracle against it,
 /// returning (exit code, stderr).
 fn run_tests_pass_oracle(dir: &std::path::Path, artifact: &str) -> (i32, String) {
-    fs::write(dir.join("artifact.md"), artifact).unwrap();
+    fs::write(dir.join("artifact.md"), artifact).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let script = dir.join(".wai/resources/oracles/tests-pass.sh");
     let output = std::process::Command::new(&script)
         .arg("artifact.md")
         .current_dir(dir)
         .output()
-        .expect("tests-pass.sh should exist and be executable");
+        .unwrap_or_else(|e| panic!("tests-pass.sh should exist and be executable: {e}"));
     (
         output.status.code().unwrap_or(-1),
         String::from_utf8_lossy(&output.stderr).to_string(),

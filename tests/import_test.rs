@@ -4,7 +4,7 @@ use tempfile::TempDir;
 
 #[allow(deprecated)]
 fn wai_cmd(dir: &std::path::Path) -> Command {
-    let mut cmd = Command::cargo_bin("wai").unwrap();
+    let mut cmd = Command::cargo_bin("wai").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     cmd.current_dir(dir);
     cmd.env("NO_COLOR", "1");
     // Update notice off in tests: existing assertions expect quiet stderr and
@@ -17,7 +17,7 @@ fn init_workspace(dir: &std::path::Path) {
     let out = wai_cmd(dir)
         .args(["init", "--name", "test-ws"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 }
 
@@ -25,48 +25,58 @@ fn create_project(dir: &std::path::Path, name: &str) {
     let out = wai_cmd(dir)
         .args(["new", "project", name])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 }
 
 #[test]
 fn import_single_rule_file_copies_into_rules_directory() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
     let source = tmp.path().join(".cursorrules");
-    fs::write(&source, "be explicit").unwrap();
+    fs::write(&source, "be explicit").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
-        .args(["import", source.to_str().unwrap()])
+        .args([
+            "import",
+            source.to_str().unwrap_or_else(|| panic!("unwrap failed")),
+        ])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let imported = tmp
         .path()
         .join(".wai/resources/agent-config/rules/.cursorrules");
     assert!(imported.is_file());
-    assert_eq!(fs::read_to_string(imported).unwrap(), "be explicit");
+    assert_eq!(
+        fs::read_to_string(imported).unwrap_or_else(|e| panic!("unwrap failed: {e}")),
+        "be explicit"
+    );
 }
 
 #[test]
 fn import_directory_routes_files_by_category() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
     let source = tmp.path().join("external-config");
-    fs::create_dir_all(&source).unwrap();
-    fs::write(source.join("team-rule.md"), "rule").unwrap();
-    fs::write(source.join("review-command.md"), "command").unwrap();
-    fs::write(source.join("notes.md"), "context").unwrap();
+    fs::create_dir_all(&source).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(source.join("team-rule.md"), "rule").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(source.join("review-command.md"), "command")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(source.join("notes.md"), "context").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
-        .args(["import", source.to_str().unwrap()])
+        .args([
+            "import",
+            source.to_str().unwrap_or_else(|| panic!("unwrap failed")),
+        ])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let agent_config = tmp.path().join(".wai/resources/agent-config");
@@ -77,43 +87,52 @@ fn import_directory_routes_files_by_category() {
 
 #[test]
 fn repeated_import_overwrites_existing_file() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
     let source = tmp.path().join("notes.md");
-    fs::write(&source, "first version").unwrap();
+    fs::write(&source, "first version").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
-        .args(["import", source.to_str().unwrap()])
+        .args([
+            "import",
+            source.to_str().unwrap_or_else(|| panic!("unwrap failed")),
+        ])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
-    fs::write(&source, "second version").unwrap();
+    fs::write(&source, "second version").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
-        .args(["import", source.to_str().unwrap()])
+        .args([
+            "import",
+            source.to_str().unwrap_or_else(|| panic!("unwrap failed")),
+        ])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let imported = tmp
         .path()
         .join(".wai/resources/agent-config/context/notes.md");
-    assert_eq!(fs::read_to_string(imported).unwrap(), "second version");
+    assert_eq!(
+        fs::read_to_string(imported).unwrap_or_else(|e| panic!("unwrap failed: {e}")),
+        "second version"
+    );
 }
 
 #[test]
 fn import_missing_path_fails() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
     let out = wai_cmd(tmp.path())
         .args(["import", "missing-path"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("Path not found"));

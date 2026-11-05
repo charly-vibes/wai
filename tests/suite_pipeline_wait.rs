@@ -24,25 +24,25 @@ use wai::pipeline_wait;
 /// blind-blocking") without encoding the capability.
 #[test]
 fn orchestrator_template_requires_wait_primitive() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let init = hermetic_wai_cmd(tmp.path())
         .args(["pipeline", "init", "epic-orchestrator"])
         .output()
-        .expect("init should run");
+        .unwrap_or_else(|e| panic!("init should run: {e}"));
     assert!(init.status.success(), "init epic-orchestrator failed");
 
     let template = tmp
         .path()
         .join(".wai/resources/pipelines/epic-orchestrator.toml");
-    let content =
-        fs::read_to_string(&template).expect("epic-orchestrator template should exist after init");
+    let content = fs::read_to_string(&template)
+        .unwrap_or_else(|e| panic!("epic-orchestrator template should exist after init: {e}"));
 
     // Locate the spawn step section.
     let spawn_pos = content
         .find("id = \"spawn\"")
-        .expect("template must have a spawn step");
+        .unwrap_or_else(|| panic!("template must have a spawn step"));
     let next_step = content[spawn_pos..]
         .find("[[steps]]")
         .map(|i| spawn_pos + i)

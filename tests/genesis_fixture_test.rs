@@ -7,7 +7,7 @@ use assert_cmd::Command;
 
 #[allow(deprecated)]
 fn wai_cmd(dir: &std::path::Path) -> Command {
-    let mut cmd = Command::cargo_bin("wai").unwrap();
+    let mut cmd = Command::cargo_bin("wai").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     cmd.current_dir(dir);
     cmd.env("NO_COLOR", "1");
     // Update notice off in tests: existing assertions expect quiet stderr and
@@ -23,13 +23,13 @@ fn fixture_with_wai_marker_is_detected_by_doctor() {
     let fixture = genesis::fixture::Fixture::new()
         .with_marker(".wai")
         .build()
-        .expect("build fixture");
+        .unwrap_or_else(|e| panic!("build fixture: {e}"));
 
     // After init, .wai/ should exist
     let out = wai_cmd(fixture.root())
         .args(["init", "--name", "test-ws"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
     assert!(
         fixture.path(".wai").exists(),
@@ -50,12 +50,12 @@ fn fixture_with_toml_config_parses_correctly() {
         .with_marker(".wai")
         .with_toml(".wai/config.toml", toml::Value::Table(cfg))
         .build()
-        .expect("build fixture");
+        .unwrap_or_else(|e| panic!("build fixture: {e}"));
 
     let out = wai_cmd(fixture.root())
         .args(["status"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 }
 
@@ -66,13 +66,13 @@ fn fixture_with_git_init_allows_commit() {
     let fixture = genesis::fixture::Fixture::new()
         .with_git_init()
         .build()
-        .expect("build fixture");
+        .unwrap_or_else(|e| panic!("build fixture: {e}"));
 
     // Run wai init inside the git repo
     let out = wai_cmd(fixture.root())
         .args(["init", "--name", "git-test"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     // Git should have auto-committed .wai/
@@ -80,12 +80,15 @@ fn fixture_with_git_init_allows_commit() {
         .run(&[
             "git",
             "-C",
-            fixture.root().to_str().unwrap(),
+            fixture
+                .root()
+                .to_str()
+                .unwrap_or_else(|| panic!("unwrap failed")),
             "log",
             "--oneline",
             "-1",
         ])
-        .expect("run git log");
+        .unwrap_or_else(|e| panic!("run git log: {e}"));
     assert!(
         output.success(),
         "git log should succeed: {}",
@@ -102,7 +105,7 @@ fn fixture_custom_files_are_present() {
         .with_file("README.md", "# Test Project\n\nA fixture test project.")
         .with_file("src/main.rs", "fn main() { println!(\"hello\"); }")
         .build()
-        .expect("build fixture");
+        .unwrap_or_else(|e| panic!("build fixture: {e}"));
 
     assert!(fixture.path("README.md").exists());
     assert!(fixture.path("src/main.rs").exists());

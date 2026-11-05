@@ -31,7 +31,7 @@ use wai::pipeline_spawn;
 /// spawned pi stub, so each invocation is observable without a real pi.
 fn install_stub_pi(dir: &std::path::Path, args_log: &std::path::Path) -> PathBuf {
     let bin_dir = dir.join("fake-bin");
-    fs::create_dir_all(&bin_dir).unwrap();
+    fs::create_dir_all(&bin_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let script_path = bin_dir.join("pi");
     if script_path.exists() {
         // Idempotent: rewriting a script a still-running stub is executing
@@ -43,11 +43,13 @@ fn install_stub_pi(dir: &std::path::Path, args_log: &std::path::Path) -> PathBuf
     let script = format!(
         "#!/bin/sh\nprintf '%s\\n' \"$*\" >> '{log}'\necho 'stub pi started'\nsleep \"${{PI_STUB_SLEEP:-30}}\"\n"
     );
-    fs::write(&script_path, script).unwrap();
+    fs::write(&script_path, script).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let mut perms = fs::metadata(&script_path).unwrap().permissions();
+        let mut perms = fs::metadata(&script_path)
+            .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
+            .permissions();
         perms.set_mode(0o755);
         let _ = fs::set_permissions(&script_path, perms);
     }
@@ -96,24 +98,24 @@ fn pid_alive(pid: u32) -> bool {
 
 #[test]
 fn orchestrator_template_requires_spawn_wrapper() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let init = hermetic_wai_cmd(tmp.path())
         .args(["pipeline", "init", "epic-orchestrator"])
         .output()
-        .expect("init should run");
+        .unwrap_or_else(|e| panic!("init should run: {e}"));
     assert!(init.status.success(), "init epic-orchestrator failed");
 
     let template = tmp
         .path()
         .join(".wai/resources/pipelines/epic-orchestrator.toml");
-    let content =
-        fs::read_to_string(&template).expect("epic-orchestrator template should exist after init");
+    let content = fs::read_to_string(&template)
+        .unwrap_or_else(|e| panic!("epic-orchestrator template should exist after init: {e}"));
 
     let spawn_pos = content
         .find("id = \"spawn\"")
-        .expect("template must have a spawn step");
+        .unwrap_or_else(|| panic!("template must have a spawn step"));
     let next_step = content[spawn_pos..]
         .find("[[steps]]")
         .map(|i| spawn_pos + i)
@@ -139,7 +141,7 @@ fn orchestrator_template_requires_spawn_wrapper() {
 
 #[test]
 fn spawn_wrapper_writes_checkpoint() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     let args_log = tmp.path().join("pi-args.log");
 
@@ -152,7 +154,7 @@ fn spawn_wrapper_writes_checkpoint() {
         ])
         .env("PI_STUB_SLEEP", "30")
         .output()
-        .expect("spawn should run");
+        .unwrap_or_else(|e| panic!("spawn should run: {e}"));
     assert!(
         out.status.success(),
         "spawn failed: {}",
@@ -168,8 +170,8 @@ fn spawn_wrapper_writes_checkpoint() {
         checkpoint_path.exists(),
         "checkpoint must exist at {checkpoint_path:?}; stdout:\n{stdout}"
     );
-    let checkpoint =
-        pipeline_spawn::SpawnCheckpoint::load(&checkpoint_path).expect("checkpoint must parse");
+    let checkpoint = pipeline_spawn::SpawnCheckpoint::load(&checkpoint_path)
+        .unwrap_or_else(|e| panic!("checkpoint must parse: {e}"));
     assert_eq!(checkpoint.session, "subagent:test:run");
     assert!(checkpoint.pid > 0, "checkpoint must record the pid");
     assert_eq!(checkpoint.budget_minutes, 30, "default budget is 30m");
@@ -222,7 +224,7 @@ fn spawn_wrapper_writes_checkpoint() {
 
 #[test]
 fn spawn_status_classifies_liveness() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     let args_log = tmp.path().join("pi-args.log");
 
@@ -231,7 +233,7 @@ fn spawn_status_classifies_liveness() {
         .args(["pipeline", "spawn", "subagent:test:probe", "probe prompt"])
         .env("PI_STUB_SLEEP", "30")
         .output()
-        .expect("spawn should run");
+        .unwrap_or_else(|e| panic!("spawn should run: {e}"));
     assert!(
         out.status.success(),
         "spawn failed: {}",
@@ -241,7 +243,7 @@ fn spawn_status_classifies_liveness() {
     let status_out = spawn_cmd(tmp.path(), &args_log)
         .args(["pipeline", "spawn-status"])
         .output()
-        .expect("status should run");
+        .unwrap_or_else(|e| panic!("status should run: {e}"));
     assert!(status_out.status.success(), "status failed");
     let stdout = String::from_utf8_lossy(&status_out.stdout);
     assert!(
@@ -259,7 +261,7 @@ fn spawn_status_classifies_liveness() {
         .args(["pipeline", "spawn", "subagent:test:done", "done prompt"])
         .env("PI_STUB_SLEEP", "0")
         .output()
-        .expect("spawn should run");
+        .unwrap_or_else(|e| panic!("spawn should run: {e}"));
     assert!(
         out.status.success(),
         "spawn failed: {}",
@@ -269,7 +271,7 @@ fn spawn_status_classifies_liveness() {
         &tmp.path()
             .join(".wai/pipeline-runs/spawns/subagent:test:done.json"),
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         wait_until(Duration::from_secs(10), || !pid_alive(done_checkpoint.pid)),
         "done stub should exit (pid {})",
@@ -279,7 +281,7 @@ fn spawn_status_classifies_liveness() {
     let status_out = spawn_cmd(tmp.path(), &args_log)
         .args(["pipeline", "spawn-status", "subagent:test:done"])
         .output()
-        .expect("status should run");
+        .unwrap_or_else(|e| panic!("status should run: {e}"));
     let stdout = String::from_utf8_lossy(&status_out.stdout);
     assert!(
         stdout.to_lowercase().contains("exited"),
@@ -333,7 +335,7 @@ fn spawn_status_classifies_liveness() {
 
 #[test]
 fn spawn_resume_continues_named_session() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     let args_log = tmp.path().join("pi-args.log");
 
@@ -348,7 +350,7 @@ fn spawn_resume_continues_named_session() {
         ])
         .env("PI_STUB_SLEEP", "0")
         .output()
-        .expect("spawn should run");
+        .unwrap_or_else(|e| panic!("spawn should run: {e}"));
     assert!(
         out.status.success(),
         "spawn failed: {}",
@@ -358,7 +360,8 @@ fn spawn_resume_continues_named_session() {
     let checkpoint_path = tmp
         .path()
         .join(".wai/pipeline-runs/spawns/subagent:test:kill.json");
-    let checkpoint = pipeline_spawn::SpawnCheckpoint::load(&checkpoint_path).unwrap();
+    let checkpoint = pipeline_spawn::SpawnCheckpoint::load(&checkpoint_path)
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         wait_until(Duration::from_secs(10), || !pid_alive(checkpoint.pid)),
         "stub should exit (pid {} must die)",
@@ -371,7 +374,7 @@ fn spawn_resume_continues_named_session() {
         .args(["pipeline", "spawn-resume", "subagent:test:kill"])
         .env("PI_STUB_SLEEP", "0")
         .output()
-        .expect("resume should run");
+        .unwrap_or_else(|e| panic!("resume should run: {e}"));
     assert!(
         out.status.success(),
         "resume failed: {}",
@@ -387,7 +390,10 @@ fn spawn_resume_continues_named_session() {
         read_args_log(&args_log)
     );
     let argv = read_args_log(&args_log);
-    let resume_line = argv.lines().nth(1).expect("second invocation recorded");
+    let resume_line = argv
+        .lines()
+        .nth(1)
+        .unwrap_or_else(|| panic!("second invocation recorded"));
     assert!(
         resume_line.contains("-c") && resume_line.contains("-n subagent:test:kill-resume"),
         "resume must launch `pi -c -p -n <name>-resume`; got: {resume_line}"
@@ -410,7 +416,7 @@ fn spawn_resume_continues_named_session() {
     let out = spawn_cmd(tmp.path(), &args_log)
         .args(["pipeline", "spawn-resume", "subagent:never:spawned"])
         .output()
-        .expect("resume of unknown spawn should run");
+        .unwrap_or_else(|e| panic!("resume of unknown spawn should run: {e}"));
     assert!(
         !out.status.success(),
         "resume without a checkpoint must be refused"
@@ -424,7 +430,7 @@ fn spawn_resume_continues_named_session() {
 
 #[test]
 fn spawn_rejects_zero_budget() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     let args_log = tmp.path().join("pi-args.log");
 
@@ -438,7 +444,7 @@ fn spawn_rejects_zero_budget() {
             "0",
         ])
         .output()
-        .expect("spawn should run");
+        .unwrap_or_else(|e| panic!("spawn should run: {e}"));
     assert!(
         !out.status.success(),
         "zero budget must be refused (would kill the spawn instantly)"
@@ -453,10 +459,10 @@ fn spawn_rejects_zero_budget() {
 
 #[test]
 fn spawn_streams_stderr_to_log() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     let bin_dir = tmp.path().join("fake-bin");
-    fs::create_dir_all(&bin_dir).unwrap();
+    fs::create_dir_all(&bin_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     // A stub that writes 128KB to stderr (well past the 64KB pipe buffer that
     // would deadlock a piped stderr) then exits 0.
     let script_path = bin_dir.join("pi");
@@ -464,11 +470,13 @@ fn spawn_streams_stderr_to_log() {
         &script_path,
         "#!/bin/sh\nhead -c 131072 /dev/zero | tr '\\0' 'x' >&2\necho 'stub pi stderr done'\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let mut perms = fs::metadata(&script_path).unwrap().permissions();
+        let mut perms = fs::metadata(&script_path)
+            .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
+            .permissions();
         perms.set_mode(0o755);
         let _ = fs::set_permissions(&script_path, perms);
     }
@@ -479,7 +487,7 @@ fn spawn_streams_stderr_to_log() {
     let out = cmd
         .args(["pipeline", "spawn", "subagent:test:stderr", "prompt"])
         .output()
-        .expect("spawn should run");
+        .unwrap_or_else(|e| panic!("spawn should run: {e}"));
     assert!(
         out.status.success(),
         "spawn failed: {}",
@@ -490,7 +498,7 @@ fn spawn_streams_stderr_to_log() {
         &tmp.path()
             .join(".wai/pipeline-runs/spawns/subagent:test:stderr.json"),
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     // Wait for the stub to finish, then the log must contain the full stderr
     // payload plus the stdout line — stderr reached the file, no pipe involved.
     assert!(

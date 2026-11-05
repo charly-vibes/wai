@@ -17,13 +17,13 @@ use tempfile::TempDir;
 /// epic-orchestrator and enforce the evidence contract on review artifacts.
 #[test]
 fn verify_evidence_oracle_scaffolded_and_enforces_contract() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let init = hermetic_wai_cmd(tmp.path())
         .args(["pipeline", "init", "epic-orchestrator"])
         .output()
-        .expect("init should run");
+        .unwrap_or_else(|e| panic!("init should run: {e}"));
     assert!(init.status.success(), "init failed");
 
     let oracle = tmp.path().join(".wai/resources/oracles/verify-evidence.sh");
@@ -39,11 +39,11 @@ fn verify_evidence_oracle_scaffolded_and_enforces_contract() {
         &tmp_art,
         "## Verdict\n\nCONFIRM — implementor report matches git log and beads state.\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let out = std::process::Command::new(&oracle)
         .arg(&tmp_art)
         .output()
-        .expect("oracle should run");
+        .unwrap_or_else(|e| panic!("oracle should run: {e}"));
     assert!(
         !out.status.success(),
         "CONFIRM without artifact citations and fresh test-run output must fail"
@@ -54,11 +54,11 @@ fn verify_evidence_oracle_scaffolded_and_enforces_contract() {
         &tmp_art,
         "## Reads\n\n- read .wai/projects/p/research/2026-10-13-red-x.md\n- read .wai/projects/p/designs/2026-10-13-green-x.md\n\n## Fresh test run\n\ncargo test --test suite_x\ntest result: ok. 12 passed; 0 failed\n\n## Verdict\n\nCONFIRM\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let out = std::process::Command::new(&oracle)
         .arg(&tmp_art)
         .output()
-        .expect("oracle should run");
+        .unwrap_or_else(|e| panic!("oracle should run: {e}"));
     assert!(
         out.status.success(),
         "CONFIRM with artifact citations and fresh test-run output must pass: {}",
@@ -71,11 +71,11 @@ fn verify_evidence_oracle_scaffolded_and_enforces_contract() {
         &tmp_art,
         "## Verdict\n\nREVIEW_REQUIRED — single-model degradation: verifier ran on the same model family as the implementor.\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let out = std::process::Command::new(&oracle)
         .arg(&tmp_art)
         .output()
-        .expect("oracle should run");
+        .unwrap_or_else(|e| panic!("oracle should run: {e}"));
     assert!(
         out.status.success(),
         "REVIEW_REQUIRED must pass the evidence oracle: {}",
@@ -87,19 +87,19 @@ fn verify_evidence_oracle_scaffolded_and_enforces_contract() {
 /// in its gate output.
 #[test]
 fn epic_orchestrator_verify_step_declares_verify_evidence_oracle() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let init = hermetic_wai_cmd(tmp.path())
         .args(["pipeline", "init", "epic-orchestrator"])
         .output()
-        .expect("init should run");
+        .unwrap_or_else(|e| panic!("init should run: {e}"));
     assert!(init.status.success(), "init failed");
 
     let out = hermetic_wai_cmd(tmp.path())
         .args(["pipeline", "gates", "epic-orchestrator"])
         .output()
-        .expect("gates should run");
+        .unwrap_or_else(|e| panic!("gates should run: {e}"));
     let combined = format!(
         "{}{}",
         String::from_utf8_lossy(&out.stdout),
@@ -125,23 +125,23 @@ fn epic_orchestrator_verify_step_declares_verify_evidence_oracle() {
 /// (RO5U pass-1 medium finding: word-boundary verdict detection).
 #[test]
 fn oracle_does_not_misread_confirmation_prose_as_confirm() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     hermetic_wai_cmd(tmp.path())
         .args(["pipeline", "init", "epic-orchestrator"])
         .output()
-        .expect("init should run");
+        .unwrap_or_else(|e| panic!("init should run: {e}"));
     let oracle = tmp.path().join(".wai/resources/oracles/verify-evidence.sh");
     let art = tmp.path().join("review-artifact.md");
     fs::write(
         &art,
         "Awaiting confirmation from the lead before the verdict step; no verdict recorded yet.\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let out = std::process::Command::new(&oracle)
         .arg(&art)
         .output()
-        .expect("oracle should run");
+        .unwrap_or_else(|e| panic!("oracle should run: {e}"));
     assert!(
         !out.status.success(),
         "prose 'confirmation' must not satisfy the CONFIRM check"

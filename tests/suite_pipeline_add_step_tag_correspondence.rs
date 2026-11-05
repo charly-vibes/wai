@@ -28,24 +28,24 @@ use tempfile::TempDir;
 /// Scaffold a temp workspace with the epic-orchestrator pipeline initialized
 /// and a run started for `topic`. Returns (temp dir, run id).
 fn scaffold_pipeline_run(topic: &str) -> (TempDir, String) {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "proj");
 
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "init", "epic-orchestrator"])
         .output()
-        .expect("pipeline init should run");
+        .unwrap_or_else(|e| panic!("pipeline init should run: {e}"));
     assert!(out.status.success(), "pipeline init failed: {out:?}");
 
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "start", "epic-orchestrator", "--topic", topic])
         .output()
-        .expect("pipeline start should run");
+        .unwrap_or_else(|e| panic!("pipeline start should run: {e}"));
     assert!(out.status.success(), "pipeline start failed: {out:?}");
 
     let run_id = fs::read_to_string(tmp.path().join(".wai/resources/pipelines/.last-run"))
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .trim()
         .to_string();
     (tmp, run_id)
@@ -55,17 +55,17 @@ fn scaffold_pipeline_run(topic: &str) -> (TempDir, String) {
 fn research_frontmatter(dir: &std::path::Path, marker: &str) -> String {
     let research = dir.join(".wai/projects/proj/research");
     let files: Vec<_> = fs::read_dir(&research)
-        .unwrap()
-        .map(|e| e.unwrap().path())
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
+        .map(|e| e.unwrap_or_else(|e| panic!("unwrap failed: {e}")).path())
         .collect();
     assert!(!files.is_empty(), "expected at least one research artifact");
     let mut matches = files
         .into_iter()
-        .map(|p| fs::read_to_string(&p).unwrap())
+        .map(|p| fs::read_to_string(&p).unwrap_or_else(|e| panic!("unwrap failed: {e}")))
         .filter(|c| c.contains(marker))
         .collect::<Vec<_>>();
     assert_eq!(matches.len(), 1, "marker must match exactly one artifact");
-    matches.pop().unwrap()
+    matches.pop().unwrap_or_else(|| panic!("unwrap failed"))
 }
 
 /// Step id reported by `wai pipeline current --json` for the active run.
@@ -73,12 +73,13 @@ fn current_step_id(dir: &std::path::Path) -> String {
     let out = wai_cmd(dir)
         .args(["pipeline", "current", "--json"])
         .output()
-        .expect("pipeline current should run");
+        .unwrap_or_else(|e| panic!("pipeline current should run: {e}"));
     assert!(out.status.success(), "pipeline current failed: {out:?}");
-    let json: Value = serde_json::from_slice(&out.stdout).expect("valid JSON envelope");
+    let json: Value =
+        serde_json::from_slice(&out.stdout).unwrap_or_else(|e| panic!("valid JSON envelope: {e}"));
     json["data"]["step"]["id"]
         .as_str()
-        .expect("step.id present")
+        .unwrap_or_else(|| panic!("step.id present"))
         .to_string()
 }
 
@@ -94,7 +95,7 @@ fn add_after_next_tags_artifact_with_current_step() {
     let out = wai_cmd(dir)
         .args(["add", "research", "ORIENT: selected ticket"])
         .output()
-        .expect("add should run");
+        .unwrap_or_else(|e| panic!("add should run: {e}"));
     assert!(out.status.success(), "add failed: {out:?}");
     let fm = research_frontmatter(dir, "ORIENT: selected ticket");
     assert!(
@@ -105,7 +106,7 @@ fn add_after_next_tags_artifact_with_current_step() {
     let out = wai_cmd(dir)
         .args(["pipeline", "next"])
         .output()
-        .expect("pipeline next should run");
+        .unwrap_or_else(|e| panic!("pipeline next should run: {e}"));
     assert!(out.status.success(), "pipeline next failed: {out:?}");
 
     // The new current step, as `pipeline current` reports it.
@@ -116,7 +117,7 @@ fn add_after_next_tags_artifact_with_current_step() {
     let out = wai_cmd(dir)
         .args(["add", "research", "GATES: baseline green"])
         .output()
-        .expect("add should run");
+        .unwrap_or_else(|e| panic!("add should run: {e}"));
     assert!(out.status.success(), "add failed: {out:?}");
     let fm = research_frontmatter(dir, "GATES: baseline green");
     assert!(
@@ -139,7 +140,7 @@ fn add_before_next_tags_artifact_with_then_current_step() {
     let out = wai_cmd(dir)
         .args(["add", "research", "GATES: recorded before advancing"])
         .output()
-        .expect("add should run");
+        .unwrap_or_else(|e| panic!("add should run: {e}"));
     assert!(out.status.success(), "add failed: {out:?}");
     let before = research_frontmatter(dir, "recorded before advancing");
     assert!(
@@ -152,7 +153,7 @@ fn add_before_next_tags_artifact_with_then_current_step() {
     let out = wai_cmd(dir)
         .args(["pipeline", "next"])
         .output()
-        .expect("pipeline next should run");
+        .unwrap_or_else(|e| panic!("pipeline next should run: {e}"));
     assert!(out.status.success(), "pipeline next failed: {out:?}");
     let fm = research_frontmatter(dir, "recorded before advancing");
     assert!(
@@ -179,13 +180,13 @@ fn next_persists_run_state_before_printing_new_step_prompt() {
     let out = wai_cmd(dir)
         .args(["add", "research", "ORIENT: selected ticket"])
         .output()
-        .expect("add should run");
+        .unwrap_or_else(|e| panic!("add should run: {e}"));
     assert!(out.status.success(), "add failed: {out:?}");
 
     let out = wai_cmd(dir)
         .args(["pipeline", "next"])
         .output()
-        .expect("pipeline next should run");
+        .unwrap_or_else(|e| panic!("pipeline next should run: {e}"));
     assert!(out.status.success(), "pipeline next failed: {out:?}");
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(
@@ -194,7 +195,8 @@ fn next_persists_run_state_before_printing_new_step_prompt() {
     );
 
     // Yml on disk already reflects the advance.
-    let yml = fs::read_to_string(dir.join(format!(".wai/pipeline-runs/{run_id}.yml"))).unwrap();
+    let yml = fs::read_to_string(dir.join(format!(".wai/pipeline-runs/{run_id}.yml")))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         yml.contains("current_step: 1"),
         "run state must be persisted before the prompt is printed, yml: {yml}"

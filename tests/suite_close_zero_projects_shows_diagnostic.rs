@@ -7,13 +7,13 @@ use tempfile::TempDir;
 
 #[test]
 fn close_zero_projects_shows_diagnostic() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["close", "--no-input"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("No projects found"));
@@ -21,7 +21,7 @@ fn close_zero_projects_shows_diagnostic() {
 
 #[test]
 fn close_repeated_same_day_updates_existing() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
 
@@ -29,19 +29,19 @@ fn close_repeated_same_day_updates_existing() {
     let out = wai_cmd(tmp.path())
         .args(["close", "--project", "myproject"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     // Second invocation on same day
     let out = wai_cmd(tmp.path())
         .args(["close", "--project", "myproject"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let handoffs_dir = tmp.path().join(".wai/projects/myproject/handoffs");
     let files: Vec<_> = fs::read_dir(&handoffs_dir)
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .filter_map(|e| e.ok())
         .map(|e| e.file_name().to_string_lossy().to_string())
         .collect();
@@ -61,14 +61,14 @@ fn close_repeated_same_day_updates_existing() {
 
 #[test]
 fn close_writes_pending_resume_signal() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
 
     let out = wai_cmd(tmp.path())
         .args(["close", "--project", "myproject"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let proj_dir = tmp.path().join(".wai/projects/myproject");
@@ -78,7 +78,7 @@ fn close_writes_pending_resume_signal() {
         ".pending-resume should be written after close"
     );
 
-    let content = fs::read_to_string(&signal).unwrap();
+    let content = fs::read_to_string(&signal).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let relative = content.trim();
     // Should point to a file under handoffs/
     assert!(
@@ -94,27 +94,29 @@ fn close_writes_pending_resume_signal() {
 
 #[test]
 fn close_overwrites_pending_resume_on_second_call() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
 
     let out = wai_cmd(tmp.path())
         .args(["close", "--project", "myproject"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let proj_dir = tmp.path().join(".wai/projects/myproject");
-    let first = fs::read_to_string(proj_dir.join(".pending-resume")).unwrap();
+    let first = fs::read_to_string(proj_dir.join(".pending-resume"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // Second close on the same day updates the same file in place.
     let out = wai_cmd(tmp.path())
         .args(["close", "--project", "myproject"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
-    let second = fs::read_to_string(proj_dir.join(".pending-resume")).unwrap();
+    let second = fs::read_to_string(proj_dir.join(".pending-resume"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     // Both runs point to the same (only) handoff file for this day.
     assert_eq!(
         first.trim(),
@@ -130,7 +132,7 @@ fn close_overwrites_pending_resume_on_second_call() {
 
 #[test]
 fn prime_single_project_with_handoff() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
     write_handoff(
@@ -143,7 +145,7 @@ fn prime_single_project_with_handoff() {
     let out = wai_cmd(tmp.path())
         .args(["prime", "--project", "myproject", "--no-input"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("wai prime"));
@@ -154,14 +156,14 @@ fn prime_single_project_with_handoff() {
 
 #[test]
 fn prime_no_handoff_omits_handoff_line() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
 
     let out = wai_cmd(tmp.path())
         .args(["prime", "--project", "myproject", "--no-input"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Project: myproject"));
@@ -171,7 +173,7 @@ fn prime_no_handoff_omits_handoff_line() {
 
 #[test]
 fn search_with_project_filter() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "app-a");
     create_project(tmp.path(), "app-b");
@@ -193,7 +195,7 @@ fn search_with_project_filter() {
     let out = wai_cmd(tmp.path())
         .args(["search", "unique_a", "--in", "app-a"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("unique_a"));
@@ -201,7 +203,7 @@ fn search_with_project_filter() {
     let out = wai_cmd(tmp.path())
         .args(["search", "unique_b", "--in", "app-a"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("No results found"));
@@ -209,7 +211,7 @@ fn search_with_project_filter() {
 
 #[test]
 fn search_with_regex() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     write_artifact(
@@ -223,7 +225,7 @@ fn search_with_regex() {
     let out = wai_cmd(tmp.path())
         .args(["search", "error_code: \\d+", "--regex"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("2 matches"));
@@ -233,7 +235,7 @@ fn search_with_regex() {
 
 #[test]
 fn search_with_limit() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     write_artifact(
@@ -247,7 +249,7 @@ fn search_with_limit() {
     let out = wai_cmd(tmp.path())
         .args(["search", "match", "-n", "2"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success());
@@ -257,13 +259,13 @@ fn search_with_limit() {
 
 #[test]
 fn search_invalid_regex_fails() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["search", "[invalid", "--regex"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("Invalid regex"));
@@ -271,7 +273,7 @@ fn search_invalid_regex_fails() {
 
 #[test]
 fn search_include_memories_appends_memories_section() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     write_artifact(
@@ -281,7 +283,7 @@ fn search_include_memories_appends_memories_section() {
         "2026-01-15-notes.md",
         "shared-term in artifact\n",
     );
-    fs::create_dir_all(tmp.path().join(".beads")).unwrap();
+    fs::create_dir_all(tmp.path().join(".beads")).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let fake_bin = install_fake_bd(
         tmp.path(),
         "shared-term",
@@ -297,7 +299,7 @@ fn search_include_memories_appends_memories_section() {
         .args(["search", "shared-term", "--include-memories"])
         .env("PATH", path)
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Search results"));
@@ -308,10 +310,10 @@ fn search_include_memories_appends_memories_section() {
 
 #[test]
 fn search_include_memories_shows_memory_only_results() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
-    fs::create_dir_all(tmp.path().join(".beads")).unwrap();
+    fs::create_dir_all(tmp.path().join(".beads")).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let fake_bin = install_fake_bd(
         tmp.path(),
         "memory-only",
@@ -327,7 +329,7 @@ fn search_include_memories_shows_memory_only_results() {
         .args(["search", "memory-only", "--include-memories"])
         .env("PATH", path)
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("No artifact results found"));
@@ -337,10 +339,10 @@ fn search_include_memories_shows_memory_only_results() {
 
 #[test]
 fn search_include_memories_verbose_shows_full_value() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
-    fs::create_dir_all(tmp.path().join(".beads")).unwrap();
+    fs::create_dir_all(tmp.path().join(".beads")).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let long_value = "This memory value is intentionally long so search should truncate it by default but show the full value when verbose is enabled.";
     let fake_bin = install_fake_bd(
         tmp.path(),
@@ -357,7 +359,7 @@ fn search_include_memories_verbose_shows_full_value() {
         .args(["-v", "search", "verbose-memory", "--include-memories"])
         .env("PATH", path)
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains(long_value));
@@ -367,7 +369,7 @@ fn search_include_memories_verbose_shows_full_value() {
 
 #[test]
 fn add_plan_with_tags_includes_frontmatter() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
@@ -382,16 +384,17 @@ fn add_plan_with_tags_includes_frontmatter() {
             "backend,api",
         ])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let plans_dir = tmp.path().join(".wai/projects/my-app/plans");
     let files: Vec<_> = fs::read_dir(&plans_dir)
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .filter_map(|e| e.ok())
         .collect();
     assert_eq!(files.len(), 1);
-    let content = fs::read_to_string(files[0].path()).unwrap();
+    let content =
+        fs::read_to_string(files[0].path()).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(content.contains("---"), "plan should have frontmatter");
     assert!(content.contains("tags:"), "plan should have tags key");
     assert!(content.contains("backend"), "plan should have backend tag");
@@ -404,7 +407,7 @@ fn add_plan_with_tags_includes_frontmatter() {
 
 #[test]
 fn add_design_with_tags_includes_frontmatter() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
@@ -419,16 +422,17 @@ fn add_design_with_tags_includes_frontmatter() {
             "ux",
         ])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let designs_dir = tmp.path().join(".wai/projects/my-app/designs");
     let files: Vec<_> = fs::read_dir(&designs_dir)
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .filter_map(|e| e.ok())
         .collect();
     assert_eq!(files.len(), 1);
-    let content = fs::read_to_string(files[0].path()).unwrap();
+    let content =
+        fs::read_to_string(files[0].path()).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(content.contains("---"), "design should have frontmatter");
     assert!(content.contains("ux"), "design should have ux tag");
 }
@@ -437,7 +441,7 @@ fn add_design_with_tags_includes_frontmatter() {
 
 #[test]
 fn search_tag_filter_returns_only_tagged_files() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
@@ -460,7 +464,7 @@ fn search_tag_filter_returns_only_tagged_files() {
     let output = wai_cmd(tmp.path())
         .args(["search", "foo", "--tag", "rust"])
         .output()
-        .unwrap();
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let stdout = String::from_utf8_lossy(&output.stdout);
 
     assert!(stdout.contains("tagged"), "should match the tagged file");
@@ -472,7 +476,7 @@ fn search_tag_filter_returns_only_tagged_files() {
 
 #[test]
 fn search_tag_filter_no_match_returns_no_results() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
@@ -487,14 +491,14 @@ fn search_tag_filter_no_match_returns_no_results() {
     let output = wai_cmd(tmp.path())
         .args(["search", "content", "--tag", "nonexistent-tag"])
         .output()
-        .unwrap();
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("No results"), "should report no results");
 }
 
 #[test]
 fn search_malformed_frontmatter_does_not_abort_tag_search() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
@@ -510,13 +514,13 @@ fn search_malformed_frontmatter_does_not_abort_tag_search() {
     let out = wai_cmd(tmp.path())
         .args(["search", "content", "--tag", "anything"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 }
 
 #[test]
 fn search_latest_returns_only_most_recent_file() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
@@ -538,7 +542,7 @@ fn search_latest_returns_only_most_recent_file() {
     let output = wai_cmd(tmp.path())
         .args(["search", "needle", "--latest"])
         .output()
-        .unwrap();
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let stdout = String::from_utf8_lossy(&output.stdout);
 
     assert!(stdout.contains("newer"), "should contain the newer file");
@@ -550,7 +554,7 @@ fn search_latest_returns_only_most_recent_file() {
 
 #[test]
 fn search_tag_and_type_and_latest_combined() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
@@ -582,7 +586,7 @@ fn search_tag_and_type_and_latest_combined() {
             "search", "data", "--tag", "perf", "--type", "research", "--latest",
         ])
         .output()
-        .unwrap();
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let stdout = String::from_utf8_lossy(&output.stdout);
 
     assert!(
@@ -597,7 +601,7 @@ fn search_tag_and_type_and_latest_combined() {
 
 #[test]
 fn timeline_shows_dated_artifacts() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     write_artifact(
@@ -618,7 +622,7 @@ fn timeline_shows_dated_artifacts() {
     let out = wai_cmd(tmp.path())
         .args(["timeline", "my-app"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Timeline for"));
@@ -628,14 +632,14 @@ fn timeline_shows_dated_artifacts() {
 
 #[test]
 fn timeline_empty_project_shows_message() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
     let out = wai_cmd(tmp.path())
         .args(["timeline", "my-app"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("No dated artifacts found"));
@@ -643,13 +647,13 @@ fn timeline_empty_project_shows_message() {
 
 #[test]
 fn timeline_nonexistent_project_fails() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["timeline", "ghost"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("not found"));
@@ -657,7 +661,7 @@ fn timeline_nonexistent_project_fails() {
 
 #[test]
 fn timeline_from_filter() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     write_artifact(
@@ -678,7 +682,7 @@ fn timeline_from_filter() {
     let out = wai_cmd(tmp.path())
         .args(["timeline", "my-app", "--from", "2026-02-01"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("2026-02-15"));
@@ -687,7 +691,7 @@ fn timeline_from_filter() {
 
 #[test]
 fn timeline_to_filter() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     write_artifact(
@@ -708,7 +712,7 @@ fn timeline_to_filter() {
     let out = wai_cmd(tmp.path())
         .args(["timeline", "my-app", "--to", "2026-01-31"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("2026-01-05"));
@@ -717,7 +721,7 @@ fn timeline_to_filter() {
 
 #[test]
 fn timeline_from_to_range() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     write_artifact(
@@ -752,7 +756,7 @@ fn timeline_from_to_range() {
             "2026-02-15",
         ])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("2026-02-01"));
@@ -762,7 +766,7 @@ fn timeline_from_to_range() {
 
 #[test]
 fn timeline_reverse_shows_oldest_first() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     write_artifact(
@@ -783,11 +787,15 @@ fn timeline_reverse_shows_oldest_first() {
     let output = wai_cmd(tmp.path())
         .args(["timeline", "my-app", "--reverse"])
         .output()
-        .unwrap();
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let stdout = String::from_utf8_lossy(&output.stdout);
 
-    let pos_jan = stdout.find("2026-01-10").unwrap();
-    let pos_mar = stdout.find("2026-03-20").unwrap();
+    let pos_jan = stdout
+        .find("2026-01-10")
+        .unwrap_or_else(|| panic!("unwrap failed"));
+    let pos_mar = stdout
+        .find("2026-03-20")
+        .unwrap_or_else(|| panic!("unwrap failed"));
     assert!(
         pos_jan < pos_mar,
         "In reverse mode, oldest date should appear first"
@@ -796,7 +804,7 @@ fn timeline_reverse_shows_oldest_first() {
 
 #[test]
 fn timeline_json_outputs_entries() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     write_artifact(
@@ -810,7 +818,7 @@ fn timeline_json_outputs_entries() {
     let out = wai_cmd(tmp.path())
         .args(["timeline", "my-app", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("\"entries\""));

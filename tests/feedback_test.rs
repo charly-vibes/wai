@@ -3,7 +3,7 @@ use std::fs;
 
 /// Helper: create a wai command with NO_COLOR for predictable assertions.
 fn wai_cmd() -> Command {
-    let mut cmd = Command::cargo_bin("wai").unwrap();
+    let mut cmd = Command::cargo_bin("wai").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     cmd.env("NO_COLOR", "1");
     // Update notice off in tests: existing assertions expect quiet stderr and
     // must not depend on real ~/.cache state (wai-r3p0 tidy).
@@ -18,13 +18,13 @@ const TARGET_REPO: &str = "charly-vibes/wai";
 
 #[test]
 fn feedback_dry_run_prints_title_body_labels_and_exact_gh_line() {
-    let tmp = tempfile::TempDir::new().unwrap();
+    let tmp = tempfile::TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     // Initialize a workspace so context-gathering has a repo to inspect.
     let out = wai_cmd()
         .current_dir(tmp.path())
         .args(["init", "--name", "demo"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let output = wai_cmd()
@@ -40,7 +40,7 @@ fn feedback_dry_run_prints_title_body_labels_and_exact_gh_line() {
             "--yes",
         ])
         .output()
-        .unwrap();
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     assert!(output.status.success(), "dry-run should exit 0");
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -53,7 +53,7 @@ fn feedback_dry_run_prints_title_body_labels_and_exact_gh_line() {
     let gh_line = stdout
         .lines()
         .find(|l| l.starts_with("gh issue create"))
-        .expect("an exact `gh issue create` line is printed in dry-run");
+        .unwrap_or_else(|| panic!("an exact `gh issue create` line is printed in dry-run"));
     assert!(
         gh_line.contains(&format!("--repo {}", TARGET_REPO)),
         "gh line targets wai upstream: {gh_line}"
@@ -71,12 +71,12 @@ fn feedback_dry_run_prints_title_body_labels_and_exact_gh_line() {
 
 #[test]
 fn feedback_dry_run_no_context_omits_environment_section() {
-    let tmp = tempfile::TempDir::new().unwrap();
+    let tmp = tempfile::TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let out = wai_cmd()
         .current_dir(tmp.path())
         .args(["init", "--name", "demo"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let output = wai_cmd()
@@ -93,7 +93,7 @@ fn feedback_dry_run_no_context_omits_environment_section() {
             "--yes",
         ])
         .output()
-        .unwrap();
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
@@ -112,21 +112,27 @@ fn feedback_dry_run_no_context_omits_environment_section() {
 
 #[test]
 fn feedback_from_last_error_without_scratch_is_stable() {
-    let tmp = tempfile::TempDir::new().unwrap();
+    let tmp = tempfile::TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let out = wai_cmd()
         .current_dir(tmp.path())
         .args(["init", "--name", "demo"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     // Point XDG_CACHE_HOME at the temp dir so there is no prior scratch.
     let output = wai_cmd()
         .current_dir(tmp.path())
-        .env("XDG_CACHE_HOME", tmp.path().join("cache").to_str().unwrap())
+        .env(
+            "XDG_CACHE_HOME",
+            tmp.path()
+                .join("cache")
+                .to_str()
+                .unwrap_or_else(|| panic!("unwrap failed")),
+        )
         .args(["feedback", "bug", "--from-last-error", "--dry-run", "--yes"])
         .output()
-        .unwrap();
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // Stable, non-panic exit (not 101). Exit code is non-zero (no error to file)
     // but the process must not crash.
@@ -152,12 +158,12 @@ fn feedback_from_last_error_without_scratch_is_stable() {
 
 #[test]
 fn feedback_dry_run_redacts_pat_from_remote_url_in_body() {
-    let tmp = tempfile::TempDir::new().unwrap();
+    let tmp = tempfile::TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let out = wai_cmd()
         .current_dir(tmp.path())
         .args(["init", "--name", "demo"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let pat_url = "https://ghp_SECRET1234567890@github.com/charly-vibes/wai.git";
@@ -174,7 +180,7 @@ fn feedback_dry_run_redacts_pat_from_remote_url_in_body() {
             "--yes",
         ])
         .output()
-        .unwrap();
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
 
@@ -195,12 +201,12 @@ fn feedback_dry_run_redacts_pat_from_remote_url_in_body() {
 
 #[test]
 fn feedback_dry_run_preserves_monkey_type_and_keymap_values() {
-    let tmp = tempfile::TempDir::new().unwrap();
+    let tmp = tempfile::TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let out = wai_cmd()
         .current_dir(tmp.path())
         .args(["init", "--name", "demo"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let body = "I was configuring my keymap and testing monkey_type when wai crashed.";
@@ -217,7 +223,7 @@ fn feedback_dry_run_preserves_monkey_type_and_keymap_values() {
             "--yes",
         ])
         .output()
-        .unwrap();
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
@@ -231,37 +237,37 @@ fn feedback_dry_run_preserves_monkey_type_and_keymap_values() {
 
 #[test]
 fn feedback_invalid_kind_is_rejected() {
-    let tmp = tempfile::TempDir::new().unwrap();
+    let tmp = tempfile::TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let out = wai_cmd()
         .current_dir(tmp.path())
         .args(["init", "--name", "demo"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let out = wai_cmd()
         .current_dir(tmp.path())
         .args(["feedback", "not-a-kind", "--dry-run", "--yes"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(!out.status.success());
 }
 
 #[test]
 fn feedback_missing_title_without_from_last_error_errors_cleanly() {
-    let tmp = tempfile::TempDir::new().unwrap();
+    let tmp = tempfile::TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let out = wai_cmd()
         .current_dir(tmp.path())
         .args(["init", "--name", "demo"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let output = wai_cmd()
         .current_dir(tmp.path())
         .args(["feedback", "bug", "--dry-run", "--yes"])
         .output()
-        .unwrap();
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     // No title and no --from-last-error → clean error, not a panic.
     assert_ne!(output.status.code(), Some(101));
     assert!(!output.status.success());
@@ -277,26 +283,32 @@ fn feedback_missing_title_without_from_last_error_errors_cleanly() {
 
 #[test]
 fn feedback_from_last_error_reads_a_real_wai_error() {
-    let tmp = tempfile::TempDir::new().unwrap();
+    let tmp = tempfile::TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     // Isolate the scratch file in the temp dir's cache.
     let cache = tmp.path().join("cache");
-    fs::create_dir_all(&cache).unwrap();
+    fs::create_dir_all(&cache).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // Trigger a real wai error: `wai status` outside any initialized workspace.
     let _ = wai_cmd()
         .current_dir(tmp.path())
-        .env("XDG_CACHE_HOME", cache.to_str().unwrap())
+        .env(
+            "XDG_CACHE_HOME",
+            cache.to_str().unwrap_or_else(|| panic!("unwrap failed")),
+        )
         .args(["status"])
         .output()
-        .unwrap();
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // The scratch file now exists and the feedback command reads it back.
     let output = wai_cmd()
         .current_dir(tmp.path())
-        .env("XDG_CACHE_HOME", cache.to_str().unwrap())
+        .env(
+            "XDG_CACHE_HOME",
+            cache.to_str().unwrap_or_else(|| panic!("unwrap failed")),
+        )
         .args(["feedback", "bug", "--from-last-error", "--dry-run", "--yes"])
         .output()
-        .unwrap();
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         output.status.success(),
         "dry-run from last error should exit 0; stderr: {}",

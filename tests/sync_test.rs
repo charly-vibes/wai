@@ -4,7 +4,7 @@ use tempfile::TempDir;
 
 #[allow(deprecated)]
 fn wai_cmd(dir: &std::path::Path) -> Command {
-    let mut cmd = Command::cargo_bin("wai").unwrap();
+    let mut cmd = Command::cargo_bin("wai").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     cmd.current_dir(dir);
     cmd.env("NO_COLOR", "1");
     // Update notice off in tests: existing assertions expect quiet stderr and
@@ -17,25 +17,26 @@ fn init_workspace(dir: &std::path::Path) {
     let out = wai_cmd(dir)
         .args(["init", "--name", "test-ws"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 }
 
 fn write_projections_yml(dir: &std::path::Path, content: &str) {
     let path = dir.join(".wai/resources/agent-config/.projections.yml");
-    fs::write(path, content).unwrap();
+    fs::write(path, content).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 }
 
 // ── successful sync ───────────────────────────────────────────────────────────
 
 #[test]
 fn sync_projects_inline_source_to_target_file() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let source_dir = tmp.path().join(".wai/resources/agent-config/docs");
-    fs::create_dir_all(&source_dir).unwrap();
-    fs::write(source_dir.join("guide.md"), "# Guide").unwrap();
+    fs::create_dir_all(&source_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(source_dir.join("guide.md"), "# Guide")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     write_projections_yml(
         tmp.path(),
@@ -45,7 +46,7 @@ fn sync_projects_inline_source_to_target_file() {
     let out = wai_cmd(tmp.path())
         .args(["sync"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     assert!(
@@ -61,7 +62,7 @@ fn sync_projects_inline_source_to_target_file() {
 /// (Test-local copy of prime_test's helper — intentionally not shared.)
 fn write_pipeline(dir: &std::path::Path, name: &str, when: &str, steps: &[(&str, &str)]) {
     let pipelines_dir = dir.join(".wai/resources/pipelines");
-    fs::create_dir_all(&pipelines_dir).unwrap();
+    fs::create_dir_all(&pipelines_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let mut toml = String::new();
     toml.push_str("[pipeline]\n");
     toml.push_str(&format!("name = \"{}\"\n", name));
@@ -73,7 +74,8 @@ fn write_pipeline(dir: &std::path::Path, name: &str, when: &str, steps: &[(&str,
         toml.push_str(&format!("id = \"{}\"\n", id));
         toml.push_str(&format!("prompt = \"{}\"\n", prompt));
     }
-    fs::write(pipelines_dir.join(format!("{name}.toml")), toml).unwrap();
+    fs::write(pipelines_dir.join(format!("{name}.toml")), toml)
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 }
 
 /// Write an active pipeline run state and point `.last-run` at it.
@@ -81,22 +83,25 @@ fn write_pipeline(dir: &std::path::Path, name: &str, when: &str, steps: &[(&str,
 fn write_active_run(dir: &std::path::Path, pipeline: &str, current_step: usize) {
     let run_id = format!("{pipeline}-test-run");
     let runs_dir = dir.join(".wai/pipeline-runs");
-    fs::create_dir_all(&runs_dir).unwrap();
+    fs::create_dir_all(&runs_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let yml = format!(
         "run_id: {run_id}\npipeline: {pipeline}\ntopic: test topic\ncreated_at: '2026-07-29T00:00:00Z'\ncurrent_step: {current_step}\napprovals: {{}}\n"
     );
-    fs::write(runs_dir.join(format!("{run_id}.yml")), yml).unwrap();
-    fs::write(dir.join(".wai/resources/pipelines/.last-run"), &run_id).unwrap();
+    fs::write(runs_dir.join(format!("{run_id}.yml")), yml)
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(dir.join(".wai/resources/pipelines/.last-run"), &run_id)
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 }
 
 #[test]
 fn sync_active_run_includes_resume_the_orchestration() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let source_dir = tmp.path().join(".wai/resources/agent-config/docs");
-    fs::create_dir_all(&source_dir).unwrap();
-    fs::write(source_dir.join("guide.md"), "# Guide").unwrap();
+    fs::create_dir_all(&source_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(source_dir.join("guide.md"), "# Guide")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     write_projections_yml(
         tmp.path(),
         "projections:\n  - target: GUIDE.md\n    strategy: inline\n    sources: [docs]\n",
@@ -114,7 +119,7 @@ fn sync_active_run_includes_resume_the_orchestration() {
     let out = wai_cmd(tmp.path())
         .args(["sync"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(
@@ -127,12 +132,13 @@ fn sync_active_run_includes_resume_the_orchestration() {
 
 #[test]
 fn sync_dry_run_does_not_create_files() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let source_dir = tmp.path().join(".wai/resources/agent-config/docs");
-    fs::create_dir_all(&source_dir).unwrap();
-    fs::write(source_dir.join("guide.md"), "# Guide").unwrap();
+    fs::create_dir_all(&source_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(source_dir.join("guide.md"), "# Guide")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     write_projections_yml(
         tmp.path(),
@@ -142,7 +148,7 @@ fn sync_dry_run_does_not_create_files() {
     let out = wai_cmd(tmp.path())
         .args(["sync", "--dry-run"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     assert!(
@@ -155,12 +161,12 @@ fn sync_dry_run_does_not_create_files() {
 
 #[test]
 fn sync_empty_workspace_succeeds_without_projections() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["sync"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 }

@@ -8,7 +8,7 @@ use tempfile::TempDir;
 
 #[test]
 fn resource_add_skill_template_unknown_fails_with_valid_names() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
@@ -21,7 +21,7 @@ fn resource_add_skill_template_unknown_fails_with_valid_names() {
             "bogus",
         ])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("gather"));
@@ -32,7 +32,7 @@ fn resource_add_skill_template_unknown_fails_with_valid_names() {
 
 #[test]
 fn resource_add_skill_template_ubiquitous_language_preserves_progressive_disclosure() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
@@ -45,13 +45,13 @@ fn resource_add_skill_template_ubiquitous_language_preserves_progressive_disclos
             "ubiquitous-language",
         ])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let skill_md = tmp
         .path()
         .join(".wai/resources/agent-config/skills/term-curator/SKILL.md");
-    let content = fs::read_to_string(&skill_md).unwrap();
+    let content = fs::read_to_string(&skill_md).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(content.contains(".wai/resources/ubiquitous-language/README.md"));
     assert!(content.contains("contexts/"));
     assert!(content.contains("giant glossary file"));
@@ -59,19 +59,19 @@ fn resource_add_skill_template_ubiquitous_language_preserves_progressive_disclos
 
 #[test]
 fn resource_add_skill_no_template_still_creates_bare_stub() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["resource", "add", "skill", "bare-skill"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let skill_md = tmp
         .path()
         .join(".wai/resources/agent-config/skills/bare-skill/SKILL.md");
-    let content = fs::read_to_string(&skill_md).unwrap();
+    let content = fs::read_to_string(&skill_md).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         content.contains("name: bare-skill"),
         "bare stub should have skill name"
@@ -86,13 +86,13 @@ fn resource_add_skill_no_template_still_creates_bare_stub() {
 
 #[test]
 fn add_skill_creates_directory_and_skill_md() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["add", "skill", "my-skill"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let skill_dir = tmp
@@ -103,7 +103,7 @@ fn add_skill_creates_directory_and_skill_md() {
     let skill_md = skill_dir.join("SKILL.md");
     assert!(skill_md.is_file(), "SKILL.md should be created");
 
-    let content = fs::read_to_string(&skill_md).unwrap();
+    let content = fs::read_to_string(&skill_md).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         content.contains("name: my-skill"),
         "SKILL.md should include skill name"
@@ -112,19 +112,19 @@ fn add_skill_creates_directory_and_skill_md() {
 
 #[test]
 fn add_skill_with_template_creates_templated_file() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["add", "skill", "issue/gather", "--template", "gather"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let skill_md = tmp
         .path()
         .join(".wai/resources/agent-config/skills/issue/gather/SKILL.md");
-    let content = fs::read_to_string(&skill_md).unwrap();
+    let content = fs::read_to_string(&skill_md).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         content.contains("wai search"),
         "gather template should contain wai search"
@@ -133,12 +133,12 @@ fn add_skill_with_template_creates_templated_file() {
 
 #[test]
 fn resource_help_lists_ubiquitous_language_template() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["resource", "--help", "-v"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("ubiquitous-language"));
@@ -146,12 +146,12 @@ fn resource_help_lists_ubiquitous_language_template() {
 
 #[test]
 fn add_skill_help_lists_ubiquitous_language_template() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["add", "skill", "--help", "-v"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("ubiquitous-language"));
@@ -159,13 +159,13 @@ fn add_skill_help_lists_ubiquitous_language_template() {
 
 #[test]
 fn resource_add_skill_deprecated_still_works_and_warns() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["resource", "add", "skill", "my-skill"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success());
     assert!(stderr.contains("deprecated"));
@@ -174,13 +174,13 @@ fn resource_add_skill_deprecated_still_works_and_warns() {
 
 #[test]
 fn resource_add_skill_deprecation_warning_text_format() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["resource", "add", "skill", "my-skill"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(stderr.contains("'wai resource add skill' is deprecated. Use: wai add skill my-skill"));
 }
@@ -189,14 +189,14 @@ fn resource_add_skill_deprecation_warning_text_format() {
 
 #[test]
 fn resource_list_skills_shows_skill_name() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     // Add a skill then update SKILL.md with a real description
     let out = wai_cmd(tmp.path())
         .args(["resource", "add", "skill", "list-skill"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let skill_md = tmp
@@ -206,12 +206,12 @@ fn resource_list_skills_shows_skill_name() {
         &skill_md,
         "---\nname: list-skill\ndescription: A skill for listing tests\n---\n\n# List Skill\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["resource", "list", "skills"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("list-skill"));
@@ -219,14 +219,14 @@ fn resource_list_skills_shows_skill_name() {
 
 #[test]
 fn resource_list_skills_empty_shows_hint() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     // No skills added — directory is empty after init
     let out = wai_cmd(tmp.path())
         .args(["resource", "list", "skills"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!((stdout.contains("No skills found") || stdout.contains("resource add skill")));

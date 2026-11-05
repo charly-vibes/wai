@@ -7,24 +7,25 @@ use tempfile::TempDir;
 
 #[test]
 fn pipeline_gates_tdd_ro5_shows_approval_on_ship_close() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "init", "tdd-ro5"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let output = wai_cmd(tmp.path())
         .args(["pipeline", "gates", "tdd-ro5"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(output.status.success());
     let output = output.stdout.clone();
-    let stripped = strip_ansi(&String::from_utf8(output).unwrap());
+    let stripped =
+        strip_ansi(&String::from_utf8(output).unwrap_or_else(|e| panic!("unwrap failed: {e}")));
     let ship_idx = stripped
         .find("ship-close")
-        .expect("ship-close step must be shown, got:\n{stripped}");
+        .unwrap_or_else(|| panic!("ship-close step must be shown, got:\n{stripped}"));
     assert!(
         stripped[ship_idx..].contains("Approval"),
         "gates output must show the approval tier on ship-close, got:\n{stripped}"
@@ -34,13 +35,13 @@ fn pipeline_gates_tdd_ro5_shows_approval_on_ship_close() {
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "validate", "tdd-ro5"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 }
 
 #[test]
 fn pipeline_lock_creates_lock_files_for_step_artifacts() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-proj");
     write_pipeline_toml(tmp.path(), "basic");
@@ -48,11 +49,11 @@ fn pipeline_lock_creates_lock_files_for_step_artifacts() {
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "start", "basic", "--topic=lock-test"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let run_id = fs::read_to_string(tmp.path().join(".wai/resources/pipelines/.last-run"))
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .trim()
         .to_string();
 
@@ -70,7 +71,7 @@ fn pipeline_lock_creates_lock_files_for_step_artifacts() {
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "lock"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let lock_path = tmp
@@ -82,7 +83,7 @@ fn pipeline_lock_creates_lock_files_for_step_artifacts() {
 
 #[test]
 fn pipeline_verify_passes_after_locking_artifacts() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-proj");
     write_pipeline_toml(tmp.path(), "basic");
@@ -90,11 +91,11 @@ fn pipeline_verify_passes_after_locking_artifacts() {
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "start", "basic", "--topic=verify-pass"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let run_id = fs::read_to_string(tmp.path().join(".wai/resources/pipelines/.last-run"))
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .trim()
         .to_string();
 
@@ -112,19 +113,23 @@ fn pipeline_verify_passes_after_locking_artifacts() {
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "lock"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let output = wai_cmd(tmp.path())
         .args(["pipeline", "verify"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(output.status.success());
 
     let combined = format!(
         "{}{}",
-        strip_ansi(&String::from_utf8(output.stdout).unwrap()),
-        strip_ansi(&String::from_utf8(output.stderr).unwrap())
+        strip_ansi(
+            &String::from_utf8(output.stdout).unwrap_or_else(|e| panic!("unwrap failed: {e}"))
+        ),
+        strip_ansi(
+            &String::from_utf8(output.stderr).unwrap_or_else(|e| panic!("unwrap failed: {e}"))
+        )
     );
     assert!(
         combined.contains("verified") || combined.contains("All 1 locked artifacts verified"),
@@ -134,7 +139,7 @@ fn pipeline_verify_passes_after_locking_artifacts() {
 
 #[test]
 fn pipeline_verify_fails_when_locked_artifact_is_tampered() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-proj");
     write_pipeline_toml(tmp.path(), "basic");
@@ -142,11 +147,11 @@ fn pipeline_verify_fails_when_locked_artifact_is_tampered() {
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "start", "basic", "--topic=verify-fail"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let run_id = fs::read_to_string(tmp.path().join(".wai/resources/pipelines/.last-run"))
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .trim()
         .to_string();
 
@@ -167,21 +172,26 @@ fn pipeline_verify_fails_when_locked_artifact_is_tampered() {
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "lock"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
-    fs::write(&artifact_path, "tampered content\n").unwrap();
+    fs::write(&artifact_path, "tampered content\n")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let output = wai_cmd(tmp.path())
         .args(["pipeline", "verify"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(!output.status.success());
 
     let combined = format!(
         "{}{}",
-        strip_ansi(&String::from_utf8(output.stdout).unwrap()),
-        strip_ansi(&String::from_utf8(output.stderr).unwrap())
+        strip_ansi(
+            &String::from_utf8(output.stdout).unwrap_or_else(|e| panic!("unwrap failed: {e}"))
+        ),
+        strip_ansi(
+            &String::from_utf8(output.stderr).unwrap_or_else(|e| panic!("unwrap failed: {e}"))
+        )
     );
     assert!(
         combined.contains("failed verification") || combined.contains("expected sha256:"),
@@ -191,7 +201,7 @@ fn pipeline_verify_fails_when_locked_artifact_is_tampered() {
 
 #[test]
 fn pipeline_suggest_lists_all_pipelines() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     write_pipeline_toml_with_desc(tmp.path(), "auth", "Authentication workflow");
     write_pipeline_toml_with_desc(tmp.path(), "database", "Database migration workflow");
@@ -199,11 +209,11 @@ fn pipeline_suggest_lists_all_pipelines() {
     let output = wai_cmd(tmp.path())
         .args(["pipeline", "suggest"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(output.status.success());
     let output = output.stdout.clone();
 
-    let stdout = String::from_utf8(output).unwrap();
+    let stdout = String::from_utf8(output).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let stripped = strip_ansi(&stdout);
 
     assert!(
@@ -224,7 +234,7 @@ fn pipeline_suggest_lists_all_pipelines() {
 
 #[test]
 fn pipeline_suggest_with_description_ranks_keyword_match_first() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     write_pipeline_toml_with_desc(tmp.path(), "auth", "Authentication and login workflow");
     write_pipeline_toml_with_desc(
@@ -236,18 +246,20 @@ fn pipeline_suggest_with_description_ranks_keyword_match_first() {
     let output = wai_cmd(tmp.path())
         .args(["pipeline", "suggest", "auth login"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(output.status.success());
     let output = output.stdout.clone();
 
-    let stdout = String::from_utf8(output).unwrap();
+    let stdout = String::from_utf8(output).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let stripped = strip_ansi(&stdout);
 
     // "auth" should appear before "database" in the output
-    let auth_pos = stripped.find("auth").expect("'auth' should be in output");
+    let auth_pos = stripped
+        .find("auth")
+        .unwrap_or_else(|| panic!("'auth' should be in output"));
     let db_pos = stripped
         .find("database")
-        .expect("'database' should be in output");
+        .unwrap_or_else(|| panic!("'database' should be in output"));
     assert!(
         auth_pos < db_pos,
         "'auth' should appear before 'database' when query matches 'auth login', got:\n{stripped}"
@@ -262,7 +274,7 @@ fn pipeline_suggest_with_description_ranks_keyword_match_first() {
 
 #[test]
 fn pipeline_suggest_no_match_still_shows_all_alphabetically() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     write_pipeline_toml_with_desc(tmp.path(), "zebra", "Zebra workflow");
     write_pipeline_toml_with_desc(tmp.path(), "apple", "Apple workflow");
@@ -270,11 +282,11 @@ fn pipeline_suggest_no_match_still_shows_all_alphabetically() {
     let output = wai_cmd(tmp.path())
         .args(["pipeline", "suggest", "xyzzy-nomatch-token"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(output.status.success());
     let output = output.stdout.clone();
 
-    let stdout = String::from_utf8(output).unwrap();
+    let stdout = String::from_utf8(output).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let stripped = strip_ansi(&stdout);
 
     // Both should appear
@@ -288,8 +300,12 @@ fn pipeline_suggest_no_match_still_shows_all_alphabetically() {
     );
 
     // Alphabetically "apple" comes before "zebra" when scores are tied at 0
-    let apple_pos = stripped.find("apple").unwrap();
-    let zebra_pos = stripped.find("zebra").unwrap();
+    let apple_pos = stripped
+        .find("apple")
+        .unwrap_or_else(|| panic!("unwrap failed"));
+    let zebra_pos = stripped
+        .find("zebra")
+        .unwrap_or_else(|| panic!("unwrap failed"));
     assert!(
         apple_pos < zebra_pos,
         "'apple' should appear before 'zebra' (alphabetical tie-break), got:\n{stripped}"
@@ -298,19 +314,20 @@ fn pipeline_suggest_no_match_still_shows_all_alphabetically() {
 
 #[test]
 fn pipeline_suggest_no_pipelines_prints_hint() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     // Ensure the pipelines dir exists but is empty (no TOML files)
-    fs::create_dir_all(tmp.path().join(".wai/resources/pipelines")).unwrap();
+    fs::create_dir_all(tmp.path().join(".wai/resources/pipelines"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let output = wai_cmd(tmp.path())
         .args(["pipeline", "suggest"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(output.status.success());
     let output = output.stdout.clone();
 
-    let stdout = String::from_utf8(output).unwrap();
+    let stdout = String::from_utf8(output).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let stripped = strip_ansi(&stdout);
 
     assert!(
@@ -325,7 +342,7 @@ fn pipeline_suggest_no_pipelines_prints_hint() {
 
 #[test]
 fn pipeline_suggest_empty_string_treated_as_no_description() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     write_pipeline_toml_with_desc(tmp.path(), "beta", "Beta workflow");
     write_pipeline_toml_with_desc(tmp.path(), "alpha", "Alpha workflow");
@@ -334,11 +351,11 @@ fn pipeline_suggest_empty_string_treated_as_no_description() {
     let output = wai_cmd(tmp.path())
         .args(["pipeline", "suggest", ""])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(output.status.success());
     let output = output.stdout.clone();
 
-    let stdout = String::from_utf8(output).unwrap();
+    let stdout = String::from_utf8(output).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let stripped = strip_ansi(&stdout);
 
     // Should show both pipelines
@@ -352,8 +369,12 @@ fn pipeline_suggest_empty_string_treated_as_no_description() {
     );
 
     // Alphabetically: "alpha" before "beta"
-    let alpha_pos = stripped.find("alpha").unwrap();
-    let beta_pos = stripped.find("beta").unwrap();
+    let alpha_pos = stripped
+        .find("alpha")
+        .unwrap_or_else(|| panic!("unwrap failed"));
+    let beta_pos = stripped
+        .find("beta")
+        .unwrap_or_else(|| panic!("unwrap failed"));
     assert!(
         alpha_pos < beta_pos,
         "'alpha' should appear before 'beta' (alphabetical, empty string = no scoring), got:\n{stripped}"
@@ -362,7 +383,7 @@ fn pipeline_suggest_empty_string_treated_as_no_description() {
 
 #[test]
 fn status_shows_pipeline_active_when_run_exists() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
@@ -375,11 +396,11 @@ fn status_shows_pipeline_active_when_run_exists() {
     let output = wai_cmd(tmp.path())
         .args(["status"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(output.status.success());
     let output = output.stdout.clone();
 
-    let stdout = String::from_utf8(output).unwrap();
+    let stdout = String::from_utf8(output).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let stripped = strip_ansi(&stdout);
 
     assert!(
@@ -398,7 +419,7 @@ fn status_shows_pipeline_active_when_run_exists() {
 
 #[test]
 fn status_shows_pipeline_current_suggestion_when_active() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
@@ -408,11 +429,11 @@ fn status_shows_pipeline_current_suggestion_when_active() {
     let output = wai_cmd(tmp.path())
         .args(["status"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(output.status.success());
     let output = output.stdout.clone();
 
-    let stdout = String::from_utf8(output).unwrap();
+    let stdout = String::from_utf8(output).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let stripped = strip_ansi(&stdout);
 
     assert!(
@@ -423,7 +444,7 @@ fn status_shows_pipeline_current_suggestion_when_active() {
 
 #[test]
 fn status_shows_available_pipelines_when_no_active_run() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
@@ -433,11 +454,11 @@ fn status_shows_available_pipelines_when_no_active_run() {
     let output = wai_cmd(tmp.path())
         .args(["status"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(output.status.success());
     let output = output.stdout.clone();
 
-    let stdout = String::from_utf8(output).unwrap();
+    let stdout = String::from_utf8(output).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let stripped = strip_ansi(&stdout);
 
     assert!(
@@ -452,7 +473,7 @@ fn status_shows_available_pipelines_when_no_active_run() {
 
 #[test]
 fn status_shows_pipeline_suggest_when_pipelines_exist() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
@@ -462,11 +483,11 @@ fn status_shows_pipeline_suggest_when_pipelines_exist() {
     let output = wai_cmd(tmp.path())
         .args(["status"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(output.status.success());
     let output = output.stdout.clone();
 
-    let stdout = String::from_utf8(output).unwrap();
+    let stdout = String::from_utf8(output).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let stripped = strip_ansi(&stdout);
 
     assert!(
@@ -477,7 +498,7 @@ fn status_shows_pipeline_suggest_when_pipelines_exist() {
 
 #[test]
 fn status_ignores_stale_last_run_pointer() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
@@ -486,18 +507,19 @@ fn status_ignores_stale_last_run_pointer() {
 
     // Write .last-run pointing to a nonexistent run file (stale pointer)
     let pipelines_dir = tmp.path().join(".wai/resources/pipelines");
-    fs::create_dir_all(&pipelines_dir).unwrap();
-    fs::write(pipelines_dir.join(".last-run"), "nonexistent-run-id").unwrap();
+    fs::create_dir_all(&pipelines_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(pipelines_dir.join(".last-run"), "nonexistent-run-id")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // Should NOT crash and should show "Available pipelines" instead
     let output = wai_cmd(tmp.path())
         .args(["status"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(output.status.success());
     let output = output.stdout.clone();
 
-    let stdout = String::from_utf8(output).unwrap();
+    let stdout = String::from_utf8(output).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let stripped = strip_ansi(&stdout);
 
     assert!(
@@ -514,12 +536,12 @@ fn status_ignores_stale_last_run_pointer() {
 
 #[test]
 fn way_verbose_shows_intent() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "-v"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Intent:"));
@@ -527,12 +549,12 @@ fn way_verbose_shows_intent() {
 
 #[test]
 fn way_verbose_shows_success_criteria() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "-v"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Success:"));
@@ -540,12 +562,12 @@ fn way_verbose_shows_success_criteria() {
 
 #[test]
 fn way_json_includes_intent() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("\"intent\""));
@@ -553,12 +575,12 @@ fn way_json_includes_intent() {
 
 #[test]
 fn way_plugin_toml_parsed() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     // Place a TOML plugin file with intent and success_criteria
     let plugins_dir = tmp.path().join(".wai/plugins");
-    fs::create_dir_all(&plugins_dir).unwrap();
+    fs::create_dir_all(&plugins_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         plugins_dir.join("my-check.toml"),
         r#"name = "my-check"
@@ -567,13 +589,13 @@ intent = "Ensure the repo has a CODEOWNERS file."
 success_criteria = "CODEOWNERS file exists in the repo root or .github/ directory."
 "#,
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // Plugin list is the command that exercises detect_plugins
     let out = wai_cmd(tmp.path())
         .args(["plugin", "list", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("\"my-check\""));
@@ -583,14 +605,14 @@ success_criteria = "CODEOWNERS file exists in the repo root or .github/ director
 
 #[test]
 fn phase_show_single_project_auto_detects() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "only-project");
 
     let out = wai_cmd(tmp.path())
         .args(["phase", "show"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("only-project"));
@@ -598,7 +620,7 @@ fn phase_show_single_project_auto_detects() {
 
 #[test]
 fn phase_show_multiple_projects_no_context_errors_non_interactive() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "alpha");
     create_project(tmp.path(), "beta");
@@ -607,7 +629,7 @@ fn phase_show_multiple_projects_no_context_errors_non_interactive() {
     let out = wai_cmd(tmp.path())
         .args(["--no-input", "phase", "show"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("alpha"));
@@ -616,7 +638,7 @@ fn phase_show_multiple_projects_no_context_errors_non_interactive() {
 
 #[test]
 fn phase_show_wai_project_env_selects_project() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "alpha");
     create_project(tmp.path(), "beta");
@@ -625,7 +647,7 @@ fn phase_show_wai_project_env_selects_project() {
         .env("WAI_PROJECT", "beta")
         .args(["phase", "show"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("beta"));
@@ -633,7 +655,7 @@ fn phase_show_wai_project_env_selects_project() {
 
 #[test]
 fn phase_show_wai_project_invalid_errors() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "alpha");
 
@@ -641,7 +663,7 @@ fn phase_show_wai_project_invalid_errors() {
         .env("WAI_PROJECT", "nonexistent")
         .args(["phase", "show"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("nonexistent"));
@@ -649,7 +671,7 @@ fn phase_show_wai_project_invalid_errors() {
 
 #[test]
 fn phase_show_wai_project_empty_treated_as_unset() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "only-project");
 
@@ -658,7 +680,7 @@ fn phase_show_wai_project_empty_treated_as_unset() {
         .env("WAI_PROJECT", "")
         .args(["phase", "show"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("only-project"));
@@ -666,7 +688,7 @@ fn phase_show_wai_project_empty_treated_as_unset() {
 
 #[test]
 fn phase_show_project_flag_overrides_wai_project_env() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "alpha");
     create_project(tmp.path(), "beta");
@@ -676,7 +698,7 @@ fn phase_show_project_flag_overrides_wai_project_env() {
         .env("WAI_PROJECT", "alpha")
         .args(["phase", "--project", "beta", "show"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("beta"));
@@ -684,14 +706,14 @@ fn phase_show_project_flag_overrides_wai_project_env() {
 
 #[test]
 fn phase_show_project_flag_invalid_errors() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "alpha");
 
     let out = wai_cmd(tmp.path())
         .args(["phase", "--project", "nonexistent", "show"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("nonexistent"));
@@ -699,7 +721,7 @@ fn phase_show_project_flag_invalid_errors() {
 
 #[test]
 fn phase_next_project_flag_only_mutates_target() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "alpha");
     create_project(tmp.path(), "beta");
@@ -708,14 +730,14 @@ fn phase_next_project_flag_only_mutates_target() {
     let out = wai_cmd(tmp.path())
         .args(["phase", "--project", "alpha", "next"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     // Alpha should now be in design
     let out = wai_cmd(tmp.path())
         .args(["phase", "--project", "alpha", "show"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
     let out = out.stdout.clone();
     let stdout = strip_ansi(&String::from_utf8_lossy(&out));
@@ -729,7 +751,7 @@ fn phase_next_project_flag_only_mutates_target() {
     let out = wai_cmd(tmp.path())
         .args(["phase", "--project", "beta", "show"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
     let out = out.stdout.clone();
     let stdout = strip_ansi(&String::from_utf8_lossy(&out));
@@ -744,7 +766,7 @@ fn phase_next_project_flag_only_mutates_target() {
 
 #[test]
 fn project_use_valid_prints_export() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproj");
 
@@ -766,14 +788,14 @@ fn project_use_valid_prints_export() {
 
 #[test]
 fn project_use_invalid_errors() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproj");
 
     let out = wai_cmd(tmp.path())
         .args(["project", "use", "nonexistent"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("nonexistent"));
@@ -781,7 +803,7 @@ fn project_use_invalid_errors() {
 
 #[test]
 fn project_use_no_args_lists_projects() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "alpha");
     create_project(tmp.path(), "beta");
@@ -789,7 +811,7 @@ fn project_use_no_args_lists_projects() {
     let out = wai_cmd(tmp.path())
         .args(["project", "use"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("alpha"));

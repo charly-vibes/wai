@@ -18,15 +18,17 @@ fn block_injector() -> BlockInjector {
 
 #[test]
 fn test_genesis_block_injector_creates_new_file() {
-    let dir = TempDir::new().unwrap();
+    let dir = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let path = dir.path().join("AGENTS.md");
     let injector = block_injector();
 
-    let result = injector.inject(&path, "WAI", "\n# Test content\n").unwrap();
+    let result = injector
+        .inject(&path, "WAI", "\n# Test content\n")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert_eq!(result, InjectResult::Created);
     assert!(path.exists());
 
-    let content = std::fs::read_to_string(&path).unwrap();
+    let content = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(content.contains("<!-- WAI:START -->"));
     assert!(content.contains("<!-- WAI:END -->"));
     assert!(content.contains("# Test content"));
@@ -34,15 +36,19 @@ fn test_genesis_block_injector_creates_new_file() {
 
 #[test]
 fn test_genesis_block_injector_updates_existing_block() {
-    let dir = TempDir::new().unwrap();
+    let dir = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let path = dir.path().join("AGENTS.md");
     let injector = block_injector();
 
-    injector.inject(&path, "WAI", "\n# Old\n").unwrap();
-    let result = injector.inject(&path, "WAI", "\n# New\n").unwrap();
+    injector
+        .inject(&path, "WAI", "\n# Old\n")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    let result = injector
+        .inject(&path, "WAI", "\n# New\n")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert_eq!(result, InjectResult::Updated);
 
-    let content = std::fs::read_to_string(&path).unwrap();
+    let content = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(content.contains("# New"));
     assert!(!content.contains("# Old"));
     assert_eq!(content.matches("<!-- WAI:START -->").count(), 1);
@@ -50,38 +56,46 @@ fn test_genesis_block_injector_updates_existing_block() {
 
 #[test]
 fn test_genesis_block_injector_prepends_to_existing_file() {
-    let dir = TempDir::new().unwrap();
+    let dir = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let path = dir.path().join("AGENTS.md");
-    std::fs::write(&path, "# Existing content\n").unwrap();
+    std::fs::write(&path, "# Existing content\n").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let injector = block_injector();
 
-    let result = injector.inject(&path, "WAI", "\n# Block\n").unwrap();
+    let result = injector
+        .inject(&path, "WAI", "\n# Block\n")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert_eq!(result, InjectResult::Prepended);
 
-    let content = std::fs::read_to_string(&path).unwrap();
+    let content = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(content.starts_with("<!-- WAI:START -->"));
     assert!(content.contains("# Existing content"));
 }
 
 #[test]
 fn test_genesis_block_injector_has_block() {
-    let dir = TempDir::new().unwrap();
+    let dir = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let path = dir.path().join("AGENTS.md");
     let injector = block_injector();
 
     assert!(!injector.has_block(&path, "WAI"));
-    injector.inject(&path, "WAI", "content").unwrap();
+    injector
+        .inject(&path, "WAI", "content")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(injector.has_block(&path, "WAI"));
 }
 
 #[test]
 fn test_genesis_block_injector_read_block() {
-    let dir = TempDir::new().unwrap();
+    let dir = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let path = dir.path().join("AGENTS.md");
     let injector = block_injector();
 
-    injector.inject(&path, "WAI", "\n# Readable\n").unwrap();
-    let content = injector.read_block(&path, "WAI").unwrap();
+    injector
+        .inject(&path, "WAI", "\n# Readable\n")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    let content = injector
+        .read_block(&path, "WAI")
+        .unwrap_or_else(|| panic!("unwrap failed"));
     assert!(content.contains("<!-- WAI:START -->"));
     assert!(content.contains("<!-- WAI:END -->"));
     assert!(content.contains("# Readable"));
@@ -89,16 +103,18 @@ fn test_genesis_block_injector_read_block() {
 
 #[test]
 fn test_genesis_block_injector_multiple_blocks() {
-    let dir = TempDir::new().unwrap();
+    let dir = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let path = dir.path().join("AGENTS.md");
     let injector = block_injector();
 
-    injector.inject(&path, "WAI", "\n# WAI\n").unwrap();
+    injector
+        .inject(&path, "WAI", "\n# WAI\n")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     injector
         .inject(&path, "WAI:REFLECT:REF", "\n# REFLECT\n")
-        .unwrap();
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
-    let content = std::fs::read_to_string(&path).unwrap();
+    let content = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(content.contains("<!-- WAI:START -->"));
     assert!(content.contains("<!-- WAI:END -->"));
     assert!(content.contains("<!-- WAI:REFLECT:REF:START -->"));
@@ -111,23 +127,26 @@ fn test_genesis_block_injector_multiple_blocks() {
 fn test_wai_sync_injects_managed_block() {
     use assert_cmd::Command;
 
-    let dir = TempDir::new().unwrap();
+    let dir = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // Init a workspace, which creates AGENTS.md with the managed block
-    let mut cmd = Command::cargo_bin("wai").unwrap();
+    let mut cmd = Command::cargo_bin("wai").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     cmd.current_dir(dir.path());
     cmd.env("NO_COLOR", "1");
     // Update notice off in tests: existing assertions expect quiet stderr and
     // must not depend on real ~/.cache state (wai-r3p0 tidy).
     cmd.env("GENESIS_NO_UPDATE_CHECK", "1");
     cmd.args(["init", "--name", "regression-test"]);
-    let out = cmd.output().expect("command should run");
+    let out = cmd
+        .output()
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     // Check that AGENTS.md has the WAI:START block
     let agents_md = dir.path().join("AGENTS.md");
     assert!(agents_md.exists(), "AGENTS.md should exist after init");
-    let content = std::fs::read_to_string(&agents_md).unwrap();
+    let content =
+        std::fs::read_to_string(&agents_md).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     eprintln!(
         "DEBUG after init: WAI:START count={}, REFLECT:REF:START count={}",
         content.matches("<!-- WAI:START -->").count(),
@@ -148,18 +167,21 @@ fn test_wai_sync_injects_managed_block() {
     );
 
     // Run sync to verify it refreshes the block
-    let mut cmd = Command::cargo_bin("wai").unwrap();
+    let mut cmd = Command::cargo_bin("wai").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     cmd.current_dir(dir.path());
     cmd.env("NO_COLOR", "1");
     // Update notice off in tests: existing assertions expect quiet stderr and
     // must not depend on real ~/.cache state (wai-r3p0 tidy).
     cmd.env("GENESIS_NO_UPDATE_CHECK", "1");
     cmd.args(["sync"]);
-    let out = cmd.output().expect("command should run");
+    let out = cmd
+        .output()
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     // Block is still there after sync
-    let content = std::fs::read_to_string(&agents_md).unwrap();
+    let content =
+        std::fs::read_to_string(&agents_md).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     eprintln!(
         "DEBUG after sync: WAI:START count={}, REFLECT:REF:START count={}",
         content.matches("<!-- WAI:START -->").count(),

@@ -31,7 +31,7 @@ fn head_sha(dir: &std::path::Path) -> String {
         .env("GIT_COMMITTER_NAME", "test")
         .env("GIT_COMMITTER_EMAIL", "test@example.com")
         .output()
-        .expect("git rev-parse should run");
+        .unwrap_or_else(|e| panic!("git rev-parse should run: {e}"));
     String::from_utf8_lossy(&out.stdout).trim().to_string()
 }
 
@@ -41,7 +41,7 @@ fn commit_all(dir: &std::path::Path, message: &str) {
         .args(["add", "-A"])
         .current_dir(dir)
         .output()
-        .expect("git add should run");
+        .unwrap_or_else(|e| panic!("git add should run: {e}"));
     assert!(
         out.status.success(),
         "git add failed: {}",
@@ -55,7 +55,7 @@ fn commit_all(dir: &std::path::Path, message: &str) {
         .env("GIT_COMMITTER_NAME", "test")
         .env("GIT_COMMITTER_EMAIL", "test@example.com")
         .output()
-        .expect("git commit should run");
+        .unwrap_or_else(|e| panic!("git commit should run: {e}"));
     assert!(
         out.status.success(),
         "git commit failed: {}",
@@ -68,20 +68,20 @@ fn commit_all(dir: &std::path::Path, message: &str) {
 /// retry-drift semantics.
 #[test]
 fn pipeline_epic_orchestrator_template_declares_ticket_state_contract() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "init", "epic-orchestrator"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let raw = fs::read_to_string(
         tmp.path()
             .join(".wai/resources/pipelines/epic-orchestrator.toml"),
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let content = squash(&raw);
 
     // State-file path convention.
@@ -128,20 +128,20 @@ fn pipeline_epic_orchestrator_template_declares_ticket_state_contract() {
 /// and single-model degradation the docs describe.
 #[test]
 fn pipeline_epic_orchestrator_template_declares_refusals_and_degradation() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "init", "epic-orchestrator"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let raw = fs::read_to_string(
         tmp.path()
             .join(".wai/resources/pipelines/epic-orchestrator.toml"),
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let content = squash(&raw);
 
     // Spawn refusals (canon Invariants 4 + 2).
@@ -179,7 +179,7 @@ fn pipeline_epic_orchestrator_template_declares_refusals_and_degradation() {
 /// to the spawn step with the recorded brief.
 #[test]
 fn pipeline_epic_orchestrator_walks_claim_gates_brief_to_ticket_state() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "demo");
 
@@ -192,7 +192,7 @@ fn pipeline_epic_orchestrator_walks_claim_gates_brief_to_ticket_state() {
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "init", "epic-orchestrator"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let out = wai_cmd(tmp.path())
@@ -203,11 +203,11 @@ fn pipeline_epic_orchestrator_walks_claim_gates_brief_to_ticket_state() {
             "--topic=wai-test-child",
         ])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let run_id = fs::read_to_string(tmp.path().join(".wai/resources/pipelines/.last-run"))
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .trim()
         .to_string();
     assert!(
@@ -221,14 +221,19 @@ fn pipeline_epic_orchestrator_walks_claim_gates_brief_to_ticket_state() {
 
     // ── claim ────────────────────────────────────────────────────────────
     // The agent writes the per-ticket state file at claim (create if absent).
-    fs::create_dir_all(state_path.parent().unwrap()).unwrap();
+    fs::create_dir_all(
+        state_path
+            .parent()
+            .unwrap_or_else(|| panic!("unwrap failed")),
+    )
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         &state_path,
         format!(
             "ticket: wai-test-child\nbranch: main\nbrief_path: \nstep_history: []\n- claim @ {sha_claim}\n"
         ),
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // Orientation artifact satisfies the claim step's structural gate.
     let out = wai_cmd(tmp.path())
@@ -239,7 +244,7 @@ fn pipeline_epic_orchestrator_walks_claim_gates_brief_to_ticket_state() {
             "ORIENT: claimed wai-test-child; no blockers",
         ])
         .output()
-        .expect("wai add should run");
+        .unwrap_or_else(|e| panic!("wai add should run: {e}"));
     assert!(
         out.status.success(),
         "add research failed: {:?}",
@@ -250,7 +255,7 @@ fn pipeline_epic_orchestrator_walks_claim_gates_brief_to_ticket_state() {
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "next"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(
         out.status.success(),
         "pipeline next failed: {:?}",
@@ -271,7 +276,7 @@ fn pipeline_epic_orchestrator_walks_claim_gates_brief_to_ticket_state() {
             "GATES: baseline suite green",
         ])
         .output()
-        .expect("wai add should run");
+        .unwrap_or_else(|e| panic!("wai add should run: {e}"));
     assert!(
         out.status.success(),
         "add research failed: {:?}",
@@ -281,7 +286,7 @@ fn pipeline_epic_orchestrator_walks_claim_gates_brief_to_ticket_state() {
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "next"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(
         out.status.success(),
         "pipeline next failed: {:?}",
@@ -298,18 +303,23 @@ fn pipeline_epic_orchestrator_walks_claim_gates_brief_to_ticket_state() {
     // Briefs are repo artifacts at a recorded path (canon Invariant 4).
     let brief_rel = ".wai/projects/demo/briefs/wai-test-child.md";
     let brief_path = tmp.path().join(brief_rel);
-    fs::create_dir_all(brief_path.parent().unwrap()).unwrap();
+    fs::create_dir_all(
+        brief_path
+            .parent()
+            .unwrap_or_else(|| panic!("unwrap failed")),
+    )
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         &brief_path,
         "# Brief: wai-test-child\n\n## Why\n\nDelegated: single bounded test.\n\n## Completion criteria\n\n- cargo test --test wai-test-child (exit 0)\n\n## Spawn model\n\nModel: default; context ceiling ≤ 40% of the model window.\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // The agent records the brief path in the state file and checkpoints.
-    let state = fs::read_to_string(&state_path).unwrap();
+    let state = fs::read_to_string(&state_path).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let state = state.replace("brief_path: \n", &format!("brief_path: {brief_rel}\n"));
     let state = format!("{state}- gates @ {sha_claim}\n- brief @ {sha_brief}\n");
-    fs::write(&state_path, state).unwrap();
+    fs::write(&state_path, state).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // Brief record artifact satisfies the brief step's structural gate.
     let out = wai_cmd(tmp.path())
@@ -320,14 +330,14 @@ fn pipeline_epic_orchestrator_walks_claim_gates_brief_to_ticket_state() {
             &format!("BRIEF: {brief_rel}; committed"),
         ])
         .output()
-        .expect("wai add should run");
+        .unwrap_or_else(|e| panic!("wai add should run: {e}"));
     assert!(out.status.success(), "add design failed: {:?}", out.stderr);
 
     // Advancing past brief hands off to spawn.
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "next"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(
         out.status.success(),
         "pipeline next failed: {:?}",
@@ -349,7 +359,7 @@ fn pipeline_epic_orchestrator_walks_claim_gates_brief_to_ticket_state() {
     );
 
     // ── state-file shape ─────────────────────────────────────────────────
-    let state = fs::read_to_string(&state_path).unwrap();
+    let state = fs::read_to_string(&state_path).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         state.contains("ticket: wai-test-child"),
         "state file must record the ticket id, got:\n{state}"
@@ -373,7 +383,7 @@ fn pipeline_epic_orchestrator_walks_claim_gates_brief_to_ticket_state() {
         let sha = line
             .rsplit_once(" @ ")
             .map(|(_, s)| s.trim())
-            .expect("checkpoint entry must be `step id @ sha`");
+            .unwrap_or_else(|| panic!("checkpoint entry must be `step id @ sha`"));
         assert_eq!(
             sha.len(),
             40,
@@ -385,9 +395,15 @@ fn pipeline_epic_orchestrator_walks_claim_gates_brief_to_ticket_state() {
         );
     }
     // Step history is ordered: claim before gates before brief.
-    let claim_idx = state.find("- claim @ ").unwrap();
-    let gates_idx = state.find("- gates @ ").unwrap();
-    let brief_idx = state.find("- brief @ ").unwrap();
+    let claim_idx = state
+        .find("- claim @ ")
+        .unwrap_or_else(|| panic!("unwrap failed"));
+    let gates_idx = state
+        .find("- gates @ ")
+        .unwrap_or_else(|| panic!("unwrap failed"));
+    let brief_idx = state
+        .find("- brief @ ")
+        .unwrap_or_else(|| panic!("unwrap failed"));
     assert!(
         claim_idx < gates_idx && gates_idx < brief_idx,
         "step history must be in loop order claim → gates → brief, got:\n{state}"

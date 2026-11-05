@@ -12,36 +12,38 @@ use tempfile::TempDir;
 
 #[test]
 fn pipeline_init_epic_orchestrator_scaffolds_template() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "init", "epic-orchestrator"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let toml_path = tmp
         .path()
         .join(".wai/resources/pipelines/epic-orchestrator.toml");
-    fs::metadata(&toml_path).expect("pipeline init epic-orchestrator should scaffold the template");
+    fs::metadata(&toml_path).unwrap_or_else(|e| {
+        panic!("pipeline init epic-orchestrator should scaffold the template: {e}")
+    });
 }
 
 #[test]
 fn pipeline_init_epic_orchestrator_declares_orchestrator_loop_steps() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "init", "epic-orchestrator"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let toml_path = tmp
         .path()
         .join(".wai/resources/pipelines/epic-orchestrator.toml");
-    let content = fs::read_to_string(&toml_path).unwrap();
+    let content = fs::read_to_string(&toml_path).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // The orchestrator loop: claim → gates → brief → spawn → verify → ship → STOP
     for expected in [
@@ -62,19 +64,19 @@ fn pipeline_init_epic_orchestrator_declares_orchestrator_loop_steps() {
 
 #[test]
 fn pipeline_init_epic_orchestrator_cites_canon_pattern() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "init", "epic-orchestrator"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let toml_path = tmp
         .path()
         .join(".wai/resources/pipelines/epic-orchestrator.toml");
-    let content = fs::read_to_string(&toml_path).unwrap();
+    let content = fs::read_to_string(&toml_path).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // Header must cite the canon pattern and its tool-agnostic invariants.
     assert!(
@@ -89,19 +91,19 @@ fn pipeline_init_epic_orchestrator_cites_canon_pattern() {
 
 #[test]
 fn pipeline_init_epic_orchestrator_toml_is_valid() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "init", "epic-orchestrator"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let toml_path = tmp
         .path()
         .join(".wai/resources/pipelines/epic-orchestrator.toml");
-    let content = fs::read_to_string(&toml_path).unwrap();
+    let content = fs::read_to_string(&toml_path).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let parsed: Result<toml::Value, _> = toml::from_str(&content);
     assert!(
         parsed.is_ok(),
@@ -112,19 +114,19 @@ fn pipeline_init_epic_orchestrator_toml_is_valid() {
 
 #[test]
 fn pipeline_init_epic_orchestrator_encodes_run_state_durability() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "init", "epic-orchestrator"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let toml_path = tmp
         .path()
         .join(".wai/resources/pipelines/epic-orchestrator.toml");
-    let content = fs::read_to_string(&toml_path).unwrap();
+    let content = fs::read_to_string(&toml_path).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // Claim step writes the durable per-ticket state file with its fixed shape.
     assert!(
@@ -173,19 +175,19 @@ fn pipeline_init_epic_orchestrator_encodes_run_state_durability() {
 
 #[test]
 fn pipeline_init_epic_orchestrator_encodes_brief_format() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "init", "epic-orchestrator"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let toml_path = tmp
         .path()
         .join(".wai/resources/pipelines/epic-orchestrator.toml");
-    let content = fs::read_to_string(&toml_path).unwrap();
+    let content = fs::read_to_string(&toml_path).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // Brief step mandates the three brief sections.
     for section in ["## Why", "## Completion criteria", "## Spawn model"] {
@@ -225,19 +227,19 @@ fn pipeline_init_epic_orchestrator_encodes_brief_format() {
 
 #[test]
 fn pipeline_init_epic_orchestrator_encodes_isolation_verify() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "init", "epic-orchestrator"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let toml_path = tmp
         .path()
         .join(".wai/resources/pipelines/epic-orchestrator.toml");
-    let content = fs::read_to_string(&toml_path).unwrap();
+    let content = fs::read_to_string(&toml_path).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // Named read-only verifier session convention.
     assert!(
@@ -295,13 +297,13 @@ fn pipeline_init_epic_orchestrator_encodes_isolation_verify() {
 
 #[test]
 fn pipeline_help_lists_epic_orchestrator_builtin() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "--help"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(
@@ -314,19 +316,19 @@ fn pipeline_help_lists_epic_orchestrator_builtin() {
 fn pipeline_init_epic_orchestrator_encodes_spawn_safety_invariants() {
     // Canon invariants 6 (resume exception), 8 (wall-clock budget), 9 (.beads)
     // — openspec change harden-orchestrator-spawn-budget, beads wai-tdnv.
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["pipeline", "init", "epic-orchestrator"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let toml_path = tmp
         .path()
         .join(".wai/resources/pipelines/epic-orchestrator.toml");
-    let content = fs::read_to_string(&toml_path).unwrap();
+    let content = fs::read_to_string(&toml_path).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // Invariant 8: spawn wrapped in a wall-clock budget, never blind-blocking.
     assert!(

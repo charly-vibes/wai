@@ -10,7 +10,7 @@ use tempfile::TempDir;
 
 #[allow(deprecated)]
 fn wai_cmd(dir: &Path) -> Command {
-    let mut cmd = Command::cargo_bin("wai").unwrap();
+    let mut cmd = Command::cargo_bin("wai").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     cmd.current_dir(dir);
     cmd.env("NO_COLOR", "1");
     // Update notice off in tests: existing assertions expect quiet stderr and
@@ -33,7 +33,7 @@ fn run_ok(dir: &Path, args: &[&str]) -> std::process::Output {
     let out = wai_cmd(dir)
         .args(args)
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success(), "wai {:?} failed", args);
     out
 }
@@ -48,7 +48,7 @@ fn matrix_dir(dir: &Path, project: &str) -> std::path::PathBuf {
 
 #[test]
 fn matrix_init_scaffolds_expected_layout() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
@@ -70,7 +70,8 @@ fn matrix_init_scaffolds_expected_layout() {
     );
     assert!(m.join("decision.md").exists(), "decision.md must exist");
 
-    let problem = fs::read_to_string(m.join("problem.md")).unwrap();
+    let problem =
+        fs::read_to_string(m.join("problem.md")).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         problem.contains("Which storage engine should we adopt?"),
         "problem statement must be written into problem.md"
@@ -81,7 +82,7 @@ fn matrix_init_scaffolds_expected_layout() {
 
 #[test]
 fn matrix_init_twice_fails_naming_existing_matrix() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
 
@@ -90,7 +91,7 @@ fn matrix_init_twice_fails_naming_existing_matrix() {
     let out = wai_cmd(tmp.path())
         .args(["matrix", "init", "second"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("matrix"));
@@ -98,11 +99,11 @@ fn matrix_init_twice_fails_naming_existing_matrix() {
 
 #[test]
 fn matrix_init_requires_workspace() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let out = wai_cmd(tmp.path())
         .args(["matrix", "init", "problem"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(!out.status.success());
 }
 
@@ -110,7 +111,7 @@ fn matrix_init_requires_workspace() {
 
 #[test]
 fn matrix_criterion_add_touches_every_approach() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     run_ok(tmp.path(), &["matrix", "init", "problem"]);
@@ -140,7 +141,7 @@ fn matrix_criterion_add_touches_every_approach() {
 
 #[test]
 fn matrix_approach_add_creates_empty_cells_for_all_criteria() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     run_ok(tmp.path(), &["matrix", "init", "problem"]);
@@ -163,7 +164,7 @@ fn matrix_approach_add_creates_empty_cells_for_all_criteria() {
 
 #[test]
 fn matrix_decide_writes_decision_and_design_doc() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     run_ok(tmp.path(), &["matrix", "init", "problem"]);
@@ -180,7 +181,8 @@ fn matrix_decide_writes_decision_and_design_doc() {
     );
 
     let m = matrix_dir(tmp.path(), "my-app");
-    let decision = fs::read_to_string(m.join("decision.md")).unwrap();
+    let decision =
+        fs::read_to_string(m.join("decision.md")).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         decision.contains("02-event-sourcing"),
         "decision must name the approach"
@@ -192,14 +194,24 @@ fn matrix_decide_writes_decision_and_design_doc() {
     );
 
     let designs = tmp.path().join(".wai/projects/my-app/designs");
-    let entries: Vec<_> = fs::read_dir(&designs).unwrap().collect();
+    let entries: Vec<_> = fs::read_dir(&designs)
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
+        .collect();
     let doc = entries.iter().find_map(|e| {
-        let name = e.as_ref().unwrap().file_name().into_string().unwrap();
-        name.starts_with("2026-")
-            .then(|| e.as_ref().unwrap().path())
+        let name = e
+            .as_ref()
+            .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
+            .file_name()
+            .into_string()
+            .unwrap_or_else(|e| panic!("unwrap failed: {e:?}"));
+        name.starts_with("2026-").then(|| {
+            e.as_ref()
+                .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
+                .path()
+        })
     });
-    let doc = doc.expect("design doc must be scaffolded in designs/");
-    let body = fs::read_to_string(&doc).unwrap();
+    let doc = doc.unwrap_or_else(|| panic!("design doc must be scaffolded in designs/"));
+    let body = fs::read_to_string(&doc).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         body.contains("tracks:"),
         "design doc needs frontmatter tracks"
@@ -212,7 +224,7 @@ fn matrix_decide_writes_decision_and_design_doc() {
 
 #[test]
 fn matrix_decide_rejects_unknown_approach_listing_valid() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     run_ok(tmp.path(), &["matrix", "init", "problem"]);
@@ -220,7 +232,7 @@ fn matrix_decide_rejects_unknown_approach_listing_valid() {
     let out = wai_cmd(tmp.path())
         .args(["matrix", "decide", "02-nope", "because"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("01-status-quo"));
@@ -228,7 +240,7 @@ fn matrix_decide_rejects_unknown_approach_listing_valid() {
 
 #[test]
 fn matrix_decide_snapshot_includes_winning_column_facts() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     run_ok(tmp.path(), &["matrix", "init", "problem"]);
@@ -236,7 +248,8 @@ fn matrix_decide_snapshot_includes_winning_column_facts() {
     run_ok(tmp.path(), &["matrix", "criterion", "add", "impact"]);
 
     let cell = matrix_dir(tmp.path(), "my-app").join("approaches/02-event-sourcing/01-impact");
-    fs::write(cell.join("fact.md"), "Full audit trail by construction.").unwrap();
+    fs::write(cell.join("fact.md"), "Full audit trail by construction.")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     run_ok(
         tmp.path(),
@@ -245,7 +258,7 @@ fn matrix_decide_snapshot_includes_winning_column_facts() {
 
     let designs = tmp.path().join(".wai/projects/my-app/designs");
     let body = fs::read_dir(&designs)
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .filter_map(|e| e.ok())
         .map(|e| e.path())
         .filter(|p| p.is_file())
@@ -254,7 +267,7 @@ fn matrix_decide_snapshot_includes_winning_column_facts() {
                 .map(|s| s.contains("# Design"))
                 .unwrap_or(false)
         })
-        .map(|p| fs::read_to_string(p).unwrap())
+        .map(|p| fs::read_to_string(p).unwrap_or_else(|e| panic!("unwrap failed: {e}")))
         .unwrap_or_else(|| panic!("design doc not found under designs/"));
     assert!(
         body.contains("Full audit trail by construction."),
@@ -265,7 +278,7 @@ fn matrix_decide_snapshot_includes_winning_column_facts() {
 // ── 5.1–5.11 lint ─────────────────────────────────────────────────────────
 
 fn setup_matrix() -> (TempDir, std::path::PathBuf) {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     run_ok(tmp.path(), &["matrix", "init", "problem"]);
@@ -283,7 +296,9 @@ fn lint_cmd(dir: &Path) -> Command {
 fn lint_valid_matrix_passes() {
     let (tmp, m) = setup_matrix();
     fill_cell(&m, "01-status-quo", "x", "fact", Some("red"));
-    let out = lint_cmd(tmp.path()).output().expect("lint should run");
+    let out = lint_cmd(tmp.path())
+        .output()
+        .unwrap_or_else(|e| panic!("lint should run: {e}"));
     assert!(out.status.success());
 }
 
@@ -295,9 +310,12 @@ fn lint_missing_cell_fails_naming_path() {
     run_ok(tmp.path(), &["matrix", "criterion", "add", "impact"]);
     run_ok(tmp.path(), &["matrix", "approach", "add", "es"]);
     // remove the cell dir from one approach → non-rectangular
-    fs::remove_dir_all(m.join("approaches/02-es/01-impact")).unwrap();
+    fs::remove_dir_all(m.join("approaches/02-es/01-impact"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
-    let out = lint_cmd(tmp.path()).output().expect("command should run");
+    let out = lint_cmd(tmp.path())
+        .output()
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("02-es/01-impact"));
@@ -310,11 +328,13 @@ fn lint_multiple_markers_fails_naming_cell() {
     let (tmp, m) = setup_matrix();
     run_ok(tmp.path(), &["matrix", "criterion", "add", "c"]);
     let cell = m.join("approaches/01-status-quo/01-c");
-    fs::write(cell.join("fact.md"), "fact").unwrap();
-    fs::write(cell.join("green"), "").unwrap();
-    fs::write(cell.join("red"), "").unwrap();
+    fs::write(cell.join("fact.md"), "fact").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(cell.join("green"), "").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(cell.join("red"), "").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
-    let out = lint_cmd(tmp.path()).output().expect("command should run");
+    let out = lint_cmd(tmp.path())
+        .output()
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("01-c"));
@@ -325,10 +345,12 @@ fn lint_unknown_marker_fails() {
     let (tmp, m) = setup_matrix();
     run_ok(tmp.path(), &["matrix", "criterion", "add", "c"]);
     let cell = m.join("approaches/01-status-quo/01-c");
-    fs::write(cell.join("fact.md"), "fact").unwrap();
-    fs::write(cell.join("chartreuse"), "").unwrap();
+    fs::write(cell.join("fact.md"), "fact").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(cell.join("chartreuse"), "").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
-    let out = lint_cmd(tmp.path()).output().expect("lint should run");
+    let out = lint_cmd(tmp.path())
+        .output()
+        .unwrap_or_else(|e| panic!("lint should run: {e}"));
     assert!(!out.status.success());
 }
 
@@ -338,9 +360,12 @@ fn lint_unknown_marker_fails() {
 fn lint_empty_fact_md_fails() {
     let (tmp, m) = setup_matrix();
     run_ok(tmp.path(), &["matrix", "criterion", "add", "c"]);
-    fs::write(m.join("approaches/01-status-quo/01-c/fact.md"), "   \n").unwrap();
+    fs::write(m.join("approaches/01-status-quo/01-c/fact.md"), "   \n")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
-    let out = lint_cmd(tmp.path()).output().expect("lint should run");
+    let out = lint_cmd(tmp.path())
+        .output()
+        .unwrap_or_else(|e| panic!("lint should run: {e}"));
     assert!(!out.status.success());
 }
 
@@ -348,9 +373,12 @@ fn lint_empty_fact_md_fails() {
 fn lint_marker_without_fact_reports_incomplete() {
     let (tmp, m) = setup_matrix();
     run_ok(tmp.path(), &["matrix", "criterion", "add", "c"]);
-    fs::write(m.join("approaches/01-status-quo/01-c/red"), "").unwrap();
+    fs::write(m.join("approaches/01-status-quo/01-c/red"), "")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
-    let out = lint_cmd(tmp.path()).output().expect("command should run");
+    let out = lint_cmd(tmp.path())
+        .output()
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("missing or empty fact.md"));
@@ -361,8 +389,11 @@ fn lint_marker_without_fact_reports_incomplete() {
 #[test]
 fn lint_missing_status_quo_fails() {
     let (tmp, m) = setup_matrix();
-    fs::remove_dir_all(m.join("approaches/01-status-quo")).unwrap();
-    let out = lint_cmd(tmp.path()).output().expect("lint should run");
+    fs::remove_dir_all(m.join("approaches/01-status-quo"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    let out = lint_cmd(tmp.path())
+        .output()
+        .unwrap_or_else(|e| panic!("lint should run: {e}"));
     assert!(!out.status.success());
 }
 
@@ -375,7 +406,9 @@ fn lint_all_green_column_warns_but_passes() {
     run_ok(tmp.path(), &["matrix", "criterion", "add", "c"]);
     fill_cell(&m, "02-es", "01-c", "Perfect in every way.", Some("green"));
 
-    let out = lint_cmd(tmp.path()).output().expect("command should run");
+    let out = lint_cmd(tmp.path())
+        .output()
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success());
     assert!(stderr.contains("02-es"));
@@ -391,7 +424,9 @@ fn lint_undistinguished_columns_warn() {
     fill_cell(&m, "01-status-quo", "01-c", "Same text.", Some("neutral"));
     fill_cell(&m, "02-es", "01-c", "Same text.", Some("neutral"));
 
-    let out = lint_cmd(tmp.path()).output().expect("command should run");
+    let out = lint_cmd(tmp.path())
+        .output()
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success());
     assert!(stderr.contains("indistinguish"));
@@ -411,7 +446,9 @@ fn lint_judgment_words_in_fact_warn() {
         Some("neutral"),
     );
 
-    let out = lint_cmd(tmp.path()).output().expect("command should run");
+    let out = lint_cmd(tmp.path())
+        .output()
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success());
     assert!(stderr.contains("judgment"));
@@ -429,7 +466,9 @@ fn lint_link_only_cell_warns() {
         Some("neutral"),
     );
 
-    let out = lint_cmd(tmp.path()).output().expect("command should run");
+    let out = lint_cmd(tmp.path())
+        .output()
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success());
     assert!(stderr.contains("link"));
@@ -443,9 +482,11 @@ fn lint_criterion_phrased_as_question_warns() {
         matrix_dir(tmp.path(), "my-app").join("criteria/01-c.md"),
         "# c\n\nHow cheap is it?\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
-    let out = lint_cmd(tmp.path()).output().expect("command should run");
+    let out = lint_cmd(tmp.path())
+        .output()
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success());
     assert!(stderr.contains("question"));
@@ -465,7 +506,9 @@ fn lint_status_quo_without_red_warns() {
         Some("green"),
     );
 
-    let out = lint_cmd(tmp.path()).output().expect("command should run");
+    let out = lint_cmd(tmp.path())
+        .output()
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success());
     assert!(stderr.contains("status quo"));
@@ -480,7 +523,9 @@ fn lint_decided_with_unfilled_cells_warns() {
     run_ok(tmp.path(), &["matrix", "criterion", "add", "c"]);
     run_ok(tmp.path(), &["matrix", "decide", "02-es", "because"]);
 
-    let out = lint_cmd(tmp.path()).output().expect("command should run");
+    let out = lint_cmd(tmp.path())
+        .output()
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success());
     assert!(stderr.contains("unfilled"));
@@ -491,8 +536,11 @@ fn lint_decided_with_unfilled_cells_warns() {
 #[test]
 fn lint_empty_problem_md_warns() {
     let (tmp, m) = setup_matrix();
-    fs::write(m.join("problem.md"), "# Problem\n\n").unwrap();
-    let out = lint_cmd(tmp.path()).output().expect("lint should run");
+    fs::write(m.join("problem.md"), "# Problem\n\n")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    let out = lint_cmd(tmp.path())
+        .output()
+        .unwrap_or_else(|e| panic!("lint should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success());
     assert!(stderr.contains("problem"));
@@ -508,7 +556,8 @@ fn lint_stale_decision_warns() {
     run_ok(tmp.path(), &["matrix", "decide", "01-status-quo", "keep"]);
     // simulate an edit after the decision, with a decision timestamp in the past
     fill_cell(&m, "01-status-quo", "01-c", "edited fact", Some("red"));
-    let decision = fs::read_to_string(m.join("decision.md")).unwrap();
+    let decision =
+        fs::read_to_string(m.join("decision.md")).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let rewritten: String = decision
         .lines()
         .map(|l| {
@@ -520,9 +569,11 @@ fn lint_stale_decision_warns() {
         })
         .collect::<Vec<_>>()
         .join("\n");
-    fs::write(m.join("decision.md"), rewritten).unwrap();
+    fs::write(m.join("decision.md"), rewritten).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
-    let out = lint_cmd(tmp.path()).output().expect("command should run");
+    let out = lint_cmd(tmp.path())
+        .output()
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success());
     assert!(stderr.contains("newer than the decision"));
@@ -532,7 +583,7 @@ fn lint_stale_decision_warns() {
 
 #[test]
 fn agent_flow_direct_file_io_lint_render_gate() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     set_phase_design(tmp.path(), "my-app");
@@ -544,7 +595,9 @@ fn agent_flow_direct_file_io_lint_render_gate() {
     write_agent_flow_cells(&matrix_dir(tmp.path(), "my-app"));
 
     // 3. Lint passes (status quo has red — no methodology warning expected).
-    let out = lint_cmd(tmp.path()).output().expect("lint should run");
+    let out = lint_cmd(tmp.path())
+        .output()
+        .unwrap_or_else(|e| panic!("lint should run: {e}"));
     assert!(out.status.success());
 
     // 4. Decide (multi-artifact op) + render + gate.
@@ -553,7 +606,8 @@ fn agent_flow_direct_file_io_lint_render_gate() {
         &["matrix", "decide", "02-event-sourcing", "Audit story wins."],
     );
     run_ok(tmp.path(), &["matrix", "render"]);
-    let html = fs::read_to_string(matrix_dir(tmp.path(), "my-app").join("matrix.html")).unwrap();
+    let html = fs::read_to_string(matrix_dir(tmp.path(), "my-app").join("matrix.html"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(html.contains("Audit trail by construction."));
     run_ok(tmp.path(), &["phase", "next"]);
 }
@@ -564,20 +618,22 @@ fn write_agent_flow_cells(m: &Path) {
         m.join("criteria/01-impact.md"),
         "# impact\n\nBlast radius of failure.\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let es = m.join("approaches/02-event-sourcing");
-    fs::create_dir_all(es.join("01-impact")).unwrap();
+    fs::create_dir_all(es.join("01-impact")).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         es.join("_description.md"),
         "# event-sourcing\n\nAppend-only events.\n",
     )
-    .unwrap();
-    fs::write(es.join("01-impact/fact.md"), "Audit trail by construction.").unwrap();
-    fs::write(es.join("01-impact/green"), "").unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(es.join("01-impact/fact.md"), "Audit trail by construction.")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(es.join("01-impact/green"), "").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let sq = m.join("approaches/01-status-quo/01-impact");
-    fs::create_dir_all(&sq).unwrap();
-    fs::write(sq.join("fact.md"), "Manual audit scripts, drift-prone.").unwrap();
-    fs::write(sq.join("red"), "").unwrap();
+    fs::create_dir_all(&sq).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(sq.join("fact.md"), "Manual audit scripts, drift-prone.")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(sq.join("red"), "").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 }
 
 // ── 6.1 design → plan phase gate ─────────────────────────────────────────
@@ -589,7 +645,7 @@ fn set_phase_design(dir: &Path, project: &str) {
 
 #[test]
 fn gate_no_matrix_passes() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     set_phase_design(tmp.path(), "my-app");
@@ -600,7 +656,7 @@ fn gate_no_matrix_passes() {
 
 #[test]
 fn gate_scaffolded_decision_blocks() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     set_phase_design(tmp.path(), "my-app");
@@ -609,7 +665,7 @@ fn gate_scaffolded_decision_blocks() {
     let out = wai_cmd(tmp.path())
         .args(["phase", "next"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("no decision"));
@@ -618,7 +674,7 @@ fn gate_scaffolded_decision_blocks() {
 
 #[test]
 fn gate_current_decision_passes() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     set_phase_design(tmp.path(), "my-app");
@@ -639,7 +695,7 @@ fn gate_current_decision_passes() {
 
 #[test]
 fn gate_edited_after_decision_blocks() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     set_phase_design(tmp.path(), "my-app");
@@ -654,16 +710,18 @@ fn gate_edited_after_decision_blocks() {
     fill_cell(&m, "01-status-quo", "01-c", "edited", Some("red"));
     let later = filetime::FileTime::from_unix_time(1_800_000_000, 0);
     for entry in walkdir::WalkDir::new(m.join("approaches")) {
-        let path = entry.unwrap().into_path();
+        let path = entry
+            .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
+            .into_path();
         if path.is_file() {
-            filetime::set_file_mtime(&path, later).unwrap();
+            filetime::set_file_mtime(&path, later).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
         }
     }
 
     let out = wai_cmd(tmp.path())
         .args(["phase", "next"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("newer than the decision"));
@@ -672,7 +730,7 @@ fn gate_edited_after_decision_blocks() {
 
 #[test]
 fn gate_fresh_clone_equal_timestamps_warns_but_proceeds() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     set_phase_design(tmp.path(), "my-app");
@@ -690,7 +748,7 @@ fn gate_fresh_clone_equal_timestamps_warns_but_proceeds() {
     let out = wai_cmd(tmp.path())
         .args(["phase", "next"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success());
     assert!(stderr.contains("stale"));
@@ -700,16 +758,20 @@ fn gate_fresh_clone_equal_timestamps_warns_but_proceeds() {
 fn backdate_matrix_tree(m: &std::path::Path, unix_secs: i64) {
     let checkout = filetime::FileTime::from_unix_time(unix_secs, 0);
     for entry in walkdir::WalkDir::new(m) {
-        let path = entry.unwrap().into_path();
+        let path = entry
+            .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
+            .into_path();
         if path.is_file() {
-            filetime::set_file_mtime(&path, checkout).unwrap();
+            filetime::set_file_mtime(&path, checkout)
+                .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
         }
     }
 }
 
 /// Rewrite the decision's `Decided at:` line to the given RFC 3339 timestamp.
 fn rewrite_decision_timestamp(m: &std::path::Path, stamp: &str) {
-    let decision = fs::read_to_string(m.join("decision.md")).unwrap();
+    let decision =
+        fs::read_to_string(m.join("decision.md")).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let rewritten: String = decision
         .lines()
         .map(|l| {
@@ -721,12 +783,12 @@ fn rewrite_decision_timestamp(m: &std::path::Path, stamp: &str) {
         })
         .collect::<Vec<_>>()
         .join("\n");
-    fs::write(m.join("decision.md"), rewritten).unwrap();
+    fs::write(m.join("decision.md"), rewritten).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 }
 
 #[test]
 fn gate_set_plan_bypass_blocked() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     set_phase_design(tmp.path(), "my-app");
@@ -736,7 +798,7 @@ fn gate_set_plan_bypass_blocked() {
     let out = wai_cmd(tmp.path())
         .args(["phase", "set", "plan"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("no decision"));
@@ -746,7 +808,7 @@ fn gate_set_plan_bypass_blocked() {
 
 #[test]
 fn status_design_phase_shows_matrix_progress() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     set_phase_design(tmp.path(), "my-app");
@@ -766,7 +828,7 @@ fn status_design_phase_shows_matrix_progress() {
     let out = wai_cmd(tmp.path())
         .args(["status"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Which storage engine?"));
@@ -778,7 +840,7 @@ fn status_design_phase_shows_matrix_progress() {
 
 #[test]
 fn close_handoff_includes_matrix_context() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     let m = matrix_dir(tmp.path(), "my-app");
@@ -799,11 +861,11 @@ fn close_handoff_includes_matrix_context() {
 
     let handoffs = tmp.path().join(".wai/projects/my-app/handoffs");
     let body: String = fs::read_dir(&handoffs)
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .filter_map(|e| e.ok())
         .map(|e| fs::read_to_string(e.path()).unwrap_or_default())
         .find(|s| s.contains("Decision Matrix"))
-        .expect("handoff must include a Decision Matrix section");
+        .unwrap_or_else(|| panic!("handoff must include a Decision Matrix section"));
     assert!(
         body.contains("Which storage engine?"),
         "problem statement in handoff"
@@ -823,16 +885,16 @@ fn close_handoff_includes_matrix_context() {
 
 fn fill_cell(m: &Path, approach: &str, criterion: &str, fact: &str, marker: Option<&str>) {
     let cell = m.join("approaches").join(approach).join(criterion);
-    fs::create_dir_all(&cell).unwrap();
-    fs::write(cell.join("fact.md"), fact).unwrap();
+    fs::create_dir_all(&cell).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(cell.join("fact.md"), fact).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     if let Some(marker) = marker {
-        fs::write(cell.join(marker), "").unwrap();
+        fs::write(cell.join(marker), "").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     }
 }
 
 #[test]
 fn matrix_render_produces_banner_rows_columns_and_key() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     run_ok(tmp.path(), &["matrix", "init", "Which storage engine?"]);
@@ -856,7 +918,8 @@ fn matrix_render_produces_banner_rows_columns_and_key() {
 
     run_ok(tmp.path(), &["matrix", "render"]);
 
-    let html = fs::read_to_string(m.join("matrix.html")).unwrap();
+    let html =
+        fs::read_to_string(m.join("matrix.html")).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(html.contains("Which storage engine?"), "problem banner");
     assert!(html.contains("01-impact"), "criterion row");
     assert!(html.contains("01-status-quo"), "approach column");
@@ -868,7 +931,7 @@ fn matrix_render_produces_banner_rows_columns_and_key() {
 
 #[test]
 fn matrix_render_is_deterministic_byte_identical() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     run_ok(tmp.path(), &["matrix", "init", "problem"]);
@@ -878,15 +941,15 @@ fn matrix_render_is_deterministic_byte_identical() {
     fill_cell(&m, "01-status-quo", "01-c", "fact", Some("yellow"));
 
     run_ok(tmp.path(), &["matrix", "render"]);
-    let first = fs::read(m.join("matrix.html")).unwrap();
+    let first = fs::read(m.join("matrix.html")).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     run_ok(tmp.path(), &["matrix", "render"]);
-    let second = fs::read(m.join("matrix.html")).unwrap();
+    let second = fs::read(m.join("matrix.html")).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert_eq!(first, second, "same state must produce byte-identical HTML");
 }
 
 #[test]
 fn matrix_render_empty_cell_is_not_a_judgment_color() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     run_ok(tmp.path(), &["matrix", "init", "problem"]);
@@ -895,7 +958,8 @@ fn matrix_render_empty_cell_is_not_a_judgment_color() {
 
     run_ok(tmp.path(), &["matrix", "render"]);
 
-    let html = fs::read_to_string(matrix_dir(tmp.path(), "my-app").join("matrix.html")).unwrap();
+    let html = fs::read_to_string(matrix_dir(tmp.path(), "my-app").join("matrix.html"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         html.contains("not yet assessed"),
         "empty cell must show the placeholder"
@@ -904,7 +968,7 @@ fn matrix_render_empty_cell_is_not_a_judgment_color() {
 
 #[test]
 fn matrix_render_neutral_is_a_judgment_not_incomplete() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     run_ok(tmp.path(), &["matrix", "init", "problem"]);
@@ -921,7 +985,8 @@ fn matrix_render_neutral_is_a_judgment_not_incomplete() {
 
     run_ok(tmp.path(), &["matrix", "render"]);
 
-    let html = fs::read_to_string(m.join("matrix.html")).unwrap();
+    let html =
+        fs::read_to_string(m.join("matrix.html")).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(html.contains("Clear, nothing special."));
     assert!(html.contains("neutral"));
 }
@@ -930,7 +995,7 @@ fn matrix_render_neutral_is_a_judgment_not_incomplete() {
 
 #[test]
 fn matrix_add_commands_number_sequentially() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     run_ok(tmp.path(), &["matrix", "init", "problem"]);

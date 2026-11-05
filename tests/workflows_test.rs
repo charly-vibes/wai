@@ -152,7 +152,7 @@ fn research_ready_to_advance_suggests_design_phase() {
     let d = detections
         .iter()
         .find(|d| d.pattern == WorkflowPattern::ResearchReadyToAdvance)
-        .expect("ResearchReadyToAdvance should be present");
+        .unwrap_or_else(|| panic!("ResearchReadyToAdvance should be present"));
 
     assert!(
         d.suggestions.iter().any(|s| s.command.contains("design")),
@@ -166,7 +166,7 @@ fn implement_phase_suggestions_include_status_check() {
     let d = detections
         .iter()
         .find(|d| d.pattern == WorkflowPattern::ImplementPhaseActive)
-        .expect("ImplementPhaseActive should be present");
+        .unwrap_or_else(|| panic!("ImplementPhaseActive should be present"));
 
     assert!(
         d.suggestions.iter().any(|s| s.command.contains("status")),
@@ -178,7 +178,7 @@ fn implement_phase_suggestions_include_status_check() {
 
 #[allow(deprecated)]
 fn wai_cmd(dir: &std::path::Path) -> Command {
-    let mut cmd = Command::cargo_bin("wai").unwrap();
+    let mut cmd = Command::cargo_bin("wai").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     cmd.current_dir(dir);
     cmd.env("NO_COLOR", "1");
     // Update notice off in tests: existing assertions expect quiet stderr and
@@ -191,18 +191,18 @@ fn init_and_create(dir: &std::path::Path, project: &str) {
     let out = wai_cmd(dir)
         .args(["init", "--name", "test-ws"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
     let out = wai_cmd(dir)
         .args(["new", "project", project])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 }
 
 #[test]
 fn scan_project_returns_none_for_missing_project() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let result = scan_project(tmp.path(), "nonexistent");
     assert!(
         result.is_none(),
@@ -212,15 +212,18 @@ fn scan_project_returns_none_for_missing_project() {
 
 #[test]
 fn scan_project_counts_research_artifacts() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_and_create(tmp.path(), "myproj");
 
     // Write two research artifacts directly
     let research_dir = tmp.path().join(".wai/projects/myproj/research");
-    fs::write(research_dir.join("2026-01-01-first.md"), "First note").unwrap();
-    fs::write(research_dir.join("2026-01-02-second.md"), "Second note").unwrap();
+    fs::write(research_dir.join("2026-01-01-first.md"), "First note")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(research_dir.join("2026-01-02-second.md"), "Second note")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
-    let ctx = scan_project(tmp.path(), "myproj").expect("scan_project should succeed");
+    let ctx =
+        scan_project(tmp.path(), "myproj").unwrap_or_else(|| panic!("scan_project should succeed"));
     assert_eq!(ctx.research_count, 2, "should count 2 research artifacts");
     assert_eq!(ctx.plan_count, 0);
     assert_eq!(ctx.design_count, 0);
@@ -228,23 +231,24 @@ fn scan_project_counts_research_artifacts() {
 
 #[test]
 fn scan_project_detects_correct_phase() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_and_create(tmp.path(), "phased");
 
     // Advance to design phase via CLI
     let out = wai_cmd(tmp.path())
         .args(["phase", "set", "design"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
-    let ctx = scan_project(tmp.path(), "phased").expect("scan_project should succeed");
+    let ctx =
+        scan_project(tmp.path(), "phased").unwrap_or_else(|| panic!("scan_project should succeed"));
     assert_eq!(ctx.phase, Phase::Design);
 }
 
 #[test]
 fn scan_then_detect_gives_correct_workflow_pattern() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_and_create(tmp.path(), "workflow-proj");
 
     // Add 3 research artifacts to trigger ResearchReadyToAdvance
@@ -254,10 +258,11 @@ fn scan_then_detect_gives_correct_workflow_pattern() {
             research_dir.join(format!("2026-01-0{}-note.md", i)),
             format!("Research note {}", i),
         )
-        .unwrap();
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     }
 
-    let ctx = scan_project(tmp.path(), "workflow-proj").expect("scan_project should succeed");
+    let ctx = scan_project(tmp.path(), "workflow-proj")
+        .unwrap_or_else(|| panic!("scan_project should succeed"));
     let detections = detect_patterns(&ctx);
 
     assert!(
@@ -385,7 +390,7 @@ fn stale_phase_suggestions_include_archive_and_advance() {
     let d = detections
         .iter()
         .find(|d| matches!(d.pattern, WorkflowPattern::StalePhase { .. }))
-        .expect("StalePhase should be present");
+        .unwrap_or_else(|| panic!("StalePhase should be present"));
     assert!(
         d.suggestions
             .iter()
@@ -413,7 +418,7 @@ fn looks_complete_suggestions_include_archive_and_advance() {
     let d = detections
         .iter()
         .find(|d| d.pattern == WorkflowPattern::LooksComplete)
-        .expect("LooksComplete should be present");
+        .unwrap_or_else(|| panic!("LooksComplete should be present"));
     assert!(
         d.suggestions.iter().any(|s| s.command.contains("move")),
         "LooksComplete suggestions should include 'wai move'"

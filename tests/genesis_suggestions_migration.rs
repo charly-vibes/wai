@@ -94,14 +94,16 @@ fn test_genesis_suggestions_command_registry() {
 fn test_wai_statos_regression() {
     use assert_cmd::Command;
 
-    let mut cmd = Command::cargo_bin("wai").unwrap();
+    let mut cmd = Command::cargo_bin("wai").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     cmd.env("NO_COLOR", "1");
     // Update notice off in tests: existing assertions expect quiet stderr and
     // must not depend on real ~/.cache state (wai-r3p0 tidy).
     cmd.env("GENESIS_NO_UPDATE_CHECK", "1");
     cmd.arg("statos");
 
-    let out = cmd.output().expect("command should run");
+    let out = cmd
+        .output()
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("Did you mean"));

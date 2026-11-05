@@ -4,7 +4,7 @@ use tempfile::TempDir;
 
 #[allow(deprecated)]
 fn wai_cmd(dir: &std::path::Path) -> Command {
-    let mut cmd = Command::cargo_bin("wai").unwrap();
+    let mut cmd = Command::cargo_bin("wai").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     cmd.current_dir(dir);
     cmd.env("NO_COLOR", "1");
     // Update notice off in tests: existing assertions expect quiet stderr and
@@ -17,7 +17,7 @@ fn init_workspace(dir: &std::path::Path) {
     let out = wai_cmd(dir)
         .args(["init", "--name", "test-ws"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 }
 
@@ -25,7 +25,7 @@ fn create_project(dir: &std::path::Path, name: &str) {
     let out = wai_cmd(dir)
         .args(["new", "project", name])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 }
 
@@ -33,21 +33,21 @@ fn create_project(dir: &std::path::Path, name: &str) {
 
 #[test]
 fn close_creates_handoff_for_named_project() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
 
     let out = wai_cmd(tmp.path())
         .args(["close", "--project", "myproject"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Handoff created:"));
 
     let handoffs_dir = tmp.path().join(".wai/projects/myproject/handoffs");
     let files: Vec<_> = fs::read_dir(&handoffs_dir)
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .filter_map(|e| e.ok())
         .collect();
     assert_eq!(
@@ -61,7 +61,7 @@ fn close_creates_handoff_for_named_project() {
 
 #[test]
 fn close_with_project_flag_targets_only_named_project() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "alpha");
     create_project(tmp.path(), "beta");
@@ -69,7 +69,7 @@ fn close_with_project_flag_targets_only_named_project() {
     let out = wai_cmd(tmp.path())
         .args(["close", "--project", "alpha"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Handoff created:"));
@@ -78,11 +78,11 @@ fn close_with_project_flag_targets_only_named_project() {
     let beta_handoffs = tmp.path().join(".wai/projects/beta/handoffs");
 
     let alpha_files: Vec<_> = fs::read_dir(&alpha_handoffs)
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .filter_map(|e| e.ok())
         .collect();
     let beta_files: Vec<_> = fs::read_dir(&beta_handoffs)
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .filter_map(|e| e.ok())
         .collect();
 
@@ -94,14 +94,14 @@ fn close_with_project_flag_targets_only_named_project() {
 
 #[test]
 fn close_unknown_project_fails_with_diagnostic() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
 
     let out = wai_cmd(tmp.path())
         .args(["close", "--project", "nonexistent"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("not found"));
@@ -113,32 +113,33 @@ fn close_unknown_project_fails_with_diagnostic() {
 /// pointer. `current_step` == total means the run is complete.
 fn write_pipeline_run(dir: &std::path::Path, pipeline: &str, current_step: usize) {
     let pipelines_dir = dir.join(".wai/resources/pipelines");
-    fs::create_dir_all(&pipelines_dir).unwrap();
+    fs::create_dir_all(&pipelines_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         pipelines_dir.join(format!("{pipeline}.toml")),
         "[pipeline]\nname = \"flow\"\ndescription = \"d\"\n\
          [[steps]]\nid = \"a\"\nprompt = \"do {{topic}}\"\n\
          [[steps]]\nid = \"b\"\nprompt = \"do {{topic}}\"\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let run_id = format!("{pipeline}-run");
     let runs_dir = dir.join(".wai/pipeline-runs");
-    fs::create_dir_all(&runs_dir).unwrap();
+    fs::create_dir_all(&runs_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         runs_dir.join(format!("{run_id}.yml")),
         format!(
             "run_id: {run_id}\npipeline: {pipeline}\ntopic: t\ncreated_at: '2026-07-29T00:00:00Z'\ncurrent_step: {current_step}\napprovals: {{}}\n"
         ),
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     // Single source of truth: .last-run pointer
-    fs::write(pipelines_dir.join(".last-run"), &run_id).unwrap();
+    fs::write(pipelines_dir.join(".last-run"), &run_id)
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 }
 
 #[test]
 fn close_clears_complete_pipeline_run_pointers() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
     // current_step == 2 (total) → run is complete.
@@ -150,7 +151,7 @@ fn close_clears_complete_pipeline_run_pointers() {
     let out = wai_cmd(tmp.path())
         .args(["close", "--project", "myproject"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Cleared complete pipeline run"));
@@ -165,7 +166,7 @@ fn close_clears_complete_pipeline_run_pointers() {
 
 #[test]
 fn close_refuses_incomplete_pipeline_run() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
     // current_step == 0 of 2 → run is mid-flight.
@@ -173,12 +174,12 @@ fn close_refuses_incomplete_pipeline_run() {
 
     let last_run = tmp.path().join(".wai/resources/pipelines/.last-run");
     let run_state = tmp.path().join(".wai/pipeline-runs/flow-run.yml");
-    let before = fs::read_to_string(&run_state).unwrap();
+    let before = fs::read_to_string(&run_state).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["close", "--project", "myproject"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
@@ -191,7 +192,7 @@ fn close_refuses_incomplete_pipeline_run() {
 
     // Run state must be untouched by the refusal.
     assert_eq!(
-        fs::read_to_string(&run_state).unwrap(),
+        fs::read_to_string(&run_state).unwrap_or_else(|e| panic!("unwrap failed: {e}")),
         before,
         "refused close must not modify the run state file"
     );
@@ -201,7 +202,7 @@ fn close_refuses_incomplete_pipeline_run() {
     let handoffs_dir = tmp.path().join(".wai/projects/myproject/handoffs");
     if handoffs_dir.exists() {
         let files: Vec<_> = fs::read_dir(&handoffs_dir)
-            .unwrap()
+            .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
             .filter_map(|e| e.ok())
             .collect();
         assert!(
@@ -213,7 +214,7 @@ fn close_refuses_incomplete_pipeline_run() {
 
 #[test]
 fn close_force_overrides_incomplete_pipeline_run() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
     // current_step == 0 of 2 → run is mid-flight.
@@ -222,7 +223,7 @@ fn close_force_overrides_incomplete_pipeline_run() {
     let out = wai_cmd(tmp.path())
         .args(["close", "--project", "myproject", "--force"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Handoff created:"));
@@ -238,7 +239,7 @@ fn close_force_overrides_incomplete_pipeline_run() {
     // And the refusal path must have been skipped (close proceeded).
     let handoffs_dir = tmp.path().join(".wai/projects/myproject/handoffs");
     let files: Vec<_> = fs::read_dir(&handoffs_dir)
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .filter_map(|e| e.ok())
         .collect();
     assert_eq!(files.len(), 1, "forced close creates the handoff");
@@ -246,7 +247,7 @@ fn close_force_overrides_incomplete_pipeline_run() {
 
 #[test]
 fn close_still_clears_complete_pipeline_run_pointers() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
     // current_step == 2 (total) → run is complete.
@@ -258,7 +259,7 @@ fn close_still_clears_complete_pipeline_run_pointers() {
     let out = wai_cmd(tmp.path())
         .args(["close", "--project", "myproject"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Cleared complete pipeline run"));
@@ -271,7 +272,7 @@ fn close_still_clears_complete_pipeline_run_pointers() {
 
 #[test]
 fn close_with_no_pipeline_run_is_unchanged() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
     // No pipeline run at all.
@@ -279,7 +280,7 @@ fn close_with_no_pipeline_run_is_unchanged() {
     let out = wai_cmd(tmp.path())
         .args(["close", "--project", "myproject"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     // Nothing to clear: no run pointer was ever created, and close reports no

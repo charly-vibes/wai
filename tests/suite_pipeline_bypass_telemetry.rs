@@ -27,19 +27,19 @@ fn hermetic_wai_cmd(dir: &std::path::Path) -> Command {
 /// state and is surfaced by `wai pipeline status` (count + last reason).
 #[test]
 fn bypass_during_active_run_recorded_and_surfaced() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let init = hermetic_wai_cmd(tmp.path())
         .args(["pipeline", "init", "tdd-ro5"])
         .output()
-        .expect("init should run");
+        .unwrap_or_else(|e| panic!("init should run: {e}"));
     assert!(init.status.success(), "init failed");
 
     let start = hermetic_wai_cmd(tmp.path())
         .args(["pipeline", "start", "tdd-ro5", "--topic=bypass-test"])
         .output()
-        .expect("start should run");
+        .unwrap_or_else(|e| panic!("start should run: {e}"));
     assert!(start.status.success(), "start failed");
 
     let bypass = hermetic_wai_cmd(tmp.path())
@@ -49,7 +49,7 @@ fn bypass_during_active_run_recorded_and_surfaced() {
             "skipped pre-push hook: flaky under parallel load",
         ])
         .output()
-        .expect("bypass should run");
+        .unwrap_or_else(|e| panic!("bypass should run: {e}"));
     assert!(
         bypass.status.success(),
         "bypass during active run must succeed: {}{}",
@@ -59,7 +59,7 @@ fn bypass_during_active_run_recorded_and_surfaced() {
 
     // Ledger entry exists in the run state file.
     let run_id = fs::read_to_string(tmp.path().join(".wai/resources/pipelines/.last-run"))
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .trim()
         .to_string();
     let run_state = fs::read_to_string(
@@ -67,7 +67,7 @@ fn bypass_during_active_run_recorded_and_surfaced() {
             .join(".wai/pipeline-runs")
             .join(format!("{run_id}.yml")),
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         run_state.contains("bypasses"),
         "run state must contain a bypasses ledger:\n{run_state}"
@@ -81,14 +81,14 @@ fn bypass_during_active_run_recorded_and_surfaced() {
     let bypass2 = hermetic_wai_cmd(tmp.path())
         .args(["pipeline", "bypass", "second disclosed reason"])
         .output()
-        .expect("second bypass should run");
+        .unwrap_or_else(|e| panic!("second bypass should run: {e}"));
     assert!(bypass2.status.success(), "second bypass failed");
 
     // Status surfaces count + last reason.
     let status = hermetic_wai_cmd(tmp.path())
         .args(["pipeline", "status"])
         .output()
-        .expect("status should run");
+        .unwrap_or_else(|e| panic!("status should run: {e}"));
     let combined = format!(
         "{}{}",
         String::from_utf8_lossy(&status.stdout),
@@ -109,13 +109,13 @@ fn bypass_during_active_run_recorded_and_surfaced() {
 /// (spec scenario: bypass without active run ignored).
 #[test]
 fn bypass_without_active_run_is_silent_noop() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let bypass = hermetic_wai_cmd(tmp.path())
         .args(["pipeline", "bypass", "no run active"])
         .output()
-        .expect("bypass should run");
+        .unwrap_or_else(|e| panic!("bypass should run: {e}"));
     let combined = format!(
         "{}{}",
         String::from_utf8_lossy(&bypass.stdout),
@@ -128,7 +128,9 @@ fn bypass_without_active_run_is_silent_noop() {
 
     let runs_dir = tmp.path().join(".wai/pipeline-runs");
     if runs_dir.exists() {
-        let entries: Vec<_> = fs::read_dir(&runs_dir).unwrap().collect();
+        let entries: Vec<_> = fs::read_dir(&runs_dir)
+            .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
+            .collect();
         assert!(
             entries.is_empty(),
             "no run-state entries may be written without an active run"

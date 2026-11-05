@@ -4,7 +4,7 @@ use tempfile::TempDir;
 
 #[allow(deprecated)]
 fn wai_cmd(dir: &std::path::Path) -> Command {
-    let mut cmd = Command::cargo_bin("wai").unwrap();
+    let mut cmd = Command::cargo_bin("wai").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     cmd.current_dir(dir);
     cmd.env("NO_COLOR", "1");
     // Update notice off in tests: existing assertions expect quiet stderr and
@@ -17,7 +17,7 @@ fn init_workspace(dir: &std::path::Path) {
     let out = wai_cmd(dir)
         .args(["init", "--name", "test-ws"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 }
 
@@ -25,7 +25,7 @@ fn create_project(dir: &std::path::Path, name: &str) {
     let out = wai_cmd(dir)
         .args(["new", "project", name])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 }
 
@@ -42,14 +42,14 @@ fn write_artifact(
         .join(project)
         .join(subdir)
         .join(filename);
-    fs::write(path, content).unwrap();
+    fs::write(path, content).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 }
 
 // ── chronological output ──────────────────────────────────────────────────────
 
 #[test]
 fn timeline_shows_dated_artifacts_in_output() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     write_artifact(
@@ -70,7 +70,7 @@ fn timeline_shows_dated_artifacts_in_output() {
     let out = wai_cmd(tmp.path())
         .args(["timeline", "my-app"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Timeline for"));
@@ -82,7 +82,7 @@ fn timeline_shows_dated_artifacts_in_output() {
 
 #[test]
 fn timeline_from_filter_excludes_older_entries() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "my-app");
     write_artifact(
@@ -103,7 +103,7 @@ fn timeline_from_filter_excludes_older_entries() {
     let out = wai_cmd(tmp.path())
         .args(["timeline", "my-app", "--from", "2026-02-01"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("2026-02-15"));
@@ -114,13 +114,13 @@ fn timeline_from_filter_excludes_older_entries() {
 
 #[test]
 fn timeline_nonexistent_project_fails_with_diagnostic() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["timeline", "ghost"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("not found"));

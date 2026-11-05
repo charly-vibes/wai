@@ -11,13 +11,13 @@ use tempfile::TempDir;
 
 #[test]
 fn plugin_list_shows_builtin_plugins() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["plugin", "list"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(((stdout.contains("git") || stdout.contains("beads")) || stdout.contains("openspec")));
@@ -25,13 +25,13 @@ fn plugin_list_shows_builtin_plugins() {
 
 #[test]
 fn plugin_list_json_outputs_plugins() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["plugin", "list", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("\"name\""));
@@ -41,56 +41,58 @@ fn plugin_list_json_outputs_plugins() {
 
 #[test]
 fn plugin_enable_persists_to_config() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["plugin", "enable", "git"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("enabled"));
 
-    let config = fs::read_to_string(tmp.path().join(".wai/config.toml")).unwrap();
+    let config = fs::read_to_string(tmp.path().join(".wai/config.toml"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(config.contains("git"));
     assert!(config.contains("enabled = true"));
 }
 
 #[test]
 fn plugin_disable_persists_to_config() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     // Enable first, then disable
     let out = wai_cmd(tmp.path())
         .args(["plugin", "enable", "git"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let out = wai_cmd(tmp.path())
         .args(["plugin", "disable", "git"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("disabled"));
 
-    let config = fs::read_to_string(tmp.path().join(".wai/config.toml")).unwrap();
+    let config = fs::read_to_string(tmp.path().join(".wai/config.toml"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(config.contains("git"));
     assert!(config.contains("enabled = false"));
 }
 
 #[test]
 fn plugin_enable_unknown_plugin_fails() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["plugin", "enable", "nonexistent"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("not found"));
@@ -98,13 +100,13 @@ fn plugin_enable_unknown_plugin_fails() {
 
 #[test]
 fn plugin_enable_json_outputs_state() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["plugin", "enable", "git", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("\"plugin\""));
@@ -113,9 +115,9 @@ fn plugin_enable_json_outputs_state() {
 
 #[test]
 fn plugin_passthrough_ready_executes_beads_command() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
-    fs::create_dir_all(tmp.path().join(".beads")).unwrap();
+    fs::create_dir_all(tmp.path().join(".beads")).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let fake_bin = install_fake_bd_passthrough(tmp.path());
     let path = format!(
         "{}:{}",
@@ -127,7 +129,7 @@ fn plugin_passthrough_ready_executes_beads_command() {
         .args(["beads", "ready"])
         .env("PATH", path)
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("fake ready issue"));
@@ -135,14 +137,14 @@ fn plugin_passthrough_ready_executes_beads_command() {
 
 #[test]
 fn plugin_passthrough_unknown_command_fails_for_detected_plugin() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
-    fs::create_dir_all(tmp.path().join(".beads")).unwrap();
+    fs::create_dir_all(tmp.path().join(".beads")).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["beads", "unknown-cmd"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("has no command 'unknown-cmd'"));
@@ -150,7 +152,7 @@ fn plugin_passthrough_unknown_command_fails_for_detected_plugin() {
 
 #[test]
 fn plugin_trust_skips_unapproved_hook_on_status() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let data_dir = tmp.path().join("wai-data");
     init_workspace(tmp.path());
     create_project(tmp.path(), "test-p");
@@ -171,7 +173,7 @@ fn plugin_trust_skips_unapproved_hook_on_status() {
 
 #[test]
 fn plugin_trust_approve_enables_hook() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let data_dir = tmp.path().join("wai-data");
     init_workspace(tmp.path());
     create_project(tmp.path(), "test-p");
@@ -197,15 +199,17 @@ fn plugin_trust_approve_enables_hook() {
 
 #[test]
 fn way_check_documentation_partial() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     // Has critical files but missing LICENSE, CONTRIBUTING, docs/, and doc tool
-    fs::write(tmp.path().join("README.md"), "# Test").unwrap();
-    fs::write(tmp.path().join(".gitignore"), "*.tmp").unwrap();
+    fs::write(tmp.path().join("README.md"), "# Test")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(tmp.path().join(".gitignore"), "*.tmp")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Project documentation"));
@@ -215,19 +219,25 @@ fn way_check_documentation_partial() {
 
 #[test]
 fn way_check_documentation_license_md_variant() {
-    let tmp = TempDir::new().unwrap();
-    fs::write(tmp.path().join("README.md"), "# Test").unwrap();
-    fs::write(tmp.path().join("LICENSE.md"), "MIT").unwrap();
-    fs::write(tmp.path().join("CONTRIBUTING.md"), "# Contributing").unwrap();
-    fs::write(tmp.path().join(".gitignore"), "*.tmp").unwrap();
-    fs::write(tmp.path().join("Cargo.toml"), "[package]\nname = \"test\"").unwrap();
-    fs::create_dir(tmp.path().join("docs")).unwrap();
-    fs::write(tmp.path().join("docs").join("index.md"), "# Docs").unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(tmp.path().join("README.md"), "# Test")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(tmp.path().join("LICENSE.md"), "MIT")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(tmp.path().join("CONTRIBUTING.md"), "# Contributing")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(tmp.path().join(".gitignore"), "*.tmp")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(tmp.path().join("Cargo.toml"), "[package]\nname = \"test\"")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::create_dir(tmp.path().join("docs")).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(tmp.path().join("docs").join("index.md"), "# Docs")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Project documentation"));
@@ -237,13 +247,14 @@ fn way_check_documentation_license_md_variant() {
 
 #[test]
 fn way_check_ai_instructions_claude_md() {
-    let tmp = TempDir::new().unwrap();
-    fs::write(tmp.path().join("CLAUDE.md"), "# Instructions").unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(tmp.path().join("CLAUDE.md"), "# Instructions")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("AI-agent context"));
@@ -253,14 +264,15 @@ fn way_check_ai_instructions_claude_md() {
 
 #[test]
 fn way_check_ai_instructions_suggests_reflect_when_no_reflections() {
-    let tmp = TempDir::new().unwrap();
-    fs::write(tmp.path().join("CLAUDE.md"), "# Instructions").unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(tmp.path().join("CLAUDE.md"), "# Instructions")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     // No .wai/resources/reflections/ directory — reflect has never been run.
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("AI-agent context"));
@@ -271,17 +283,19 @@ fn way_check_ai_instructions_suggests_reflect_when_no_reflections() {
 
 #[test]
 fn way_check_ai_instructions_no_reflect_suggestion_when_reflections_exist() {
-    let tmp = TempDir::new().unwrap();
-    fs::write(tmp.path().join("CLAUDE.md"), "# Instructions").unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(tmp.path().join("CLAUDE.md"), "# Instructions")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     // Create a reflection file to simulate reflect having been run.
     let refl_dir = tmp.path().join(".wai/resources/reflections");
-    fs::create_dir_all(&refl_dir).unwrap();
-    fs::write(refl_dir.join("2026-01-01-my-proj.md"), "## patterns").unwrap();
+    fs::create_dir_all(&refl_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(refl_dir.join("2026-01-01-my-proj.md"), "## patterns")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let output = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .unwrap();
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
         stdout.contains("AI-agent context"),
@@ -300,13 +314,14 @@ fn way_check_ai_instructions_no_reflect_suggestion_when_reflections_exist() {
 
 #[test]
 fn way_check_ai_instructions_agents_md() {
-    let tmp = TempDir::new().unwrap();
-    fs::write(tmp.path().join("AGENTS.md"), "# Instructions").unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(tmp.path().join("AGENTS.md"), "# Instructions")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("AI-agent context"));
@@ -316,12 +331,12 @@ fn way_check_ai_instructions_agents_md() {
 
 #[test]
 fn way_check_ai_instructions_missing() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("AI-agent context"));
@@ -331,19 +346,19 @@ fn way_check_ai_instructions_missing() {
 
 #[test]
 fn way_check_agent_config_sync_pass() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let agent_config = tmp.path().join(".wai/resources/agent-config");
-    fs::create_dir_all(&agent_config).unwrap();
+    fs::create_dir_all(&agent_config).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         agent_config.join(".projections.yml"),
         "projections:\n  - target: .agents",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Agent context sync"));
@@ -353,12 +368,12 @@ fn way_check_agent_config_sync_pass() {
 
 #[test]
 fn way_check_agent_config_sync_info_missing() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Agent context sync"));
@@ -368,15 +383,16 @@ fn way_check_agent_config_sync_info_missing() {
 
 #[test]
 fn way_check_agent_config_sync_info_empty() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let agent_config = tmp.path().join(".wai/resources/agent-config");
-    fs::create_dir_all(&agent_config).unwrap();
-    fs::write(agent_config.join(".projections.yml"), "projections: []").unwrap();
+    fs::create_dir_all(&agent_config).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(agent_config.join(".projections.yml"), "projections: []")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Agent context sync"));
@@ -386,14 +402,16 @@ fn way_check_agent_config_sync_info_empty() {
 
 #[test]
 fn way_check_cicd_github_actions() {
-    let tmp = TempDir::new().unwrap();
-    fs::create_dir_all(tmp.path().join(".github/workflows")).unwrap();
-    fs::write(tmp.path().join(".github/workflows/ci.yml"), "name: CI").unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::create_dir_all(tmp.path().join(".github/workflows"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(tmp.path().join(".github/workflows/ci.yml"), "name: CI")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Automated verification"));
@@ -403,13 +421,14 @@ fn way_check_cicd_github_actions() {
 
 #[test]
 fn way_check_cicd_gitlab() {
-    let tmp = TempDir::new().unwrap();
-    fs::write(tmp.path().join(".gitlab-ci.yml"), "stages: [test]").unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(tmp.path().join(".gitlab-ci.yml"), "stages: [test]")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Automated verification"));
@@ -419,14 +438,16 @@ fn way_check_cicd_gitlab() {
 
 #[test]
 fn way_check_cicd_circleci() {
-    let tmp = TempDir::new().unwrap();
-    fs::create_dir_all(tmp.path().join(".circleci")).unwrap();
-    fs::write(tmp.path().join(".circleci/config.yml"), "version: 2.1").unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::create_dir_all(tmp.path().join(".circleci"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(tmp.path().join(".circleci/config.yml"), "version: 2.1")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Automated verification"));
@@ -436,12 +457,12 @@ fn way_check_cicd_circleci() {
 
 #[test]
 fn way_check_cicd_missing() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Automated verification"));
@@ -451,13 +472,14 @@ fn way_check_cicd_missing() {
 
 #[test]
 fn way_check_devcontainer_dir() {
-    let tmp = TempDir::new().unwrap();
-    fs::create_dir_all(tmp.path().join(".devcontainer")).unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::create_dir_all(tmp.path().join(".devcontainer"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Reproducible environments"));
@@ -467,13 +489,14 @@ fn way_check_devcontainer_dir() {
 
 #[test]
 fn way_check_devcontainer_json() {
-    let tmp = TempDir::new().unwrap();
-    fs::write(tmp.path().join(".devcontainer.json"), "{}").unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(tmp.path().join(".devcontainer.json"), "{}")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Reproducible environments"));
@@ -483,12 +506,12 @@ fn way_check_devcontainer_json() {
 
 #[test]
 fn way_check_devcontainer_missing() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Reproducible environments"));
@@ -500,13 +523,14 @@ fn way_check_devcontainer_missing() {
 
 #[test]
 fn way_check_llm_txt_present() {
-    let tmp = TempDir::new().unwrap();
-    fs::write(tmp.path().join("llm.txt"), "# Project docs").unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(tmp.path().join("llm.txt"), "# Project docs")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("LLM-friendly context"));
@@ -516,12 +540,12 @@ fn way_check_llm_txt_present() {
 
 #[test]
 fn way_check_llm_txt_missing() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("LLM-friendly context"));
@@ -532,21 +556,23 @@ fn way_check_llm_txt_missing() {
 
 #[test]
 fn way_check_agent_skills_present() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let skills_base = tmp.path().join(".wai/resources/agent-config/skills");
-    fs::create_dir_all(skills_base.join("rule-of-5-universal")).unwrap();
+    fs::create_dir_all(skills_base.join("rule-of-5-universal"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         skills_base.join("rule-of-5-universal/SKILL.md"),
         "# Rule of 5 Universal",
     )
-    .unwrap();
-    fs::create_dir_all(skills_base.join("commit")).unwrap();
-    fs::write(skills_base.join("commit/SKILL.md"), "# Commit").unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::create_dir_all(skills_base.join("commit")).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(skills_base.join("commit/SKILL.md"), "# Commit")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Extended agent capabilities"));
@@ -556,13 +582,14 @@ fn way_check_agent_skills_present() {
 
 #[test]
 fn way_check_agent_skills_empty_dir() {
-    let tmp = TempDir::new().unwrap();
-    fs::create_dir_all(tmp.path().join(".wai/resources/agent-config/skills")).unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::create_dir_all(tmp.path().join(".wai/resources/agent-config/skills"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Extended agent capabilities"));
@@ -572,12 +599,12 @@ fn way_check_agent_skills_empty_dir() {
 
 #[test]
 fn way_check_agent_skills_missing() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Extended agent capabilities"));
@@ -587,12 +614,12 @@ fn way_check_agent_skills_missing() {
 
 #[test]
 fn way_check_agent_skills_missing_suggests_fix_command() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("wai way --fix skills"));
@@ -600,29 +627,29 @@ fn way_check_agent_skills_missing_suggests_fix_command() {
 
 #[test]
 fn way_check_ubiquitous_language_fully_configured_tree_passes() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::create_dir_all(
         tmp.path()
             .join(".wai/resources/ubiquitous-language/contexts"),
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         tmp.path()
             .join(".wai/resources/ubiquitous-language/README.md"),
         "# Ubiquitous language\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         tmp.path()
             .join(".wai/resources/ubiquitous-language/contexts/billing.md"),
         "# Billing\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Ubiquitous language context"));
@@ -632,19 +659,20 @@ fn way_check_ubiquitous_language_fully_configured_tree_passes() {
 
 #[test]
 fn way_check_ubiquitous_language_skeleton_tree_reports_info() {
-    let tmp = TempDir::new().unwrap();
-    fs::create_dir_all(tmp.path().join(".wai/resources/ubiquitous-language")).unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::create_dir_all(tmp.path().join(".wai/resources/ubiquitous-language"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         tmp.path()
             .join(".wai/resources/ubiquitous-language/README.md"),
         "# Ubiquitous language\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Ubiquitous language context"));
@@ -654,25 +682,26 @@ fn way_check_ubiquitous_language_skeleton_tree_reports_info() {
 
 #[test]
 fn way_check_ubiquitous_language_shared_only_tree_reports_info() {
-    let tmp = TempDir::new().unwrap();
-    fs::create_dir_all(tmp.path().join(".wai/resources/ubiquitous-language")).unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::create_dir_all(tmp.path().join(".wai/resources/ubiquitous-language"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         tmp.path()
             .join(".wai/resources/ubiquitous-language/README.md"),
         "# Ubiquitous language\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         tmp.path()
             .join(".wai/resources/ubiquitous-language/shared.md"),
         "# Shared\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Ubiquitous language context"));
@@ -682,23 +711,23 @@ fn way_check_ubiquitous_language_shared_only_tree_reports_info() {
 
 #[test]
 fn way_check_ubiquitous_language_malformed_tree_without_index_reports_info() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::create_dir_all(
         tmp.path()
             .join(".wai/resources/ubiquitous-language/contexts"),
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         tmp.path()
             .join(".wai/resources/ubiquitous-language/contexts/billing.md"),
         "# Billing\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Ubiquitous language context"));
@@ -708,17 +737,17 @@ fn way_check_ubiquitous_language_malformed_tree_without_index_reports_info() {
 
 #[test]
 fn way_fix_skills_prints_description_before_acting() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let output = wai_cmd(tmp.path())
         .args(["way", "--fix", "skills"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(output.status.success());
     let output = output.stdout.clone();
 
-    let stdout = String::from_utf8(output).unwrap();
+    let stdout = String::from_utf8(output).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     // Should explain what it's doing before listing created skills
     assert!(
         stdout.contains("rule-of-5-universal") && stdout.contains("commit"),
@@ -732,13 +761,13 @@ fn way_fix_skills_prints_description_before_acting() {
 
 #[test]
 fn way_fix_skills_scaffolds_both_skills() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--fix", "skills"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     assert!(
@@ -757,17 +786,17 @@ fn way_fix_skills_scaffolds_both_skills() {
 
 #[test]
 fn way_check_justfile_recipes() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         tmp.path().join("justfile"),
         "test:\n\techo test\n\ninstall:\n\techo install\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Command standardization"));
@@ -779,17 +808,17 @@ fn way_check_justfile_recipes() {
 
 #[test]
 fn way_check_test_coverage_tarpaulin_with_threshold() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         tmp.path().join("tarpaulin.toml"),
         "[report]\nfail-under = 80\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Test coverage"));
@@ -799,13 +828,14 @@ fn way_check_test_coverage_tarpaulin_with_threshold() {
 
 #[test]
 fn way_check_test_coverage_tarpaulin_no_threshold() {
-    let tmp = TempDir::new().unwrap();
-    fs::write(tmp.path().join("tarpaulin.toml"), "[report]\n").unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(tmp.path().join("tarpaulin.toml"), "[report]\n")
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["way", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Test coverage"));

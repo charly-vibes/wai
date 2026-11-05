@@ -8,7 +8,7 @@ mod common;
 
 #[allow(deprecated)]
 fn wai_cmd(dir: &std::path::Path) -> Command {
-    let mut cmd = Command::cargo_bin("wai").unwrap();
+    let mut cmd = Command::cargo_bin("wai").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     cmd.current_dir(dir);
     cmd.env("NO_COLOR", "1");
     // Update notice off in tests: existing assertions expect quiet stderr and
@@ -24,7 +24,7 @@ fn init_workspace(dir: &std::path::Path) {
     let out = wai_cmd(dir)
         .args(["init", "--name", "test-ws"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 }
 
@@ -32,7 +32,7 @@ fn create_project(dir: &std::path::Path, name: &str) {
     let out = wai_cmd(dir)
         .args(["new", "project", name])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 }
 
@@ -40,7 +40,7 @@ fn create_project(dir: &std::path::Path, name: &str) {
 /// workspace's pipelines dir so prime can discover it.
 fn write_pipeline(dir: &std::path::Path, name: &str, when: &str, steps: &[(&str, &str)]) {
     let pipelines_dir = dir.join(".wai/resources/pipelines");
-    fs::create_dir_all(&pipelines_dir).unwrap();
+    fs::create_dir_all(&pipelines_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let mut toml = String::new();
     toml.push_str("[pipeline]\n");
     toml.push_str(&format!("name = \"{}\"\n", name));
@@ -52,19 +52,22 @@ fn write_pipeline(dir: &std::path::Path, name: &str, when: &str, steps: &[(&str,
         toml.push_str(&format!("id = \"{}\"\n", id));
         toml.push_str(&format!("prompt = \"{}\"\n", prompt));
     }
-    fs::write(pipelines_dir.join(format!("{name}.toml")), toml).unwrap();
+    fs::write(pipelines_dir.join(format!("{name}.toml")), toml)
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 }
 
 /// Write an active pipeline run state and point `.last-run` at it.
 fn write_active_run(dir: &std::path::Path, pipeline: &str, current_step: usize) {
     let run_id = format!("{pipeline}-test-run");
     let runs_dir = dir.join(".wai/pipeline-runs");
-    fs::create_dir_all(&runs_dir).unwrap();
+    fs::create_dir_all(&runs_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let yml = format!(
         "run_id: {run_id}\npipeline: {pipeline}\ntopic: test topic\ncreated_at: '2026-07-29T00:00:00Z'\ncurrent_step: {current_step}\napprovals: {{}}\n"
     );
-    fs::write(runs_dir.join(format!("{run_id}.yml")), yml).unwrap();
-    fs::write(dir.join(".wai/resources/pipelines/.last-run"), &run_id).unwrap();
+    fs::write(runs_dir.join(format!("{run_id}.yml")), yml)
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(dir.join(".wai/resources/pipelines/.last-run"), &run_id)
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 }
 
 /// Write a pipeline TOML WITHOUT a `[pipeline.metadata]` section. This triggers
@@ -72,32 +75,33 @@ fn write_active_run(dir: &std::path::Path, pipeline: &str, current_step: usize) 
 /// non-clean health summary in status/prime tests.
 fn write_pipeline_no_metadata(dir: &std::path::Path, name: &str) {
     let pipelines_dir = dir.join(".wai/resources/pipelines");
-    fs::create_dir_all(&pipelines_dir).unwrap();
+    fs::create_dir_all(&pipelines_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let toml = format!(
         "[pipeline]\nname = \"{name}\"\ndescription = \"no metadata\"\n[[steps]]\nid = \"one\"\nprompt = \"do {{topic}}\"\n"
     );
-    fs::write(pipelines_dir.join(format!("{name}.toml")), toml).unwrap();
+    fs::write(pipelines_dir.join(format!("{name}.toml")), toml)
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 }
 
 // ── session orientation ───────────────────────────────────────────────────────
 
 #[test]
 fn prime_lists_prior_research_docs() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "demo");
     let research = tmp.path().join(".wai/projects/demo/research");
-    fs::create_dir_all(&research).unwrap();
+    fs::create_dir_all(&research).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         research.join("2026-09-17-cache-eviction-investigation.md"),
         "---\ntags: []\n---\n\nline one\nline two\nline three\nline four\nline five\nline six\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["prime"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Prior context"));
@@ -106,21 +110,21 @@ fn prime_lists_prior_research_docs() {
 
 #[test]
 fn prime_plans_render_body_title_not_frontmatter() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "demo");
     let plans = tmp.path().join(".wai/projects/demo/plans");
-    fs::create_dir_all(&plans).unwrap();
+    fs::create_dir_all(&plans).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         plans.join("2026-09-17-my-plan.md"),
         "---\ntags: []\n---\n\nMy plan title: evict caches in two phases\n\nmore detail\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["prime"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("My plan title: evict caches in two phases"));
@@ -129,14 +133,14 @@ fn prime_plans_render_body_title_not_frontmatter() {
 
 #[test]
 fn prime_single_project_shows_orientation_output() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
 
     let out = wai_cmd(tmp.path())
         .args(["prime", "--project", "myproject", "--no-input"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Project: myproject"));
@@ -147,7 +151,7 @@ fn prime_single_project_shows_orientation_output() {
 
 #[test]
 fn prime_project_flag_selects_named_project() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "alpha");
     create_project(tmp.path(), "beta");
@@ -155,7 +159,7 @@ fn prime_project_flag_selects_named_project() {
     let out = wai_cmd(tmp.path())
         .args(["prime", "--project", "alpha", "--no-input"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Project: alpha"));
@@ -166,14 +170,14 @@ fn prime_project_flag_selects_named_project() {
 
 #[test]
 fn prime_unknown_project_fails_with_diagnostic() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
 
     let out = wai_cmd(tmp.path())
         .args(["prime", "--project", "doesnotexist", "--no-input"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!(stderr.contains("doesnotexist"));
@@ -183,7 +187,7 @@ fn prime_unknown_project_fails_with_diagnostic() {
 
 #[test]
 fn prime_shows_available_pipeline_and_start_suggestion() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject"); // default phase: research
     write_pipeline(
@@ -196,7 +200,7 @@ fn prime_shows_available_pipeline_and_start_suggestion() {
     let out = wai_cmd(tmp.path())
         .args(["prime", "--project", "myproject", "--no-input"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Pipelines"));
@@ -206,7 +210,7 @@ fn prime_shows_available_pipeline_and_start_suggestion() {
 
 #[test]
 fn prime_shows_active_pipeline_run_step() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
     write_pipeline(
@@ -220,7 +224,7 @@ fn prime_shows_active_pipeline_run_step() {
     let out = wai_cmd(tmp.path())
         .args(["prime", "--project", "myproject", "--no-input"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("PIPELINE RUN ADOPT/RESUME"));
@@ -232,7 +236,7 @@ fn prime_shows_active_pipeline_run_step() {
 
 #[test]
 fn prime_active_run_directives_resume_the_orchestration() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
     write_pipeline(
@@ -246,7 +250,7 @@ fn prime_active_run_directives_resume_the_orchestration() {
     let out = wai_cmd(tmp.path())
         .args(["prime", "--project", "myproject", "--no-input"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.to_lowercase().contains("resume the orchestration"));
@@ -254,7 +258,7 @@ fn prime_active_run_directives_resume_the_orchestration() {
 
 #[test]
 fn prime_adopts_active_run_in_json() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
     write_pipeline(
@@ -268,7 +272,7 @@ fn prime_adopts_active_run_in_json() {
     let out = wai_cmd(tmp.path())
         .args(["prime", "--project", "myproject", "--no-input", "--json"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("\"run_id\": \"research-flow-test-run\""));
@@ -278,7 +282,7 @@ fn prime_adopts_active_run_in_json() {
 
 #[test]
 fn prime_no_adopt_block_without_active_run() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
     write_pipeline(
@@ -291,7 +295,7 @@ fn prime_no_adopt_block_without_active_run() {
     let out = wai_cmd(tmp.path())
         .args(["prime", "--project", "myproject", "--no-input"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(!(stdout.contains("ADOPT/RESUME")));
@@ -299,7 +303,7 @@ fn prime_no_adopt_block_without_active_run() {
 
 #[test]
 fn prime_omits_start_suggestion_when_no_pipeline_matches_phase() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject"); // phase: research
     write_pipeline(
@@ -312,7 +316,7 @@ fn prime_omits_start_suggestion_when_no_pipeline_matches_phase() {
     let out = wai_cmd(tmp.path())
         .args(["prime", "--project", "myproject", "--no-input"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("deploy-bot"));
@@ -323,7 +327,7 @@ fn prime_omits_start_suggestion_when_no_pipeline_matches_phase() {
 
 #[test]
 fn prime_surfaces_doctor_warning_when_not_clean() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
     // A pipeline without [pipeline.metadata] triggers a doctor Warn.
@@ -332,7 +336,7 @@ fn prime_surfaces_doctor_warning_when_not_clean() {
     let out = wai_cmd(tmp.path())
         .args(["prime", "--project", "myproject", "--no-input"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("warning"));
@@ -341,7 +345,7 @@ fn prime_surfaces_doctor_warning_when_not_clean() {
 
 #[test]
 fn prime_silent_on_health_when_doctor_is_clean() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
 
@@ -349,7 +353,7 @@ fn prime_silent_on_health_when_doctor_is_clean() {
     // ~/.claude/settings.json with a wai status SessionStart hook).
     let home = tmp.path().join("fake-home");
     let claude_dir = home.join(".claude");
-    std::fs::create_dir_all(&claude_dir).unwrap();
+    std::fs::create_dir_all(&claude_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     std::fs::write(
         claude_dir.join("settings.json"),
         r#"{
@@ -360,13 +364,13 @@ fn prime_silent_on_health_when_doctor_is_clean() {
   }
 }"#,
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .env("HOME", &home)
         .args(["prime", "--project", "myproject", "--no-input"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(!(stdout.contains("wai doctor")));
@@ -378,23 +382,23 @@ fn prime_silent_on_health_when_doctor_is_clean() {
 /// its name and first heading, so repo-session agents discover the canon.
 #[test]
 fn prime_lists_global_patterns_when_present() {
-    let tmp = TempDir::new().unwrap();
-    let home = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    let home = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
     let patterns = home.path().join(".wai/resources/patterns");
-    fs::create_dir_all(&patterns).unwrap();
+    fs::create_dir_all(&patterns).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         patterns.join("orchestrator-subagents.md"),
         "# Orchestrator Subagents\n\nCanon body.\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .env("HOME", home.path())
         .args(["prime", "--project", "myproject", "--no-input"])
         .output()
-        .expect("prime should succeed");
+        .unwrap_or_else(|e| panic!("prime should succeed: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Global Patterns"));
@@ -405,8 +409,8 @@ fn prime_lists_global_patterns_when_present() {
 /// No global patterns dir → no Global Patterns section at all.
 #[test]
 fn prime_omits_global_patterns_section_when_empty() {
-    let tmp = TempDir::new().unwrap();
-    let home = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    let home = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
 
@@ -414,7 +418,7 @@ fn prime_omits_global_patterns_section_when_empty() {
         .env("HOME", home.path())
         .args(["prime", "--project", "myproject", "--no-input"])
         .output()
-        .expect("prime should succeed");
+        .unwrap_or_else(|e| panic!("prime should succeed: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(!stdout.contains("Global Patterns"));
@@ -427,7 +431,7 @@ fn prime_omits_global_patterns_section_when_empty() {
 /// follow (wai-xa8i.3, openspec resume-pipeline-adoption).
 #[test]
 fn prime_active_run_suppresses_suggested_next() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
     write_pipeline(
@@ -451,7 +455,7 @@ fn prime_active_run_suppresses_suggested_next() {
         .env("PATH", path.clone())
         .args(["prime", "--project", "myproject", "--no-input"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     // Fixture sanity: the run IS adopted as active and mid-flight.
@@ -468,7 +472,7 @@ fn prime_active_run_suppresses_suggested_next() {
         .env("PATH", path)
         .args(["prime", "--project", "myproject", "--no-input", "--json"])
         .output()
-        .expect("prime --json should run");
+        .unwrap_or_else(|e| panic!("prime --json should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(
@@ -480,23 +484,23 @@ fn prime_active_run_suppresses_suggested_next() {
 /// The JSON payload carries the same list as an additive field.
 #[test]
 fn prime_json_includes_global_patterns() {
-    let tmp = TempDir::new().unwrap();
-    let home = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    let home = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproject");
     let patterns = home.path().join(".wai/resources/patterns");
-    fs::create_dir_all(&patterns).unwrap();
+    fs::create_dir_all(&patterns).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(
         patterns.join("orchestrator-subagents.md"),
         "# Orchestrator Subagents\n\nCanon body.\n",
     )
-    .unwrap();
+    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .env("HOME", home.path())
         .args(["prime", "--project", "myproject", "--no-input", "--json"])
         .output()
-        .expect("prime --json should succeed");
+        .unwrap_or_else(|e| panic!("prime --json should succeed: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("\"global_patterns\""));

@@ -17,7 +17,7 @@ use tempfile::TempDir;
 
 #[test]
 fn project_use_default_is_posix_export_line() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproj");
 
@@ -42,7 +42,7 @@ fn project_use_default_is_posix_export_line() {
 
 #[test]
 fn project_use_shell_flag_fish_overrides_posix_default() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproj");
 
@@ -64,7 +64,7 @@ fn project_use_shell_flag_fish_overrides_posix_default() {
 
 #[test]
 fn project_use_shell_flag_posix_overrides_fish_shell_env() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproj");
 
@@ -86,7 +86,7 @@ fn project_use_shell_flag_posix_overrides_fish_shell_env() {
 
 #[test]
 fn project_use_shell_flag_rejects_unknown_shell() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
     create_project(tmp.path(), "myproj");
 
@@ -94,7 +94,7 @@ fn project_use_shell_flag_rejects_unknown_shell() {
         .env("SHELL", "/bin/bash")
         .args(["project", "use", "myproj", "--shell", "nushell"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success(), "unknown shell must fail the command");
     assert!(

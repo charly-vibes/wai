@@ -13,10 +13,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 /// Seed a fresh update-check cache saying `9999.1.1` is available.
 fn seed_fresh_cache(cache_root: &std::path::Path) {
     let dir = cache_root.join("genesis").join("update-check");
-    fs::create_dir_all(&dir).unwrap();
+    fs::create_dir_all(&dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .as_secs();
     let entry = format!(
         r#"{{"checked_at":{now},"latest":"9999.1.1","published_at":null,"ttl_secs":604800}}"#
@@ -30,14 +30,15 @@ fn seed_fresh_cache(cache_root: &std::path::Path) {
         .join(".cache")
         .join("genesis")
         .join("update-check");
-    fs::create_dir_all(&home_dir).unwrap();
-    fs::write(dir.join("wai-cli.json"), &entry).unwrap();
-    fs::write(home_dir.join("wai-cli.json"), &entry).unwrap();
+    fs::create_dir_all(&home_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(dir.join("wai-cli.json"), &entry).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    fs::write(home_dir.join("wai-cli.json"), &entry)
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 }
 
 /// A wai command pointed at a hermetic cache dir, with CI opt-outs cleared.
 fn wai_cmd(cache_root: &std::path::Path) -> Command {
-    let mut cmd = Command::cargo_bin("wai").unwrap();
+    let mut cmd = Command::cargo_bin("wai").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     cmd.env("XDG_CACHE_HOME", cache_root)
         .env("NO_COLOR", "1")
         .env_remove("GENESIS_NO_UPDATE_CHECK")
@@ -49,7 +50,7 @@ fn wai_cmd(cache_root: &std::path::Path) -> Command {
 
 #[test]
 fn notice_prints_after_command_output_as_one_line() {
-    let tmp = tempfile::TempDir::new().unwrap();
+    let tmp = tempfile::TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     seed_fresh_cache(tmp.path());
 
     // `completions` is a cheap, side-effect-free, pure-output command.
@@ -57,7 +58,7 @@ fn notice_prints_after_command_output_as_one_line() {
         .args(["completions", "bash"])
         .env("HOME", tmp.path()) // isolate real cache dir too
         .output()
-        .unwrap();
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -91,7 +92,7 @@ fn notice_prints_after_command_output_as_one_line() {
 
 #[test]
 fn genesis_no_update_check_suppresses_notice() {
-    let tmp = tempfile::TempDir::new().unwrap();
+    let tmp = tempfile::TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     seed_fresh_cache(tmp.path());
 
     let output = wai_cmd(tmp.path())
@@ -99,7 +100,7 @@ fn genesis_no_update_check_suppresses_notice() {
         .env("HOME", tmp.path())
         .env("GENESIS_NO_UPDATE_CHECK", "1")
         .output()
-        .unwrap();
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     assert!(output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
@@ -111,7 +112,7 @@ fn genesis_no_update_check_suppresses_notice() {
 
 #[test]
 fn ci_env_suppresses_notice() {
-    let tmp = tempfile::TempDir::new().unwrap();
+    let tmp = tempfile::TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     seed_fresh_cache(tmp.path());
 
     let output = wai_cmd(tmp.path())
@@ -119,7 +120,7 @@ fn ci_env_suppresses_notice() {
         .env("HOME", tmp.path())
         .env("CI", "true")
         .output()
-        .unwrap();
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     assert!(output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
@@ -133,23 +134,23 @@ fn ci_env_suppresses_notice() {
 
 #[test]
 fn no_update_available_means_no_notice() {
-    let tmp = tempfile::TempDir::new().unwrap();
+    let tmp = tempfile::TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let dir = tmp.path().join("genesis").join("update-check");
-    fs::create_dir_all(&dir).unwrap();
+    fs::create_dir_all(&dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .as_secs();
     // Cache says installed version IS the latest.
     let entry =
         format!(r#"{{"checked_at":{now},"latest":null,"published_at":null,"ttl_secs":604800}}"#);
-    fs::write(dir.join("wai-cli.json"), entry).unwrap();
+    fs::write(dir.join("wai-cli.json"), entry).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let output = wai_cmd(tmp.path())
         .args(["completions", "bash"])
         .env("HOME", tmp.path())
         .output()
-        .unwrap();
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     assert!(output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);

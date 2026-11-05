@@ -4,7 +4,7 @@ use tempfile::TempDir;
 
 #[allow(deprecated)]
 fn wai_cmd(dir: &std::path::Path) -> Command {
-    let mut cmd = Command::cargo_bin("wai").unwrap();
+    let mut cmd = Command::cargo_bin("wai").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     cmd.current_dir(dir);
     cmd.env("NO_COLOR", "1");
     // Update notice off in tests: existing assertions expect quiet stderr and
@@ -17,7 +17,7 @@ fn init_workspace(dir: &std::path::Path) {
     let out = wai_cmd(dir)
         .args(["init", "--name", "test-ws"])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 }
 
@@ -25,7 +25,7 @@ fn create_project(dir: &std::path::Path, name: &str) {
     let out = wai_cmd(dir)
         .args(["new", "project", name])
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 }
 
@@ -43,7 +43,7 @@ fn reflect_workspace(dir: &std::path::Path) {
 
     init_workspace(dir);
     create_project(dir, "test-proj");
-    fs::write(dir.join("CLAUDE.md"), "# Claude\n").unwrap();
+    fs::write(dir.join("CLAUDE.md"), "# Claude\n").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 }
 
 const MOCK_REFLECT_CONTENT: &str = "\
@@ -57,14 +57,14 @@ _Last reflected: 2026-02-24 · 1 sessions analyzed_\n\
 
 #[test]
 fn reflect_populated_workspace_writes_resource_file() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     reflect_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["reflect", "--project", "test-proj", "--yes"])
         .env("WAI_REFLECT_MOCK_RESPONSE", MOCK_REFLECT_CONTENT)
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Wrote"));
@@ -73,7 +73,7 @@ fn reflect_populated_workspace_writes_resource_file() {
     assert!(refl_dir.exists(), "reflections directory should be created");
 
     let entries: Vec<_> = fs::read_dir(&refl_dir)
-        .unwrap()
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
         .filter_map(|e| e.ok())
         .collect();
     assert_eq!(
@@ -82,7 +82,8 @@ fn reflect_populated_workspace_writes_resource_file() {
         "exactly one reflection resource file expected"
     );
 
-    let content = fs::read_to_string(entries[0].path()).unwrap();
+    let content =
+        fs::read_to_string(entries[0].path()).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         content.contains("Use TDD always"),
         "resource file should contain mock reflection content"
@@ -91,14 +92,14 @@ fn reflect_populated_workspace_writes_resource_file() {
 
 #[test]
 fn reflect_populated_workspace_creates_reflect_meta() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     reflect_workspace(tmp.path());
 
     let out = wai_cmd(tmp.path())
         .args(["reflect", "--project", "test-proj", "--yes"])
         .env("WAI_REFLECT_MOCK_RESPONSE", MOCK_REFLECT_CONTENT)
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
     let meta_path = tmp.path().join(".wai/projects/test-proj/.reflect-meta");
@@ -112,27 +113,33 @@ fn reflect_populated_workspace_creates_reflect_meta() {
 
 #[test]
 fn reflect_dry_run_does_not_create_resource_file() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     reflect_workspace(tmp.path());
 
-    let claude_before = fs::read_to_string(tmp.path().join("CLAUDE.md")).unwrap();
+    let claude_before = fs::read_to_string(tmp.path().join("CLAUDE.md"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     let out = wai_cmd(tmp.path())
         .args(["reflect", "--project", "test-proj", "--dry-run"])
         .env("WAI_REFLECT_MOCK_RESPONSE", MOCK_REFLECT_CONTENT)
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(stdout.contains("Dry run"));
 
     let refl_dir = tmp.path().join(".wai/resources/reflections");
     assert!(
-        !refl_dir.exists() || fs::read_dir(&refl_dir).unwrap().count() == 0,
+        !refl_dir.exists()
+            || fs::read_dir(&refl_dir)
+                .unwrap_or_else(|e| panic!("unwrap failed: {e}"))
+                .count()
+                == 0,
         "dry-run must not create a reflection resource file"
     );
 
-    let claude_after = fs::read_to_string(tmp.path().join("CLAUDE.md")).unwrap();
+    let claude_after = fs::read_to_string(tmp.path().join("CLAUDE.md"))
+        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert_eq!(
         claude_before, claude_after,
         "dry-run must not modify CLAUDE.md"
@@ -143,31 +150,31 @@ fn reflect_dry_run_does_not_create_resource_file() {
 
 #[test]
 fn reflect_outside_wai_workspace_fails_with_diagnostic() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     // No `wai init` — no .wai/ directory exists.
 
     let out = wai_cmd(tmp.path())
         .args(["reflect", "--project", "test-proj", "--yes"])
         .env("WAI_REFLECT_MOCK_RESPONSE", MOCK_REFLECT_CONTENT)
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(!out.status.success());
 }
 
 #[test]
 fn reflect_missing_output_target_fails_after_removing_claude_md() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     reflect_workspace(tmp.path());
 
     // Remove both CLAUDE.md and AGENTS.md so detect_output_targets errors.
-    fs::remove_file(tmp.path().join("CLAUDE.md")).unwrap();
+    fs::remove_file(tmp.path().join("CLAUDE.md")).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let _ = fs::remove_file(tmp.path().join("AGENTS.md"));
 
     let out = wai_cmd(tmp.path())
         .args(["reflect", "--project", "test-proj", "--yes"])
         .env("WAI_REFLECT_MOCK_RESPONSE", MOCK_REFLECT_CONTENT)
         .output()
-        .expect("command should run");
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success());
     assert!((stderr.contains("CLAUDE.md") || stderr.contains("AGENTS.md")));
