@@ -193,7 +193,13 @@ pub fn scan_freshness(project_root: &Path) -> FreshnessReport {
             continue;
         }
         for subdir in &artifact_subdirs {
-            scan_artifact_dir(project_root, &proj_path.join(subdir), &mut stale, &mut untracked, &mut clean);
+            scan_artifact_dir(
+                project_root,
+                &proj_path.join(subdir),
+                &mut stale,
+                &mut untracked,
+                &mut clean,
+            );
         }
     }
 
