@@ -110,244 +110,277 @@ pub fn run(status_only: bool, dry_run: bool, from_main: bool) -> Result<()> {
         .into());
     }
 
-    let content = std::fs::read_to_string(&projections_path).into_diagnostic()?;
-    let config: ProjectionsConfig =
-        serde_yml::from_str(&content).map_err(|e| crate::error::WaiError::ConfigError {
-            message: format!("Invalid .projections.yml: {}", e),
-        })?;
-
+    let config = load_projections(&projections_path)?;
     let quiet = current_context().quiet;
-
     if config.projections.is_empty() {
-        if !quiet {
-            println!();
-            println!("  {} No projections configured.", "○".dimmed());
-            println!(
-                "  {} Edit .wai/resources/agent-config/.projections.yml to add projections",
-                "→".dimmed()
-            );
-            println!();
-        }
+        print_no_projections(quiet);
         return Ok(());
     }
 
     if status_only {
-        if !quiet {
-            println!();
-            println!("  {} Sync Status", "◆".cyan());
-            for proj in &config.projections {
-                if proj.target == "claude-code" {
-                    let cc_dir = project_root.join(".claude").join("commands");
-                    let status = if !cc_dir.exists() {
-                        "not synced".yellow().to_string()
-                    } else if claude_code_needs_sync(&config_dir, &cc_dir) {
-                        "needs sync".yellow().to_string()
-                    } else {
-                        "synced".green().to_string()
-                    };
-                    println!(
-                        "    {} [claude-code] → .claude/commands/ [{}]",
-                        "•".dimmed(),
-                        status
-                    );
-                    continue;
-                }
-                let target_path = project_root.join(&proj.target);
-                let exists = target_path.exists();
-                let status = if exists {
-                    "synced".green().to_string()
-                } else {
-                    "not synced".yellow().to_string()
-                };
-                println!(
-                    "    {} {} → {} [{}]",
-                    "•".dimmed(),
-                    proj.sources.join(", "),
-                    proj.target,
-                    status
-                );
-            }
-            println!();
-        }
+        print_sync_status(&project_root, &config_dir, &config.projections);
         return Ok(());
     }
 
     if dry_run {
-        if !quiet {
-            println!();
-            println!("  {} Dry-run — no files will be modified", "◆".cyan());
-            for proj in &config.projections {
-                if proj.target == "claude-code" {
-                    println!(
-                        "    {} [claude-code] skills/ → .claude/commands/",
-                        "•".dimmed()
-                    );
-                    continue;
-                }
-                println!(
-                    "    {} [{}] {} → {}",
-                    "•".dimmed(),
-                    proj.strategy,
-                    proj.sources.join(", "),
-                    proj.target
-                );
-            }
-            println!();
-        }
+        print_dry_run(&config.projections);
         return Ok(());
     }
 
     require_safe_mode("sync agent configs")?;
+    execute_projections(&project_root, &config_dir, &config.projections)?;
 
-    // Execute projections
-    for proj in &config.projections {
+    if quiet {
+        return Ok(());
+    }
+    log::success("Agent configs synced").into_diagnostic()?;
+    // Resume breadcrumb for an in-flight pipeline run (wai-xa8i.2).
+    let in_flight = pipeline_current_status(&project_root)
+        .ok()
+        .flatten()
+        .is_some_and(|s| s.active && run_is_incomplete(&s));
+    if in_flight {
+        println!("{} Resume the orchestration: wai pipeline next", "→".cyan());
+    }
+    Ok(())
+}
+
+/// `--status`: report per-projection sync state without writing.
+fn print_sync_status(
+    project_root: &std::path::Path,
+    config_dir: &std::path::Path,
+    projections: &[Projection],
+) {
+    let quiet = current_context().quiet;
+    if quiet {
+        return;
+    }
+    println!();
+    println!("  {} Sync Status", "◆".cyan());
+    for proj in projections {
+        let status = if proj.target == "claude-code" {
+            let cc_dir = project_root.join(".claude").join("commands");
+            if !cc_dir.exists() {
+                "not synced".yellow().to_string()
+            } else if claude_code_needs_sync(config_dir, &cc_dir) {
+                "needs sync".yellow().to_string()
+            } else {
+                "synced".green().to_string()
+            }
+        } else if project_root.join(&proj.target).exists() {
+            "synced".green().to_string()
+        } else {
+            "not synced".yellow().to_string()
+        };
+        println!(
+            "    {} {} → {} [{}]",
+            "•".dimmed(),
+            proj.sources.join(", "),
+            proj.target,
+            status
+        );
+    }
+    println!();
+}
+
+/// `--dry-run`: list what would be synced without writing.
+fn print_dry_run(projections: &[Projection]) {
+    let quiet = current_context().quiet;
+    if quiet {
+        return;
+    }
+    println!();
+    println!("  {} Dry-run — no files will be modified", "◆".cyan());
+    for proj in projections {
+        if proj.target == "claude-code" {
+            println!(
+                "    {} [claude-code] skills/ → .claude/commands/",
+                "•".dimmed()
+            );
+            continue;
+        }
+        println!(
+            "    {} [{}] {} → {}",
+            "•".dimmed(),
+            proj.strategy,
+            proj.sources.join(", "),
+            proj.target
+        );
+    }
+    println!();
+}
+
+/// Execute each configured projection against its target.
+fn execute_projections(
+    project_root: &std::path::Path,
+    config_dir: &std::path::Path,
+    projections: &[Projection],
+) -> Result<()> {
+    let quiet = current_context().quiet;
+    for proj in projections {
         // Built-in targets are dispatched before strategy-based projections.
         if proj.target == "claude-code" {
-            sync_core::execute_claude_code(&project_root, &config_dir)?;
+            sync_core::execute_claude_code(project_root, config_dir)?;
             continue;
         }
         if proj.target == ".agents" {
-            sync_core::execute_agents_projection(&project_root, &config_dir)?;
+            sync_core::execute_agents_projection(project_root, config_dir)?;
             continue;
         }
-        match proj.strategy.as_str() {
-            "symlink" => sync_core::execute_symlink(&project_root, &config_dir, proj)?,
-            "inline" => sync_core::execute_inline(&project_root, &config_dir, proj)?,
-            "reference" => sync_core::execute_reference(&project_root, &config_dir, proj)?,
-            "copy" => sync_core::execute_copy(&project_root, &config_dir, proj)?,
-            other => {
-                if !quiet {
-                    log::warning(format!(
-                        "Unknown strategy '{}' for target '{}'",
-                        other, proj.target
-                    ))
-                    .into_diagnostic()?;
-                }
-            }
-        }
-    }
-
-    if !quiet {
-        log::success("Agent configs synced").into_diagnostic()?;
-        // Resume breadcrumb for an in-flight pipeline run (wai-xa8i.2).
-        if let Some(status) = pipeline_current_status(&project_root).ok().flatten()
-            && status.active
-            && run_is_incomplete(&status)
-        {
-            println!("{} Resume the orchestration: wai pipeline next", "→".cyan());
-        }
+        execute_strategy(project_root, config_dir, proj, quiet)?;
     }
     Ok(())
+}
+
+/// Dispatch one projection by strategy.
+fn execute_strategy(
+    project_root: &std::path::Path,
+    config_dir: &std::path::Path,
+    proj: &Projection,
+    quiet: bool,
+) -> Result<()> {
+    match proj.strategy.as_str() {
+        "symlink" => sync_core::execute_symlink(project_root, config_dir, proj),
+        "inline" => sync_core::execute_inline(project_root, config_dir, proj),
+        "reference" => sync_core::execute_reference(project_root, config_dir, proj),
+        "copy" => sync_core::execute_copy(project_root, config_dir, proj),
+        other => {
+            if !quiet {
+                log::warning(format!(
+                    "Unknown strategy '{}' for target '{}'",
+                    other, proj.target
+                ))
+                .into_diagnostic()?;
+            }
+            Ok(())
+        }
+    }
 }
 
 /// Sync .wai/areas/ and .wai/resources/ from the main git worktree.
 fn run_from_main(project_root: &std::path::Path, dry_run: bool) -> miette::Result<()> {
     use crate::plugin::detect_main_worktree_root;
 
-    let main_root = match detect_main_worktree_root(project_root) {
-        Some(r) => r,
-        None => {
-            println!("Not in a git worktree — nothing to sync.");
-            return Ok(());
-        }
+    let Some(main_root) = detect_main_worktree_root(project_root) else {
+        println!("Not in a git worktree — nothing to sync.");
+        return Ok(());
     };
 
-    let dirs_to_sync = ["areas", "resources"];
-    let wai_subdir = ".wai";
-
-    let mut synced = 0u32;
-    let mut skipped = 0u32;
-    let mut conflicts = 0u32;
-
-    for dir_name in &dirs_to_sync {
-        let src_dir = main_root.join(wai_subdir).join(dir_name);
-        let dst_dir = project_root.join(wai_subdir).join(dir_name);
-
-        if !src_dir.exists() {
-            continue;
-        }
-
-        for entry in walkdir::WalkDir::new(&src_dir)
-            .into_iter()
-            .filter_map(|e| e.ok())
-            .filter(|e| e.file_type().is_file())
-        {
-            let rel = match entry.path().strip_prefix(&src_dir) {
-                Ok(r) => r,
-                Err(_) => continue,
-            };
-
-            let dst_file = dst_dir.join(rel);
-            let src_content = match std::fs::read(entry.path()) {
-                Ok(c) => c,
-                Err(_) => {
-                    skipped += 1;
-                    continue;
-                }
-            };
-
-            if dst_file.exists() {
-                let dst_content = std::fs::read(&dst_file).unwrap_or_default();
-                if src_content == dst_content {
-                    skipped += 1;
-                    continue;
-                }
-                // Content differs — conflict: skip-and-warn
-                println!(
-                    "! Conflict: {} differs from main — skipped (resolve manually)",
-                    dst_file
-                        .strip_prefix(project_root)
-                        .unwrap_or(&dst_file)
-                        .display()
-                );
-                conflicts += 1;
-                continue;
-            }
-
-            if dry_run {
-                println!(
-                    "  [dry-run] would copy: {}",
-                    dst_file
-                        .strip_prefix(project_root)
-                        .unwrap_or(&dst_file)
-                        .display()
-                );
-                synced += 1;
-                continue;
-            }
-
-            if let Some(parent) = dst_file.parent() {
-                let _ = std::fs::create_dir_all(parent);
-            }
-            match std::fs::write(&dst_file, &src_content) {
-                Ok(()) => {
-                    println!(
-                        "  ✓ {}",
-                        dst_file
-                            .strip_prefix(project_root)
-                            .unwrap_or(&dst_file)
-                            .display()
-                    );
-                    synced += 1;
-                }
-                Err(e) => {
-                    println!(
-                        "! Failed to copy {}: {}",
-                        dst_file
-                            .strip_prefix(project_root)
-                            .unwrap_or(&dst_file)
-                            .display(),
-                        e
-                    );
-                    skipped += 1;
-                }
-            }
-        }
+    let mut stats = SyncStats::default();
+    for dir_name in ["areas", "resources"] {
+        sync_dir_from_main(project_root, &main_root, dir_name, dry_run, &mut stats);
     }
 
     println!(
         "Sync from main: {} copied, {} skipped, {} conflicts",
-        synced, skipped, conflicts
+        stats.synced, stats.skipped, stats.conflicts
     );
     Ok(())
+}
+
+/// Counters for a `sync --from-main` pass.
+#[derive(Default)]
+struct SyncStats {
+    synced: u32,
+    skipped: u32,
+    conflicts: u32,
+}
+
+/// Sync one `.wai/<dir_name>` subtree from the main worktree.
+fn sync_dir_from_main(
+    project_root: &std::path::Path,
+    main_root: &std::path::Path,
+    dir_name: &str,
+    dry_run: bool,
+    stats: &mut SyncStats,
+) {
+    let src_dir = main_root.join(".wai").join(dir_name);
+    if !src_dir.exists() {
+        return;
+    }
+    let dst_dir = project_root.join(".wai").join(dir_name);
+
+    for entry in walkdir::WalkDir::new(&src_dir)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().is_file())
+    {
+        let Ok(rel) = entry.path().strip_prefix(&src_dir) else {
+            continue;
+        };
+        let dst_file = dst_dir.join(rel);
+        let Ok(src_content) = std::fs::read(entry.path()) else {
+            stats.skipped += 1;
+            continue;
+        };
+        sync_file_from_main(project_root, &dst_file, &src_content, dry_run, stats);
+    }
+}
+
+/// Copy one file from main unless it conflicts; honors dry-run.
+fn sync_file_from_main(
+    project_root: &std::path::Path,
+    dst_file: &std::path::Path,
+    src_content: &[u8],
+    dry_run: bool,
+    stats: &mut SyncStats,
+) {
+    let shown = dst_file.strip_prefix(project_root).unwrap_or(dst_file).display();
+    if dst_file.exists() {
+        let dst_content = std::fs::read(dst_file).unwrap_or_default();
+        if src_content == dst_content {
+            stats.skipped += 1;
+            return;
+        }
+        // Content differs — conflict: skip-and-warn
+        println!("! Conflict: {shown} differs from main — skipped (resolve manually)");
+        stats.conflicts += 1;
+        return;
+    }
+
+    if dry_run {
+        println!("  [dry-run] would copy: {shown}");
+        stats.synced += 1;
+        return;
+    }
+
+    if let Some(parent) = dst_file.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    match std::fs::write(dst_file, src_content) {
+        Ok(()) => {
+            println!("  ✓ {shown}");
+            stats.synced += 1;
+        }
+        Err(e) => {
+            println!("! Failed to copy {shown}: {}", e);
+            stats.skipped += 1;
+        }
+    }
+}
+
+/// Load and parse `.projections.yml`.
+fn load_projections(path: &std::path::Path) -> Result<ProjectionsConfig> {
+    let content = std::fs::read_to_string(path).into_diagnostic()?;
+    serde_yml::from_str(&content).map_err(|e| {
+        let err: miette::Report = crate::error::WaiError::ConfigError {
+            message: format!("Invalid .projections.yml: {}", e),
+        }
+        .into();
+        err
+    })
+}
+
+/// Print the "nothing configured" hint.
+fn print_no_projections(quiet: bool) {
+    if quiet {
+        return;
+    }
+    println!();
+    println!("  {} No projections configured.", "○".dimmed());
+    println!(
+        "  {} Edit .wai/resources/agent-config/.projections.yml to add projections",
+        "→".dimmed()
+    );
+    println!();
 }
