@@ -7,14 +7,12 @@ friction signals (cd re-establishment, sleep-polling, shell-based reads).
 
 Outputs: JSON (machine) + markdown summary (human) with a per-repo breakdown and
 waste expressed in common units (polling wall-clock minutes, wasted tool turns).
-
 Selection predicate (single source of truth — review finding EDGE-002):
 a session is included iff its START timestamp >= --since AND its project matches
 the project filter. File-level mtime is never used for selection.
 
 Usage:
-    python3 scripts/session-friction.py --since 2026-10-13 \
-        [--out /tmp/friction] [--project-regex 'gh/(charly|ak)/']
+    python3 scripts/session-friction.py --since 2026-10-13 [--out /tmp/friction]
 
 Terapia requirements: `terapia list` and `terapia errors <id>` must emit JSON.
 Cache: terapia is mtime-keyed and incremental; run once before publishing.
