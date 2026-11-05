@@ -201,7 +201,7 @@ fn version_entry(
     fix: Option<&str>,
     sync_commit: bool,
 ) -> WaiCheckEntry {
-    let fix_fn: Option<Box<dyn FnOnce(&Path) -> miette::Result<()>>> = fix.map(|fix| {
+    let fix_fn: Option<Box<dyn FnOnce(&Path) -> miette::Result<()>>> = fix.map(|_fix| {
         Box::new(move |project_root: &Path| {
             ensure_workspace_current(project_root)?;
             if sync_commit {

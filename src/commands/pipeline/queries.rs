@@ -13,7 +13,7 @@ use super::gates::{
     evaluate_gates, find_step_artifacts, format_gate_summary, parse_frontmatter, print_gate_status,
 };
 use super::orchestration::{pipeline_current_status, resolve_active_run_id};
-use super::{PipelineDefinition, PipelineRun, ValidationLevel};
+use super::{PipelineDefinition, PipelineRun, PipelineStep, ValidationLevel};
 
 use crate::commands::require_project;
 
@@ -81,33 +81,42 @@ pub(super) fn cmd_current(json: bool) -> Result<()> {
     let project_root = require_project()?;
 
     let Some(status) = pipeline_current_status(&project_root)? else {
-        if json {
-            return print_envelope_ok(PipelineCurrentPayload {
-                bypass_count: None,
-                last_bypass_reason: None,
-                active: false,
-                message: Some(
-                    "No active pipeline run. Start one with: wai pipeline start <name> --topic=<topic>"
-                        .to_string(),
-                ),
-                pipeline: None,
-                run_id: None,
-                topic: None,
-                step: None,
-                gate_summary: None,
-                next_command: Some("wai pipeline start <name> --topic=<topic>".to_string()),
-                epic: None,
-            });
-        }
-        miette::bail!(
-            "No active pipeline run. Start one with: wai pipeline start <name> --topic=<topic>"
-        );
+        return current_none(json);
     };
 
     if json {
         return print_envelope_ok(status);
     }
 
+    print_current_human(&project_root, status);
+    Ok(())
+}
+
+fn current_none(json: bool) -> Result<()> {
+    if json {
+        return print_envelope_ok(PipelineCurrentPayload {
+            bypass_count: None,
+            last_bypass_reason: None,
+            active: false,
+            message: Some(
+                "No active pipeline run. Start one with: wai pipeline start <name> --topic=<topic>"
+                    .to_string(),
+            ),
+            pipeline: None,
+            run_id: None,
+            topic: None,
+            step: None,
+            gate_summary: None,
+            next_command: Some("wai pipeline start <name> --topic=<topic>".to_string()),
+            epic: None,
+        });
+    }
+    miette::bail!(
+        "No active pipeline run. Start one with: wai pipeline start <name> --topic=<topic>"
+    )
+}
+
+fn print_current_human(project_root: &Path, status: PipelineCurrentPayload) {
     if let Some(ref step) = status.step {
         println!(
             "── step {}/{}: {} ──────────────────────────────",
@@ -115,7 +124,7 @@ pub(super) fn cmd_current(json: bool) -> Result<()> {
         );
         println!("{}", step.prompt);
 
-        let addenda = find_step_addenda(&project_root, &step.id);
+        let addenda = find_step_addenda(project_root, &step.id);
         if !addenda.is_empty() {
             println!();
             println!("{} Addenda ({})", "◆".cyan(), addenda.len());
@@ -144,8 +153,6 @@ pub(super) fn cmd_current(json: bool) -> Result<()> {
         println!();
         println!("{} Gate bypasses: {} — last: {}", "◆".cyan(), count, last);
     }
-
-    Ok(())
 }
 
 // ─── suggest ──────────────────────────────────────────────────────────────────
@@ -155,21 +162,7 @@ pub(super) fn cmd_suggest(description: Option<&str>) -> Result<()> {
     let pipelines = pipelines_dir(&project_root);
 
     // Collect all valid pipeline TOMLs
-    let mut found: Vec<(String, PipelineDefinition)> = vec![];
-    if pipelines.exists() {
-        for entry in fs::read_dir(&pipelines).into_diagnostic()? {
-            let entry = entry.into_diagnostic()?;
-            let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) == Some("toml")
-                && let Some(name) = path.file_stem().and_then(|s| s.to_str())
-            {
-                match load_pipeline_toml(&path) {
-                    Ok(def) => found.push((name.to_string(), def)),
-                    Err(e) => eprintln!("warning: skipping {}: {}", path.display(), e),
-                }
-            }
-        }
-    }
+    let mut found = collect_pipelines(&pipelines)?;
 
     if found.is_empty() {
         println!("No pipelines defined.");
@@ -183,8 +176,35 @@ pub(super) fn cmd_suggest(description: Option<&str>) -> Result<()> {
         .filter(|s| !s.trim().is_empty())
         .map(|s| s.to_lowercase());
 
-    // Score and sort
-    if let Some(ref q) = query {
+    sort_pipelines(&mut found, query.as_deref());
+    print_suggestions(&found);
+    Ok(())
+}
+
+fn collect_pipelines(pipelines: &Path) -> Result<Vec<(String, PipelineDefinition)>> {
+    let mut found: Vec<(String, PipelineDefinition)> = vec![];
+    if !pipelines.exists() {
+        return Ok(found);
+    }
+    for entry in fs::read_dir(pipelines).into_diagnostic()? {
+        let entry = entry.into_diagnostic()?;
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("toml") {
+            continue;
+        }
+        let Some(name) = path.file_stem().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        match load_pipeline_toml(&path) {
+            Ok(def) => found.push((name.to_string(), def)),
+            Err(e) => eprintln!("warning: skipping {}: {}", path.display(), e),
+        }
+    }
+    Ok(found)
+}
+
+fn sort_pipelines(found: &mut [(String, PipelineDefinition)], query: Option<&str>) {
+    if let Some(q) = query {
         let words: Vec<&str> = q.split_whitespace().collect();
         found.sort_by(|(a_name, a_def), (b_name, b_def)| {
             let score_a = score_pipeline(a_name, a_def, &words);
@@ -195,9 +215,10 @@ pub(super) fn cmd_suggest(description: Option<&str>) -> Result<()> {
     } else {
         found.sort_by(|(a, _), (b, _)| a.cmp(b));
     }
+}
 
-    // Print each pipeline
-    for (name, def) in &found {
+fn print_suggestions(found: &[(String, PipelineDefinition)]) {
+    for (name, def) in found {
         let desc = def.description.as_deref().unwrap_or("(no description)");
         let steps = def.steps.len();
         println!("  {} — {} ({} steps)", name, desc, steps);
@@ -209,8 +230,6 @@ pub(super) fn cmd_suggest(description: Option<&str>) -> Result<()> {
         "Start: wai pipeline start {} --topic=<your-topic>",
         top_name
     );
-
-    Ok(())
 }
 
 /// Score a pipeline by counting how many query words appear in its name + description.
@@ -237,7 +256,11 @@ pub(super) fn cmd_show(name: &str) -> Result<()> {
         }
     }
     let def = load_pipeline_toml(&def_path)?;
+    print_pipeline_show(&project_root, &def);
+    Ok(())
+}
 
+fn print_pipeline_show(project_root: &Path, def: &PipelineDefinition) {
     // Header
     println!();
     println!("  {} {}", "◆".cyan(), def.name.bold());
@@ -279,14 +302,12 @@ pub(super) fn cmd_show(name: &str) -> Result<()> {
     }
 
     // Oracle directory
-    let oracles_dir = crate::config::wai_dir(&project_root)
+    let oracles_dir = crate::config::wai_dir(project_root)
         .join("resources")
         .join("oracles");
     println!();
     println!("  {} Oracles: {}", "•".dimmed(), oracles_dir.display());
     println!();
-
-    Ok(())
 }
 
 // ─── gates ────────────────────────────────────────────────────────────────────
@@ -300,57 +321,9 @@ pub(super) fn cmd_gates(name: Option<&str>, step_filter: Option<&str>) -> Result
     if let Some(ref run_id) = active_run
         && name.is_none()
     {
-        // Active run, no explicit pipeline name — show live status for current step
-        let runs_dir = crate::config::wai_dir(&project_root).join("pipeline-runs");
-        let run_path = runs_dir.join(format!("{}.yml", run_id));
-        let run: PipelineRun =
-            serde_yml::from_str(&fs::read_to_string(&run_path).into_diagnostic()?)
-                .map_err(|e| miette::miette!("Failed to parse run state: {}", e))?;
-        let def_path = pipelines_dir(&project_root).join(format!("{}.toml", run.pipeline));
-        let definition = load_pipeline_toml(&def_path)?;
-
-        if run.current_step >= definition.steps.len() {
-            miette::bail!("Pipeline run is complete.");
-        }
-
-        let step = &definition.steps[run.current_step];
-        print_gate_status(step, Some(&run), Some(&definition), &project_root)?;
+        gates_live_status(&project_root, run_id)?;
     } else if let Some(pipeline_name) = name {
-        // Show gate definitions (not live status)
-        let def_path = pipelines_dir(&project_root).join(format!("{}.toml", pipeline_name));
-        if !def_path.exists() {
-            miette::bail!(
-                "Pipeline '{}' not found. Specify a pipeline name: wai pipeline gates <name>",
-                pipeline_name
-            );
-        }
-        let definition = load_pipeline_toml(&def_path)?;
-
-        if let Some(step_id) = step_filter {
-            let step = definition
-                .steps
-                .iter()
-                .find(|s| s.id == step_id)
-                .ok_or_else(|| {
-                    miette::miette!(
-                        "Step '{}' not found in pipeline '{}'. Steps: {}",
-                        step_id,
-                        pipeline_name,
-                        definition
-                            .steps
-                            .iter()
-                            .map(|s| s.id.as_str())
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    )
-                })?;
-            print_gate_status(step, None, None, &project_root)?;
-        } else {
-            // Show all steps' gates
-            for step in &definition.steps {
-                print_gate_status(step, None, None, &project_root)?;
-            }
-        }
+        gates_definitions(&project_root, pipeline_name, step_filter)?;
     } else {
         miette::bail!("No active pipeline run. Specify a pipeline name: wai pipeline gates <name>");
     }
@@ -358,21 +331,13 @@ pub(super) fn cmd_gates(name: Option<&str>, step_filter: Option<&str>) -> Result
     Ok(())
 }
 
-// ─── check ────────────────────────────────────────────────────────────────────
-
-pub(super) fn cmd_check(oracle_name: Option<&str>) -> Result<()> {
-    let project_root = require_project()?;
-    let run_id = resolve_active_run_id(&project_root)?;
-
-    let runs_dir = crate::config::wai_dir(&project_root).join("pipeline-runs");
+// Active run, no explicit pipeline name — show live status for current step
+fn gates_live_status(project_root: &Path, run_id: &str) -> Result<()> {
+    let runs_dir = crate::config::wai_dir(project_root).join("pipeline-runs");
     let run_path = runs_dir.join(format!("{}.yml", run_id));
-    if !run_path.exists() {
-        miette::bail!("No active pipeline run.");
-    }
     let run: PipelineRun = serde_yml::from_str(&fs::read_to_string(&run_path).into_diagnostic()?)
         .map_err(|e| miette::miette!("Failed to parse run state: {}", e))?;
-
-    let def_path = pipelines_dir(&project_root).join(format!("{}.toml", run.pipeline));
+    let def_path = pipelines_dir(project_root).join(format!("{}.toml", run.pipeline));
     let definition = load_pipeline_toml(&def_path)?;
 
     if run.current_step >= definition.steps.len() {
@@ -380,46 +345,142 @@ pub(super) fn cmd_check(oracle_name: Option<&str>) -> Result<()> {
     }
 
     let step = &definition.steps[run.current_step];
+    print_gate_status(step, Some(&run), Some(&definition), project_root)
+}
+
+// Show gate definitions (not live status)
+fn gates_definitions(
+    project_root: &Path,
+    pipeline_name: &str,
+    step_filter: Option<&str>,
+) -> Result<()> {
+    let def_path = pipelines_dir(project_root).join(format!("{}.toml", pipeline_name));
+    if !def_path.exists() {
+        miette::bail!(
+            "Pipeline '{}' not found. Specify a pipeline name: wai pipeline gates <name>",
+            pipeline_name
+        );
+    }
+    let definition = load_pipeline_toml(&def_path)?;
+
+    if let Some(step_id) = step_filter {
+        let step = find_step(&definition, pipeline_name, step_id)?;
+        print_gate_status(step, None, None, project_root)?;
+    } else {
+        // Show all steps' gates
+        for step in &definition.steps {
+            print_gate_status(step, None, None, project_root)?;
+        }
+    }
+    Ok(())
+}
+
+fn find_step<'a>(
+    definition: &'a PipelineDefinition,
+    pipeline_name: &str,
+    step_id: &str,
+) -> Result<&'a PipelineStep> {
+    definition
+        .steps
+        .iter()
+        .find(|s| s.id == step_id)
+        .ok_or_else(|| {
+            miette::miette!(
+                "Step '{}' not found in pipeline '{}'. Steps: {}",
+                step_id,
+                pipeline_name,
+                definition
+                    .steps
+                    .iter()
+                    .map(|s| s.id.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        })
+}
+
+// ─── check ────────────────────────────────────────────────────────────────────
+
+pub(super) fn cmd_check(oracle_name: Option<&str>) -> Result<()> {
+    let project_root = require_project()?;
+    let (run, definition) = load_current_run(&project_root)?;
+    let step = &definition.steps[run.current_step];
 
     if let Some(oracle_filter) = oracle_name {
-        // Single oracle mode
-        let step_artifacts = find_step_artifacts(&project_root, &run.run_id, &step.id);
-        let oracle = step
-            .gate
-            .as_ref()
-            .and_then(|g| g.oracles.iter().find(|o| o.name == oracle_filter));
+        return check_single_oracle(&project_root, &run.run_id, step, oracle_filter);
+    }
+    check_full_gates(&project_root, &run, &definition, step)
+}
 
-        let Some(oracle) = oracle else {
-            miette::bail!(
-                "Oracle '{}' not configured for step '{}'. Available oracles: {}",
-                oracle_filter,
-                step.id,
-                step.gate
-                    .as_ref()
-                    .map(|g| g
-                        .oracles
-                        .iter()
-                        .map(|o| o.name.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", "))
-                    .unwrap_or_default()
-            );
-        };
+fn load_current_run(project_root: &Path) -> Result<(PipelineRun, PipelineDefinition)> {
+    let run_id = resolve_active_run_id(project_root)?;
 
-        let failures = super::gates::run_oracle(oracle, &step_artifacts, &project_root)?;
-        println!();
-        if failures.is_empty() {
-            println!("  {} Oracle '{}': PASS", "✓".green(), oracle_filter);
-        } else {
-            for f in &failures {
-                println!("  {} {}", "✗".red(), f);
-            }
-        }
-        println!();
-        return Ok(());
+    let runs_dir = crate::config::wai_dir(project_root).join("pipeline-runs");
+    let run_path = runs_dir.join(format!("{}.yml", run_id));
+    if !run_path.exists() {
+        miette::bail!("No active pipeline run.");
+    }
+    let run: PipelineRun = serde_yml::from_str(&fs::read_to_string(&run_path).into_diagnostic()?)
+        .map_err(|e| miette::miette!("Failed to parse run state: {}", e))?;
+
+    let def_path = pipelines_dir(project_root).join(format!("{}.toml", run.pipeline));
+    let definition = load_pipeline_toml(&def_path)?;
+
+    if run.current_step >= definition.steps.len() {
+        miette::bail!("Pipeline run is complete.");
     }
 
-    // Full gate check
+    Ok((run, definition))
+}
+
+fn check_single_oracle(
+    project_root: &Path,
+    run_id: &str,
+    step: &PipelineStep,
+    oracle_filter: &str,
+) -> Result<()> {
+    let step_artifacts = find_step_artifacts(project_root, run_id, &step.id);
+    let oracle = step
+        .gate
+        .as_ref()
+        .and_then(|g| g.oracles.iter().find(|o| o.name == oracle_filter));
+
+    let Some(oracle) = oracle else {
+        miette::bail!(
+            "Oracle '{}' not configured for step '{}'. Available oracles: {}",
+            oracle_filter,
+            step.id,
+            step.gate
+                .as_ref()
+                .map(|g| g
+                    .oracles
+                    .iter()
+                    .map(|o| o.name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", "))
+                .unwrap_or_default()
+        );
+    };
+
+    let failures = super::gates::run_oracle(oracle, &step_artifacts, project_root)?;
+    println!();
+    if failures.is_empty() {
+        println!("  {} Oracle '{}': PASS", "✓".green(), oracle_filter);
+    } else {
+        for f in &failures {
+            println!("  {} {}", "✗".red(), f);
+        }
+    }
+    println!();
+    Ok(())
+}
+
+fn check_full_gates(
+    project_root: &Path,
+    run: &PipelineRun,
+    definition: &PipelineDefinition,
+    step: &PipelineStep,
+) -> Result<()> {
     let Some(ref gate) = step.gate else {
         println!();
         println!("  No gates configured for step '{}'. Result: PASS", step.id);
@@ -427,7 +488,7 @@ pub(super) fn cmd_check(oracle_name: Option<&str>) -> Result<()> {
         return Ok(());
     };
 
-    let failures = evaluate_gates(gate, step, &run, &definition, &project_root)?;
+    let failures = evaluate_gates(gate, step, run, definition, project_root)?;
 
     println!();
     println!("  {} Gate check for step '{}':", "◆".cyan(), step.id);
@@ -461,73 +522,12 @@ pub(super) fn cmd_validate(name: Option<&str>) -> Result<()> {
         miette::bail!("No pipelines directory found.");
     }
 
-    let targets: Vec<(String, std::path::PathBuf)> = if let Some(name) = name {
-        let path = pipelines.join(format!("{}.toml", name));
-        if !path.exists() {
-            let available = list_pipeline_names(&project_root);
-            miette::bail!(
-                "Pipeline '{}' not found. Available: {}",
-                name,
-                available.join(", ")
-            );
-        }
-        vec![(name.to_string(), path)]
-    } else {
-        // Validate all
-        let mut targets = Vec::new();
-        for entry in fs::read_dir(&pipelines).into_diagnostic()?.flatten() {
-            let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) == Some("toml")
-                && let Some(stem) = path.file_stem().and_then(|s| s.to_str())
-            {
-                targets.push((stem.to_string(), path));
-            }
-        }
-        targets.sort_by(|a, b| a.0.cmp(&b.0));
-        targets
-    };
+    let targets = validate_targets(&project_root, &pipelines, name)?;
 
     let mut had_errors = false;
 
     for (pname, path) in &targets {
-        match load_pipeline_toml(path) {
-            Err(e) => {
-                cliclack::log::error(format!("{}: {}", pname, e)).into_diagnostic()?;
-                had_errors = true;
-            }
-            Ok(def) => {
-                let issues = validate_pipeline(&def, &project_root);
-                let errors: Vec<_> = issues
-                    .iter()
-                    .filter(|i| i.level == ValidationLevel::Error)
-                    .collect();
-                let warnings: Vec<_> = issues
-                    .iter()
-                    .filter(|i| i.level == ValidationLevel::Warn)
-                    .collect();
-
-                if errors.is_empty() && warnings.is_empty() {
-                    let gate_count = def.steps.iter().filter(|s| s.gate.is_some()).count();
-                    cliclack::log::success(format!(
-                        "{}: {} steps, {} gated",
-                        pname,
-                        def.steps.len(),
-                        gate_count
-                    ))
-                    .into_diagnostic()?;
-                } else {
-                    for e in &errors {
-                        cliclack::log::error(format!("{}: {}", pname, e.message))
-                            .into_diagnostic()?;
-                        had_errors = true;
-                    }
-                    for w in &warnings {
-                        cliclack::log::warning(format!("{}: {}", pname, w.message))
-                            .into_diagnostic()?;
-                    }
-                }
-            }
-        }
+        had_errors |= validate_one(&project_root, pname, path)?;
     }
 
     if had_errors {
@@ -537,6 +537,83 @@ pub(super) fn cmd_validate(name: Option<&str>) -> Result<()> {
     Ok(())
 }
 
+fn validate_targets(
+    project_root: &Path,
+    pipelines: &Path,
+    name: Option<&str>,
+) -> Result<Vec<(String, std::path::PathBuf)>> {
+    if !pipelines.exists() {
+        miette::bail!("No pipelines directory found.");
+    }
+
+    if let Some(name) = name {
+        let path = pipelines.join(format!("{}.toml", name));
+        if !path.exists() {
+            let available = list_pipeline_names(project_root);
+            miette::bail!(
+                "Pipeline '{}' not found. Available: {}",
+                name,
+                available.join(", ")
+            );
+        }
+        return Ok(vec![(name.to_string(), path)]);
+    }
+
+    // Validate all
+    let mut targets = Vec::new();
+    for entry in fs::read_dir(pipelines).into_diagnostic()?.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) == Some("toml")
+            && let Some(stem) = path.file_stem().and_then(|s| s.to_str())
+        {
+            targets.push((stem.to_string(), path));
+        }
+    }
+    targets.sort_by(|a, b| a.0.cmp(&b.0));
+    Ok(targets)
+}
+
+fn validate_one(project_root: &Path, pname: &str, path: &Path) -> Result<bool> {
+    let def = match load_pipeline_toml(path) {
+        Err(e) => {
+            cliclack::log::error(format!("{}: {}", pname, e)).into_diagnostic()?;
+            return Ok(true);
+        }
+        Ok(def) => def,
+    };
+    let issues = validate_pipeline(&def, project_root);
+    let errors: Vec<_> = issues
+        .iter()
+        .filter(|i| i.level == ValidationLevel::Error)
+        .collect();
+    let warnings: Vec<_> = issues
+        .iter()
+        .filter(|i| i.level == ValidationLevel::Warn)
+        .collect();
+
+    if errors.is_empty() && warnings.is_empty() {
+        let gate_count = def.steps.iter().filter(|s| s.gate.is_some()).count();
+        cliclack::log::success(format!(
+            "{}: {} steps, {} gated",
+            pname,
+            def.steps.len(),
+            gate_count
+        ))
+        .into_diagnostic()?;
+        return Ok(false);
+    }
+    let mut had_errors = false;
+    for e in &errors {
+        cliclack::log::error(format!("{}: {}", pname, e.message)).into_diagnostic()?;
+        had_errors = true;
+    }
+    for w in &warnings {
+        cliclack::log::warning(format!("{}: {}", pname, w.message)).into_diagnostic()?;
+    }
+    Ok(had_errors)
+}
+
+#[allow(dead_code)]
 // ─── print_step ───────────────────────────────────────────────────────────────
 
 /// Print a step prompt block with a "step N/M" header and rendered prompt.
