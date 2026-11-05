@@ -15,35 +15,7 @@ pub fn run(project: Option<String>, remember: bool, force: bool) -> Result<()> {
     let project_root = require_project()?;
     require_safe_mode("create handoff")?;
 
-    // Close-time enforcement (wai-csgb): refuse to close while an active
-    // pipeline run is still mid-flight — closing silently would strand the run
-    // and poison `wai status`/`wai prime` nudges. `--force` marks intentional
-    // abandonment.
-    if let Some(status) = pipeline_current_status(&project_root).ok().flatten()
-        && run_is_incomplete(&status)
-        && !force
-    {
-        let step = status.step.as_ref().expect("incomplete run has a step");
-        let run_id = status.run_id.as_deref().unwrap_or("<unknown>");
-        let pipeline = status.pipeline.as_deref().unwrap_or("<unknown>");
-        let topic = status.topic.as_deref().unwrap_or("");
-        let remaining = step.total.saturating_sub(step.index);
-        let steps_word = if remaining == 1 { "step" } else { "steps" };
-        return Err(miette::miette!(
-            "Refusing to close: pipeline run '{}' (pipeline '{}', topic '{}') \
-             is still in progress at step {} of {}.\n\
-             {} {} remaining before this run is complete.\n\
-             → Resume the run: wai pipeline next\n\
-             → Abandon it anyway: wai close --force",
-            run_id,
-            pipeline,
-            topic,
-            step.index,
-            step.total,
-            remaining,
-            steps_word,
-        ));
-    }
+    refuse_if_pipeline_active(&project_root, force)?;
 
     let resolved = resolve_project(&project_root, project.as_deref())?;
     let project_name = resolved.name;
@@ -65,110 +37,183 @@ pub fn run(project: Option<String>, remember: bool, force: bool) -> Result<()> {
     let cleared_pipeline = crate::commands::pipeline::clear_complete_pipeline_run(&project_root);
 
     let context = current_context();
-    let quiet = context.quiet;
-
-    if !quiet {
-        if let Some(name) = &cleared_pipeline {
-            println!("✓ Cleared complete pipeline run '{}'", name);
-        }
-        // Display relative path from project root
-        let display_path = handoff_path
-            .strip_prefix(&project_root)
-            .unwrap_or(&handoff_path);
-        println!("✓ Handoff created: {}", display_path.display());
-
-        // Get uncommitted files (silently skip if git unavailable or not a repo)
-        let uncommitted = get_uncommitted_files(&project_root);
-        if !uncommitted.is_empty() {
-            const MAX_FILES: usize = 10;
-            let (shown, extra) = if uncommitted.len() > MAX_FILES {
-                (&uncommitted[..MAX_FILES], uncommitted.len() - MAX_FILES)
-            } else {
-                (&uncommitted[..], 0)
-            };
-            let file_list = shown.join(", ");
-            if extra > 0 {
-                println!("! Uncommitted changes: {}… and {} more", file_list, extra);
-            } else {
-                println!("! Uncommitted changes: {}", file_list);
-            }
-        }
-
-        // Print next-steps reminder
-        let beads_detected = plugin::detect_plugins(&project_root)
-            .iter()
-            .any(|p| p.def.name == "beads" && p.detected);
-
-        let git_add_part = if uncommitted.is_empty() {
-            "git add <files> && git commit".to_string()
-        } else {
-            let quoted: Vec<String> = uncommitted.iter().map(|f| format!("\"{}\"", f)).collect();
-            format!("git add {} && git commit", quoted.join(" "))
-        };
-
-        let in_worktree = detect_main_worktree_root(&project_root).is_some();
-
-        let next_steps = if in_worktree {
-            format!("wai sync --from-main && {}", git_add_part)
-        } else {
-            git_add_part
-        };
-        println!("→ Next: {}", next_steps);
-        if beads_detected {
-            println!(
-                "→ Beads: if you need tracker-specific follow-up, run `bd` and use the commands your installed version offers"
-            );
-        }
-
-        // 5.1–5.3: Reflect nudge — show if 5+ handoffs since last reflect.
-        if !context.json {
-            let proj_dir = projects_dir(&project_root).join(&project_name);
-            let handoffs_dir = proj_dir.join("handoffs");
-            let meta = read_reflect_meta(&proj_dir).unwrap_or(None);
-            let last_reflected = meta
-                .as_ref()
-                .map(|m| m.last_reflected.as_str())
-                .unwrap_or("");
-            let session_count = count_handoffs_since(&handoffs_dir, last_reflected);
-            if session_count >= 5 {
-                // Determine which target files exist.
-                let has_claude = project_root.join("CLAUDE.md").exists();
-                let has_agents = project_root.join("AGENTS.md").exists();
-                let target_hint = match (has_claude, has_agents) {
-                    (true, true) => "CLAUDE.md and AGENTS.md",
-                    (true, false) => "CLAUDE.md",
-                    (false, true) => "AGENTS.md",
-                    (false, false) => "CLAUDE.md",
-                };
-                println!(
-                    "→ {} sessions since last reflect — run `wai reflect` to update {}",
-                    session_count, target_hint
-                );
-            }
-        }
-    }
+    let uncommitted = if context.quiet {
+        Vec::new()
+    } else {
+        print_close_summary(
+            &project_root,
+            &project_name,
+            &handoff_path,
+            &cleared_pipeline,
+        )
+    };
 
     if remember {
-        if context.safe {
-            eprintln!("! --remember skipped in safe mode");
-        } else if context.no_input {
-            eprintln!("! --remember skipped in no-input mode");
-        } else {
-            print!("→ Insight to save (bd remember): ");
-            let _ = std::io::Write::flush(&mut std::io::stdout());
-            let mut line = String::new();
-            if std::io::BufRead::read_line(&mut std::io::stdin().lock(), &mut line).is_ok() {
-                let text = line.trim().to_string();
-                if !text.is_empty() {
-                    match store_memory(&project_root, &text) {
-                        Ok(()) => println!("✓ Memory saved"),
-                        Err(e) => eprintln!("! Could not save memory: {}", e),
-                    }
+        prompt_remember(&project_root, &context)?;
+    }
+
+    let _ = uncommitted;
+    Ok(())
+}
+
+/// Close-time enforcement (wai-csgb): refuse to close while an active
+/// pipeline run is still mid-flight — closing silently would strand the run
+/// and poison `wai status`/`wai prime` nudges. `--force` marks intentional
+/// abandonment.
+fn refuse_if_pipeline_active(project_root: &Path, force: bool) -> Result<()> {
+    let Some(status) = pipeline_current_status(project_root).ok().flatten() else {
+        return Ok(());
+    };
+    if !run_is_incomplete(&status) || force {
+        return Ok(());
+    }
+    let step = status.step.as_ref().expect("incomplete run has a step");
+    let run_id = status.run_id.as_deref().unwrap_or("<unknown>");
+    let pipeline = status.pipeline.as_deref().unwrap_or("<unknown>");
+    let topic = status.topic.as_deref().unwrap_or("");
+    let remaining = step.total.saturating_sub(step.index);
+    let steps_word = if remaining == 1 { "step" } else { "steps" };
+    Err(miette::miette!(
+        "Refusing to close: pipeline run '{}' (pipeline '{}', topic '{}') \
+         is still in progress at step {} of {}.\n\
+         {} {} remaining before this run is complete.\n\
+         → Resume the run: wai pipeline next\n\
+         → Abandon it anyway: wai close --force",
+        run_id,
+        pipeline,
+        topic,
+        step.index,
+        step.total,
+        remaining,
+        steps_word,
+    ))
+}
+
+/// Print the post-close summary; returns the uncommitted file list for reuse.
+fn print_close_summary(
+    project_root: &Path,
+    project_name: &str,
+    handoff_path: &Path,
+    cleared_pipeline: &Option<String>,
+) -> Vec<String> {
+    let context = current_context();
+    if let Some(name) = cleared_pipeline {
+        println!("✓ Cleared complete pipeline run '{}'", name);
+    }
+    // Display relative path from project root
+    let display_path = handoff_path
+        .strip_prefix(project_root)
+        .unwrap_or(handoff_path);
+    println!("✓ Handoff created: {}", display_path.display());
+
+    // Get uncommitted files (silently skip if git unavailable or not a repo)
+    let uncommitted = get_uncommitted_files(project_root);
+    print_uncommitted(&uncommitted);
+    print_next_steps(project_root, &uncommitted);
+    print_reflect_nudge(project_root, project_name, &context);
+    uncommitted
+}
+
+fn print_uncommitted(uncommitted: &[String]) {
+    if uncommitted.is_empty() {
+        return;
+    }
+    const MAX_FILES: usize = 10;
+    let (shown, extra) = if uncommitted.len() > MAX_FILES {
+        (&uncommitted[..MAX_FILES], uncommitted.len() - MAX_FILES)
+    } else {
+        (&uncommitted[..], 0)
+    };
+    let file_list = shown.join(", ");
+    if extra > 0 {
+        println!("! Uncommitted changes: {}… and {} more", file_list, extra);
+    } else {
+        println!("! Uncommitted changes: {}", file_list);
+    }
+}
+
+fn print_next_steps(project_root: &Path, uncommitted: &[String]) {
+    // Print next-steps reminder
+    let beads_detected = plugin::detect_plugins(project_root)
+        .iter()
+        .any(|p| p.def.name == "beads" && p.detected);
+
+    let git_add_part = if uncommitted.is_empty() {
+        "git add <files> && git commit".to_string()
+    } else {
+        let quoted: Vec<String> = uncommitted.iter().map(|f| format!("\"{}\"", f)).collect();
+        format!("git add {} && git commit", quoted.join(" "))
+    };
+
+    let in_worktree = detect_main_worktree_root(project_root).is_some();
+
+    let next_steps = if in_worktree {
+        format!("wai sync --from-main && {}", git_add_part)
+    } else {
+        git_add_part
+    };
+    println!("→ Next: {}", next_steps);
+    if beads_detected {
+        println!(
+            "→ Beads: if you need tracker-specific follow-up, run `bd` and use the commands your installed version offers"
+        );
+    }
+}
+
+// 5.1–5.3: Reflect nudge — show if 5+ handoffs since last reflect.
+fn print_reflect_nudge(
+    project_root: &Path,
+    project_name: &str,
+    context: &crate::context::CliContext,
+) {
+    if context.json {
+        return;
+    }
+    let proj_dir = projects_dir(project_root).join(project_name);
+    let handoffs_dir = proj_dir.join("handoffs");
+    let meta = read_reflect_meta(&proj_dir).unwrap_or(None);
+    let last_reflected = meta
+        .as_ref()
+        .map(|m| m.last_reflected.as_str())
+        .unwrap_or("");
+    let session_count = count_handoffs_since(&handoffs_dir, last_reflected);
+    if session_count < 5 {
+        return;
+    }
+    // Determine which target files exist.
+    let has_claude = project_root.join("CLAUDE.md").exists();
+    let has_agents = project_root.join("AGENTS.md").exists();
+    let target_hint = match (has_claude, has_agents) {
+        (true, true) => "CLAUDE.md and AGENTS.md",
+        (true, false) => "CLAUDE.md",
+        (false, true) => "AGENTS.md",
+        (false, false) => "CLAUDE.md",
+    };
+    println!(
+        "→ {} sessions since last reflect — run `wai reflect` to update {}",
+        session_count, target_hint
+    );
+}
+
+fn prompt_remember(project_root: &Path, context: &crate::context::CliContext) -> Result<()> {
+    if context.safe {
+        eprintln!("! --remember skipped in safe mode");
+    } else if context.no_input {
+        eprintln!("! --remember skipped in no-input mode");
+    } else {
+        print!("→ Insight to save (bd remember): ");
+        let _ = std::io::Write::flush(&mut std::io::stdout());
+        let mut line = String::new();
+        if std::io::BufRead::read_line(&mut std::io::stdin().lock(), &mut line).is_ok() {
+            let text = line.trim().to_string();
+            if !text.is_empty() {
+                match store_memory(project_root, &text) {
+                    Ok(()) => println!("✓ Memory saved"),
+                    Err(e) => eprintln!("! Could not save memory: {}", e),
                 }
             }
         }
     }
-
     Ok(())
 }
 

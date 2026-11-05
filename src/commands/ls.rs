@@ -197,7 +197,6 @@ fn discover_workspaces(root: &Path, max_depth: usize, deadline: Instant) -> Vec<
     let mut workspaces = Vec::new();
     let mut dirs_scanned: u64 = 0;
     let mut progress_shown = false;
-    let show_progress_after = Duration::from_secs(1);
     let start = Instant::now();
     // Only show progress when stderr is a terminal.
     let stderr_is_tty = std::io::stderr().is_terminal();
