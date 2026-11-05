@@ -29,67 +29,68 @@ fn claude_code_needs_sync(config_dir: &std::path::Path, cc_dir: &std::path::Path
         return false; // Nothing to sync
     }
 
-    let cat_entries = match std::fs::read_dir(&skills_dir) {
-        Ok(rd) => rd.filter_map(|e| e.ok()).collect::<Vec<_>>(),
-        Err(_) => return true, // Unreadable source → conservative
+    let read_entries = |dir: &std::path::Path| -> Option<Vec<std::path::PathBuf>> {
+        std::fs::read_dir(dir)
+            .ok()?
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .collect::<Vec<_>>()
+            .into()
     };
 
-    for cat_entry in cat_entries {
-        let cat_path = cat_entry.path();
-        if !cat_path.is_dir() {
-            continue;
-        }
-        if cat_path.join("SKILL.md").exists() {
-            continue; // Flat skill, skipped by execute_claude_code
-        }
+    let Some(cat_entries) = read_entries(&skills_dir) else {
+        return true; // Unreadable source → conservative
+    };
 
-        let category = match cat_path.file_name().and_then(|n| n.to_str()) {
-            Some(s) => s.to_string(),
-            None => continue,
-        };
+    cat_entries
+        .iter()
+        .filter(|p| p.is_dir())
+        .filter(|p| !p.join("SKILL.md").exists()) // flat skills are skipped by execute_claude_code
+        .any(|cat_path| category_needs_sync(cat_path, cc_dir, read_entries))
+}
 
-        let action_entries = match std::fs::read_dir(&cat_path) {
-            Ok(rd) => rd.filter_map(|e| e.ok()).collect::<Vec<_>>(),
-            Err(_) => return true,
-        };
-
-        for action_entry in action_entries {
-            let action_path = action_entry.path();
-            if !action_path.is_dir() {
-                continue;
-            }
-            let skill_file = action_path.join("SKILL.md");
-            if !skill_file.exists() {
-                continue;
-            }
-
-            let action = match action_path.file_name().and_then(|n| n.to_str()) {
-                Some(s) => s.to_string(),
-                None => continue,
+/// Check one skill category dir for stale/missing Claude Code projections.
+fn category_needs_sync(
+    cat_path: &std::path::Path,
+    cc_dir: &std::path::Path,
+    read_entries: impl Fn(&std::path::Path) -> Option<Vec<std::path::PathBuf>>,
+) -> bool {
+    let Some(category) = cat_path.file_name().and_then(|n| n.to_str()) else {
+        return false;
+    };
+    let Some(action_entries) = read_entries(cat_path) else {
+        return true; // Unreadable category → conservative
+    };
+    action_entries
+        .iter()
+        .filter(|p| p.is_dir())
+        .map(|p| (p.join("SKILL.md"), p.file_name()))
+        .filter(|(skill, _)| skill.exists())
+        .any(|(skill, action)| {
+            let Some(action) = action.and_then(|n| n.to_str()) else {
+                return false;
             };
+            let dest = cc_dir.join(category).join(format!("{}.md", action));
+            destination_is_stale(&skill, &dest)
+        })
+}
 
-            let dest = cc_dir.join(&category).join(format!("{}.md", action));
-            if !dest.exists() {
-                return true; // Missing destination
-            }
-
-            // Compare mtimes: stale destination means needs sync
-            if let Ok(src_meta) = std::fs::metadata(&skill_file) {
-                if let Ok(dst_meta) = std::fs::metadata(&dest) {
-                    if let (Ok(src_mtime), Ok(dst_mtime)) =
-                        (src_meta.modified(), dst_meta.modified())
-                        && src_mtime > dst_mtime
-                    {
-                        return true; // Source newer than destination
-                    }
-                } else {
-                    return true; // Can't read dest metadata → conservative
-                }
-            }
-        }
+/// True when the destination is missing, unreadable, or older than the source.
+fn destination_is_stale(skill_file: &std::path::Path, dest: &std::path::Path) -> bool {
+    if !dest.exists() {
+        return true; // Missing destination
     }
-
-    false
+    // Compare mtimes: stale destination means needs sync. An unreadable
+    // SOURCE is skipped (not conservative-true), matching the original
+    // per-artifact `if let Ok` semantics; an unreadable DESTINATION is
+    // treated as stale (conservative).
+    let Ok(src_mtime) = std::fs::metadata(skill_file).and_then(|m| m.modified()) else {
+        return false;
+    };
+    let Ok(dst_mtime) = std::fs::metadata(dest).and_then(|m| m.modified()) else {
+        return true;
+    };
+    src_mtime > dst_mtime
 }
 
 pub fn run(status_only: bool, dry_run: bool, from_main: bool) -> Result<()> {
