@@ -222,6 +222,28 @@ fn spawn_wrapper_writes_checkpoint() {
 // pure classification pinned for running/exited/budget-exhausted.
 // ---------------------------------------------------------------------------
 
+/// Run a hermetic spawn subcommand with a stub sleep, asserting the child spawned.
+fn run_spawn(
+    tmp: &TempDir,
+    args_log: &std::path::Path,
+    args: &[&str],
+    sleep: &str,
+) -> std::process::Output {
+    spawn_cmd(tmp.path(), args_log)
+        .args(args)
+        .env("PI_STUB_SLEEP", sleep)
+        .output()
+        .unwrap_or_else(|e| panic!("spawn should run: {e}"))
+}
+
+/// Run a hermetic spawn-status subcommand.
+fn run_status(tmp: &TempDir, args_log: &std::path::Path, args: &[&str]) -> std::process::Output {
+    spawn_cmd(tmp.path(), args_log)
+        .args(args)
+        .output()
+        .unwrap_or_else(|e| panic!("status should run: {e}"))
+}
+
 #[test]
 fn spawn_status_classifies_liveness() {
     let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
@@ -229,21 +251,19 @@ fn spawn_status_classifies_liveness() {
     let args_log = tmp.path().join("pi-args.log");
 
     // Running: stub sleeps 30s (kept alive through the running probe).
-    let out = spawn_cmd(tmp.path(), &args_log)
-        .args(["pipeline", "spawn", "subagent:test:probe", "probe prompt"])
-        .env("PI_STUB_SLEEP", "30")
-        .output()
-        .unwrap_or_else(|e| panic!("spawn should run: {e}"));
+    let out = run_spawn(
+        &tmp,
+        &args_log,
+        &["pipeline", "spawn", "subagent:test:probe", "probe prompt"],
+        "30",
+    );
     assert!(
         out.status.success(),
         "spawn failed: {}",
         String::from_utf8_lossy(&out.stderr)
     );
 
-    let status_out = spawn_cmd(tmp.path(), &args_log)
-        .args(["pipeline", "spawn-status"])
-        .output()
-        .unwrap_or_else(|e| panic!("status should run: {e}"));
+    let status_out = run_status(&tmp, &args_log, &["pipeline", "spawn-status"]);
     assert!(status_out.status.success(), "status failed");
     let stdout = String::from_utf8_lossy(&status_out.stdout);
     assert!(
@@ -257,11 +277,12 @@ fn spawn_status_classifies_liveness() {
 
     // Exited: a second spawn whose stub exits immediately, then wait for the
     // pid to die before probing.
-    let out = spawn_cmd(tmp.path(), &args_log)
-        .args(["pipeline", "spawn", "subagent:test:done", "done prompt"])
-        .env("PI_STUB_SLEEP", "0")
-        .output()
-        .unwrap_or_else(|e| panic!("spawn should run: {e}"));
+    let out = run_spawn(
+        &tmp,
+        &args_log,
+        &["pipeline", "spawn", "subagent:test:done", "done prompt"],
+        "0",
+    );
     assert!(
         out.status.success(),
         "spawn failed: {}",
@@ -278,10 +299,7 @@ fn spawn_status_classifies_liveness() {
         done_checkpoint.pid
     );
 
-    let status_out = spawn_cmd(tmp.path(), &args_log)
-        .args(["pipeline", "spawn-status", "subagent:test:done"])
-        .output()
-        .unwrap_or_else(|e| panic!("status should run: {e}"));
+    let status_out = run_status(&tmp, &args_log, &["pipeline", "spawn-status", "subagent:test:done"]);
     let stdout = String::from_utf8_lossy(&status_out.stdout);
     assert!(
         stdout.to_lowercase().contains("exited"),
