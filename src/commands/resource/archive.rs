@@ -314,6 +314,41 @@ mod tests {
 
     // ── export → import round-trip ───────────────────────────────────────────
 
+    
+        // ── shared test helpers ─────────────────────────────────────────
+        /// Write a gzipped tar containing `archive_name -> skill_md`.
+        fn make_archive(archive_path: &std::path::Path, archive_name: &str, skill_md: &std::path::Path) {
+            let out_file = fs::File::create(archive_path).unwrap();
+            let gz = GzEncoder::new(out_file, Compression::default());
+            let mut builder = tar::Builder::new(gz);
+            builder
+                .append_path_with_name(skill_md, archive_name)
+                .unwrap();
+            builder.finish().unwrap();
+            builder.into_inner().unwrap().finish().unwrap();
+        }
+
+        /// Import every non-dir entry into `dst_skills`, mirroring the import flow.
+        fn import_archive(archive_path: &std::path::Path, dst_skills: &std::path::Path) {
+            let in_file = fs::File::open(archive_path).unwrap();
+            let gz = GzDecoder::new(BufReader::new(in_file));
+            let mut archive = tar::Archive::new(gz);
+            for entry in archive.entries().unwrap() {
+                let mut entry = entry.unwrap();
+                let entry_path = entry.path().unwrap().to_string_lossy().to_string();
+                if entry.header().entry_type().is_dir() {
+                    continue;
+                }
+                validate_archive_entry_path(&entry_path).unwrap();
+                let skill_name = entry_path.trim_end_matches("/SKILL.md");
+                let dst_dir = dst_skills.join(skill_name);
+                fs::create_dir_all(&dst_dir).unwrap();
+                let mut content_bytes = Vec::new();
+                std::io::copy(&mut entry, &mut content_bytes).unwrap();
+                fs::write(dst_dir.join("SKILL.md"), &content_bytes).unwrap();
+            }
+        }
+
     #[test]
     fn test_export_import_round_trip() {
         let src_skills = tempfile::tempdir().unwrap();
@@ -323,52 +358,22 @@ mod tests {
         let content = "---\nname: gather\ndescription: Gather skill\n---\n\nInstructions.\n";
         make_skill_dir(src_skills.path(), "gather", content);
 
-        // Export
         let archive_path = archive_dir.path().join("skills.tar.gz");
-        let archive_path_str = archive_path.to_string_lossy().to_string();
-
-        let out_file = fs::File::create(&archive_path).unwrap();
-        let gz = GzEncoder::new(out_file, Compression::default());
-        let mut builder = tar::Builder::new(gz);
-        let skill_md = src_skills.path().join("gather").join("SKILL.md");
-        builder
-            .append_path_with_name(&skill_md, "gather/SKILL.md")
-            .unwrap();
-        builder.finish().unwrap();
-        let gz_encoder = builder.into_inner().unwrap();
-        gz_encoder.finish().unwrap();
+        make_archive(&archive_path, "gather/SKILL.md", &src_skills.path().join("gather").join("SKILL.md"));
 
         // Validate paths in archive
         assert!(validate_archive_entry_path("gather/SKILL.md").is_ok());
 
         // Import (simulate)
-        let in_file = fs::File::open(&archive_path).unwrap();
-        let gz = GzDecoder::new(BufReader::new(in_file));
-        let mut archive = tar::Archive::new(gz);
-        for entry in archive.entries().unwrap() {
-            let mut entry = entry.unwrap();
-            let entry_path = entry.path().unwrap().to_string_lossy().to_string();
-            if entry.header().entry_type().is_dir() {
-                continue;
-            }
-            validate_archive_entry_path(&entry_path).unwrap();
-            let skill_name = entry_path.trim_end_matches("/SKILL.md");
-            let dst_dir = dst_skills.path().join(skill_name);
-            fs::create_dir_all(&dst_dir).unwrap();
-            let mut content_bytes = Vec::new();
-            std::io::copy(&mut entry, &mut content_bytes).unwrap();
-            fs::write(dst_dir.join("SKILL.md"), &content_bytes).unwrap();
-        }
+        import_archive(&archive_path, dst_skills.path());
 
         // Verify content preserved
         let imported_content =
             fs::read_to_string(dst_skills.path().join("gather").join("SKILL.md")).unwrap();
         assert_eq!(imported_content, content);
-        let _ = archive_path_str;
     }
 
-    #[test]
-    fn test_export_import_hierarchical_round_trip() {
+fn test_export_import_hierarchical_round_trip() {
         let src_skills = tempfile::tempdir().unwrap();
         let dst_skills = tempfile::tempdir().unwrap();
         let archive_dir = tempfile::tempdir().unwrap();
@@ -378,43 +383,14 @@ mod tests {
         make_skill_dir(src_skills.path(), "issue/gather", content);
 
         let archive_path = archive_dir.path().join("skills.tar.gz");
-
-        let out_file = fs::File::create(&archive_path).unwrap();
-        let gz = GzEncoder::new(out_file, Compression::default());
-        let mut builder = tar::Builder::new(gz);
-        let skill_md = src_skills
-            .path()
-            .join("issue")
-            .join("gather")
-            .join("SKILL.md");
-        builder
-            .append_path_with_name(&skill_md, "issue/gather/SKILL.md")
-            .unwrap();
-        builder.finish().unwrap();
-        let gz_encoder = builder.into_inner().unwrap();
-        gz_encoder.finish().unwrap();
+        let skill_md = src_skills.path().join("issue").join("gather").join("SKILL.md");
+        make_archive(&archive_path, "issue/gather/SKILL.md", &skill_md);
 
         // Validate hierarchical path
         assert!(validate_archive_entry_path("issue/gather/SKILL.md").is_ok());
 
         // Import
-        let in_file = fs::File::open(&archive_path).unwrap();
-        let gz = GzDecoder::new(BufReader::new(in_file));
-        let mut archive = tar::Archive::new(gz);
-        for entry in archive.entries().unwrap() {
-            let mut entry = entry.unwrap();
-            let entry_path = entry.path().unwrap().to_string_lossy().to_string();
-            if entry.header().entry_type().is_dir() {
-                continue;
-            }
-            validate_archive_entry_path(&entry_path).unwrap();
-            let skill_name = entry_path.trim_end_matches("/SKILL.md");
-            let dst_dir = dst_skills.path().join(skill_name);
-            fs::create_dir_all(&dst_dir).unwrap();
-            let mut content_bytes = Vec::new();
-            std::io::copy(&mut entry, &mut content_bytes).unwrap();
-            fs::write(dst_dir.join("SKILL.md"), &content_bytes).unwrap();
-        }
+        import_archive(&archive_path, dst_skills.path());
 
         let imported = fs::read_to_string(
             dst_skills
@@ -444,16 +420,7 @@ mod tests {
         // Create archive with updated content
         make_skill_dir(src_skills.path(), "gather", updated);
         let archive_path = archive_dir.path().join("skills.tar.gz");
-        let out_file = fs::File::create(&archive_path).unwrap();
-        let gz = GzEncoder::new(out_file, Compression::default());
-        let mut builder = tar::Builder::new(gz);
-        let skill_md = src_skills.path().join("gather").join("SKILL.md");
-        builder
-            .append_path_with_name(&skill_md, "gather/SKILL.md")
-            .unwrap();
-        builder.finish().unwrap();
-        let gz_encoder = builder.into_inner().unwrap();
-        gz_encoder.finish().unwrap();
+        make_archive(&archive_path, "gather/SKILL.md", &src_skills.path().join("gather").join("SKILL.md"));
 
         // Import with yes=true
         let entries = read_archive_entries(archive_path.to_str().unwrap()).unwrap();
