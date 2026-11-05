@@ -1,5 +1,6 @@
 use crate::config::BUILTIN_PIPELINE_TEMPLATES_HELP;
 
+#[derive(Clone, Copy)]
 pub struct HelpContent {
     pub about: &'static str,
     pub examples: &'static [(&'static str, &'static str)],
@@ -9,9 +10,10 @@ pub struct HelpContent {
     pub internals: &'static [&'static str],
 }
 
-pub fn command_help(name: &str) -> Option<HelpContent> {
-    match name {
-        "status" => Some(HelpContent {
+static HELP_ENTRIES: &[(&str, HelpContent)] = &[
+    (
+        "status",
+        HelpContent {
             about: "Check project status and suggest next steps",
             examples: &[
                 ("wai status", "Quick project overview"),
@@ -33,8 +35,11 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 "Runs on_status plugin hooks for enrichment",
                 "Scans openspec/changes/ for task progress",
             ],
-        }),
-        "init" => Some(HelpContent {
+        },
+    ),
+    (
+        "init",
+        HelpContent {
             about: "Initialize wai in the current directory",
             examples: &[
                 ("wai init", "Initialize with directory name as project"),
@@ -48,8 +53,11 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 "Generates config.toml with project metadata",
                 "Sets up agent-config with .projections.yml",
             ],
-        }),
-        "new" => Some(HelpContent {
+        },
+    ),
+    (
+        "new",
+        HelpContent {
             about: "Create a new project, area, or resource",
             examples: &[
                 ("wai new project my-app", "Create a new project"),
@@ -63,8 +71,11 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 "Creates subdirectories under .wai/projects|areas|resources",
                 "Initializes .state file with research phase for projects",
             ],
-        }),
-        "add" => Some(HelpContent {
+        },
+    ),
+    (
+        "add",
+        HelpContent {
             about: "Add artifacts (research, plans, designs, reviews) to a project",
             examples: &[
                 (
@@ -113,8 +124,11 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 "Tags are stored in YAML frontmatter",
                 "WAI_PIPELINE_RUN tag is merged with any --tags value",
             ],
-        }),
-        "add skill" => Some(HelpContent {
+        },
+    ),
+    (
+        "add skill",
+        HelpContent {
             about: "Add a new agent skill to the repository",
             examples: &[
                 ("wai add skill my-skill", "Create a blank skill"),
@@ -137,8 +151,11 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 "Hierarchical skill names use one '/' separator (e.g. issue/gather)",
                 "'wai resource add skill' is deprecated — prefer 'wai add skill'",
             ],
-        }),
-        "phase" => Some(HelpContent {
+        },
+    ),
+    (
+        "phase",
+        HelpContent {
             about: "Show or change the current project phase",
             examples: &[
                 ("wai phase show", "Display current phase"),
@@ -153,8 +170,11 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 "Phases: research → design → plan → implement → review → archive",
                 "State persisted in .wai/projects/<name>/.state",
             ],
-        }),
-        "sync" => Some(HelpContent {
+        },
+    ),
+    (
+        "sync",
+        HelpContent {
             about: "Sync agent configs to tool-specific locations",
             examples: &[
                 ("wai sync", "Sync all agent configs"),
@@ -173,8 +193,11 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 "Reads .projections.yml for tool-specific mappings",
                 "Copies/symlinks config files to target locations",
             ],
-        }),
-        "search" => Some(HelpContent {
+        },
+    ),
+    (
+        "search",
+        HelpContent {
             about: "Search across all artifacts",
             examples: &[
                 ("wai search \"authentication\"", "Search all artifacts"),
@@ -203,8 +226,11 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 "Walks .wai/ directory tree recursively",
                 "Uses regex crate for pattern matching",
             ],
-        }),
-        "show" => Some(HelpContent {
+        },
+    ),
+    (
+        "show",
+        HelpContent {
             about: "Show information about items",
             examples: &[
                 ("wai show", "Show overview of all items"),
@@ -214,8 +240,11 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
             advanced_options: &[],
             env_vars: &[("NO_COLOR", "Disable colored output")],
             internals: &["Aggregates data from projects, areas, and resources"],
-        }),
-        "doctor" => Some(HelpContent {
+        },
+    ),
+    (
+        "doctor",
+        HelpContent {
             about: "Diagnose workspace health",
             examples: &[
                 ("wai doctor", "Run all health checks"),
@@ -234,8 +263,11 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 "Verifies plugin tool availability in PATH",
                 "Validates project .state files",
             ],
-        }),
-        "feedback" => Some(HelpContent {
+        },
+    ),
+    (
+        "feedback",
+        HelpContent {
             about: "File an issue against wai's upstream repository",
             examples: &[
                 ("wai feedback bug", "File a bug report"),
@@ -265,8 +297,11 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 "Fallback: --web then manual copy-paste if gh is unavailable",
                 "Kinds: bug, friction, docs-gap, aix-gap, idea",
             ],
-        }),
-        "handoff" => Some(HelpContent {
+        },
+    ),
+    (
+        "handoff",
+        HelpContent {
             about: "Generate handoff documents",
             examples: &[(
                 "wai handoff create my-app",
@@ -279,8 +314,11 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 "Aggregates research, plans, and designs into a single document",
                 "Includes phase history and timeline",
             ],
-        }),
-        "plugin" => Some(HelpContent {
+        },
+    ),
+    (
+        "plugin",
+        HelpContent {
             about: "Manage plugins",
             examples: &[
                 ("wai plugin list", "List all available plugins"),
@@ -294,8 +332,11 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 "Plugins are defined in .wai/plugins/",
                 "Plugin detection based on marker files",
             ],
-        }),
-        "config" => Some(HelpContent {
+        },
+    ),
+    (
+        "config",
+        HelpContent {
             about: "Manage agent configuration files",
             examples: &[
                 ("wai config list", "List all config files"),
@@ -309,8 +350,11 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 "Configs stored in .wai/resources/agent-config/",
                 "Types: skills, rules, context",
             ],
-        }),
-        "timeline" => Some(HelpContent {
+        },
+    ),
+    (
+        "timeline",
+        HelpContent {
             about: "View chronological timeline of artifacts",
             examples: &[
                 ("wai timeline my-app", "View full project timeline"),
@@ -331,8 +375,11 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 "Reads artifact timestamps from filenames",
                 "Sorts by date, newest first by default",
             ],
-        }),
-        "move" => Some(HelpContent {
+        },
+    ),
+    (
+        "move",
+        HelpContent {
             about: "Move items between PARA categories",
             examples: &[
                 (
@@ -345,8 +392,11 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
             advanced_options: &[],
             env_vars: &[("NO_COLOR", "Disable colored output")],
             internals: &["Moves directory between .wai/projects|areas|resources|archives"],
-        }),
-        "import" => Some(HelpContent {
+        },
+    ),
+    (
+        "import",
+        HelpContent {
             about: "Import existing tool configurations",
             examples: &[
                 ("wai import .claude/", "Import Claude config files"),
@@ -359,8 +409,11 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 "Copies files into .wai/resources/agent-config/",
                 "Detects config type from file structure",
             ],
-        }),
-        "pipeline" => Some(HelpContent {
+        },
+    ),
+    (
+        "pipeline",
+        HelpContent {
             about: "Manage pipelines (ordered multi-step workflows)",
             examples: &[
                 (
@@ -406,8 +459,11 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 "Run state stored in .wai/resources/pipelines/<name>/runs/<id>.yml",
                 "Artifact lookup uses pipeline-run:<id> and pipeline-step:<id> tags",
             ],
-        }),
-        "close" => Some(HelpContent {
+        },
+    ),
+    (
+        "close",
+        HelpContent {
             about: "Wrap up a session: create a handoff and show next steps",
             examples: &[
                 ("wai close", "Close current session (auto-detects project)"),
@@ -425,8 +481,11 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 "Creates a handoff artifact under .wai/projects/<name>/",
                 "Writes .wai/.pending-resume signal for wai prime to detect",
             ],
-        }),
-        "prime" => Some(HelpContent {
+        },
+    ),
+    (
+        "prime",
+        HelpContent {
             about: "Orient yourself at session start: project, phase, last handoff, and suggested next step",
             examples: &[
                 (
@@ -447,8 +506,11 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 "Detects .wai/.pending-resume and shows RESUMING banner when present",
                 "Reads the most recent handoff artifact for next-step suggestions",
             ],
-        }),
-        "why" => Some(HelpContent {
+        },
+    ),
+    (
+        "why",
+        HelpContent {
             about: "Ask why a decision was made (LLM-powered reasoning oracle)",
             examples: &[
                 (
@@ -475,8 +537,11 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 "Backends: claude, claude-cli, agent (auto-detect), ollama",
                 "Falls back to wai search when no LLM is available",
             ],
-        }),
-        "reflect" => Some(HelpContent {
+        },
+    ),
+    (
+        "reflect",
+        HelpContent {
             about: "Synthesize session context into project-specific AI guidance",
             examples: &[
                 (
@@ -508,8 +573,11 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 "Context sources (ranked): conversation > handoffs > research/design/plan",
                 "Reuses [llm] config from .wai/config.toml",
             ],
-        }),
-        "ls" => Some(HelpContent {
+        },
+    ),
+    (
+        "ls",
+        HelpContent {
             about: "List all wai projects across workspaces (default root: $HOME)",
             examples: &[
                 ("wai ls", "Scan $HOME for wai workspaces (default depth 3)"),
@@ -528,16 +596,22 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 "Walks the filesystem looking for .wai/ directories",
                 "Reads phase and beads issue counts from each workspace",
             ],
-        }),
-        "tutorial" => Some(HelpContent {
+        },
+    ),
+    (
+        "tutorial",
+        HelpContent {
             about: "Run the interactive quickstart tutorial",
             examples: &[("wai tutorial", "Start the interactive quickstart tutorial")],
             options: &[],
             advanced_options: &[],
             env_vars: &[("NO_COLOR", "Disable colored output")],
             internals: &["Guides through init, new project, add artifact, and phase commands"],
-        }),
-        "resource" => Some(HelpContent {
+        },
+    ),
+    (
+        "resource",
+        HelpContent {
             about: "Manage resources (skills, rules, context)",
             examples: &[
                 ("wai resource add skill my-skill", "Add a new skill"),
@@ -577,8 +651,11 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 "Hierarchical skill names use one '/' separator (e.g. issue/gather)",
                 "Global skills stored in ~/.wai/resources/skills/",
             ],
-        }),
-        "way" => Some(HelpContent {
+        },
+    ),
+    (
+        "way",
+        HelpContent {
             about: "Show repo hygiene and agent workflow conventions — skills, rules, best practices",
             examples: &[
                 ("wai way", "Show hygiene status for the current repo"),
@@ -603,59 +680,71 @@ pub fn command_help(name: &str) -> Option<HelpContent> {
                 "Works in any directory — a wai workspace is not required",
                 "Always exits successfully; shows recommendations without enforcing them",
             ],
-        }),
-        _ => None,
-    }
+        },
+    ),
+];
+
+pub fn command_help(name: &str) -> Option<HelpContent> {
+    HELP_ENTRIES
+        .iter()
+        .find(|(entry_name, _)| *entry_name == name)
+        .map(|(_, content)| *content)
 }
+
+const MAIN_HELP_QUICKSTART: &str = "QUICK START:\n\
+  wai init                    Initialize in current directory\n\
+  wai new project my-app      Create a new project\n\
+  wai status                  Check project status\n\
+  wai add research \"notes\"     Add research artifacts\n\
+  wai phase next              Advance project phase\n\n";
+
+const MAIN_HELP_COMMANDS: &str = "COMMANDS:\n\
+  add       Add artifacts (research, plans, designs, reviews) to a project\n\
+  close     Wrap up a session and save handoff\n\
+  config    Manage agent configuration files\n\
+  doctor    Diagnose workspace health\n\
+  feedback  File an issue against wai's upstream repository\n\
+  handoff   Generate handoff documents\n\
+  import    Import existing tool configurations\n\
+  init      Initialize wai in the current directory\n\
+  ls        List all wai projects across workspaces (default root: $HOME)\n\
+  move      Move items between PARA categories\n\
+  new       Create a new project, area, or resource\n\
+  phase     Show or change the current project phase\n\
+  pipeline  Manage pipelines (ordered multi-skill workflows)\n\
+  plugin    Manage plugins\n\
+  prime     Orient yourself at session start\n\
+  reflect   Synthesize session context into AI guidance\n\
+  resource  Manage resources (skills, rules, context)\n\
+  search    Search across all artifacts\n\
+  show      Show information about items\n\
+  status    Check project status and suggest next steps\n\
+  sync      Sync agent configs to tool-specific locations\n\
+  timeline  View chronological timeline of artifacts\n\
+  tutorial  Run the interactive quickstart tutorial\n\
+  way       Check repository best practices\n\
+  why       Ask why a decision was made (LLM-powered)\n\n";
+
+const MAIN_HELP_OPTIONS: &str = "OPTIONS:\n\
+  -v, --verbose...  Increase output verbosity (-v, -vv, -vvv)\n\
+  -q, --quiet       Suppress non-error output\n\
+  -h, --help        Print help\n\
+  -V, --version     Print version\n";
 
 pub fn render_main_help(verbose: u8) -> String {
     let mut out = String::new();
 
     out.push_str("wai /waɪ/ — know why it was built that way\n\n");
+    out.push_str(MAIN_HELP_QUICKSTART);
+    out.push_str(MAIN_HELP_COMMANDS);
+    out.push_str(MAIN_HELP_OPTIONS);
+    append_verbose_sections(&mut out, verbose);
+    out.push_str("Run 'wai <command> --help' for more information on a command.\n");
 
-    out.push_str("QUICK START:\n");
-    out.push_str("  wai init                    Initialize in current directory\n");
-    out.push_str("  wai new project my-app      Create a new project\n");
-    out.push_str("  wai status                  Check project status\n");
-    out.push_str("  wai add research \"notes\"     Add research artifacts\n");
-    out.push_str("  wai phase next              Advance project phase\n");
-    out.push('\n');
+    out
+}
 
-    // COMMANDS: keep in alphabetical order
-    out.push_str("COMMANDS:\n");
-    out.push_str("  add       Add artifacts (research, plans, designs, reviews) to a project\n");
-    out.push_str("  close     Wrap up a session and save handoff\n");
-    out.push_str("  config    Manage agent configuration files\n");
-    out.push_str("  doctor    Diagnose workspace health\n");
-    out.push_str("  feedback  File an issue against wai's upstream repository\n");
-    out.push_str("  handoff   Generate handoff documents\n");
-    out.push_str("  import    Import existing tool configurations\n");
-    out.push_str("  init      Initialize wai in the current directory\n");
-    out.push_str("  ls        List all wai projects across workspaces (default root: $HOME)\n");
-    out.push_str("  move      Move items between PARA categories\n");
-    out.push_str("  new       Create a new project, area, or resource\n");
-    out.push_str("  phase     Show or change the current project phase\n");
-    out.push_str("  pipeline  Manage pipelines (ordered multi-skill workflows)\n");
-    out.push_str("  plugin    Manage plugins\n");
-    out.push_str("  prime     Orient yourself at session start\n");
-    out.push_str("  reflect   Synthesize session context into AI guidance\n");
-    out.push_str("  resource  Manage resources (skills, rules, context)\n");
-    out.push_str("  search    Search across all artifacts\n");
-    out.push_str("  show      Show information about items\n");
-    out.push_str("  status    Check project status and suggest next steps\n");
-    out.push_str("  sync      Sync agent configs to tool-specific locations\n");
-    out.push_str("  timeline  View chronological timeline of artifacts\n");
-    out.push_str("  tutorial  Run the interactive quickstart tutorial\n");
-    out.push_str("  way       Check repository best practices\n");
-    out.push_str("  why       Ask why a decision was made (LLM-powered)\n");
-    out.push('\n');
-
-    out.push_str("OPTIONS:\n");
-    out.push_str("  -v, --verbose...  Increase output verbosity (-v, -vv, -vvv)\n");
-    out.push_str("  -q, --quiet       Suppress non-error output\n");
-    out.push_str("  -h, --help        Print help\n");
-    out.push_str("  -V, --version     Print version\n");
-
+fn append_verbose_sections(out: &mut String, verbose: u8) {
     if verbose >= 1 {
         out.push_str("\nADVANCED OPTIONS:\n");
         out.push_str("      --json        Output machine-readable JSON\n");
@@ -689,10 +778,6 @@ pub fn render_main_help(verbose: u8) -> String {
             "\nUse -v for advanced options, -vv for environment variables, -vvv for internals.\n",
         );
     }
-
-    out.push_str("Run 'wai <command> --help' for more information on a command.\n");
-
-    out
 }
 
 pub fn render_command_help(name: &str, verbose: u8) -> Option<String> {
