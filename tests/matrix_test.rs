@@ -20,15 +20,18 @@ fn wai_cmd(dir: &Path) -> Command {
 }
 
 fn init_workspace(dir: &Path) {
-    run_ok(dir, &["init", "--name", "test-ws"]);
+    let out = wai_cmd(dir)
+        .args(["init", "--name", "test-ws"])
+        .output()
+        .unwrap_or_else(|e| panic!("init should run: {e}"));
+    assert!(out.status.success());
 }
 
 fn create_project(dir: &Path, name: &str) {
     run_ok(dir, &["new", "project", name]);
 }
 
-/// Run `wai <args>` in `dir`, asserting success; returns the output so
-/// callers can add their own assertions (pretender counts per-function).
+/// Run `wai <args>` in `dir`; asserts success, returns output for extra assertions.
 fn run_ok(dir: &Path, args: &[&str]) -> std::process::Output {
     let out = wai_cmd(dir)
         .args(args)
@@ -181,8 +184,8 @@ fn matrix_decide_writes_decision_and_design_doc() {
     );
 
     let m = matrix_dir(tmp.path(), "my-app");
-    let decision =
-        fs::read_to_string(m.join("decision.md")).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    let path = m.join("decision.md");
+    let decision = fs::read_to_string(path).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert!(
         decision.contains("02-event-sourcing"),
         "decision must name the approach"
@@ -439,7 +442,6 @@ fn lint_judgment_and_link_only_cells_warn() {
     let (tmp, m) = setup_matrix();
     run_ok(tmp.path(), &["matrix", "criterion", "add", "c"]);
 
-    // judgment words lint
     fill_cell(
         &m,
         "01-status-quo",
@@ -454,7 +456,6 @@ fn lint_judgment_and_link_only_cells_warn() {
     assert!(out.status.success());
     assert!(stderr.contains("judgment"));
 
-    // link-only cell lint
     fill_cell(
         &m,
         "01-status-quo",
@@ -469,7 +470,6 @@ fn lint_judgment_and_link_only_cells_warn() {
     assert!(out.status.success());
     assert!(stderr.contains("link"));
 
-    // criterion phrased as question lint
     fs::write(
         matrix_dir(tmp.path(), "my-app").join("criteria/01-c.md"),
         "# c\n\nHow cheap is it?\n",
@@ -586,7 +586,7 @@ fn agent_flow_direct_file_io_lint_render_gate() {
         .unwrap_or_else(|e| panic!("lint should run: {e}"));
     assert!(out.status.success());
 
-    // 4. Decide (multi-artifact op) + render + gate.
+    // 4. Decide + render + gate.
     run_ok(
         tmp.path(),
         &["matrix", "decide", "02-event-sourcing", "Audit story wins."],
@@ -624,10 +624,8 @@ fn write_agent_flow_cells(m: &Path) {
 
 // ── 6.1 design → plan phase gate ─────────────────────────────────────────
 
-fn set_phase_design(dir: &Path, project: &str) {
-    let _ = project;
-    let out = wai_cmd(dir).args(["phase", "set", "design"]).output().unwrap_or_else(|e| panic!("phase set should run: {e}"));
-    assert!(out.status.success());
+fn set_phase_design(dir: &Path, _project: &str) {
+    run_ok(dir, &["phase", "set", "design"]);
 }
 
 #[test]
