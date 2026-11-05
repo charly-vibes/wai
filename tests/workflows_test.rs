@@ -48,47 +48,31 @@ fn minimal_research_at_one_artifact() {
 }
 
 #[test]
-fn research_threshold_triggers_advance_at_three() {
-    let detections = detect_patterns(&ctx(Phase::Research, 3, 0, 0));
-    assert_eq!(detections.len(), 1);
-    assert_eq!(
-        detections[0].pattern,
-        WorkflowPattern::ResearchReadyToAdvance
-    );
-}
-
-#[test]
-fn two_research_artifacts_triggers_advance() {
-    // threshold is >= 2, so 2 artifacts should suggest advancing to design
-    let detections = detect_patterns(&ctx(Phase::Research, 2, 0, 0));
-    assert_eq!(detections.len(), 1);
-    assert_eq!(
-        detections[0].pattern,
-        WorkflowPattern::ResearchReadyToAdvance,
-        "2 research artifacts should trigger ResearchReadyToAdvance"
-    );
+fn research_threshold_triggers_advance_at_two_and_three() {
+    // threshold is >= 2, so both 2 and 3 artifacts suggest advancing to design
+    for artifacts in [2usize, 3] {
+        let detections = detect_patterns(&ctx(Phase::Research, artifacts, 0, 0));
+        assert_eq!(detections.len(), 1);
+        assert_eq!(
+            detections[0].pattern,
+            WorkflowPattern::ResearchReadyToAdvance,
+            "{artifacts} research artifacts should trigger ResearchReadyToAdvance"
+        );
+    }
 }
 
 #[test]
 fn ready_to_implement_requires_design_artifact() {
     // design phase with design artifact → ReadyToImplement
-    let detections = detect_patterns(&ctx(Phase::Design, 2, 0, 1));
+    let with_design = detect_patterns(&ctx(Phase::Design, 2, 0, 1));
     assert!(
-        detections
-            .iter()
-            .any(|d| d.pattern == WorkflowPattern::ReadyToImplement),
+        with_design.iter().any(|d| d.pattern == WorkflowPattern::ReadyToImplement),
         "should suggest ReadyToImplement when design artifact exists"
     );
-}
-
-#[test]
-fn ready_to_implement_needs_design_artifact() {
     // design phase but no design artifacts → no ReadyToImplement
-    let detections = detect_patterns(&ctx(Phase::Design, 2, 1, 0));
+    let without = detect_patterns(&ctx(Phase::Design, 2, 1, 0));
     assert!(
-        !detections
-            .iter()
-            .any(|d| d.pattern == WorkflowPattern::ReadyToImplement),
+        !without.iter().any(|d| d.pattern == WorkflowPattern::ReadyToImplement),
         "should not suggest ReadyToImplement with no design artifacts"
     );
 }
@@ -105,43 +89,25 @@ fn implement_phase_active_always_detected() {
 }
 
 #[test]
-fn needs_research_in_plan_with_no_research() {
-    let detections = detect_patterns(&ctx(Phase::Plan, 0, 1, 0));
+fn needs_research_depends_on_research_presence() {
+    let fires = detect_patterns(&ctx(Phase::Plan, 0, 1, 0));
     assert!(
-        detections
-            .iter()
-            .any(|d| d.pattern == WorkflowPattern::NeedsResearch),
+        fires.iter().any(|d| d.pattern == WorkflowPattern::NeedsResearch),
         "NeedsResearch should fire when in plan phase with no research"
     );
-}
-
-#[test]
-fn no_needs_research_when_research_present() {
-    let detections = detect_patterns(&ctx(Phase::Plan, 2, 1, 0));
+    let quiet = detect_patterns(&ctx(Phase::Plan, 2, 1, 0));
     assert!(
-        !detections
-            .iter()
-            .any(|d| d.pattern == WorkflowPattern::NeedsResearch),
+        !quiet.iter().any(|d| d.pattern == WorkflowPattern::NeedsResearch),
         "NeedsResearch should not fire when research is present"
     );
 }
 
 #[test]
-fn review_phase_produces_no_patterns() {
-    let detections = detect_patterns(&ctx(Phase::Review, 5, 3, 2));
-    assert!(
-        detections.is_empty(),
-        "review phase should produce no workflow patterns"
-    );
-}
-
-#[test]
-fn archive_phase_produces_no_patterns() {
-    let detections = detect_patterns(&ctx(Phase::Archive, 5, 3, 2));
-    assert!(
-        detections.is_empty(),
-        "archive phase should produce no workflow patterns"
-    );
+fn review_and_archive_phases_produce_no_patterns() {
+    for (phase, label) in [(Phase::Review, "review"), (Phase::Archive, "archive")] {
+        let detections = detect_patterns(&ctx(phase, 5, 3, 2));
+        assert!(detections.is_empty(), "{label} phase should produce no workflow patterns");
+    }
 }
 
 // ─── suggestion relevance ─────────────────────────────────────────────────────
@@ -288,37 +254,20 @@ fn stale_ctx(phase: Phase, days_old: i64) -> ProjectContext {
 }
 
 #[test]
-fn stale_phase_detected_after_threshold() {
-    let ctx = stale_ctx(Phase::Implement, 15);
-    let detections = detect_patterns(&ctx);
+fn stale_phase_threshold_and_archive_exemption() {
+    let stale = detect_patterns(&stale_ctx(Phase::Implement, 15));
     assert!(
-        detections
-            .iter()
-            .any(|d| matches!(d.pattern, WorkflowPattern::StalePhase { .. })),
+        stale.iter().any(|d| matches!(d.pattern, WorkflowPattern::StalePhase { .. })),
         "should detect StalePhase when phase is >14 days old"
     );
-}
-
-#[test]
-fn stale_phase_not_detected_within_threshold() {
-    let ctx = stale_ctx(Phase::Implement, 13);
-    let detections = detect_patterns(&ctx);
+    let fresh = detect_patterns(&stale_ctx(Phase::Implement, 13));
     assert!(
-        !detections
-            .iter()
-            .any(|d| matches!(d.pattern, WorkflowPattern::StalePhase { .. })),
+        !fresh.iter().any(|d| matches!(d.pattern, WorkflowPattern::StalePhase { .. })),
         "should not detect StalePhase when phase is <14 days old"
     );
-}
-
-#[test]
-fn stale_phase_not_detected_for_archive() {
-    let ctx = stale_ctx(Phase::Archive, 30);
-    let detections = detect_patterns(&ctx);
+    let archived = detect_patterns(&stale_ctx(Phase::Archive, 30));
     assert!(
-        !detections
-            .iter()
-            .any(|d| matches!(d.pattern, WorkflowPattern::StalePhase { .. })),
+        !archived.iter().any(|d| matches!(d.pattern, WorkflowPattern::StalePhase { .. })),
         "should not detect StalePhase for archive phase"
     );
 }
@@ -341,42 +290,21 @@ fn looks_complete_detected_in_review_with_handoff() {
             .any(|d| d.pattern == WorkflowPattern::LooksComplete),
         "should detect LooksComplete in review phase with handoff"
     );
-}
-
-#[test]
-fn looks_complete_not_detected_without_handoff() {
-    let ctx = ProjectContext {
-        name: "test".to_string(),
-        phase: Phase::Review,
-        phase_started: Utc::now(),
-        research_count: 3,
-        plan_count: 1,
-        design_count: 1,
-        handoff_count: 0,
-    };
-    let detections = detect_patterns(&ctx);
+    // no handoff → no LooksComplete
+    let mut no_handoff = ctx;
+    no_handoff.handoff_count = 0;
     assert!(
-        !detections
+        !detect_patterns(&no_handoff)
             .iter()
             .any(|d| d.pattern == WorkflowPattern::LooksComplete),
-        "should not detect LooksComplete in review phase without handoff"
+        "should not detect LooksComplete without handoff"
     );
-}
-
-#[test]
-fn looks_complete_not_detected_outside_review() {
-    let ctx = ProjectContext {
-        name: "test".to_string(),
-        phase: Phase::Implement,
-        phase_started: Utc::now(),
-        research_count: 3,
-        plan_count: 1,
-        design_count: 1,
-        handoff_count: 2,
-    };
-    let detections = detect_patterns(&ctx);
+    // handoff outside review → no LooksComplete
+    let mut outside = no_handoff;
+    outside.phase = Phase::Implement;
+    outside.handoff_count = 2;
     assert!(
-        !detections
+        !detect_patterns(&outside)
             .iter()
             .any(|d| d.pattern == WorkflowPattern::LooksComplete),
         "should not detect LooksComplete outside review phase"
