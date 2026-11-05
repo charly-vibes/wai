@@ -193,40 +193,7 @@ pub fn scan_freshness(project_root: &Path) -> FreshnessReport {
             continue;
         }
         for subdir in &artifact_subdirs {
-            let art_dir = proj_path.join(subdir);
-            let Ok(art_entries) = fs::read_dir(&art_dir) else {
-                continue;
-            };
-            for art_entry in art_entries.filter_map(|e| e.ok()) {
-                let path = art_entry.path();
-                if path.extension().and_then(|e| e.to_str()) != Some("md") {
-                    continue;
-                }
-                let Ok(content) = fs::read_to_string(&path) else {
-                    continue;
-                };
-                let tracks = parse_tracks_from_frontmatter(&content);
-                if tracks.is_empty() {
-                    continue;
-                }
-                match read_sidecar(&path) {
-                    None => {
-                        untracked.push(path.to_string_lossy().to_string());
-                    }
-                    Some(sc) => {
-                        let (stale_flag, changed) = is_stale(project_root, &sc);
-                        if stale_flag {
-                            stale.push(StaleEntry {
-                                artifact: path.to_string_lossy().to_string(),
-                                decision_point: parse_decision_point(&content),
-                                changed_paths: changed,
-                            });
-                        } else {
-                            clean += 1;
-                        }
-                    }
-                }
-            }
+            scan_artifact_dir(project_root, &proj_path.join(subdir), &mut stale, &mut untracked, &mut clean);
         }
     }
 
@@ -236,6 +203,54 @@ pub fn scan_freshness(project_root: &Path) -> FreshnessReport {
         untracked,
         clean,
         stale_count,
+    }
+}
+
+fn scan_artifact_dir(
+    project_root: &Path,
+    art_dir: &Path,
+    stale: &mut Vec<StaleEntry>,
+    untracked: &mut Vec<String>,
+    clean: &mut usize,
+) {
+    let Ok(art_entries) = fs::read_dir(art_dir) else {
+        return;
+    };
+    for art_entry in art_entries.filter_map(|e| e.ok()) {
+        let path = art_entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("md") {
+            continue;
+        }
+        let Ok(content) = fs::read_to_string(&path) else {
+            continue;
+        };
+        if parse_tracks_from_frontmatter(&content).is_empty() {
+            continue;
+        }
+        match read_sidecar(&path) {
+            None => untracked.push(path.to_string_lossy().to_string()),
+            Some(sc) => classify_stale(project_root, &path, &content, &sc, stale, clean),
+        }
+    }
+}
+
+fn classify_stale(
+    project_root: &Path,
+    path: &Path,
+    content: &str,
+    sc: &FreshnessSidecar,
+    stale: &mut Vec<StaleEntry>,
+    clean: &mut usize,
+) {
+    let (stale_flag, changed) = is_stale(project_root, sc);
+    if stale_flag {
+        stale.push(StaleEntry {
+            artifact: path.to_string_lossy().to_string(),
+            decision_point: parse_decision_point(content),
+            changed_paths: changed,
+        });
+    } else {
+        *clean += 1;
     }
 }
 
