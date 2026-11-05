@@ -383,7 +383,11 @@ prompt = "{topic}: do step two implementation."
 "#;
 
 pub fn write_pipeline_toml(dir: &std::path::Path, name: &str) {
-    write_pipeline_file(dir, name, BASIC_PIPELINE_TOML_TEMPLATE.replace("{name}", name));
+    write_pipeline_file(
+        dir,
+        name,
+        BASIC_PIPELINE_TOML_TEMPLATE.replace("{name}", name),
+    );
 }
 
 // ─── wai pipeline gates and approvals ─────────────────────────────────────────
@@ -617,7 +621,7 @@ pub fn init_workspace_with_project(dir: &std::path::Path, name: &str) {
 pub fn install_fake_bd_ready_json(dir: &std::path::Path, issues_json: &str) -> std::path::PathBuf {
     let bin_dir = dir.join("fake-bin");
     fs::create_dir_all(&bin_dir).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-    let script_path = bin_dir.join("bd");
+    let _script_path = bin_dir.join("bd");
     let escaped = issues_json.replace('\'', "'\"'\"'");
     let script = format!(
         "#!/bin/sh

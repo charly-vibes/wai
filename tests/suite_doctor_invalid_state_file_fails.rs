@@ -169,8 +169,16 @@ const HELP_CASES: &[(&[&str], &[&str], &[&str])] = &[
         &["ADVANCED OPTIONS:", "--json", "--safe"],
         &[],
     ),
-    (&["--help", "-vv"], &["ENVIRONMENT:", "NO_COLOR", "WAI_LOG"], &[]),
-    (&["--help", "-vvv"], &["INTERNALS:", "config.toml", "PARA"], &[]),
+    (
+        &["--help", "-vv"],
+        &["ENVIRONMENT:", "NO_COLOR", "WAI_LOG"],
+        &[],
+    ),
+    (
+        &["--help", "-vvv"],
+        &["INTERNALS:", "config.toml", "PARA"],
+        &[],
+    ),
 ];
 
 #[test]
@@ -324,10 +332,9 @@ fn way_works_without_wai_init() {
 
 #[test]
 fn way_always_exits_zero_across_adoption_levels() {
-    fn seed_empty(dir: &std::path::Path) {}
+    fn seed_empty(_dir: &std::path::Path) {}
     fn seed_partial(dir: &std::path::Path) {
-        fs::write(dir.join("README.md"), "# Test")
-            .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+        fs::write(dir.join("README.md"), "# Test").unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     }
     fn seed_full(dir: &std::path::Path) {
         seed_repo_with_all_way_checks(dir);
