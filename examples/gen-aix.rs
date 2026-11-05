@@ -62,71 +62,77 @@ fn generate_llms_txt() -> String {
     out
 }
 
+/// Static body of llm.txt (everything before the genesis adoption table).
+const LLM_TXT_BODY: &str = r#"# wai
+
+> Workflow manager for AI-driven development — captures the *why* behind decisions.
+
+## What It Does
+
+wai is a CLI tool that helps teams document the reasoning, research, and design
+decisions that shaped their code. When you revisit a project later, wai tells you
+*why* it was built that way.
+
+- **Artifact tracking** — research, design, and plan documents organized by project and phase
+- **PARA method** — Projects / Areas / Resources / Archives structure
+- **Phase workflow** — research → design → plan → implement → review → archive
+- **Session handoffs** — `wai close` creates a handoff doc; `wai prime` resumes where you left off
+- **Plugin system** — integrates with beads (issues), git, and openspec
+- **AI features** — `wai why` (LLM oracle), `wai reflect` (synthesizes context into CLAUDE.md)
+- **Agent config sync** — single source of truth for AI assistant configs, synced to tool locations
+
+## Key Commands
+
+```
+wai init                    # Initialize in current directory
+wai status                  # Project status and suggestions
+wai prime                   # Orient at session start
+wai add research "..."      # Add research artifact
+wai add design "..."        # Add design artifact
+wai add plan "..."          # Add plan artifact
+wai close                   # Session handoff
+wai why "why X?"            # LLM-powered reasoning oracle
+wai reflect                 # Synthesize context into CLAUDE.md
+wai doctor                  # Workspace health check
+wai sync                    # Sync agent configs
+wai pipeline start          # Run an automated workflow pipeline
+wai feedback bug            # File an issue with context attached
+```
+
+## Project Structure
+
+```
+.wai/
+├── config.toml
+├── projects/           # Active projects (phase-tracked)
+├── areas/              # Ongoing responsibilities
+├── resources/
+│   └── agent-config/   # Skills, rules, context for AI assistants
+└── archives/           # Completed work
+```
+
+## Source Layout
+
+```
+src/
+├── main.rs
+├── cli.rs              # Clap argument definitions
+├── commands/           # One file per subcommand
+│   ├── way.rs          # wai way — best practices checker
+│   ├── status.rs       # wai status
+│   ├── add.rs          # wai add
+│   ├── search.rs       # wai search
+│   └── ...
+├── plugin.rs           # Plugin detection and dispatch
+├── output.rs           # JSON output (wraps genesis::envelope)
+├── managed_block.rs    # Content generation (via genesis::managed_block)
+└── config.rs           # Config loading and paths
+```
+
+"#;
+
 fn generate_llm_txt() -> String {
-    let mut out = String::new();
-    out.push_str("# wai\n\n");
-    out.push_str(
-        "> Workflow manager for AI-driven development — captures the *why* behind decisions.\n\n",
-    );
-    out.push_str("## What It Does\n\n");
-    out.push_str(
-        "wai is a CLI tool that helps teams document the reasoning, research, and design\n",
-    );
-    out.push_str(
-        "decisions that shaped their code. When you revisit a project later, wai tells you\n",
-    );
-    out.push_str("*why* it was built that way.\n\n");
-    out.push_str("- **Artifact tracking** — research, design, and plan documents organized by project and phase\n");
-    out.push_str("- **PARA method** — Projects / Areas / Resources / Archives structure\n");
-    out.push_str(
-        "- **Phase workflow** — research → design → plan → implement → review → archive\n",
-    );
-    out.push_str("- **Session handoffs** — `wai close` creates a handoff doc; `wai prime` resumes where you left off\n");
-    out.push_str("- **Plugin system** — integrates with beads (issues), git, and openspec\n");
-    out.push_str("- **AI features** — `wai why` (LLM oracle), `wai reflect` (synthesizes context into CLAUDE.md)\n");
-    out.push_str("- **Agent config sync** — single source of truth for AI assistant configs, synced to tool locations\n\n");
-    out.push_str("## Key Commands\n\n");
-    out.push_str("```\n");
-    out.push_str("wai init                    # Initialize in current directory\n");
-    out.push_str("wai status                  # Project status and suggestions\n");
-    out.push_str("wai prime                   # Orient at session start\n");
-    out.push_str("wai add research \"...\"      # Add research artifact\n");
-    out.push_str("wai add design \"...\"        # Add design artifact\n");
-    out.push_str("wai add plan \"...\"          # Add plan artifact\n");
-    out.push_str("wai close                   # Session handoff\n");
-    out.push_str("wai why \"why X?\"            # LLM-powered reasoning oracle\n");
-    out.push_str("wai reflect                 # Synthesize context into CLAUDE.md\n");
-    out.push_str("wai doctor                  # Workspace health check\n");
-    out.push_str("wai sync                    # Sync agent configs\n");
-    out.push_str("wai pipeline start          # Run an automated workflow pipeline\n");
-    out.push_str("wai feedback bug            # File an issue with context attached\n");
-    out.push_str("```\n\n");
-    out.push_str("## Project Structure\n\n");
-    out.push_str("```\n");
-    out.push_str(".wai/\n");
-    out.push_str("├── config.toml\n");
-    out.push_str("├── projects/           # Active projects (phase-tracked)\n");
-    out.push_str("├── areas/              # Ongoing responsibilities\n");
-    out.push_str("├── resources/\n");
-    out.push_str("│   └── agent-config/   # Skills, rules, context for AI assistants\n");
-    out.push_str("└── archives/           # Completed work\n");
-    out.push_str("```\n\n");
-    out.push_str("## Source Layout\n\n");
-    out.push_str("```\n");
-    out.push_str("src/\n");
-    out.push_str("├── main.rs\n");
-    out.push_str("├── cli.rs              # Clap argument definitions\n");
-    out.push_str("├── commands/           # One file per subcommand\n");
-    out.push_str("│   ├── way.rs          # wai way — best practices checker\n");
-    out.push_str("│   ├── status.rs       # wai status\n");
-    out.push_str("│   ├── add.rs          # wai add\n");
-    out.push_str("│   ├── search.rs       # wai search\n");
-    out.push_str("│   └── ...\n");
-    out.push_str("├── plugin.rs           # Plugin detection and dispatch\n");
-    out.push_str("├── output.rs           # JSON output (wraps genesis::envelope)\n");
-    out.push_str("├── managed_block.rs    # Content generation (via genesis::managed_block)\n");
-    out.push_str("└── config.rs           # Config loading and paths\n");
-    out.push_str("```\n\n");
+    let mut out = String::from(LLM_TXT_BODY);
 
     // Genesis adoption
     out.push_str("## Shared Infrastructure\n\n");
