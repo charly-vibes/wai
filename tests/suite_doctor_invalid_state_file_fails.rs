@@ -46,7 +46,7 @@ fn doctor_uninitialised_directory_errors() {
 }
 
 #[test]
-fn doctor_fix_repairs_missing_directories() {
+fn doctor_fix_repairs_missing_directories_without_prompting() {
     let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     init_workspace(tmp.path());
 
@@ -54,7 +54,7 @@ fn doctor_fix_repairs_missing_directories() {
     fs::remove_dir_all(tmp.path().join(".wai/archives"))
         .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
-    // Run fix with --yes to skip confirmation
+    // Run fix with --yes to skip confirmation - should not prompt and should succeed
     let out = wai_cmd(tmp.path())
         .args(["doctor", "--fix", "--yes"])
         .output()
@@ -65,25 +65,6 @@ fn doctor_fix_repairs_missing_directories() {
 
     // Verify the directory was recreated
     assert!(tmp.path().join(".wai/archives").is_dir());
-}
-
-#[test]
-fn doctor_fix_skips_confirmation_with_yes() {
-    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-    init_workspace(tmp.path());
-
-    // Create a fixable issue
-    fs::remove_dir_all(tmp.path().join(".wai/archives"))
-        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-
-    // Run with --yes - should not prompt and should succeed
-    let out = wai_cmd(tmp.path())
-        .args(["doctor", "--fix", "--yes"])
-        .output()
-        .unwrap_or_else(|e| panic!("command should run: {e}"));
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(out.status.success());
-    assert!(stderr.contains("Fixed"));
 }
 
 #[test]
@@ -176,77 +157,40 @@ fn doctor_fix_blocked_by_safe_mode() {
 
 // ─── progressive disclosure help ────────────────────────────────────────────
 
-#[test]
-fn help_shows_quick_start_and_commands() {
-    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-
-    let out = wai_cmd(tmp.path())
-        .args(["--help"])
-        .output()
-        .unwrap_or_else(|e| panic!("command should run: {e}"));
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(out.status.success());
-    assert!(stdout.contains("QUICK START:"));
-    assert!(stdout.contains("COMMANDS:"));
-    assert!(stdout.contains("Use -v for advanced options"));
-}
-
-#[test]
-fn help_default_hides_advanced_options() {
-    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-
-    let out = wai_cmd(tmp.path())
-        .args(["--help"])
-        .output()
-        .unwrap_or_else(|e| panic!("command should run: {e}"));
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(out.status.success());
-    assert!(!(stdout.contains("ADVANCED OPTIONS:")));
-}
+const HELP_CASES: &[(&[&str], &[&str], &[&str])] = &[
+    (
+        &["--help"],
+        &["QUICK START:", "COMMANDS:", "Use -v for advanced options"],
+        &["ADVANCED OPTIONS:"],
+    ),
+    (&["--help"], &[], &["ADVANCED OPTIONS:"]),
+    (
+        &["--help", "-v"],
+        &["ADVANCED OPTIONS:", "--json", "--safe"],
+        &[],
+    ),
+    (&["--help", "-vv"], &["ENVIRONMENT:", "NO_COLOR", "WAI_LOG"], &[]),
+    (&["--help", "-vvv"], &["INTERNALS:", "config.toml", "PARA"], &[]),
+];
 
 #[test]
-fn help_v_shows_advanced_options() {
-    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+fn help_levels_show_progressively_more_sections() {
+    for (args, expected, forbidden) in HELP_CASES {
+        let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
-    let out = wai_cmd(tmp.path())
-        .args(["--help", "-v"])
-        .output()
-        .unwrap_or_else(|e| panic!("command should run: {e}"));
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(out.status.success());
-    assert!(stdout.contains("ADVANCED OPTIONS:"));
-    assert!(stdout.contains("--json"));
-    assert!(stdout.contains("--safe"));
-}
-
-#[test]
-fn help_vv_shows_environment_variables() {
-    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-
-    let out = wai_cmd(tmp.path())
-        .args(["--help", "-vv"])
-        .output()
-        .unwrap_or_else(|e| panic!("command should run: {e}"));
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(out.status.success());
-    assert!(stdout.contains("ENVIRONMENT:"));
-    assert!(stdout.contains("NO_COLOR"));
-    assert!(stdout.contains("WAI_LOG"));
-}
-
-#[test]
-fn help_vvv_shows_internals() {
-    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-
-    let out = wai_cmd(tmp.path())
-        .args(["--help", "-vvv"])
-        .output()
-        .unwrap_or_else(|e| panic!("command should run: {e}"));
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(out.status.success());
-    assert!(stdout.contains("INTERNALS:"));
-    assert!(stdout.contains("config.toml"));
-    assert!(stdout.contains("PARA"));
+        let out = wai_cmd(tmp.path())
+            .args(*args)
+            .output()
+            .unwrap_or_else(|e| panic!("command should run: {e}"));
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        assert!(out.status.success());
+        for needle in *expected {
+            assert!(stdout.contains(needle), "missing {needle} for {args:?}");
+        }
+        for needle in *forbidden {
+            assert!(!stdout.contains(needle), "unexpected {needle} for {args:?}");
+        }
+    }
 }
 
 #[test]
@@ -317,23 +261,6 @@ fn commands_fail_without_init() {
 // ─── First-Run Detection ────────────────────────────────────────────────────
 
 #[test]
-fn first_run_detects_no_user_config() {
-    // Create a temporary directory for user config
-    let tmp_config = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-    let tmp_project = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-
-    // Set XDG_CONFIG_HOME to use our temp directory
-    let out = wai_cmd(tmp_project.path())
-        .env("XDG_CONFIG_HOME", tmp_config.path())
-        .output()
-        .unwrap_or_else(|e| panic!("command should run: {e}"));
-    assert!(out.status.success());
-
-    // Verify user config was created
-    assert!(tmp_config.path().join("wai/config.toml").exists());
-}
-
-#[test]
 fn first_run_creates_default_user_config() {
     let tmp_config = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     let tmp_project = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
@@ -344,10 +271,10 @@ fn first_run_creates_default_user_config() {
         .unwrap_or_else(|e| panic!("command should run: {e}"));
     assert!(out.status.success());
 
-    // Read the created config
+    // Verify user config was created and seen_tutorial defaults to false
+    // (not present or explicitly false)
     let config_content = fs::read_to_string(tmp_config.path().join("wai/config.toml"))
         .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-    // seen_tutorial should default to false (not present or explicitly false)
     assert!(!config_content.contains("seen_tutorial = true"));
 }
 
@@ -396,63 +323,32 @@ fn way_works_without_wai_init() {
 }
 
 #[test]
-fn way_always_exits_zero_empty_repo() {
-    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+fn way_always_exits_zero_across_adoption_levels() {
+    fn seed_empty(dir: &std::path::Path) {}
+    fn seed_partial(dir: &std::path::Path) {
+        fs::write(dir.join("README.md"), "# Test")
+            .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+    }
+    fn seed_full(dir: &std::path::Path) {
+        seed_repo_with_all_way_checks(dir);
+    }
+    for seed in [seed_empty, seed_partial, seed_full] {
+        let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+        seed(tmp.path());
 
-    // Empty repo with no files
-    let output = wai_cmd(tmp.path())
-        .args(["way"])
-        .output()
-        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+        let output = wai_cmd(tmp.path())
+            .args(["way"])
+            .output()
+            .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
-    assert_eq!(
-        output
-            .status
-            .code()
-            .unwrap_or_else(|| panic!("unwrap failed")),
-        0
-    );
-}
-
-#[test]
-fn way_always_exits_zero_partial_adoption() {
-    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-
-    // Partial adoption - just README
-    fs::write(tmp.path().join("README.md"), "# Test")
-        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-
-    let output = wai_cmd(tmp.path())
-        .args(["way"])
-        .output()
-        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-
-    assert_eq!(
-        output
-            .status
-            .code()
-            .unwrap_or_else(|| panic!("unwrap failed")),
-        0
-    );
-}
-
-#[test]
-fn way_always_exits_zero_all_passing() {
-    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-    seed_repo_with_all_way_checks(tmp.path());
-
-    let output = wai_cmd(tmp.path())
-        .args(["way"])
-        .output()
-        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-
-    assert_eq!(
-        output
-            .status
-            .code()
-            .unwrap_or_else(|| panic!("unwrap failed")),
-        0
-    );
+        assert_eq!(
+            output
+                .status
+                .code()
+                .unwrap_or_else(|| panic!("unwrap failed")),
+            0
+        );
+    }
 }
 
 /// Populate `dir` with every artifact the `wai way` checks look for.
@@ -480,7 +376,7 @@ fn seed_repo_with_all_way_checks(dir: &std::path::Path) {
 }
 
 #[test]
-fn way_json_output_valid() {
+fn way_json_output_is_valid_and_complete() {
     let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     fs::write(tmp.path().join("README.md"), "# Test")
         .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
@@ -495,43 +391,13 @@ fn way_json_output_valid() {
     assert!(stdout.contains("\"summary\""));
     assert!(stdout.contains("\"pass\""));
     assert!(stdout.contains("\"recommendations\""));
-}
-
-#[test]
-fn way_json_includes_check_fields() {
-    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-
-    let out = wai_cmd(tmp.path())
-        .args(["way", "--json"])
-        .output()
-        .unwrap_or_else(|e| panic!("command should run: {e}"));
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(out.status.success());
     assert!(stdout.contains("\"name\""));
     assert!(stdout.contains("\"status\""));
     assert!(stdout.contains("\"message\""));
 }
 
 #[test]
-fn way_json_exits_zero() {
-    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-
-    let output = wai_cmd(tmp.path())
-        .args(["way", "--json"])
-        .output()
-        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-
-    assert_eq!(
-        output
-            .status
-            .code()
-            .unwrap_or_else(|| panic!("unwrap failed")),
-        0
-    );
-}
-
-#[test]
-fn way_minimal_repository_shows_info() {
+fn way_minimal_repository_shows_info_and_suggestions() {
     let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
     // Only README.md
@@ -546,23 +412,9 @@ fn way_minimal_repository_shows_info() {
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success());
     assert!(stdout.contains("ℹ"));
-    assert!(stderr.contains("best practices adopted"));
-}
-
-#[test]
-fn way_minimal_repository_has_suggestions() {
-    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-    fs::write(tmp.path().join("README.md"), "# Test")
-        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-
-    let out = wai_cmd(tmp.path())
-        .args(["way"])
-        .output()
-        .unwrap_or_else(|e| panic!("command should run: {e}"));
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(out.status.success());
     assert!(stdout.contains("→"));
     assert!(stdout.contains("https://"));
+    assert!(stderr.contains("best practices adopted"));
 }
 
 #[test]
@@ -600,231 +452,147 @@ fn way_complete_repository_minimal_suggestions() {
 
 // ─── wai way: unit tests for individual checks ─────────────────────────────
 
-#[test]
-fn way_check_task_runner_justfile() {
-    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-    fs::write(tmp.path().join("justfile"), "test:\n\techo test")
-        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-
-    let out = wai_cmd(tmp.path())
-        .args(["way", "--json"])
-        .output()
-        .unwrap_or_else(|e| panic!("command should run: {e}"));
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(out.status.success());
-    assert!(stdout.contains("Command standardization"));
-    assert!(stdout.contains("justfile detected"));
-    assert!(stdout.contains("\"pass\""));
+/// Case table for individual `way` check scenarios.
+/// Each case: setup (file to write, or none), check label, message, status.
+struct WayCheckCase {
+    file: Option<(&'static str, &'static str)>,
+    install_hook: bool,
+    hook_script: Option<&'static str>,
+    label: &'static str,
+    message: &'static str,
+    status: &'static str,
 }
 
-#[test]
-fn way_check_task_runner_makefile() {
-    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-    fs::write(tmp.path().join("Makefile"), "test:\n\techo test")
-        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-
-    let out = wai_cmd(tmp.path())
-        .args(["way", "--json"])
-        .output()
-        .unwrap_or_else(|e| panic!("command should run: {e}"));
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(out.status.success());
-    assert!(stdout.contains("Command standardization"));
-    assert!(stdout.contains("Makefile detected"));
-    assert!(stdout.contains("\"pass\""));
-}
-
-#[test]
-fn way_check_task_runner_missing() {
-    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-
-    let out = wai_cmd(tmp.path())
-        .args(["way", "--json"])
-        .output()
-        .unwrap_or_else(|e| panic!("command should run: {e}"));
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(out.status.success());
-    assert!(stdout.contains("Command standardization"));
-    assert!(stdout.contains("No task runner detected"));
-    assert!(stdout.contains("\"warn\""));
-}
-
-#[test]
-fn way_check_git_hooks_prek() {
-    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-    fs::write(tmp.path().join("prek.toml"), "[hooks]")
-        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-    fs::create_dir_all(tmp.path().join(".git/hooks"))
-        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-    fs::write(
-        tmp.path().join(".git/hooks/pre-commit"),
-        "#!/bin/sh\nprek run",
-    )
-    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-
-    let out = wai_cmd(tmp.path())
-        .args(["way", "--json"])
-        .output()
-        .unwrap_or_else(|e| panic!("command should run: {e}"));
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(out.status.success());
-    assert!(stdout.contains("Pre-commit quality gates"));
-    assert!(stdout.contains("prek detected and installed"));
-    assert!(stdout.contains("\"pass\""));
-}
-
-#[test]
-fn way_check_git_hooks_prek_not_installed() {
-    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-    fs::write(tmp.path().join("prek.toml"), "[hooks]")
-        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-    // No .git/hooks/pre-commit — hooks not installed
-
-    let out = wai_cmd(tmp.path())
-        .args(["way", "--json"])
-        .output()
-        .unwrap_or_else(|e| panic!("command should run: {e}"));
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(out.status.success());
-    assert!(stdout.contains("Pre-commit quality gates"));
-    assert!(stdout.contains("prek.toml found but hooks not installed"));
-    assert!(stdout.contains("\"warn\""));
-}
-
-#[test]
-fn way_check_git_hooks_precommit() {
-    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-    fs::write(tmp.path().join(".pre-commit-config.yaml"), "repos: []")
-        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-    fs::create_dir_all(tmp.path().join(".git/hooks"))
-        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-    fs::write(
-        tmp.path().join(".git/hooks/pre-commit"),
-        "#!/bin/sh\npre-commit run",
-    )
-    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-
-    let out = wai_cmd(tmp.path())
-        .args(["way", "--json"])
-        .output()
-        .unwrap_or_else(|e| panic!("command should run: {e}"));
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(out.status.success());
-    assert!(stdout.contains("Pre-commit quality gates"));
-    assert!(stdout.contains("pre-commit detected and installed"));
-    assert!(stdout.contains("\"pass\""));
-}
-
-#[test]
-fn way_check_git_hooks_precommit_not_installed() {
-    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-    fs::write(tmp.path().join(".pre-commit-config.yaml"), "repos: []")
-        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-    // No .git/hooks/pre-commit
-
-    let out = wai_cmd(tmp.path())
-        .args(["way", "--json"])
-        .output()
-        .unwrap_or_else(|e| panic!("command should run: {e}"));
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(out.status.success());
-    assert!(stdout.contains("Pre-commit quality gates"));
-    assert!(stdout.contains(".pre-commit-config.yaml found but hooks not installed"));
-    assert!(stdout.contains("\"warn\""));
-}
+const WAY_CHECK_CASES: &[WayCheckCase] = &[
+    // ── task runner ──
+    WayCheckCase {
+        file: Some(("justfile", "test:\n\techo test")),
+        install_hook: false,
+        hook_script: None,
+        label: "Command standardization",
+        message: "justfile detected",
+        status: "\"pass\"",
+    },
+    WayCheckCase {
+        file: Some(("Makefile", "test:\n\techo test")),
+        install_hook: false,
+        hook_script: None,
+        label: "Command standardization",
+        message: "Makefile detected",
+        status: "\"pass\"",
+    },
+    WayCheckCase {
+        file: None,
+        install_hook: false,
+        hook_script: None,
+        label: "Command standardization",
+        message: "No task runner detected",
+        status: "\"warn\"",
+    },
+    // ── git hooks ──
+    WayCheckCase {
+        file: Some(("prek.toml", "[hooks]")),
+        install_hook: true,
+        hook_script: Some("#!/bin/sh\nprek run"),
+        label: "Pre-commit quality gates",
+        message: "prek detected and installed",
+        status: "\"pass\"",
+    },
+    WayCheckCase {
+        file: Some(("prek.toml", "[hooks]")),
+        install_hook: false,
+        hook_script: None,
+        label: "Pre-commit quality gates",
+        message: "prek.toml found but hooks not installed",
+        status: "\"warn\"",
+    },
+    WayCheckCase {
+        file: Some((".pre-commit-config.yaml", "repos: []")),
+        install_hook: true,
+        hook_script: Some("#!/bin/sh\npre-commit run"),
+        label: "Pre-commit quality gates",
+        message: "pre-commit detected and installed",
+        status: "\"pass\"",
+    },
+    WayCheckCase {
+        file: Some((".pre-commit-config.yaml", "repos: []")),
+        install_hook: false,
+        hook_script: None,
+        label: "Pre-commit quality gates",
+        message: ".pre-commit-config.yaml found but hooks not installed",
+        status: "\"warn\"",
+    },
+    WayCheckCase {
+        file: Some(("lefthook.yml", "pre-commit:\n  commands: {}")),
+        install_hook: true,
+        hook_script: Some("#!/bin/sh\nlefthook run pre-commit"),
+        label: "Pre-commit quality gates",
+        message: "lefthook detected and installed",
+        status: "\"pass\"",
+    },
+    WayCheckCase {
+        file: Some(("lefthook.yml", "pre-commit:\n  commands: {}")),
+        install_hook: false,
+        hook_script: None,
+        label: "Pre-commit quality gates",
+        message: "lefthook.yml found but hooks not installed",
+        status: "\"warn\"",
+    },
+    WayCheckCase {
+        file: None,
+        install_hook: false,
+        hook_script: None,
+        label: "Pre-commit quality gates",
+        message: "No git hook manager detected",
+        status: "\"warn\"",
+    },
+    // ── editorconfig ──
+    WayCheckCase {
+        file: Some((".editorconfig", "root = true")),
+        install_hook: false,
+        hook_script: None,
+        label: "Consistent formatting",
+        message: ".editorconfig detected",
+        status: "\"pass\"",
+    },
+    WayCheckCase {
+        file: None,
+        install_hook: false,
+        hook_script: None,
+        label: "Consistent formatting",
+        message: "No .editorconfig detected",
+        status: "\"warn\"",
+    },
+];
 
 #[test]
-fn way_check_git_hooks_lefthook_installed() {
-    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-    fs::write(
-        tmp.path().join("lefthook.yml"),
-        "pre-commit:\n  commands: {}",
-    )
-    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-    fs::create_dir_all(tmp.path().join(".git/hooks"))
-        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-    fs::write(
-        tmp.path().join(".git/hooks/pre-commit"),
-        "#!/bin/sh\nlefthook run pre-commit",
-    )
-    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+fn way_check_scenarios_report_expected_labels_and_status() {
+    for case in WAY_CHECK_CASES {
+        let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+        if let Some((name, contents)) = case.file {
+            fs::write(tmp.path().join(name), contents)
+                .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+        }
+        if case.install_hook {
+            fs::create_dir_all(tmp.path().join(".git/hooks"))
+                .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+            fs::write(
+                tmp.path().join(".git/hooks/pre-commit"),
+                case.hook_script.unwrap(),
+            )
+            .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+        }
 
-    let out = wai_cmd(tmp.path())
-        .args(["way", "--json"])
-        .output()
-        .unwrap_or_else(|e| panic!("command should run: {e}"));
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(out.status.success());
-    assert!(stdout.contains("Pre-commit quality gates"));
-    assert!(stdout.contains("lefthook detected and installed"));
-    assert!(stdout.contains("\"pass\""));
-}
-
-#[test]
-fn way_check_git_hooks_lefthook_not_installed() {
-    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-    fs::write(
-        tmp.path().join("lefthook.yml"),
-        "pre-commit:\n  commands: {}",
-    )
-    .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-
-    let out = wai_cmd(tmp.path())
-        .args(["way", "--json"])
-        .output()
-        .unwrap_or_else(|e| panic!("command should run: {e}"));
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(out.status.success());
-    assert!(stdout.contains("Pre-commit quality gates"));
-    assert!(stdout.contains("lefthook.yml found but hooks not installed"));
-    assert!(stdout.contains("\"warn\""));
-}
-
-#[test]
-fn way_check_git_hooks_missing() {
-    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-
-    let out = wai_cmd(tmp.path())
-        .args(["way", "--json"])
-        .output()
-        .unwrap_or_else(|e| panic!("command should run: {e}"));
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(out.status.success());
-    assert!(stdout.contains("Pre-commit quality gates"));
-    assert!(stdout.contains("No git hook manager detected"));
-    assert!(stdout.contains("\"warn\""));
-}
-
-#[test]
-fn way_check_editorconfig_present() {
-    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-    fs::write(tmp.path().join(".editorconfig"), "root = true")
-        .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-
-    let out = wai_cmd(tmp.path())
-        .args(["way", "--json"])
-        .output()
-        .unwrap_or_else(|e| panic!("command should run: {e}"));
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(out.status.success());
-    assert!(stdout.contains("Consistent formatting"));
-    assert!(stdout.contains(".editorconfig detected"));
-    assert!(stdout.contains("\"pass\""));
-}
-
-#[test]
-fn way_check_editorconfig_missing() {
-    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
-
-    let out = wai_cmd(tmp.path())
-        .args(["way", "--json"])
-        .output()
-        .unwrap_or_else(|e| panic!("command should run: {e}"));
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(out.status.success());
-    assert!(stdout.contains("Consistent formatting"));
-    assert!(stdout.contains("No .editorconfig detected"));
-    assert!(stdout.contains("\"warn\""));
+        let out = wai_cmd(tmp.path())
+            .args(["way", "--json"])
+            .output()
+            .unwrap_or_else(|e| panic!("command should run: {e}"));
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        assert!(out.status.success());
+        assert!(stdout.contains(case.label), "missing {}", case.label);
+        assert!(stdout.contains(case.message), "missing {}", case.message);
+        assert!(stdout.contains(case.status), "missing {}", case.status);
+    }
 }
 
 /// Write every best-practice file the `way` checks look for.
