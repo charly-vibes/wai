@@ -488,20 +488,8 @@ fn collect_matches(
             continue;
         }
 
-        // Apply type filter
-        if let Some(type_f) = type_filter {
-            let path_str = entry.path().to_str().unwrap_or("");
-            let matches = match type_f {
-                "research" => path_str.contains("/research/"),
-                "plan" | "plans" => path_str.contains("/plans/"),
-                "design" | "designs" => path_str.contains("/designs/"),
-                "handoff" | "handoffs" => path_str.contains("/handoffs/"),
-                "review" | "reviews" => path_str.contains("/reviews/"),
-                _ => true,
-            };
-            if !matches {
-                continue;
-            }
+        if !passes_type_filter(entry.path(), type_filter) {
+            continue;
         }
 
         let content = match std::fs::read_to_string(entry.path()) {
@@ -510,32 +498,67 @@ fn collect_matches(
         };
 
         // Apply tag filter: parse YAML frontmatter and check tags.
-        if !tag.is_empty() {
-            let file_tags = parse_frontmatter_tags(&content);
-            let matches_all = tag
-                .iter()
-                .all(|required| file_tags.iter().any(|ft| ft.eq_ignore_ascii_case(required)));
-            if !matches_all {
-                continue;
-            }
+        if !passes_tag_filter(&content, tag) {
+            continue;
         }
 
-        for (line_num, line) in content.lines().enumerate() {
-            if let Some((start, end)) = matcher(line) {
-                let rel_path = entry
-                    .path()
-                    .strip_prefix(display_base)
-                    .unwrap_or(entry.path());
-                let context_lines = extract_context_lines(&content, line_num, context_size);
-                results.push((
-                    format!("{prefix}{}", rel_path.display()),
-                    line_num + 1,
-                    line.to_string(),
-                    start,
-                    end,
-                    context_lines,
-                ));
-            }
+        collect_line_matches(
+            entry.path(),
+            display_base,
+            prefix,
+            &content,
+            matcher,
+            context_size,
+            results,
+        );
+    }
+}
+
+fn passes_type_filter(path: &Path, type_filter: Option<&str>) -> bool {
+    let Some(type_f) = type_filter else {
+        return true;
+    };
+    let path_str = path.to_str().unwrap_or("");
+    match type_f {
+        "research" => path_str.contains("/research/"),
+        "plan" | "plans" => path_str.contains("/plans/"),
+        "design" | "designs" => path_str.contains("/designs/"),
+        "handoff" | "handoffs" => path_str.contains("/handoffs/"),
+        "review" | "reviews" => path_str.contains("/reviews/"),
+        _ => true,
+    }
+}
+
+fn passes_tag_filter(content: &str, tag: &[String]) -> bool {
+    if tag.is_empty() {
+        return true;
+    }
+    let file_tags = parse_frontmatter_tags(content);
+    tag.iter()
+        .all(|required| file_tags.iter().any(|ft| ft.eq_ignore_ascii_case(required)))
+}
+
+fn collect_line_matches(
+    path: &Path,
+    display_base: &Path,
+    prefix: &str,
+    content: &str,
+    matcher: &Matcher,
+    context_size: usize,
+    results: &mut Vec<RawMatch>,
+) {
+    for (line_num, line) in content.lines().enumerate() {
+        if let Some((start, end)) = matcher(line) {
+            let rel_path = path.strip_prefix(display_base).unwrap_or(path);
+            let context_lines = extract_context_lines(content, line_num, context_size);
+            results.push((
+                format!("{prefix}{}", rel_path.display()),
+                line_num + 1,
+                line.to_string(),
+                start,
+                end,
+                context_lines,
+            ));
         }
     }
 }
