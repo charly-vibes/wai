@@ -16,63 +16,23 @@ use genesis::doctor::CheckStatus;
 
 pub(super) fn check_directories(project_root: &Path) -> Vec<WaiCheckEntry> {
     let wai = wai_dir(project_root);
-    let mut results = Vec::new();
     let mut missing = Vec::new();
 
-    // Check top-level PARA directories
-    let para_dirs = [
-        PROJECTS_DIR,
-        AREAS_DIR,
-        RESOURCES_DIR,
-        ARCHIVES_DIR,
-        PLUGINS_DIR,
-    ];
+    check_para_dirs(&wai, &mut missing);
+    check_agent_config_dirs(&wai, &mut missing);
+    check_resource_dirs(&wai, &mut missing);
+    check_default_files(&wai, &mut missing);
 
-    for dir in &para_dirs {
-        if !wai.join(dir).is_dir() {
-            missing.push(format!(".wai/{}", dir));
-        }
-    }
-
-    // Check agent-config subdirectories
-    let agent_config = wai.join(RESOURCES_DIR).join(AGENT_CONFIG_DIR);
-    let agent_subdirs = [SKILLS_DIR, RULES_DIR, CONTEXT_DIR];
-
-    for subdir in &agent_subdirs {
-        if !agent_config.join(subdir).is_dir() {
-            missing.push(format!(".wai/resources/agent-config/{}", subdir));
-        }
-    }
-
-    // Check resource subdirectories
-    let resources = wai.join(RESOURCES_DIR);
-    let resource_subdirs = ["templates", "patterns"];
-
-    for subdir in &resource_subdirs {
-        if !resources.join(subdir).is_dir() {
-            missing.push(format!(".wai/resources/{}", subdir));
-        }
-    }
-
-    // Check default files
-    if !wai.join(".gitignore").exists() {
-        missing.push(".wai/.gitignore".to_string());
-    }
-
-    if !agent_config.join(".projections.yml").exists() {
-        missing.push(".wai/resources/agent-config/.projections.yml".to_string());
-    }
-
-    if missing.is_empty() {
-        results.push(WaiCheckEntry {
+    vec![if missing.is_empty() {
+        WaiCheckEntry {
             name: "Directory structure".to_string(),
             status: CheckStatus::Pass,
             message: "All directories and default files present".to_string(),
             fix: None,
             fix_fn: None,
-        });
+        }
     } else {
-        results.push(WaiCheckEntry {
+        WaiCheckEntry {
             name: "Directory structure".to_string(),
             status: CheckStatus::Fail,
             message: format!("Missing: {}", missing.join(", ")),
@@ -81,10 +41,56 @@ pub(super) fn check_directories(project_root: &Path) -> Vec<WaiCheckEntry> {
                 ensure_workspace_current(project_root)?;
                 Ok(())
             })),
-        });
-    }
+        }
+    }]
+}
 
-    results
+fn check_para_dirs(wai: &Path, missing: &mut Vec<String>) {
+    let para_dirs = [
+        PROJECTS_DIR,
+        AREAS_DIR,
+        RESOURCES_DIR,
+        ARCHIVES_DIR,
+        PLUGINS_DIR,
+    ];
+    for dir in &para_dirs {
+        if !wai.join(dir).is_dir() {
+            missing.push(format!(".wai/{}", dir));
+        }
+    }
+}
+
+fn check_agent_config_dirs(wai: &Path, missing: &mut Vec<String>) {
+    let agent_config = wai.join(RESOURCES_DIR).join(AGENT_CONFIG_DIR);
+    let agent_subdirs = [SKILLS_DIR, RULES_DIR, CONTEXT_DIR];
+    for subdir in &agent_subdirs {
+        if !agent_config.join(subdir).is_dir() {
+            missing.push(format!(".wai/resources/agent-config/{}", subdir));
+        }
+    }
+}
+
+fn check_resource_dirs(wai: &Path, missing: &mut Vec<String>) {
+    let resources = wai.join(RESOURCES_DIR);
+    let resource_subdirs = ["templates", "patterns"];
+    for subdir in &resource_subdirs {
+        if !resources.join(subdir).is_dir() {
+            missing.push(format!(".wai/resources/{}", subdir));
+        }
+    }
+}
+
+fn check_default_files(wai: &Path, missing: &mut Vec<String>) {
+    if !wai.join(".gitignore").exists() {
+        missing.push(".wai/.gitignore".to_string());
+    }
+    let projections = wai
+        .join(RESOURCES_DIR)
+        .join(AGENT_CONFIG_DIR)
+        .join(".projections.yml");
+    if !projections.exists() {
+        missing.push(".wai/resources/agent-config/.projections.yml".to_string());
+    }
 }
 
 pub(super) fn check_config(project_root: &Path) -> WaiCheckEntry {
@@ -115,25 +121,8 @@ pub(super) fn check_config(project_root: &Path) -> WaiCheckEntry {
     // run via config::default_registry()).
     let store = genesis::config::ConfigStore::new(crate::config::default_registry());
     let validations = store.validate_all(project_root);
-    let errors: Vec<_> = validations
-        .iter()
-        .filter(|v| matches!(v.severity, genesis::config::ValidationSeverity::Error))
-        .collect();
-    if !errors.is_empty() {
-        return WaiCheckEntry {
-            name: "Configuration".to_string(),
-            status: CheckStatus::Fail,
-            message: format!(
-                "config.toml validation failed: {}",
-                errors
-                    .iter()
-                    .map(|v| v.message.clone())
-                    .collect::<Vec<_>>()
-                    .join("; ")
-            ),
-            fix: Some("Fix the reported fields in .wai/config.toml".to_string()),
-            fix_fn: None,
-        };
+    if let Some(entry) = config_validation_errors(&validations) {
+        return entry;
     }
 
     let message = if validations.is_empty() {
@@ -155,6 +144,32 @@ pub(super) fn check_config(project_root: &Path) -> WaiCheckEntry {
     }
 }
 
+fn config_validation_errors(
+    validations: &[genesis::config::ConfigValidation],
+) -> Option<WaiCheckEntry> {
+    let errors: Vec<_> = validations
+        .iter()
+        .filter(|v| matches!(v.severity, genesis::config::ValidationSeverity::Error))
+        .collect();
+    if errors.is_empty() {
+        return None;
+    }
+    Some(WaiCheckEntry {
+        name: "Configuration".to_string(),
+        status: CheckStatus::Fail,
+        message: format!(
+            "config.toml validation failed: {}",
+            errors
+                .iter()
+                .map(|v| v.message.clone())
+                .collect::<Vec<_>>()
+                .join("; ")
+        ),
+        fix: Some("Fix the reported fields in .wai/config.toml".to_string()),
+        fix_fn: None,
+    })
+}
+
 pub(super) fn check_version(project_root: &Path) -> WaiCheckEntry {
     let config_path = wai_dir(project_root).join(CONFIG_FILE);
 
@@ -169,82 +184,7 @@ pub(super) fn check_version(project_root: &Path) -> WaiCheckEntry {
     }
 
     match ProjectConfig::load(project_root) {
-        Ok(config) => {
-            let current_version = env!("CARGO_PKG_VERSION");
-            let current_commit = env!("WAI_GIT_COMMIT");
-            let has_commit_tracking = !current_commit.starts_with("unknown");
-
-            // Commit-based check: fires on every rebuild after a new commit.
-            // Takes priority over the version check when commit info is available.
-            if has_commit_tracking {
-                if config.project.tool_commit.is_empty() {
-                    // Old workspace: was initialized before commit tracking was added.
-                    return WaiCheckEntry {
-                        name: "Version".to_string(),
-                        status: CheckStatus::Warn,
-                        message: format!(
-                            "Workspace not yet synced to commit tracking (binary: {} {})",
-                            current_version, current_commit
-                        ),
-                        fix: Some("Run: wai init (to sync workspace)".to_string()),
-                        fix_fn: Some(Box::new(move |project_root| {
-                            ensure_workspace_current(project_root)?;
-                            crate::workspace::sync_tool_commit(project_root)?;
-                            Ok(())
-                        })),
-                    };
-                }
-                if config.project.tool_commit != current_commit {
-                    return WaiCheckEntry {
-                        name: "Version".to_string(),
-                        status: CheckStatus::Warn,
-                        message: format!(
-                            "Workspace synced at commit {}, binary is at {} — workspace may be stale",
-                            config.project.tool_commit, current_commit
-                        ),
-                        fix: Some("Run: wai init (or wai doctor --fix)".to_string()),
-                        fix_fn: Some(Box::new(move |project_root| {
-                            ensure_workspace_current(project_root)?;
-                            crate::workspace::sync_tool_commit(project_root)?;
-                            Ok(())
-                        })),
-                    };
-                }
-                // Commit matches — workspace is current.
-                return WaiCheckEntry {
-                    name: "Version".to_string(),
-                    status: CheckStatus::Pass,
-                    message: format!("Up to date ({} {})", current_version, current_commit),
-                    fix: None,
-                    fix_fn: None,
-                };
-            }
-
-            // Fallback: no commit info in binary, compare version strings.
-            if config.project.version == current_version {
-                WaiCheckEntry {
-                    name: "Version".to_string(),
-                    status: CheckStatus::Pass,
-                    message: format!("Up to date ({})", current_version),
-                    fix: None,
-                    fix_fn: None,
-                }
-            } else {
-                WaiCheckEntry {
-                    name: "Version".to_string(),
-                    status: CheckStatus::Warn,
-                    message: format!(
-                        "Config version ({}) differs from binary ({})",
-                        config.project.version, current_version
-                    ),
-                    fix: Some("Run: wai doctor --fix (to update config.toml version)".to_string()),
-                    fix_fn: Some(Box::new(move |project_root| {
-                        ensure_workspace_current(project_root)?;
-                        Ok(())
-                    })),
-                }
-            }
-        }
+        Ok(config) => check_version_against(config),
         Err(_) => WaiCheckEntry {
             name: "Version".to_string(),
             status: CheckStatus::Pass,
@@ -252,6 +192,91 @@ pub(super) fn check_version(project_root: &Path) -> WaiCheckEntry {
             fix: None,
             fix_fn: None,
         },
+    }
+}
+
+fn version_entry(
+    status: CheckStatus,
+    message: String,
+    fix: Option<&str>,
+    sync_commit: bool,
+) -> WaiCheckEntry {
+    let fix_fn: Option<Box<dyn FnOnce(&Path) -> miette::Result<()>>> = fix.map(|fix| {
+        Box::new(move |project_root: &Path| {
+            ensure_workspace_current(project_root)?;
+            if sync_commit {
+                crate::workspace::sync_tool_commit(project_root)?;
+            }
+            Ok(())
+        }) as Box<dyn FnOnce(&Path) -> miette::Result<()>>
+    });
+    WaiCheckEntry {
+        name: "Version".to_string(),
+        status,
+        message,
+        fix: fix.map(str::to_string),
+        fix_fn,
+    }
+}
+
+fn check_version_against(config: ProjectConfig) -> WaiCheckEntry {
+    let current_version = env!("CARGO_PKG_VERSION");
+    let current_commit = env!("WAI_GIT_COMMIT");
+    let has_commit_tracking = !current_commit.starts_with("unknown");
+
+    // Commit-based check: fires on every rebuild after a new commit.
+    // Takes priority over the version check when commit info is available.
+    if has_commit_tracking {
+        if config.project.tool_commit.is_empty() {
+            // Old workspace: was initialized before commit tracking was added.
+            return version_entry(
+                CheckStatus::Warn,
+                format!(
+                    "Workspace not yet synced to commit tracking (binary: {} {})",
+                    current_version, current_commit
+                ),
+                Some("Run: wai init (to sync workspace)"),
+                true,
+            );
+        }
+        if config.project.tool_commit != current_commit {
+            return version_entry(
+                CheckStatus::Warn,
+                format!(
+                    "Workspace synced at commit {}, binary is at {} — workspace may be stale",
+                    config.project.tool_commit, current_commit
+                ),
+                Some("Run: wai init (or wai doctor --fix)"),
+                true,
+            );
+        }
+        // Commit matches — workspace is current.
+        return version_entry(
+            CheckStatus::Pass,
+            format!("Up to date ({} {})", current_version, current_commit),
+            None,
+            false,
+        );
+    }
+
+    // Fallback: no commit info in binary, compare version strings.
+    if config.project.version == current_version {
+        version_entry(
+            CheckStatus::Pass,
+            format!("Up to date ({})", current_version),
+            None,
+            false,
+        )
+    } else {
+        version_entry(
+            CheckStatus::Warn,
+            format!(
+                "Config version ({}) differs from binary ({})",
+                config.project.version, current_version
+            ),
+            Some("Run: wai doctor --fix (to update config.toml version)"),
+            false,
+        )
     }
 }
 
@@ -330,45 +355,7 @@ pub(super) fn check_project_state(project_root: &Path) -> Vec<WaiCheckEntry> {
             continue;
         }
         any_project = true;
-        let name = entry.file_name();
-        let name = name.to_string_lossy();
-        let state_path = entry.path().join(STATE_FILE);
-
-        if !state_path.exists() {
-            let state_path_clone = state_path.clone();
-            results.push(WaiCheckEntry {
-                name: format!("Project state: {}", name),
-                status: CheckStatus::Warn,
-                message: "No .state file found".to_string(),
-                fix: Some(format!("Run: wai phase set research (in project {})", name)),
-                fix_fn: Some(Box::new(move |_project_root| {
-                    let state = ProjectState::default();
-                    state.save(&state_path_clone).into_diagnostic()
-                })),
-            });
-            continue;
-        }
-
-        match ProjectState::load(&state_path) {
-            Ok(_) => {
-                results.push(WaiCheckEntry {
-                    name: format!("Project state: {}", name),
-                    status: CheckStatus::Pass,
-                    message: "Valid".to_string(),
-                    fix: None,
-                    fix_fn: None,
-                });
-            }
-            Err(e) => {
-                results.push(WaiCheckEntry {
-                    name: format!("Project state: {}", name),
-                    status: CheckStatus::Fail,
-                    message: format!("Invalid .state: {}", e),
-                    fix: Some(format!("Fix or recreate .wai/projects/{}/.state", name)),
-                    fix_fn: None,
-                });
-            }
-        }
+        project_state_entries(entry, &mut results);
     }
 
     if !any_project {
@@ -382,6 +369,48 @@ pub(super) fn check_project_state(project_root: &Path) -> Vec<WaiCheckEntry> {
     }
 
     results
+}
+
+fn project_state_entries(entry: std::fs::DirEntry, results: &mut Vec<WaiCheckEntry>) {
+    let name = entry.file_name();
+    let name = name.to_string_lossy();
+    let state_path = entry.path().join(STATE_FILE);
+
+    if !state_path.exists() {
+        let state_path_clone = state_path.clone();
+        results.push(WaiCheckEntry {
+            name: format!("Project state: {}", name),
+            status: CheckStatus::Warn,
+            message: "No .state file found".to_string(),
+            fix: Some(format!("Run: wai phase set research (in project {})", name)),
+            fix_fn: Some(Box::new(move |_project_root| {
+                let state = ProjectState::default();
+                state.save(&state_path_clone).into_diagnostic()
+            })),
+        });
+        return;
+    }
+
+    match ProjectState::load(&state_path) {
+        Ok(_) => {
+            results.push(WaiCheckEntry {
+                name: format!("Project state: {}", name),
+                status: CheckStatus::Pass,
+                message: "Valid".to_string(),
+                fix: None,
+                fix_fn: None,
+            });
+        }
+        Err(e) => {
+            results.push(WaiCheckEntry {
+                name: format!("Project state: {}", name),
+                status: CheckStatus::Fail,
+                message: format!("Invalid .state: {}", e),
+                fix: Some(format!("Fix or recreate .wai/projects/{}/.state", name)),
+                fix_fn: None,
+            });
+        }
+    }
 }
 
 pub(super) fn check_custom_plugins(project_root: &Path) -> Vec<WaiCheckEntry> {
@@ -409,44 +438,7 @@ pub(super) fn check_custom_plugins(project_root: &Path) -> Vec<WaiCheckEntry> {
             continue;
         }
         any_yaml = true;
-
-        let filename = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("unknown")
-            .to_string();
-
-        match std::fs::read_to_string(&path) {
-            Ok(content) => match serde_yml::from_str::<plugin::PluginDef>(&content) {
-                Ok(_) => {
-                    results.push(WaiCheckEntry {
-                        name: format!("Custom plugin: {}", filename),
-                        status: CheckStatus::Pass,
-                        message: "Valid YAML".to_string(),
-                        fix: None,
-                        fix_fn: None,
-                    });
-                }
-                Err(e) => {
-                    results.push(WaiCheckEntry {
-                        name: format!("Custom plugin: {}", filename),
-                        status: CheckStatus::Fail,
-                        message: format!("Invalid plugin config: {}", e),
-                        fix: Some(format!("Fix the YAML syntax in .wai/plugins/{}", filename)),
-                        fix_fn: None,
-                    });
-                }
-            },
-            Err(e) => {
-                results.push(WaiCheckEntry {
-                    name: format!("Custom plugin: {}", filename),
-                    status: CheckStatus::Fail,
-                    message: format!("Cannot read file: {}", e),
-                    fix: None,
-                    fix_fn: None,
-                });
-            }
-        }
+        plugin_config_entry(&path, &mut results);
     }
 
     if !any_yaml {
@@ -460,6 +452,46 @@ pub(super) fn check_custom_plugins(project_root: &Path) -> Vec<WaiCheckEntry> {
     }
 
     results
+}
+
+fn plugin_config_entry(path: &Path, results: &mut Vec<WaiCheckEntry>) {
+    let filename = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown")
+        .to_string();
+
+    match std::fs::read_to_string(path) {
+        Ok(content) => match serde_yml::from_str::<plugin::PluginDef>(&content) {
+            Ok(_) => {
+                results.push(WaiCheckEntry {
+                    name: format!("Custom plugin: {}", filename),
+                    status: CheckStatus::Pass,
+                    message: "Valid YAML".to_string(),
+                    fix: None,
+                    fix_fn: None,
+                });
+            }
+            Err(e) => {
+                results.push(WaiCheckEntry {
+                    name: format!("Custom plugin: {}", filename),
+                    status: CheckStatus::Fail,
+                    message: format!("Invalid plugin config: {}", e),
+                    fix: Some(format!("Fix the YAML syntax in .wai/plugins/{}", filename)),
+                    fix_fn: None,
+                });
+            }
+        },
+        Err(e) => {
+            results.push(WaiCheckEntry {
+                name: format!("Custom plugin: {}", filename),
+                status: CheckStatus::Fail,
+                message: format!("Cannot read file: {}", e),
+                fix: None,
+                fix_fn: None,
+            });
+        }
+    }
 }
 
 pub(super) fn check_wai_project_env(project_root: &Path) -> Vec<WaiCheckEntry> {
@@ -616,112 +648,114 @@ pub(super) fn check_suite_gates(project_root: &Path) -> Vec<WaiCheckEntry> {
         None
     };
 
-    let has_espectacular = project_root.join(".espectacular").is_dir();
-    let has_dont = project_root.join(".dont").is_dir();
-    let has_pretender_toml = project_root.join("pretender.toml").exists();
-    let has_testaruda_toml = project_root.join("testaruda.toml").exists();
-
-    // 1. Espectacular gate: .espectacular/ → pre-commit ah check
-    if has_espectacular {
-        let pre_commit_has_ah_check = lefthook_content.as_ref().is_some_and(|c| {
-            c.contains("ah check") || c.contains("ah-check") || c.contains("ah_check")
-        });
-        if pre_commit_has_ah_check {
-            results.push(WaiCheckEntry {
-                name: "Suite gate: espectacular".to_string(),
-                status: CheckStatus::Pass,
-                message: "ah check wired into pre-commit hooks".to_string(),
-                fix: None,
-                fix_fn: None,
-            });
-        } else {
-            results.push(WaiCheckEntry {
-                name: "Suite gate: espectacular".to_string(),
-                status: CheckStatus::Warn,
-                message: ".espectacular/ exists but 'ah check' not found in pre-commit hooks"
-                    .to_string(),
-                fix: Some("Add to pre-commit in lefthook.yml: ah-check: run: ah check".to_string()),
-                fix_fn: None,
-            });
-        }
+    if project_root.join(".espectacular").is_dir() {
+        check_espectacular_gate(lefthook_content.as_deref(), &mut results);
     }
-
-    // 2. Dont gate: .dont/ → pre-push dont check
-    if has_dont {
-        let pre_push_has_dont_check = lefthook_content.as_ref().is_some_and(|c| {
-            c.contains("dont check") || c.contains("dont-check") || c.contains("dont_check")
-        });
-        if pre_push_has_dont_check {
-            results.push(WaiCheckEntry {
-                name: "Suite gate: dont".to_string(),
-                status: CheckStatus::Pass,
-                message: "dont check wired into pre-push hooks".to_string(),
-                fix: None,
-                fix_fn: None,
-            });
-        } else {
-            results.push(WaiCheckEntry {
-                name: "Suite gate: dont".to_string(),
-                status: CheckStatus::Warn,
-                message: ".dont/ exists but 'dont check' not found in pre-push hooks".to_string(),
-                fix: Some(
-                    "Add to pre-push in lefthook.yml: dont-check: run: dont check".to_string(),
-                ),
-                fix_fn: None,
-            });
-        }
+    if project_root.join(".dont").is_dir() {
+        check_dont_gate(lefthook_content.as_deref(), &mut results);
     }
-
-    // 3. Pretender config presence
-    if has_pretender_toml {
-        results.push(WaiCheckEntry {
-            name: "Suite config: pretender".to_string(),
-            status: CheckStatus::Pass,
-            message: "pretender.toml present".to_string(),
-            fix: None,
-            fix_fn: None,
-        });
+    if project_root.join("pretender.toml").exists() {
+        results.push(pass_entry(
+            "Suite config: pretender",
+            "pretender.toml present",
+        ));
     }
-
-    // 4. Testaruda config: check testaruda.toml is valid TOML
-    if has_testaruda_toml {
-        let testaruda_path = project_root.join("testaruda.toml");
-        let toml_content = std::fs::read_to_string(&testaruda_path);
-        match toml_content {
-            Ok(content) => {
-                // Basic parse check — full schema validation depends on testaruda-86m
-                match toml::from_str::<toml::Value>(&content) {
-                    Ok(_) => {
-                        results.push(WaiCheckEntry {
-                            name: "Suite config: testaruda".to_string(),
-                            status: CheckStatus::Pass,
-                            message: "testaruda.toml is valid".to_string(),
-                            fix: None,
-                            fix_fn: None,
-                        });
-                    }
-                    Err(e) => {
-                        results.push(WaiCheckEntry {
-                            name: "Suite config: testaruda".to_string(),
-                            status: CheckStatus::Fail,
-                            message: format!("testaruda.toml is invalid: {}", e),
-                            fix: Some("Fix the TOML syntax in testaruda.toml".to_string()),
-                            fix_fn: None,
-                        });
-                    }
-                }
-            }
-            Err(_) => {
-                results.push(WaiCheckEntry {
-                    name: "Suite config: testaruda".to_string(),
-                    status: CheckStatus::Fail,
-                    message: "testaruda.toml cannot be read".to_string(),
-                    fix: None,
-                    fix_fn: None,
-                });
-            }
-        }
+    if project_root.join("testaruda.toml").exists() {
+        check_testaruda_config(project_root, &mut results);
     }
 
     results
+}
+
+fn pass_entry(name: &str, message: &str) -> WaiCheckEntry {
+    WaiCheckEntry {
+        name: name.to_string(),
+        status: CheckStatus::Pass,
+        message: message.to_string(),
+        fix: None,
+        fix_fn: None,
+    }
+}
+
+fn warn_entry(name: &str, message: &str, fix: &str) -> WaiCheckEntry {
+    WaiCheckEntry {
+        name: name.to_string(),
+        status: CheckStatus::Warn,
+        message: message.to_string(),
+        fix: Some(fix.to_string()),
+        fix_fn: None,
+    }
+}
+
+fn fail_entry(name: &str, message: String, fix: Option<&str>) -> WaiCheckEntry {
+    WaiCheckEntry {
+        name: name.to_string(),
+        status: CheckStatus::Fail,
+        message,
+        fix: fix.map(str::to_string),
+        fix_fn: None,
+    }
+}
+
+// 1. Espectacular gate: .espectacular/ → pre-commit ah check
+fn check_espectacular_gate(lefthook: Option<&str>, results: &mut Vec<WaiCheckEntry>) {
+    let wired = lefthook.is_some_and(|c| {
+        c.contains("ah check") || c.contains("ah-check") || c.contains("ah_check")
+    });
+    if wired {
+        results.push(pass_entry(
+            "Suite gate: espectacular",
+            "ah check wired into pre-commit hooks",
+        ));
+    } else {
+        results.push(warn_entry(
+            "Suite gate: espectacular",
+            ".espectacular/ exists but 'ah check' not found in pre-commit hooks",
+            "Add to pre-commit in lefthook.yml: ah-check: run: ah check",
+        ));
+    }
+}
+
+// 2. Dont gate: .dont/ → pre-push dont check
+fn check_dont_gate(lefthook: Option<&str>, results: &mut Vec<WaiCheckEntry>) {
+    let wired = lefthook.is_some_and(|c| {
+        c.contains("dont check") || c.contains("dont-check") || c.contains("dont_check")
+    });
+    if wired {
+        results.push(pass_entry(
+            "Suite gate: dont",
+            "dont check wired into pre-push hooks",
+        ));
+    } else {
+        results.push(warn_entry(
+            "Suite gate: dont",
+            ".dont/ exists but 'dont check' not found in pre-push hooks",
+            "Add to pre-push in lefthook.yml: dont-check: run: dont check",
+        ));
+    }
+}
+
+// 4. Testaruda config: check testaruda.toml is valid TOML
+fn check_testaruda_config(project_root: &Path, results: &mut Vec<WaiCheckEntry>) {
+    let testaruda_path = project_root.join("testaruda.toml");
+    let Ok(content) = std::fs::read_to_string(&testaruda_path) else {
+        results.push(fail_entry(
+            "Suite config: testaruda",
+            "testaruda.toml cannot be read".to_string(),
+            None,
+        ));
+        return;
+    };
+    // Basic parse check — full schema validation depends on testaruda-86m
+    match toml::from_str::<toml::Value>(&content) {
+        Ok(_) => results.push(pass_entry(
+            "Suite config: testaruda",
+            "testaruda.toml is valid",
+        )),
+        Err(e) => results.push(fail_entry(
+            "Suite config: testaruda",
+            format!("testaruda.toml is invalid: {}", e),
+            Some("Fix the TOML syntax in testaruda.toml"),
+        )),
+    }
 }
