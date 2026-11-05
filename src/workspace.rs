@@ -157,10 +157,54 @@ struct PipelineMetadataForDiscovery {
 /// Returns a list of actions taken for reporting.
 pub fn ensure_workspace_current(project_root: &Path) -> Result<Vec<WorkspaceAction>> {
     let mut actions = Vec::new();
-
-    // Create PARA + resource directories and .gitignore using genesis Scaffold
     let wai_dir = project_root.join(CONFIG_DIR);
     let agent_config = wai_dir.join(RESOURCES_DIR).join(AGENT_CONFIG_DIR);
+
+    scaffold_dirs(project_root, &wai_dir, &agent_config, &mut actions)?;
+    ensure_projections_file(&agent_config, &mut actions)?;
+    ensure_gitignore(&wai_dir, &mut actions)?;
+
+    // Detect plugins for managed block injection
+    let plugins = plugin::detect_plugins(project_root);
+    let detected: Vec<&str> = plugins
+        .iter()
+        .filter(|p| p.detected)
+        .map(|p| p.def.name.as_str())
+        .collect();
+
+    // Detect installed skills for managed block injection
+    let skill_names = detect_installed_skill_names(project_root);
+    let skill_name_refs: Vec<&str> = skill_names.iter().map(|s| s.as_str()).collect();
+
+    update_plugins_readme(&wai_dir, &detected, &mut actions)?;
+
+    // Collect installed pipelines with metadata for managed block
+    let installed_pipelines = detect_installed_pipelines(project_root);
+
+    inject_agent_blocks(
+        project_root,
+        &detected,
+        &skill_name_refs,
+        &installed_pipelines,
+        &mut actions,
+    );
+
+    // Write detailed workflow reference to .wai/AGENTS.md
+    match write_detailed_agents_file(&wai_dir, &detected, &skill_name_refs, &installed_pipelines) {
+        Ok(result) => actions.push(WorkspaceAction::new(result.description())),
+        Err(e) => eprintln!("Warning: Failed to write .wai/AGENTS.md: {}", e),
+    }
+
+    Ok(actions)
+}
+
+// Create PARA + resource directories using genesis Scaffold
+fn scaffold_dirs(
+    project_root: &Path,
+    wai_dir: &Path,
+    agent_config: &Path,
+    actions: &mut Vec<WorkspaceAction>,
+) -> Result<()> {
     let scaffold_result = genesis::scaffold::Scaffold::new(project_root)
         .dir(wai_dir.join(PROJECTS_DIR))
         .dir(wai_dir.join(AREAS_DIR))
@@ -181,85 +225,94 @@ pub fn ensure_workspace_current(project_root: &Path) -> Result<Vec<WorkspaceActi
             actions.push(WorkspaceAction::new(format!("Created {}", rel.display())));
         }
     }
+    Ok(())
+}
 
-    // Create .projections.yml if missing
+// Create .projections.yml if missing
+fn ensure_projections_file(agent_config: &Path, actions: &mut Vec<WorkspaceAction>) -> Result<()> {
     let projections_path = agent_config.join(".projections.yml");
-    if !projections_path.exists() {
-        let projections_content = "# Agent config projections — defines how configs are synced to tool-specific locations\n\
-            # Strategies: symlink, inline, reference, copy\n\
-            #\n\
-            # Example for general agents (like Pi): syncs skills to .agents/\n\
-            # projections:\n\
-            #   - target: .agents\n\
-            #\n\
-            # Example for Claude Code (built-in projection): translates skills to commands\n\
-            # projections:\n\
-            #   - target: claude-code\n\
-            \n\
-            projections: []\n";
-        std::fs::write(&projections_path, projections_content).into_diagnostic()?;
-        actions.push(WorkspaceAction::new(
-            "Created .wai/resources/agent-config/.projections.yml".to_string(),
-        ));
+    if projections_path.exists() {
+        return Ok(());
     }
+    let projections_content = "# Agent config projections — defines how configs are synced to tool-specific locations\n\
+        # Strategies: symlink, inline, reference, copy\n\
+        #\n\
+        # Example for general agents (like Pi): syncs skills to .agents/\n\
+        # projections:\n\
+        #   - target: .agents\n\
+        #\n\
+        # Example for Claude Code (built-in projection): translates skills to commands\n\
+        # projections:\n\
+        #   - target: claude-code\n\
+        \n\
+        projections: []\n";
+    std::fs::write(&projections_path, projections_content).into_diagnostic()?;
+    actions.push(WorkspaceAction::new(
+        "Created .wai/resources/agent-config/.projections.yml".to_string(),
+    ));
+    Ok(())
+}
 
-    // Create .gitignore for .wai if missing
+// Create .gitignore for .wai if missing
+fn ensure_gitignore(wai_dir: &Path, actions: &mut Vec<WorkspaceAction>) -> Result<()> {
     let gitignore_path = wai_dir.join(".gitignore");
-    if !gitignore_path.exists() {
-        std::fs::write(&gitignore_path, "# Local-only files\n*.local\n*.cache\n")
-            .into_diagnostic()?;
-        actions.push(WorkspaceAction::new("Created .wai/.gitignore".to_string()));
+    if gitignore_path.exists() {
+        return Ok(());
     }
+    std::fs::write(&gitignore_path, "# Local-only files\n*.local\n*.cache\n").into_diagnostic()?;
+    actions.push(WorkspaceAction::new("Created .wai/.gitignore".to_string()));
+    Ok(())
+}
 
-    // Detect plugins for managed block injection
-    let plugins = plugin::detect_plugins(project_root);
-    let detected: Vec<&str> = plugins
-        .iter()
-        .filter(|p| p.detected)
-        .map(|p| p.def.name.as_str())
-        .collect();
+// Create/update PLUGINS.md when detected plugins changed
+fn update_plugins_readme(
+    wai_dir: &Path,
+    detected: &[&str],
+    actions: &mut Vec<WorkspaceAction>,
+) -> Result<()> {
+    if detected.is_empty() {
+        return Ok(());
+    }
+    let plugins_md = create_plugins_readme(detected);
+    let plugins_path = wai_dir.join("PLUGINS.md");
 
-    // Detect installed skills for managed block injection
-    let skill_names = detect_installed_skill_names(project_root);
-    let skill_name_refs: Vec<&str> = skill_names.iter().map(|s| s.as_str()).collect();
+    // Only write if it doesn't exist or content has changed
+    let already_existed = plugins_path.exists();
+    let should_write = if already_existed {
+        match std::fs::read_to_string(&plugins_path) {
+            Ok(existing) => existing != plugins_md,
+            Err(_) => true,
+        }
+    } else {
+        true
+    };
 
-    // Create/update PLUGINS.md
-    if !detected.is_empty() {
-        let plugins_md = create_plugins_readme(&detected);
-        let plugins_path = wai_dir.join("PLUGINS.md");
-
-        // Only write if it doesn't exist or content has changed
-        let already_existed = plugins_path.exists();
-        let should_write = if already_existed {
-            match std::fs::read_to_string(&plugins_path) {
-                Ok(existing) => existing != plugins_md,
-                Err(_) => true,
-            }
+    if should_write {
+        std::fs::write(&plugins_path, &plugins_md).into_diagnostic()?;
+        if already_existed {
+            actions.push(WorkspaceAction::new("Updated .wai/PLUGINS.md".to_string()));
         } else {
-            true
-        };
-
-        if should_write {
-            std::fs::write(&plugins_path, &plugins_md).into_diagnostic()?;
-            if already_existed {
-                actions.push(WorkspaceAction::new("Updated .wai/PLUGINS.md".to_string()));
-            } else {
-                actions.push(WorkspaceAction::new("Created .wai/PLUGINS.md".to_string()));
-            }
+            actions.push(WorkspaceAction::new("Created .wai/PLUGINS.md".to_string()));
         }
     }
+    Ok(())
+}
 
-    // Collect installed pipelines with metadata for managed block
-    let installed_pipelines = detect_installed_pipelines(project_root);
-
-    // Inject/update slim managed blocks in root agent instruction files
+// Inject/update slim managed blocks in root agent instruction files
+fn inject_agent_blocks(
+    project_root: &Path,
+    detected: &[&str],
+    skill_name_refs: &[&str],
+    installed_pipelines: &[InstalledPipeline],
+    actions: &mut Vec<WorkspaceAction>,
+) {
     let agent_files = ["AGENTS.md", "CLAUDE.md"];
     for filename in &agent_files {
         let path = project_root.join(filename);
 
         // For AGENTS.md and CLAUDE.md, always ensure they exist.
         if filename == &"AGENTS.md" || filename == &"CLAUDE.md" || path.exists() {
-            match inject_managed_block(&path, &detected, &skill_name_refs, &installed_pipelines) {
+            match inject_managed_block(&path, detected, skill_name_refs, installed_pipelines) {
                 Ok(result) => {
                     actions.push(WorkspaceAction::new(describe_inject_result(
                         &result, filename,
@@ -272,15 +325,6 @@ pub fn ensure_workspace_current(project_root: &Path) -> Result<Vec<WorkspaceActi
             }
         }
     }
-
-    // Write detailed workflow reference to .wai/AGENTS.md
-    let wai_dir = project_root.join(CONFIG_DIR);
-    match write_detailed_agents_file(&wai_dir, &detected, &skill_name_refs, &installed_pipelines) {
-        Ok(result) => actions.push(WorkspaceAction::new(result.description())),
-        Err(e) => eprintln!("Warning: Failed to write .wai/AGENTS.md: {}", e),
-    }
-
-    Ok(actions)
 }
 
 /// Creates the content for PLUGINS.md based on detected plugins
