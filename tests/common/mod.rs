@@ -369,23 +369,21 @@ fn write_pipeline_file(dir: &std::path::Path, name: &str, content: String) {
 }
 
 /// Helper: write a minimal two-step TOML pipeline for start tests.
-pub fn write_pipeline_toml(dir: &std::path::Path, name: &str) {
-    let content = format!(
-        r#"[pipeline]
+const BASIC_PIPELINE_TOML_TEMPLATE: &str = r#"[pipeline]
 name = "{name}"
 description = "Test pipeline"
 
 [[steps]]
 id = "step-one"
-prompt = "{{topic}}: do step one research."
+prompt = "{topic}: do step one research."
 
 [[steps]]
 id = "step-two"
-prompt = "{{topic}}: do step two implementation."
-"#,
-        name = name
-    );
-    write_pipeline_file(dir, name, content);
+prompt = "{topic}: do step two implementation."
+"#;
+
+pub fn write_pipeline_toml(dir: &std::path::Path, name: &str) {
+    write_pipeline_file(dir, name, BASIC_PIPELINE_TOML_TEMPLATE.replace("{name}", name));
 }
 
 // ─── wai pipeline gates and approvals ─────────────────────────────────────────
@@ -445,8 +443,7 @@ pub fn write_artifact_with_tags(
 // ─── wai pipeline authoring and integrity ────────────────────────────────────
 
 pub fn write_pipeline_toml_with_metadata(dir: &std::path::Path, name: &str) {
-    let content = format!(
-        r#"[pipeline]
+    let content = r#"[pipeline]
 name = "{name}"
 description = "Pipeline with metadata"
 
@@ -456,7 +453,7 @@ skills = ["tdd", "rule-of-5-universal"]
 
 [[steps]]
 id = "research"
-prompt = "{{topic}}: research."
+prompt = "{topic}: research."
 
 [steps.gate]
 [steps.gate.structural]
@@ -465,10 +462,9 @@ types = ["research"]
 
 [[steps]]
 id = "review"
-prompt = "{{topic}}: review."
-"#,
-        name = name
-    );
+prompt = "{topic}: review."
+"#
+    .replace("{name}", name);
     write_pipeline_file(dir, name, content);
 }
 
