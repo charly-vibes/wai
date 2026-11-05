@@ -5,8 +5,8 @@ use owo_colors::OwoColorize;
 use std::path::Path;
 
 use crate::cli::PluginCommands;
-use crate::context::current_context;
 use crate::context::CliContext;
+use crate::context::current_context;
 use crate::json::{PluginCommandInfo, PluginDetector, PluginListItem};
 use crate::output::print_envelope_list;
 use crate::plugin::{self, TrustEntry, TrustStore};
@@ -236,11 +236,7 @@ fn trust_revoke(context: &CliContext, digest: &str) -> Result<()> {
             digest.dimmed()
         );
     } else {
-        println!(
-            "  {} No approval found for digest {}",
-            "○".dimmed(),
-            digest
-        );
+        println!("  {} No approval found for digest {}", "○".dimmed(), digest);
     }
     Ok(())
 }

@@ -223,10 +223,12 @@ fn render_plugins(project_root: &Path) -> Vec<plugin::HookOutput> {
 }
 
 /// Render the Plugin Info summary when hooks or incomplete spec changes exist.
-fn render_plugin_info(hook_outputs: &[plugin::HookOutput], spec_status: Option<&openspec::OpenSpecStatus>) {
+fn render_plugin_info(
+    hook_outputs: &[plugin::HookOutput],
+    spec_status: Option<&openspec::OpenSpecStatus>,
+) {
     let has_plugin_info = !hook_outputs.is_empty()
-        || spec_status
-            .is_some_and(|s| s.changes.iter().any(|c| c.total == 0 || c.done < c.total));
+        || spec_status.is_some_and(|s| s.changes.iter().any(|c| c.total == 0 || c.done < c.total));
     if !has_plugin_info {
         return;
     }
@@ -424,7 +426,11 @@ fn render_matrix_suggestion(project_root: &Path, name: &str, suggestions: &mut V
         return;
     };
     println!();
-    println!("    {} Matrix: {}", "◆".magenta(), progress.problem.dimmed());
+    println!(
+        "    {} Matrix: {}",
+        "◆".magenta(),
+        progress.problem.dimmed()
+    );
     println!(
         "      Matrix: {}/{} cells filled",
         progress.filled, progress.total
@@ -457,7 +463,10 @@ fn push_fallback_suggestions(suggestions: &mut Vec<Suggestion>) {
         command: "wai add research \"...\"".to_string(),
     });
     println!("    {} View project phase: wai phase", "→".dimmed());
-    println!("    {} Add artifacts: wai add research \"...\"", "→".dimmed());
+    println!(
+        "    {} Add artifacts: wai add research \"...\"",
+        "→".dimmed()
+    );
 }
 
 /// Append pipeline suggestions — always after workflow suggestions.
@@ -551,10 +560,7 @@ fn json_hook_outputs(project_root: &std::path::Path) -> Vec<HookOutput> {
 }
 
 /// Suggestion list for the JSON payload: workflow detections with fallbacks.
-fn json_suggestions(
-    project_root: &std::path::Path,
-    projects: &[StatusProject],
-) -> Vec<Suggestion> {
+fn json_suggestions(project_root: &std::path::Path, projects: &[StatusProject]) -> Vec<Suggestion> {
     let mut workflow_suggestions: Vec<Suggestion> = Vec::new();
     for path in project_entries(&projects_dir(project_root)) {
         let Some(name) = path.file_name().and_then(|n| n.to_str()) else {

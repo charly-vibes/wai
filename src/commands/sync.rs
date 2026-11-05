@@ -325,7 +325,10 @@ fn sync_file_from_main(
     dry_run: bool,
     stats: &mut SyncStats,
 ) {
-    let shown = dst_file.strip_prefix(project_root).unwrap_or(dst_file).display();
+    let shown = dst_file
+        .strip_prefix(project_root)
+        .unwrap_or(dst_file)
+        .display();
     if dst_file.exists() {
         let dst_content = std::fs::read(dst_file).unwrap_or_default();
         if src_content == dst_content {
