@@ -5,6 +5,22 @@ All notable changes to wai will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Calendar Versioning](https://calver.org/) (YYYY.M.MICRO).
 
+## [2026.11.11] - 2026-11-11
+
+### Changed
+
+- Internal quality pass — no behavior changes: decomposed oversized modules and
+  long functions across `src/` and `tests/` (add, matrix, plugin, sync,
+  sync_core, status, init, pipeline orchestration, llm, doctor, search, close,
+  ls, timeline, config, new, why/prompt, tutorial, reflect/context, handoff,
+  freshness), switched `help` to data-driven tables, deduplicated lazy test
+  clusters, replaced unwrap/expect with panic-context assertions, and dropped
+  superseded post-split files.
+- Regenerated the epic-orchestrator rendered-prompt baseline for the verifier
+  cross-family-pair template change (deepseek-v4-flash default, kimi-k2.5
+  deprecated) so `builtin_templates_render_byte_identical_to_baseline` is
+  green again (wai-0l9m).
+
 ## [2026.10.19] - 2026-10-19
 
 ### Added
