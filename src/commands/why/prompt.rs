@@ -13,7 +13,7 @@ fn escape_artifact(content: &str) -> String {
 
 /// Build the prompt sent to the LLM from gathered context.
 pub fn build_prompt(ctx: &GatheredContext) -> String {
-    let parts = vec![
+    let parts = [
         "You are an oracle helping understand why code and decisions exist as they do.\n"
             .to_string(),
         format!("# User Question\n{}\n", ctx.query),

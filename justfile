@@ -67,9 +67,11 @@ test-blast *files:
 test-full:
     cargo test
 
-# Validate spec-test correspondence (requires espectacular)
+# Validate spec-test correspondence (requires espectacular).
+# Runs through the declared-backlog ratchet, like the lefthook gate: the
+# legacy corpus's testless stubs are baselined, every other finding fails.
 validate:
-    ah check
+    python3 scripts/ah_check_ratchet.py
 
 # Run tests with output
 test-verbose:

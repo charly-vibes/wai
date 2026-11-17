@@ -341,6 +341,57 @@ fn days_since_epoch(year: i32, month: u32, day: u32) -> Option<u64> {
     if days < 0 { None } else { Some(days as u64) }
 }
 
+fn classify_secondary_kind(path: &Path) -> Option<&'static str> {
+    if path.extension().and_then(|x| x.to_str()) != Some("md") {
+        return None;
+    }
+    // Skip hidden files.
+    if path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .map(|n| n.starts_with('.'))
+        .unwrap_or(false)
+    {
+        return None;
+    }
+    let path_str = path.to_string_lossy();
+    if path_str.contains("/research/") {
+        Some("research")
+    } else if path_str.contains("/designs/") {
+        Some("design")
+    } else if path_str.contains("/plans/") {
+        Some("plan")
+    } else {
+        None
+    }
+}
+
+fn mtime_of(entry: &walkdir::DirEntry) -> SystemTime {
+    entry
+        .metadata()
+        .ok()
+        .and_then(|m| m.modified().ok())
+        .unwrap_or(SystemTime::UNIX_EPOCH)
+}
+
+fn rel_path_of(path: &Path, project_root: &Path) -> String {
+    path.strip_prefix(project_root)
+        .unwrap_or(path)
+        .to_string_lossy()
+        .to_string()
+}
+
+fn take_budget(content: &str, used: usize, budget: usize) -> Option<String> {
+    if used >= budget {
+        return None;
+    }
+    let mut take = content.len().min(budget - used);
+    while take > 0 && !content.is_char_boundary(take) {
+        take -= 1;
+    }
+    Some(content[..take].to_string())
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -547,55 +598,4 @@ mod tests {
         assert_eq!(ctx.handoff_count, 2);
         assert_eq!(ctx.handoff_count, ctx.handoffs.len());
     }
-}
-
-fn classify_secondary_kind(path: &Path) -> Option<&'static str> {
-    if path.extension().and_then(|x| x.to_str()) != Some("md") {
-        return None;
-    }
-    // Skip hidden files.
-    if path
-        .file_name()
-        .and_then(|n| n.to_str())
-        .map(|n| n.starts_with('.'))
-        .unwrap_or(false)
-    {
-        return None;
-    }
-    let path_str = path.to_string_lossy();
-    if path_str.contains("/research/") {
-        Some("research")
-    } else if path_str.contains("/designs/") {
-        Some("design")
-    } else if path_str.contains("/plans/") {
-        Some("plan")
-    } else {
-        None
-    }
-}
-
-fn mtime_of(entry: &walkdir::DirEntry) -> SystemTime {
-    entry
-        .metadata()
-        .ok()
-        .and_then(|m| m.modified().ok())
-        .unwrap_or(SystemTime::UNIX_EPOCH)
-}
-
-fn rel_path_of(path: &Path, project_root: &Path) -> String {
-    path.strip_prefix(project_root)
-        .unwrap_or(path)
-        .to_string_lossy()
-        .to_string()
-}
-
-fn take_budget(content: &str, used: usize, budget: usize) -> Option<String> {
-    if used >= budget {
-        return None;
-    }
-    let mut take = content.len().min(budget - used);
-    while take > 0 && !content.is_char_boundary(take) {
-        take -= 1;
-    }
-    Some(content[..take].to_string())
 }

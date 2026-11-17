@@ -122,7 +122,7 @@ fn print_uncommitted(uncommitted: &[String]) {
     let (shown, extra) = if uncommitted.len() > MAX_FILES {
         (&uncommitted[..MAX_FILES], uncommitted.len() - MAX_FILES)
     } else {
-        (&uncommitted[..], 0)
+        (uncommitted, 0)
     };
     let file_list = shown.join(", ");
     if extra > 0 {

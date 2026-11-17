@@ -11,7 +11,7 @@ use crate::plugin;
 use crate::state::ProjectState;
 use crate::workspace::ensure_workspace_current;
 
-use super::WaiCheckEntry;
+use super::{FixFn, WaiCheckEntry};
 use genesis::doctor::CheckStatus;
 
 pub(super) fn check_directories(project_root: &Path) -> Vec<WaiCheckEntry> {
@@ -201,14 +201,14 @@ fn version_entry(
     fix: Option<&str>,
     sync_commit: bool,
 ) -> WaiCheckEntry {
-    let fix_fn: Option<Box<dyn FnOnce(&Path) -> miette::Result<()>>> = fix.map(|_fix| {
+    let fix_fn: Option<FixFn> = fix.map(|_fix| {
         Box::new(move |project_root: &Path| {
             ensure_workspace_current(project_root)?;
             if sync_commit {
                 crate::workspace::sync_tool_commit(project_root)?;
             }
             Ok(())
-        }) as Box<dyn FnOnce(&Path) -> miette::Result<()>>
+        }) as FixFn
     });
     WaiCheckEntry {
         name: "Version".to_string(),

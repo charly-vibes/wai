@@ -26,6 +26,9 @@ use checks_pipeline::{
 use checks_session::{check_claude_session_hook, check_pi_session_hook};
 use checks_workspace::{check_agent_tool_coverage, check_skills_in_repo};
 
+/// Fix closure carried by [`WaiCheckEntry::fix_fn`]: applies `--fix` for a check.
+pub(super) type FixFn = Box<dyn FnOnce(&Path) -> Result<()>>;
+
 /// Internal check result with a fix closure.
 ///
 /// The public doctor API uses `genesis::doctor::CheckEntry` / `DoctorReport`;
@@ -36,8 +39,7 @@ pub(super) struct WaiCheckEntry {
     pub status: CheckStatus,
     pub message: String,
     pub fix: Option<String>,
-    #[allow(clippy::type_complexity)]
-    pub fix_fn: Option<Box<dyn FnOnce(&Path) -> Result<()>>>,
+    pub fix_fn: Option<FixFn>,
 }
 
 /// Adapter wrapping a wai check function as a genesis::doctor::DoctorCheck.

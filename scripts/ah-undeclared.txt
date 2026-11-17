@@ -1,0 +1,480 @@
+# ah check declared backlog (ratchet input for scripts/ah_check_ratchet.py)
+#
+# Format: <spec>/<scenario-id>   # <owning ticket(s)>
+#
+# Every scenario listed here is declared in openspec/specs but not yet
+# verifiable: its contract stub carries an empty [tests] table
+# (no-tests-declared) or no contract exists at all (no-toml). The corpus was
+# authored under espectacular 0.2.2 with `authored_with = "0.1.0"` stubs and
+# ah 0.12.2 requires declared tests, so these surfaced when the gate was first
+# wired (wai-ycr5). They are real gaps, not formatting drift: no test verifies
+# these scenarios. Pay them down scenario by scenario.
+#
+# The ratchet:
+#   - allows exactly these no-toml / no-tests-declared findings
+#   - fails on any other finding (orphan-toml, slug-collision, execution)
+#   - fails when a scenario is NOT listed but lacks contract/tests (new
+#     backlog must be declared with its ticket in the same change)
+#   - fails when a listed scenario is now declared (stale line: prune it)
+#
+# The list only shrinks, except when a spec-first ticket adds a scenario and
+# records it in the same change.
+
+# agent-config-sync
+agent-config-sync/add-a-rule  # wai-ycr5
+agent-config-sync/add-a-skill  # wai-ycr5
+agent-config-sync/auto-generated-header  # wai-ycr5
+agent-config-sync/available-templates  # wai-ycr5
+agent-config-sync/built-in-target-activation  # wai-ycr5
+agent-config-sync/category-grouping-in-list-output  # wai-ycr5
+agent-config-sync/check-sync-status  # wai-ycr5
+agent-config-sync/config-directory-structure  # wai-ycr5
+agent-config-sync/create-hierarchical-skill  # wai-ycr5
+agent-config-sync/create-skill-from-template  # wai-ycr5
+agent-config-sync/empty-segments-rejected  # wai-ycr5
+agent-config-sync/execute-projections  # wai-ycr5
+agent-config-sync/flat-name-collision-with-category-directory-rejected  # wai-ycr5
+agent-config-sync/flat-names-unchanged  # wai-ycr5
+agent-config-sync/frontmatter-name-for-hierarchical-skill  # wai-ycr5
+agent-config-sync/frontmatter-translation  # wai-ycr5
+agent-config-sync/generated-file-header  # wai-ycr5
+agent-config-sync/import-from-claude-directory  # wai-ycr5
+agent-config-sync/import-from-cursorrules  # wai-ycr5
+agent-config-sync/invalid-hierarchical-names-rejected  # wai-ycr5
+agent-config-sync/list-configs  # wai-ycr5
+agent-config-sync/no-template-gives-bare-stub  # wai-ycr5
+agent-config-sync/projections-file-format  # wai-ycr5
+agent-config-sync/skill-file-generated-at-correct-path  # wai-ycr5
+agent-config-sync/templates-are-portable  # wai-ycr5
+agent-config-sync/unknown-template-name-rejected  # wai-ycr5
+
+# agnostic-capabilities
+agnostic-capabilities/agnostic-check-mapping  # wai-ycr5
+agnostic-capabilities/check-output-with-intent-and-success-criteria-json  # wai-ycr5
+agnostic-capabilities/check-output-with-intent-and-success-criteria-verbose  # wai-ycr5
+agnostic-capabilities/plugin-with-custom-context  # wai-ycr5
+
+# cli-core
+cli-core/add-artifacts-and-resources-to-a-project  # wai-ycr5
+cli-core/add-skill-creates-skill-file  # wai-ycr5
+cli-core/add-skill-with-template  # wai-ycr5
+cli-core/agent-config-sync-status  # wai-ycr5
+cli-core/already-initialized  # wai-ycr5
+cli-core/ask-reasoning-questions  # wai-ycr5
+cli-core/at-least-one-workspace-has-beads-counts-column-shown-globally  # wai-ycr5
+cli-core/auto-confirm  # wai-ycr5
+cli-core/configuration-validation  # wai-ycr5
+cli-core/contextual-suggestions  # wai-ycr5
+cli-core/create-new-items  # wai-ycr5
+cli-core/custom-depth  # wai-ycr5
+cli-core/custom-plugin-validation  # wai-ycr5
+cli-core/custom-root  # wai-ycr5
+cli-core/deprecated-alias-still-works  # wai-ycr5
+cli-core/diagnose-workspace-health  # wai-ycr5
+cli-core/directory-structure-check  # wai-ycr5
+cli-core/duplicate-project-names-across-workspaces  # wai-ycr5
+cli-core/fix-skills  # wai-ycr5
+cli-core/generate-handoffs  # wai-ycr5
+cli-core/interactive-initialization  # wai-ycr5
+cli-core/invalid-root-path  # wai-ycr5
+cli-core/manage-agent-configs  # wai-ycr5
+cli-core/manage-project-phases  # wai-ycr5
+cli-core/missing-handoff-signal-ignored  # wai-ycr5
+cli-core/move-items-between-para-categories  # wai-ycr5
+cli-core/multiple-projects-in-one-workspace  # wai-ycr5
+cli-core/named-initialization  # wai-ycr5
+cli-core/no-workspace-has-beads-counts-column-omitted  # wai-ycr5
+cli-core/no-workspaces-found  # wai-ycr5
+cli-core/non-interactive-mode  # wai-ycr5
+cli-core/not-initialized  # wai-ycr5
+cli-core/output-format  # wai-ycr5
+cli-core/pending-resume-written-on-success  # wai-ycr5
+cli-core/plugin-list-as-json  # wai-ycr5
+cli-core/plugin-tool-availability  # wai-ycr5
+cli-core/project-state-integrity  # wai-ycr5
+cli-core/quiet-mode  # wai-ycr5
+cli-core/reflect-on-session-history  # wai-ycr5
+cli-core/repository-standards-check  # wai-ycr5
+cli-core/resume-mode-next-steps-present  # wai-ycr5
+cli-core/resume-mode-next-steps-rendering  # wai-ycr5
+cli-core/resume-mode-no-next-steps-section  # wai-ycr5
+cli-core/resume-mode-today-s-handoff  # wai-ycr5
+cli-core/safe-mode  # wai-ycr5
+cli-core/search-artifacts  # wai-ycr5
+cli-core/search-as-json  # wai-ycr5
+cli-core/show-information  # wai-ycr5
+cli-core/show-project-phase-and-status  # wai-ycr5
+cli-core/signal-not-consumed-by-prime  # wai-ycr5
+cli-core/stale-signal-not-today-s-handoff  # wai-ycr5
+cli-core/status-as-json  # wai-ycr5
+cli-core/summary-output  # wai-ycr5
+cli-core/sync-agent-configurations  # wai-ycr5
+cli-core/timeline-as-json  # wai-ycr5
+cli-core/verbose-output-level-1  # wai-ycr5
+cli-core/verbose-output-level-2  # wai-ycr5
+cli-core/verbose-output-level-3  # wai-ycr5
+cli-core/view-timeline  # wai-ycr5
+cli-core/way-summary-output  # wai-ycr5
+cli-core/works-without-wai-initialization  # wai-ycr5
+cli-core/workspaces-found-table-rendered  # wai-ycr5
+
+# context-suggestions
+context-suggestions/active-pipeline-run  # wai-ycr5
+context-suggestions/active-project-within-threshold-is-not-flagged  # wai-ycr5
+context-suggestions/archived-project-is-not-flagged  # wai-ycr5
+context-suggestions/beads-plugin-active  # wai-ycr5
+context-suggestions/completion-signal-in-json-output  # wai-ycr5
+context-suggestions/design-phase-with-a-matrix  # wai-ycr5
+context-suggestions/design-phase-without-a-matrix  # wai-ycr5
+context-suggestions/git-plugin-active  # wai-ycr5
+context-suggestions/new-empty-project  # wai-ycr5
+context-suggestions/pipelines-available-but-no-active-run  # wai-ycr5
+context-suggestions/plan-phase  # wai-ycr5
+context-suggestions/project-stuck-in-implement-phase  # wai-ycr5
+context-suggestions/research-phase  # wai-ycr5
+context-suggestions/review-phase-with-handoff-suggests-archiving  # wai-ycr5
+context-suggestions/review-phase-without-handoff-does-not-trigger  # wai-ycr5
+context-suggestions/stale-pipeline-pointer  # wai-ycr5
+context-suggestions/stale-signal-in-json-output  # wai-ycr5
+context-suggestions/suggestion-block-formatting  # wai-ycr5
+context-suggestions/suggestions-as-json  # wai-ycr5
+
+# decision-matrix
+decision-matrix/all-green-column-warns-but-passes  # wai-ycr5
+decision-matrix/ambiguous-timestamps-after-a-fresh-clone-warn-instead-of-blocking  # wai-ycr5
+decision-matrix/criterion-add-touches-every-approach  # wai-ycr5
+decision-matrix/current-decision-passes-the-gate  # wai-ycr5
+decision-matrix/decide-rejects-unknown-approach  # wai-ycr5
+decision-matrix/decide-writes-both-artifacts  # wai-ycr5
+decision-matrix/edited-after-decision-blocks-the-gate  # wai-ycr5
+decision-matrix/init-creates-status-quo  # wai-ycr5
+decision-matrix/init-scaffolds-the-matrix  # wai-ycr5
+decision-matrix/missing-cell-in-one-approach-fails-lint  # wai-ycr5
+decision-matrix/missing-fact-means-incomplete-not-judged  # wai-ycr5
+decision-matrix/multiple-markers-are-a-structural-error  # wai-ycr5
+decision-matrix/neutral-judgment-is-explicit  # wai-ycr5
+decision-matrix/no-matrix-means-no-gate  # wai-ycr5
+decision-matrix/one-matrix-per-project  # wai-ycr5
+decision-matrix/same-state-same-output  # wai-ycr5
+decision-matrix/scaffolded-decision-does-not-pass-the-gate  # wai-ycr5
+decision-matrix/status-shows-completion  # wai-ycr5
+decision-matrix/undistinguished-columns-warn  # wai-ycr5
+decision-matrix/unfilled-cell-is-not-a-judgment  # wai-ycr5
+
+# doctor-auto-fix
+doctor-auto-fix/cannot-fix-corrupted-config-toml  # wai-ycr5
+doctor-auto-fix/cannot-fix-missing-plugin-tools  # wai-ycr5
+doctor-auto-fix/fix-missing-agent-config-subdirectories  # wai-ycr5
+doctor-auto-fix/fix-missing-default-files  # wai-ycr5
+doctor-auto-fix/fix-missing-directories  # wai-ycr5
+doctor-auto-fix/fix-missing-managed-block  # wai-ycr5
+doctor-auto-fix/fix-missing-resource-subdirectories  # wai-ycr5
+doctor-auto-fix/fix-missing-state-file  # wai-ycr5
+doctor-auto-fix/fix-stale-inline-projection  # wai-ycr5
+doctor-auto-fix/fix-version-staleness  # wai-ycr5
+doctor-auto-fix/json-output-with-fix  # wai-ycr5
+doctor-auto-fix/refuse-in-safe-mode  # wai-ycr5
+doctor-auto-fix/skip-confirmation-with-yes  # wai-ycr5
+doctor-auto-fix/skip-corrupted-state-file  # wai-ycr5
+doctor-auto-fix/user-runs-doctor-with-fix  # wai-ycr5
+doctor-auto-fix/workspace-version-is-stale  # wai-ycr5
+doctor-auto-fix/workspace-version-matches-binary  # wai-ycr5
+
+# error-recovery
+error-recovery/error-structure  # wai-ycr5
+error-recovery/handoff-generation-failure  # wai-ycr5
+error-recovery/invalid-area-reference  # wai-ycr5
+error-recovery/invalid-project-reference  # wai-ycr5
+error-recovery/invalid-resource-reference  # wai-ycr5
+error-recovery/invalid-transition  # wai-ycr5
+error-recovery/missing-plugin  # wai-ycr5
+error-recovery/missing-project-context  # wai-ycr5
+error-recovery/sync-failure  # wai-ycr5
+
+# handoff-system
+handoff-system/create-handoff  # wai-ycr5
+handoff-system/handoff-file-structure  # wai-ycr5
+handoff-system/handoff-includes-matrix-summary  # wai-ycr5
+handoff-system/handoff-location  # wai-ycr5
+handoff-system/handoff-with-plugin-data  # wai-ycr5
+handoff-system/handoff-without-a-matrix  # wai-ycr5
+handoff-system/signal-overwritten-on-repeated-close  # wai-ycr5
+handoff-system/signal-written-on-close  # wai-ycr5
+
+# help-system
+help-system/brief-help-default  # wai-ycr5
+help-system/command-examples  # wai-ycr5
+help-system/command-help  # wai-ycr5
+help-system/detailed-help  # wai-ycr5
+help-system/example-formatting  # wai-ycr5
+help-system/help-verbosity-levels  # wai-ycr5
+help-system/no-arguments-shows-contextual-help  # wai-ycr5
+help-system/root-help  # wai-ycr5
+help-system/subcommand-help  # wai-ycr5
+
+# managed-block
+managed-block/agents-md-also-checked  # wai-ycr5
+managed-block/beads-detected-epic-note-on-close-step  # wai-ycr5
+managed-block/beads-detected-pre-claim-note-present  # wai-ycr5
+managed-block/beads-not-detected-no-epic-note  # wai-ycr5
+managed-block/beads-not-detected-no-pre-claim-note  # wai-ycr5
+managed-block/block-is-current  # wai-ycr5
+managed-block/block-is-stale-after-pipeline-added  # wai-ycr5
+managed-block/both-plugins-detected  # wai-ycr5
+managed-block/no-pipelines-installed  # wai-ycr5
+managed-block/only-one-plugin-detected  # wai-ycr5
+managed-block/openspec-detected-at-init-time  # wai-ycr5
+managed-block/openspec-not-detected  # wai-ycr5
+managed-block/pipeline-without-metadata  # wai-ycr5
+managed-block/pipelines-with-metadata-installed  # wai-ycr5
+managed-block/user-modified-managed-block-always-shows-stale  # wai-ycr5
+
+# onboarding
+onboarding/inside-project  # wai-ycr5
+onboarding/no-project-detected  # wai-ycr5
+onboarding/re-init-creates-missing-default-files  # wai-ycr5
+onboarding/re-init-creates-missing-directories  # wai-ycr5
+onboarding/re-init-is-idempotent  # wai-ycr5
+onboarding/re-init-updates-version  # wai-ycr5
+
+# orchestration-integrity
+orchestration-integrity/bypass-during-active-run-recorded  # wai-ycr5
+orchestration-integrity/bypass-without-active-run-ignored  # wai-ycr5
+orchestration-integrity/manifest-step-blocks-without-artifacts  # wai-ycr5
+orchestration-integrity/manifest-step-passes-with-artifacts  # wai-ycr5
+orchestration-integrity/no-collision-state-stays-silent  # wai-ycr5
+orchestration-integrity/parked-stash-from-parallel-agent-surfaced  # wai-ycr5
+orchestration-integrity/red-violation-class-is-closed  # wai-ycr5
+orchestration-integrity/single-model-degradation-never-confirm  # wai-ycr5
+orchestration-integrity/verify-with-evidence-yields-confirm  # wai-ycr5
+orchestration-integrity/verify-without-test-run-output-is-not-confirm  # wai-ycr5
+
+# para-structure
+para-structure/add-artifact-with-date-prefix  # wai-ycr5
+para-structure/archive-a-project  # wai-ycr5
+para-structure/archive-an-area  # wai-ycr5
+para-structure/create-new-area  # wai-ycr5
+para-structure/create-new-project  # wai-ycr5
+para-structure/create-new-resource  # wai-ycr5
+para-structure/initialize-para-structure  # wai-ycr5
+
+# pipeline-resource
+pipeline-resource/advance-blocked-by-gate-failure  # wai-ycr5
+pipeline-resource/advance-past-last-step-rejected  # wai-ycr5
+pipeline-resource/advance-pipeline-to-next-step  # wai-ycr5
+pipeline-resource/advance-with-unknown-run-id  # wai-ycr5
+pipeline-resource/ambiguous-oracle-resolution  # wai-ycr5
+pipeline-resource/approval-gate-blocks-until-approved  # wai-ycr5
+pipeline-resource/approval-gate-passes-after-approval  # wai-ycr5
+pipeline-resource/approval-invalidated-by-new-artifacts  # wai-ycr5
+pipeline-resource/approve-current-step  # wai-ycr5
+pipeline-resource/approve-without-active-run  # wai-ycr5
+pipeline-resource/artifact-created-during-active-step  # wai-ycr5
+pipeline-resource/check-all-gates  # wai-ycr5
+pipeline-resource/check-on-step-without-gates  # wai-ycr5
+pipeline-resource/check-single-oracle  # wai-ycr5
+pipeline-resource/create-a-pipeline  # wai-ycr5
+pipeline-resource/create-a-review-artifact  # wai-ycr5
+pipeline-resource/cross-artifact-oracle  # wai-ycr5
+pipeline-resource/default-oracle-scope-is-per-artifact  # wai-ycr5
+pipeline-resource/explicit-command-override  # wai-ycr5
+pipeline-resource/gates-on-step-without-gates  # wai-ycr5
+pipeline-resource/gates-with-active-run  # wai-ycr5
+pipeline-resource/gates-without-active-run  # wai-ycr5
+pipeline-resource/gates-without-active-run-and-no-pipeline-name  # wai-ycr5
+pipeline-resource/invalid-stage-format-rejected  # wai-ycr5
+pipeline-resource/invalid-verdict-rejected  # wai-ycr5
+pipeline-resource/metadata-in-toml  # wai-ycr5
+pipeline-resource/missing-metadata  # wai-ycr5
+pipeline-resource/name-based-resolution-with-executable-script  # wai-ycr5
+pipeline-resource/no-active-pipeline-run  # wai-ycr5
+pipeline-resource/no-gates-configured  # wai-ycr5
+pipeline-resource/oracle-gate-blocks-on-script-failure  # wai-ycr5
+pipeline-resource/oracle-not-executable  # wai-ycr5
+pipeline-resource/oracle-not-found  # wai-ycr5
+pipeline-resource/oracle-timeout  # wai-ycr5
+pipeline-resource/procedural-gate-blocks-on-missing-review  # wai-ycr5
+pipeline-resource/procedural-gate-blocks-on-severity-threshold  # wai-ycr5
+pipeline-resource/procedural-gate-defaults-exclude-reviews  # wai-ycr5
+pipeline-resource/procedural-gate-scopes-reviewable-types  # wai-ycr5
+pipeline-resource/retroactive-tagging-not-supported  # wai-ycr5
+pipeline-resource/review-target-does-not-exist  # wai-ycr5
+pipeline-resource/review-with-structured-metadata  # wai-ycr5
+pipeline-resource/review-without-target-rejected  # wai-ycr5
+pipeline-resource/show-nonexistent-pipeline  # wai-ycr5
+pipeline-resource/show-pipeline-with-gates  # wai-ycr5
+pipeline-resource/start-a-pipeline-run  # wai-ycr5
+pipeline-resource/start-blocked-by-validation-errors  # wai-ycr5
+pipeline-resource/step-artifact-tagged-with-run-and-step-id  # wai-ycr5
+pipeline-resource/structural-gate-blocks-on-missing-artifacts  # wai-ycr5
+pipeline-resource/validate-a-valid-pipeline  # wai-ycr5
+pipeline-resource/validate-catches-duplicate-names  # wai-ycr5
+pipeline-resource/validate-catches-missing-metadata  # wai-ycr5
+pipeline-resource/validate-catches-missing-oracle  # wai-ycr5
+pipeline-resource/validate-catches-non-executable-oracle  # wai-ycr5
+pipeline-resource/view-pipeline-status  # wai-ycr5
+pipeline-resource/view-single-run-detail  # wai-ycr5
+
+# plugin-system
+plugin-system/auto-detect-on-init  # wai-ycr5
+plugin-system/detector-types  # wai-ycr5
+plugin-system/disable-plugin  # wai-ycr5
+plugin-system/enable-plugin  # wai-ycr5
+plugin-system/handoff-enrichment  # wai-ycr5
+plugin-system/hook-execution  # wai-ycr5
+plugin-system/list-plugins  # wai-ycr5
+plugin-system/list-plugins-as-json  # wai-ycr5
+plugin-system/non-interactive-passthrough  # wai-ycr5
+plugin-system/plugin-command-execution  # wai-ycr5
+plugin-system/plugin-config-format  # wai-ycr5
+plugin-system/safe-mode-passthrough  # wai-ycr5
+
+# project-reflection
+project-reflection/agent-mode-activated-in-wai-reflect  # wai-ycr5
+project-reflection/agent-provides-reflect-content-via-inject-content  # wai-ycr5
+project-reflection/basic-reflect-run  # wai-ycr5
+project-reflection/budget-exceeded  # wai-ycr5
+project-reflection/conversation-transcript-as-input  # wai-ycr5
+project-reflection/conversation-transcript-fills-first-tier  # wai-ycr5
+project-reflection/detection-uses-same-three-env-contract  # wai-ycr5
+project-reflection/dry-run-mode  # wai-ycr5
+project-reflection/handoff-includes-nuance-sections  # wai-ycr5
+project-reflection/handoffs-fill-second-tier  # wai-ycr5
+project-reflection/managed-block-includes-search-instruction-when-companions-detected  # wai-ycr5
+project-reflection/metadata-written-after-successful-reflect  # wai-ycr5
+project-reflection/migration-from-old-wai-reflect-block  # wai-ycr5
+project-reflection/missing-metadata-treated-as-never-reflected  # wai-ycr5
+project-reflection/no-handoffs-and-no-conversation-file  # wai-ycr5
+project-reflection/no-instruction-without-companions  # wai-ycr5
+project-reflection/no-llm-available  # wai-ycr5
+project-reflection/no-nudge-when-current  # wai-ycr5
+project-reflection/no-target-file-found  # wai-ycr5
+project-reflection/non-agent-invocation-unchanged  # wai-ycr5
+project-reflection/nudge-after-threshold-exceeded  # wai-ycr5
+project-reflection/output-target-selection  # wai-ycr5
+project-reflection/previous-reflections-included-as-context  # wai-ycr5
+project-reflection/reflect-prioritizes-nuance-sections  # wai-ycr5
+project-reflection/reflect-writes-to-resource-file  # wai-ycr5
+project-reflection/resource-file-is-searchable  # wai-ycr5
+project-reflection/scoped-to-a-project  # wai-ycr5
+project-reflection/secondary-artifacts-fill-remaining-budget  # wai-ycr5
+project-reflection/staleness-flag  # wai-ycr5
+project-reflection/wai-init-injects-wai-reflect-ref-block  # wai-ycr5
+project-reflection/wai-reflect-does-not-touch-claude-md  # wai-ycr5
+
+# project-state-machine
+project-state-machine/advance-to-next-phase  # wai-ycr5
+project-state-machine/default-phase  # wai-ycr5
+project-state-machine/go-back-to-previous-phase  # wai-ycr5
+project-state-machine/inconclusive-staleness-warns-instead-of-blocking  # wai-ycr5
+project-state-machine/matrix-gates-design-to-plan-when-stale  # wai-ycr5
+project-state-machine/matrix-gates-design-to-plan-when-undecided  # wai-ycr5
+project-state-machine/no-matrix-leaves-transitions-unchanged  # wai-ycr5
+project-state-machine/phase-list  # wai-ycr5
+project-state-machine/set-cannot-bypass-the-gate  # wai-ycr5
+project-state-machine/set-specific-phase  # wai-ycr5
+project-state-machine/show-current-phase  # wai-ycr5
+project-state-machine/state-file-format  # wai-ycr5
+project-state-machine/transition-recorded  # wai-ycr5
+
+# reasoning-oracle
+reasoning-oracle/agent-instruction-blocks  # wai-ycr5
+reasoning-oracle/agent-mode-activated-automatically  # wai-ycr5
+reasoning-oracle/auto-detect-backend-inside-an-agent-session  # wai-ycr5
+reasoning-oracle/badge-already-present  # wai-ycr5
+reasoning-oracle/badge-check-in-wai-doctor  # wai-ycr5
+reasoning-oracle/badge-footer-in-wai-why-output  # wai-ycr5
+reasoning-oracle/basic-prompt-structure  # wai-ycr5
+reasoning-oracle/claude-cli-backend-behaviour  # wai-ycr5
+reasoning-oracle/claude-cli-is-not-used-inside-claude-code-sessions-auto-detect  # wai-ycr5
+reasoning-oracle/context-size-management-for-large-projects  # wai-ycr5
+reasoning-oracle/default-to-cost-effective-models  # wai-ycr5
+reasoning-oracle/detection-env-var-priority  # wai-ycr5
+reasoning-oracle/display-cost-estimate  # wai-ycr5
+reasoning-oracle/explicit-agent-mode-outside-an-agent-session  # wai-ycr5
+reasoning-oracle/file-path-query  # wai-ycr5
+reasoning-oracle/gather-artifacts  # wai-ycr5
+reasoning-oracle/gather-git-context-for-file-queries  # wai-ycr5
+reasoning-oracle/gather-project-metadata  # wai-ycr5
+reasoning-oracle/git-unavailable-or-file-not-tracked  # wai-ycr5
+reasoning-oracle/help-text  # wai-ycr5
+reasoning-oracle/json-output  # wai-ycr5
+reasoning-oracle/llm-api-error-with-diagnostic-codes  # wai-ycr5
+reasoning-oracle/local-only-mode  # wai-ycr5
+reasoning-oracle/malformed-llm-response  # wai-ycr5
+reasoning-oracle/natural-language-query  # wai-ycr5
+reasoning-oracle/no-artifacts-available  # wai-ycr5
+reasoning-oracle/no-llm-available  # wai-ycr5
+reasoning-oracle/no-llm-available-remediation-guidance-mentions-agent-mode  # wai-ycr5
+reasoning-oracle/no-readme-present  # wai-ycr5
+reasoning-oracle/output-format  # wai-ycr5
+reasoning-oracle/plugin-contributed-context  # wai-ycr5
+reasoning-oracle/privacy-warning-for-external-apis  # wai-ycr5
+reasoning-oracle/tutorial-integration  # wai-ycr5
+reasoning-oracle/verbosity-levels  # wai-ycr5
+
+# repository-best-practices
+repository-best-practices/agents-md-present  # wai-ycr5
+repository-best-practices/all-checks-pass  # wai-ycr5
+repository-best-practices/all-documentation-present  # wai-ycr5
+repository-best-practices/both-recommended-skills-present  # wai-ycr5
+repository-best-practices/claude-md-present  # wai-ycr5
+repository-best-practices/dev-container-directory-exists  # wai-ycr5
+repository-best-practices/dev-container-file-exists  # wai-ycr5
+repository-best-practices/editorconfig-present  # wai-ycr5
+repository-best-practices/empty-workflows-directory  # wai-ycr5
+repository-best-practices/fix-scaffolds-missing-skills  # wai-ycr5
+repository-best-practices/fix-skips-existing-skills  # wai-ycr5
+repository-best-practices/fresh-repository  # wai-ycr5
+repository-best-practices/gh-cli-available-and-authenticated  # wai-ycr5
+repository-best-practices/gh-cli-available-but-not-authenticated  # wai-ycr5
+repository-best-practices/gh-cli-not-installed  # wai-ycr5
+repository-best-practices/github-actions-configured  # wai-ycr5
+repository-best-practices/gitlab-ci-or-circleci-configured  # wai-ycr5
+repository-best-practices/json-includes-agnostic-fields  # wai-ycr5
+repository-best-practices/justfile-with-useful-recipes  # wai-ycr5
+repository-best-practices/library-project  # wai-ycr5
+repository-best-practices/llm-txt-present  # wai-ycr5
+repository-best-practices/missing-critical-files  # wai-ycr5
+repository-best-practices/no-ai-instructions  # wai-ycr5
+repository-best-practices/no-ci-cd-configuration  # wai-ycr5
+repository-best-practices/no-dev-container  # wai-ycr5
+repository-best-practices/no-documentation  # wai-ycr5
+repository-best-practices/no-editorconfig  # wai-ycr5
+repository-best-practices/no-hook-manager-config  # wai-ycr5
+repository-best-practices/no-llm-txt  # wai-ycr5
+repository-best-practices/no-release-pipeline  # wai-ycr5
+repository-best-practices/no-skills-configured  # wai-ycr5
+repository-best-practices/no-task-runner  # wai-ycr5
+repository-best-practices/partial-documentation  # wai-ycr5
+repository-best-practices/partial-skills-configuration  # wai-ycr5
+repository-best-practices/plugin-with-custom-context  # wai-ycr5
+repository-best-practices/pre-commit-configured-legacy  # wai-ycr5
+repository-best-practices/prek-configured  # wai-ycr5
+repository-best-practices/release-tool-detected  # wai-ycr5
+repository-best-practices/skills-directory-empty  # wai-ycr5
+repository-best-practices/skills-present-via-alias-ro5  # wai-ycr5
+repository-best-practices/task-runner-present  # wai-ycr5
+repository-best-practices/toml-plugin-file-parsed-correctly  # wai-ycr5
+repository-best-practices/unknown-fix-target  # wai-ycr5
+repository-best-practices/verbose-output-includes-agnostic-context  # wai-ycr5
+
+# skill-sharing
+skill-sharing/export-skills-to-archive  # wai-ycr5
+skill-sharing/global-skill-available-in-all-projects  # wai-ycr5
+skill-sharing/hardcoded-project-names-warned  # wai-ycr5
+skill-sharing/import-skills-from-archive  # wai-ycr5
+skill-sharing/install-skill-from-another-repository  # wai-ycr5
+skill-sharing/install-skill-globally  # wai-ycr5
+skill-sharing/local-skill-overrides-global  # wai-ycr5
+skill-sharing/non-interactive-import-with-yes  # wai-ycr5
+
+# timeline-search
+timeline-search/global-search  # wai-ycr5
+timeline-search/project-scoped-search  # wai-ycr5
+timeline-search/project-timeline  # wai-ycr5
+timeline-search/search-output-as-json  # wai-ycr5
+timeline-search/search-output-format  # wai-ycr5
+timeline-search/timeline-output-as-json  # wai-ycr5
+timeline-search/timeline-output-format  # wai-ycr5
+timeline-search/type-filtered-search  # wai-ycr5

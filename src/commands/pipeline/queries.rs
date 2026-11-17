@@ -613,7 +613,6 @@ fn validate_one(project_root: &Path, pname: &str, path: &Path) -> Result<bool> {
     Ok(had_errors)
 }
 
-#[allow(dead_code)]
 // ─── print_step ───────────────────────────────────────────────────────────────
 
 /// Print a step prompt block with a "step N/M" header and rendered prompt.

@@ -4,13 +4,10 @@
 use genesis::doctor::CheckStatus;
 use genesis::managed_block::content_sha8;
 
-use super::WaiCheckEntry;
+use super::{FixFn, WaiCheckEntry};
 use crate::managed_block::InstalledPipeline;
 use miette::IntoDiagnostic;
 use std::path::Path;
-
-/// Fix closure type carried by [`WaiCheckEntry::fix_fn`].
-type FixFn = Box<dyn FnOnce(&Path) -> miette::Result<()>>;
 
 /// Workspace generator state shared by the staleness checks: detected plugin
 /// names, installed skill names, and installed pipelines.

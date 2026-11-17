@@ -311,7 +311,7 @@ The CLI SHALL provide `wai way` to validate repository best practices and provid
 - **AND** does NOT require `.wai/` to exist
 - **AND** helps users prepare repositories before running `wai init`
 
-#### Scenario: Summary output
+#### Scenario: Way summary output
 
 - **WHEN** all checks complete
 - **THEN** the system prints a summary: "X/Y best practices adopted"
