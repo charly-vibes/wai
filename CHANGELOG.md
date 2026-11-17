@@ -5,6 +5,28 @@ All notable changes to wai will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Calendar Versioning](https://calver.org/) (YYYY.M.MICRO).
 
+## [2026.11.17] - 2026-11-17
+
+### Fixed
+
+- Agent instructions no longer point at a file that no longer exists: the
+  `WAI:START` block and the detailed `.wai/AGENTS.md` render their openspec
+  pointer from the repo layout — `openspec/AGENTS.md` only when that legacy
+  file is present, `openspec/config.yaml` plus the `.agents/skills/openspec-*`
+  workflows for openspec 1.0+ layouts, `openspec/` otherwise.
+  `openspec update` deletes `openspec/AGENTS.md`, so every migrated repo
+  carried a dangling pointer (`wai-2q3f`).
+
+### Changed
+
+- Pre-commit is green again under the current toolchain: five pre-existing
+  clippy findings fixed at the source (two allow attributes removed, none
+  added), and the `ah` gate now runs a one-way ratchet
+  (`scripts/ah_check_ratchet.py` + `scripts/ah-undeclared.txt`) over the
+  declared-test backlog instead of failing on all 417 findings. Six findings
+  were fixed outright (four orphan contracts from renamed scenarios, one
+  duplicate scenario name). `wai-ycr5`.
+
 ## [2026.11.11] - 2026-11-11
 
 ### Changed
