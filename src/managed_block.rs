@@ -4,6 +4,46 @@ use std::path::Path;
 pub(crate) const WAI_START: &str = "<!-- WAI:START -->";
 pub(crate) const WAI_END: &str = "<!-- WAI:END -->";
 
+/// Which guidance layout the detected openspec workspace uses.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum OpenspecHint {
+    /// Legacy workspace: instructions ship as a generated agents file inside
+    /// `openspec/`.
+    Legacy,
+    /// openspec >= 1.0 workspace: the generated agents file is deleted during
+    /// migration; config lives in `openspec/config.yaml` and guidance in the
+    /// projected `openspec-*` skills.
+    Artifact,
+    /// Unrecognized layout: point at the workspace directory.
+    Generic,
+}
+
+impl OpenspecHint {
+    /// Where to look for openspec instructions, as a sentence fragment.
+    pub(crate) fn pointer(self) -> &'static str {
+        match self {
+            OpenspecHint::Legacy => "`openspec/AGENTS.md`",
+            OpenspecHint::Artifact => {
+                "`openspec/config.yaml` and the `openspec-*` skills in `.agents/skills/`"
+            }
+            OpenspecHint::Generic => "`openspec/`",
+        }
+    }
+}
+
+/// Classify the openspec workspace layout so generated blocks never point at
+/// the instructions file that openspec >= 1.0 deletes on migration.
+pub(crate) fn openspec_hint(repo_root: &Path) -> OpenspecHint {
+    let openspec_dir = repo_root.join("openspec");
+    if openspec_dir.join("AGENTS.md").exists() {
+        OpenspecHint::Legacy
+    } else if openspec_dir.join("config.yaml").exists() {
+        OpenspecHint::Artifact
+    } else {
+        OpenspecHint::Generic
+    }
+}
+
 pub(crate) fn ubiquitous_language_note(repo_root: &Path) -> Option<&'static str> {
     let index = repo_root.join(".wai/resources/ubiquitous-language/README.md");
     index.exists().then_some(
@@ -69,7 +109,11 @@ pub fn wai_block_inner(
 
     let mut block = String::new();
     block.push_str(&slim_intro());
-    block.push_str(&slim_detected_tools(has_beads, has_openspec));
+    block.push_str(&slim_detected_tools(
+        has_beads,
+        has_openspec,
+        openspec_hint(repo_root),
+    ));
     if has_ro5 {
         block.push_str(&slim_ro5_reminder());
     }
@@ -96,7 +140,7 @@ fn slim_intro() -> String {
 
 /// Detected companion workflow tools plus the TDD/Tidy-First and
 /// search-before-research reminders (only when companions are present).
-fn slim_detected_tools(has_beads: bool, has_openspec: bool) -> String {
+fn slim_detected_tools(has_beads: bool, has_openspec: bool, openspec: OpenspecHint) -> String {
     let mut section = String::new();
     if has_beads || has_openspec {
         section.push_str(
@@ -111,9 +155,10 @@ fn slim_detected_tools(has_beads: bool, has_openspec: bool) -> String {
             );
         }
         if has_openspec {
-            section.push_str(
-                "- **openspec** — specifications and change proposals (see `openspec/AGENTS.md`)\n",
-            );
+            section.push_str(&format!(
+                "- **openspec** — specifications and change proposals (see {})\n",
+                openspec.pointer()
+            ));
         }
         section.push_str(
             "\n\
@@ -708,6 +753,49 @@ mod wai_block_tests {
         assert!(
             policy_pos < detailed_pos,
             "Autonomous Work Policy should appear before Detailed Instructions"
+        );
+    }
+
+    // ── openspec guidance layout (wai-2q3f) ──────────────────────────────
+
+    #[test]
+    fn slim_block_points_at_legacy_openspec_agents_file() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::create_dir_all(dir.path().join("openspec")).unwrap();
+        std::fs::write(dir.path().join("openspec/AGENTS.md"), "# OpenSpec\n").unwrap();
+        let output = wai_block_content(dir.path(), &["openspec"], &[], &[]);
+        assert!(
+            output.contains("(see `openspec/AGENTS.md`)"),
+            "legacy workspace should keep pointing at `openspec/AGENTS.md`"
+        );
+    }
+
+    #[test]
+    fn slim_block_points_at_openspec_config_and_skills_after_migration() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::create_dir_all(dir.path().join("openspec")).unwrap();
+        std::fs::write(
+            dir.path().join("openspec/config.yaml"),
+            "schema: spec-driven\n",
+        )
+        .unwrap();
+        let output = wai_block_content(dir.path(), &["openspec"], &[], &[]);
+        assert!(
+            !output.contains("openspec/AGENTS.md"),
+            "openspec >= 1.0 deletes openspec/AGENTS.md; the block must not point at it"
+        );
+        assert!(output.contains("`openspec/config.yaml`"));
+        assert!(output.contains("`openspec-*` skills in `.agents/skills/`"));
+    }
+
+    #[test]
+    fn slim_block_points_at_openspec_dir_when_layout_unknown() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let output = wai_block_content(dir.path(), &["openspec"], &[], &[]);
+        assert!(!output.contains("openspec/AGENTS.md"));
+        assert!(
+            output.contains("(see `openspec/`)"),
+            "unknown layout should point at the openspec directory"
         );
     }
 }

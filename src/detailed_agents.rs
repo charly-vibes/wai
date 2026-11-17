@@ -6,7 +6,9 @@
 
 use std::path::Path;
 
-use crate::managed_block::{InstalledPipeline, ubiquitous_language_note};
+use crate::managed_block::{
+    InstalledPipeline, OpenspecHint, openspec_hint, ubiquitous_language_note,
+};
 
 pub fn wai_detailed_content(
     repo_root: &Path,
@@ -23,8 +25,9 @@ pub fn wai_detailed_content(
 
     let mut doc = String::new();
     doc.push_str(DETAILED_HEADER);
+    let spec_hint = openspec_hint(repo_root);
     if has_companions {
-        doc.push_str(&detailed_when_to_use(has_beads, has_openspec));
+        doc.push_str(&detailed_when_to_use(has_beads, has_openspec, spec_hint));
     }
     doc.push_str(&detailed_starting_session(has_beads, has_openspec));
     doc.push_str(&detailed_capturing_work());
@@ -33,7 +36,11 @@ pub fn wai_detailed_content(
     }
     doc.push_str(&detailed_ending_session(has_beads, has_openspec));
     doc.push_str(&detailed_quality_gate());
-    doc.push_str(&detailed_quick_reference(has_beads, has_openspec));
+    doc.push_str(&detailed_quick_reference(
+        has_beads,
+        has_openspec,
+        spec_hint,
+    ));
     doc.push_str(&detailed_pipelines_section(installed_pipelines));
     if has_ro5 {
         doc.push_str(&detailed_ro5_reminder());
@@ -51,7 +58,7 @@ const DETAILED_HEADER: &str = "# wai Workflow Reference\n\n\
      > This file is managed by `wai init`. Do not edit manually.\n\
      > Changes will be overwritten on the next init.\n\n";
 
-fn detailed_when_to_use(has_beads: bool, has_openspec: bool) -> String {
+fn detailed_when_to_use(has_beads: bool, has_openspec: bool, spec_hint: OpenspecHint) -> String {
     let mut doc = String::new();
     // When to Use What (only when companion tools detected)
     doc.push_str(
@@ -71,10 +78,11 @@ fn detailed_when_to_use(has_beads: bool, has_openspec: bool) -> String {
         );
     }
     if has_openspec {
-        doc.push_str(
-            "| Propose system changes | openspec | Read `openspec/AGENTS.md` |\n\
+        doc.push_str(&format!(
+            "| Propose system changes | openspec | Read {} |\n\
                  | Define requirements | openspec | `openspec validate --strict` |\n",
-        );
+            spec_hint.pointer()
+        ));
     }
     doc.push_str(
         "\nKey distinction:\n\
@@ -267,7 +275,11 @@ fn detailed_quality_gate() -> String {
     doc
 }
 
-fn detailed_quick_reference(has_beads: bool, has_openspec: bool) -> String {
+fn detailed_quick_reference(
+    has_beads: bool,
+    has_openspec: bool,
+    spec_hint: OpenspecHint,
+) -> String {
     let mut doc = String::new();
     // Quick Reference
     doc.push_str(
@@ -309,15 +321,16 @@ fn detailed_quick_reference(has_beads: bool, has_openspec: bool) -> String {
         );
     }
     if has_openspec {
-        doc.push_str(
+        doc.push_str(&format!(
             "\n\
              ### openspec\n\
-             Read `openspec/AGENTS.md` for full instructions.\n\
+             Read {} for full instructions.\n\
              ```bash\n\
              openspec list              # Active changes\n\
              openspec list --specs      # Capabilities\n\
              ```\n",
-        );
+            spec_hint.pointer()
+        ));
     }
 
     doc
@@ -586,5 +599,50 @@ mod detailed_tests {
         let output = wai_detailed_content(Path::new("."), &[], &[], &[]);
         assert!(!output.contains(WAI_START));
         assert!(!output.contains(WAI_END));
+    }
+
+    // ── openspec guidance layout (wai-2q3f) ──────────────────────────────
+
+    #[test]
+    fn detailed_openspec_points_at_legacy_agents_file() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::create_dir_all(dir.path().join("openspec")).unwrap();
+        std::fs::write(dir.path().join("openspec/AGENTS.md"), "# OpenSpec\n").unwrap();
+        let output = wai_detailed_content(dir.path(), &["openspec"], &[], &[]);
+        assert!(
+            output.contains("| Propose system changes | openspec | Read `openspec/AGENTS.md` |")
+        );
+        assert!(output.contains("Read `openspec/AGENTS.md` for full instructions."));
+    }
+
+    #[test]
+    fn detailed_openspec_points_at_config_and_skills_after_migration() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::create_dir_all(dir.path().join("openspec")).unwrap();
+        std::fs::write(
+            dir.path().join("openspec/config.yaml"),
+            "schema: spec-driven\n",
+        )
+        .unwrap();
+        let output = wai_detailed_content(dir.path(), &["openspec"], &[], &[]);
+        assert!(
+            !output.contains("openspec/AGENTS.md"),
+            "openspec >= 1.0 deletes openspec/AGENTS.md; the detailed doc must not point at it"
+        );
+        assert!(output.contains(
+            "| Propose system changes | openspec | Read `openspec/config.yaml` and the `openspec-*` skills in `.agents/skills/` |"
+        ));
+        assert!(output.contains(
+            "Read `openspec/config.yaml` and the `openspec-*` skills in `.agents/skills/` for full instructions."
+        ));
+    }
+
+    #[test]
+    fn detailed_openspec_points_at_dir_when_layout_unknown() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let output = wai_detailed_content(dir.path(), &["openspec"], &[], &[]);
+        assert!(!output.contains("openspec/AGENTS.md"));
+        assert!(output.contains("| Propose system changes | openspec | Read `openspec/` |"));
+        assert!(output.contains("Read `openspec/` for full instructions."));
     }
 }
