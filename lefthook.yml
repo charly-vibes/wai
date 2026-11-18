@@ -20,16 +20,9 @@ pre-commit:
   commands:
     # ddl:managed:start (pre-commit)
     ddl-ah-check:
-      # ah check via the ratchet (wai-ycr5): the corpus was authored under
-      # espectacular 0.2.2, so its 400-odd contract stubs declare no tests.
-      # The ratchet allows only that recorded backlog; new findings fail.
       run: python3 scripts/ah_check_ratchet.py
     ddl-pretender-gate:
       run: pretender check --mode gate
-    # ddl-spk-lint removed 2026-11-11 (wai-g2iv): spk/specodelic lints
-    # specodelic-format specs (frontmatter); this repo's openspec tree has
-    # none, so the gate could never pass (exit 2, 'no spec files found').
-    # Re-add only after ddl adapts the gate for openspec trees.
     # ddl:managed:end (pre-commit)
     bd:
       run: bd hooks run pre-commit
@@ -48,7 +41,6 @@ pre-push:
   commands:
     # ddl:managed:start (pre-push)
     ddl-ah-check:
-      # ah check via the declared-backlog ratchet (same gate as pre-commit).
       run: python3 scripts/ah_check_ratchet.py
     # ddl:managed:end (pre-push)
     bd:

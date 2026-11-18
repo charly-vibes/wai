@@ -1,0 +1,12 @@
+install_source = "auto"
+auto_upgrade = false
+gitignore_strategy = "prompt"
+
+[gates]
+# The corpus predates the [tests] requirement; the ratchet allows only the
+# recorded backlog (scripts/ah-undeclared.txt) and fails on new findings.
+ah_check = "python3 scripts/ah_check_ratchet.py"
+pretender_gate = "pretender check --mode gate"
+# No specodelic-format specs here (plain openspec markdown) — the lint has
+# nothing to read, so the command is omitted rather than tolerated.
+spk_lint = ""
