@@ -113,7 +113,7 @@ fn current_none(json: bool) -> Result<()> {
     }
     miette::bail!(
         "No active pipeline run. Start one with: wai pipeline start <name> --topic=<topic>"
-    )
+    );
 }
 
 fn print_current_human(project_root: &Path, status: PipelineCurrentPayload) {
