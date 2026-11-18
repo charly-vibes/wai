@@ -1,0 +1,1071 @@
+{
+  "ok": true,
+  "envelope_version": "0.1",
+  "cli_version": "0.1.0",
+  "envelope_kind": "ok",
+  "data": {
+    "schema_version": "brief.v1",
+    "as_of": "2026-11-18",
+    "generated_at": "2026-11-18T21:12:08.496407559Z",
+    "sources": [
+      {
+        "name": "beads",
+        "status": "present",
+        "observed_at": "2026-11-18T14:59:37Z",
+        "staleness": "fresh",
+        "detail": "44 malformed line(s) skipped in .beads/issues.jsonl"
+      },
+      {
+        "name": "git",
+        "status": "present",
+        "observed_at": "2026-11-18T16:03:39Z",
+        "staleness": "fresh",
+        "detail": null
+      },
+      {
+        "name": "openspec",
+        "status": "present",
+        "observed_at": "2026-11-18T15:46:23.206610570Z",
+        "staleness": "fresh",
+        "detail": null
+      },
+      {
+        "name": "whisper",
+        "status": "present",
+        "observed_at": "2026-10-19T21:24:50Z",
+        "staleness": "stale",
+        "detail": null
+      },
+      {
+        "name": "curation",
+        "status": "present",
+        "observed_at": "2026-11-18T21:12:08.489748936Z",
+        "staleness": "fresh",
+        "detail": null
+      }
+    ],
+    "curation": {
+      "updated_at": "2026-11-18T21:12:08.489748936Z",
+      "confirmed_at": null
+    },
+    "purpose_lite": null,
+    "focus": [],
+    "in_flight": [
+      {
+        "id": "wai-0awg",
+        "title": "Invalidate hook approval when repository identity or script contents change",
+        "status": "open",
+        "priority": 1,
+        "blocked_by": [],
+        "age_days": 40,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-4rn7",
+        "title": "Triage ah check: 426 structural spec-test findings (381 no-tests-declared, 39 no-toml, 4 orphan-toml, 2 slug-collision)",
+        "status": "open",
+        "priority": 1,
+        "blocked_by": [],
+        "age_days": 7,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-4wp8",
+        "title": "Research: Hegel property-based testing plan (antithesis-research)",
+        "status": "open",
+        "priority": 1,
+        "blocked_by": [],
+        "age_days": 2,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fped",
+        "title": "CI red on main: clippy -D warnings — 6 errors (items_after_test_module + 5 pre-existing)",
+        "status": "open",
+        "priority": 1,
+        "blocked_by": [],
+        "age_days": 7,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fvhv",
+        "title": "QA round: 100+ wai CLI findings across usability, docs, scope, code quality, and test coverage",
+        "status": "open",
+        "priority": 1,
+        "blocked_by": [],
+        "age_days": 189,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fvhv.84",
+        "title": "Scope: Define product boundary between workflow management and repository-hygiene auditing",
+        "status": "open",
+        "priority": 1,
+        "blocked_by": [],
+        "age_days": 189,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fvhv.93",
+        "title": "Scope: Evaluate plugin-system scope against maintenance budget",
+        "status": "open",
+        "priority": 1,
+        "blocked_by": [],
+        "age_days": 189,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fvhv.94",
+        "title": "Scope: Clarify tutorial target audience and success criteria",
+        "status": "open",
+        "priority": 1,
+        "blocked_by": [],
+        "age_days": 189,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-g2iv",
+        "title": "lefthook spk-lint gate calls wrong linter for openspec tree",
+        "status": "open",
+        "priority": 1,
+        "blocked_by": [],
+        "age_days": 7,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-jzhn",
+        "title": "Implement Hegel property tests",
+        "status": "open",
+        "priority": 1,
+        "blocked_by": [
+          "wai-4wp8"
+        ],
+        "age_days": 2,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-y3p7",
+        "title": "docs: apply README front-door standard v0.4 (§5.1)",
+        "status": "open",
+        "priority": 1,
+        "blocked_by": [],
+        "age_days": 2,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-0apx",
+        "title": "fold orchestrator-subagents pattern doc projection to reference wai pipeline spawn wrapper flags (wai-tdnv task 3.5)",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 30,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-0b95",
+        "title": "wai add: error messages must state the fix (filename vs path, missing --reviews)",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 40,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-0v2e",
+        "title": "investigate: pretender gate (--mode gate) is stateful — passes with cmd_init red staged, blocks with command_help red staged, flaps across runs with identical output",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 41,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-1s8i",
+        "title": "ddl doctor repo.gates false-pass: lefthook.yml checked but hooks activation never verified",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 7,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-42ig",
+        "title": "Write ADR: command taxonomy and admission criteria",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 187,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-4rn7.1",
+        "title": "Contract-bind spec: cli-core (63 findings → 0)",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 7,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-4rn7.10",
+        "title": "Contract-bind spec: managed-block (15 findings → 0)",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 7,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-4rn7.11",
+        "title": "Contract-bind spec: project-state-machine (13 findings → 0)",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 7,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-4rn7.12",
+        "title": "Contract-bind spec: plugin-system (12 findings → 0)",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 7,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-4rn7.13",
+        "title": "Contract-bind spec: orchestration-integrity (10 findings → 0)",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 7,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-4rn7.14",
+        "title": "Contract-bind spec: error-recovery (9 findings → 0)",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 7,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-4rn7.15",
+        "title": "Contract-bind spec: help-system (9 findings → 0)",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 7,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-4rn7.16",
+        "title": "Contract-bind spec: handoff-system (8 findings → 0)",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 7,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-4rn7.17",
+        "title": "Contract-bind spec: skill-sharing (8 findings → 0)",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 7,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-4rn7.18",
+        "title": "Contract-bind spec: timeline-search (8 findings → 0)",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 7,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-4rn7.19",
+        "title": "Contract-bind spec: para-structure (7 findings → 0)",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 7,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-4rn7.2",
+        "title": "Contract-bind spec: pipeline-resource (55 findings → 0)",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 7,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-4rn7.20",
+        "title": "Contract-bind spec: onboarding (6 findings → 0)",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 7,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-4rn7.21",
+        "title": "Contract-bind spec: agnostic-capabilities (4 findings → 0)",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 7,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-4rn7.3",
+        "title": "Contract-bind spec: repository-best-practices (44 findings → 0)",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 7,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-4rn7.4",
+        "title": "Contract-bind spec: reasoning-oracle (34 findings → 0)",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 7,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-4rn7.5",
+        "title": "Contract-bind spec: project-reflection (31 findings → 0)",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 7,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-4rn7.6",
+        "title": "Contract-bind spec: agent-config-sync (26 findings → 0)",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 7,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-4rn7.7",
+        "title": "Contract-bind spec: context-suggestions (23 findings → 0)",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 7,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-4rn7.8",
+        "title": "Contract-bind spec: decision-matrix (20 findings → 0)",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 7,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-4rn7.9",
+        "title": "Contract-bind spec: doctor-auto-fix (17 findings → 0)",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 7,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-80x5",
+        "title": "refactor(src/help.rs): split command_help (598 lines) and render_main_help (86 lines, abc 60) under function_lines_max=60",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 41,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-bvn7",
+        "title": "way: detect Nix (flake.nix/devenv.nix) in the Reproducible environments check",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 41,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-ekwq",
+        "title": "Detail docs IA restructuring work",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 187,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-hfye",
+        "title": "openspec 2.1.0 validator rejects wai's specodelic-native corpus (9 items)",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 0,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-of8s",
+        "title": "Flaky test: gather_git_file_context_returns_history_for_tracked_file fails intermittently in full cargo test runs (passed 5/5 in isolation and in 2 consecutive full-suite reruns). Git-race/env-dependent in src/commands/why/context.rs — needs investigation (git config/env leakage between concurrent tests suspected). Untouched by wai-lqdr.",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 41,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-opk8",
+        "title": "pipeline templates: adopt shared-block mechanism for remaining convention boilerplate",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 41,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-sojk",
+        "title": "wai way/doctor: staleness notification for .wai artifacts",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 62,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-t3qa",
+        "title": "wai pipeline next exits 0 when a gate blocks advancement",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 41,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-wra0",
+        "title": "Design: absorb sync into doctor --fix",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 187,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-yp2l",
+        "title": "Failure census over real run history before any journal/receipt protocol work (dr-workflow-execution-verdict decisive experiment)",
+        "status": "open",
+        "priority": 2,
+        "blocked_by": [],
+        "age_days": 29,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-35zh",
+        "title": "docs: v2026.10.3 versioned snapshot missing — tag ran broken docs.yml before fixes",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [],
+        "age_days": 46,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-4z3q",
+        "title": "Add --dry-run flag to wai import",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [],
+        "age_days": 187,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-5w57",
+        "title": "wai add still stamps never-advanced abandoned runs from .last-run pointer",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [],
+        "age_days": 35,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-9gzj",
+        "title": "Docs workflow fails on tag pushes (pre-existing since v2026.10.21)",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [],
+        "age_days": 7,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-anez",
+        "title": "Strengthen tutorial exit CTA",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [],
+        "age_days": 187,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-c71i",
+        "title": "Surface harness-local memories (e.g. Claude Code memory dir) into .wai or beads",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [],
+        "age_days": 62,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-d78z",
+        "title": "openspec 1.x upgrade blocked: 18 validation failures under @fission-ai/openspec@1.14.2",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [],
+        "age_days": 33,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-db7n",
+        "title": "pipeline spawn checkpoint save is non-atomic (ro5u L3)",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [],
+        "age_days": 30,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fvhv.100",
+        "title": "Scope: Audit examples and docs for Pi-specific scope drift",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [],
+        "age_days": 189,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fvhv.110",
+        "title": "Docs: strengthen guidance for `wai plugin` management and passthrough behavior",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [
+          "wai-fvhv.76",
+          "wai-fvhv.93"
+        ],
+        "age_days": 189,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fvhv.22",
+        "title": "Docs: strengthen user-facing guidance for `wai tutorial`",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [
+          "wai-fvhv.94"
+        ],
+        "age_days": 189,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fvhv.55",
+        "title": "Code quality: modularize src/managed_block.rs",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [],
+        "age_days": 189,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fvhv.56",
+        "title": "Code quality: modularize src/cli.rs",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [],
+        "age_days": 189,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fvhv.57",
+        "title": "Code quality: modularize src/sync_core.rs",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [],
+        "age_days": 189,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fvhv.58",
+        "title": "Code quality: modularize src/llm.rs",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [],
+        "age_days": 189,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fvhv.60",
+        "title": "Code quality: modularize src/help.rs",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [],
+        "age_days": 189,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fvhv.61",
+        "title": "Code quality: modularize src/workflows.rs",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [],
+        "age_days": 189,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fvhv.62",
+        "title": "Code quality: modularize src/plugin.rs",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [],
+        "age_days": 189,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fvhv.63",
+        "title": "Code quality: modularize src/suggestions.rs",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [],
+        "age_days": 189,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fvhv.67",
+        "title": "Usability review: Review `add` command discoverability across artifact types",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [],
+        "age_days": 189,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fvhv.68",
+        "title": "Usability review: Review `resource` namespace cognitive load",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [],
+        "age_days": 189,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fvhv.71",
+        "title": "Usability review: Improve error-message guidance for outside-workspace usage",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [],
+        "age_days": 189,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fvhv.75",
+        "title": "Usability review: Audit `ls` workspace discovery ergonomics",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [],
+        "age_days": 189,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fvhv.76",
+        "title": "Usability review: Review plugin passthrough UX",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [],
+        "age_days": 189,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fvhv.78",
+        "title": "Usability review: Improve handoff discoverability",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [],
+        "age_days": 189,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fvhv.8",
+        "title": "Docs: strengthen user-facing guidance for `wai ls`",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [
+          "wai-fvhv.75"
+        ],
+        "age_days": 189,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fvhv.80",
+        "title": "Usability review: Clarify move/category semantics",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [],
+        "age_days": 189,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fvhv.82",
+        "title": "Usability review: Audit verbosity ladder consistency",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [],
+        "age_days": 189,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fvhv.85",
+        "title": "Scope: Define product boundary between session continuity features and general project management",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [],
+        "age_days": 189,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fvhv.87",
+        "title": "Scope: Decide whether the Pi extension package is a core product concern or separate integration",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [],
+        "age_days": 189,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fvhv.90",
+        "title": "Scope: Create a feature map tying commands to primary user journeys",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [],
+        "age_days": 189,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fvhv.95",
+        "title": "Scope: Write a deprecation policy for commands, flags, and output formats",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [],
+        "age_days": 189,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fvhv.98",
+        "title": "Scope: Define boundaries for global config vs workspace-local config",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [],
+        "age_days": 189,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fvhv.99",
+        "title": "Scope: Clarify the contract between `.wai/` artifacts and external tools like beads/openspec",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [],
+        "age_days": 189,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-hpn1",
+        "title": "pretender: tighten tiered advisory lease — way/ debt fully greened, lease may be removable",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [],
+        "age_days": 46,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-z25x",
+        "title": "flaky test: execute_hook_no_deadlock_on_fast_command fails under parallel load",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [],
+        "age_days": 54,
+        "reason": null,
+        "confirmed_at": null
+      }
+    ],
+    "blocked": [
+      {
+        "id": "wai-jzhn",
+        "title": "Implement Hegel property tests",
+        "status": "open",
+        "priority": 1,
+        "blocked_by": [
+          "wai-4wp8"
+        ],
+        "age_days": 2,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fvhv.110",
+        "title": "Docs: strengthen guidance for `wai plugin` management and passthrough behavior",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [
+          "wai-fvhv.76",
+          "wai-fvhv.93"
+        ],
+        "age_days": 189,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fvhv.22",
+        "title": "Docs: strengthen user-facing guidance for `wai tutorial`",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [
+          "wai-fvhv.94"
+        ],
+        "age_days": 189,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fvhv.8",
+        "title": "Docs: strengthen user-facing guidance for `wai ls`",
+        "status": "open",
+        "priority": 3,
+        "blocked_by": [
+          "wai-fvhv.75"
+        ],
+        "age_days": 189,
+        "reason": null,
+        "confirmed_at": null
+      }
+    ],
+    "next": [
+      {
+        "id": "wai-0awg",
+        "title": "Invalidate hook approval when repository identity or script contents change",
+        "status": "open",
+        "priority": 1,
+        "blocked_by": [],
+        "age_days": 40,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-4rn7",
+        "title": "Triage ah check: 426 structural spec-test findings (381 no-tests-declared, 39 no-toml, 4 orphan-toml, 2 slug-collision)",
+        "status": "open",
+        "priority": 1,
+        "blocked_by": [],
+        "age_days": 7,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-4wp8",
+        "title": "Research: Hegel property-based testing plan (antithesis-research)",
+        "status": "open",
+        "priority": 1,
+        "blocked_by": [],
+        "age_days": 2,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fped",
+        "title": "CI red on main: clippy -D warnings — 6 errors (items_after_test_module + 5 pre-existing)",
+        "status": "open",
+        "priority": 1,
+        "blocked_by": [],
+        "age_days": 7,
+        "reason": null,
+        "confirmed_at": null
+      },
+      {
+        "id": "wai-fvhv",
+        "title": "QA round: 100+ wai CLI findings across usability, docs, scope, code quality, and test coverage",
+        "status": "open",
+        "priority": 1,
+        "blocked_by": [],
+        "age_days": 189,
+        "reason": null,
+        "confirmed_at": null
+      }
+    ],
+    "parked": [],
+    "needs_retriage": [],
+    "recent": [
+      {
+        "sha": "9d95cd5e761feeed887f538e20f0c9c4fb2a9416",
+        "committed_at": "2026-11-18T16:03:39Z",
+        "subject": "chore(gates): render the managed gate blocks from .ddl/config.toml",
+        "outcome": null
+      },
+      {
+        "sha": "21b4e0b4b2ef7d1d6a0bf3b65482f97619dad37d",
+        "committed_at": "2026-11-18T15:46:50Z",
+        "subject": "spec: make the corpus valid under openspec 2.1.0",
+        "outcome": null
+      },
+      {
+        "sha": "632aab2da537a86a95f5f735a73dc3e644c93cb8",
+        "committed_at": "2026-11-18T15:21:20Z",
+        "subject": "chore(skills): retire the pre-2.1 openspec workflows",
+        "outcome": null
+      },
+      {
+        "sha": "936512c7898aea0f5908bdf7b665524bd9975c1a",
+        "committed_at": "2026-11-18T15:03:22Z",
+        "subject": "chore(openspec): migrate project.md into config.yaml; pin 2.1.0",
+        "outcome": null
+      },
+      {
+        "sha": "9c4422b054a08f53ceb8d637e464d4e828178934",
+        "committed_at": "2026-11-18T15:03:14Z",
+        "subject": "chore(openspec): adopt the 2.1 artifact layout",
+        "outcome": null
+      }
+    ],
+    "health": {
+      "status": "amber",
+      "basis": "signals",
+      "signals": [
+        {
+          "kind": "orphan_commits",
+          "reason": "68 commits in the 14-day window link no tracker id or open work-item path: 01b44d833622a923674404235932be4fa7663b7a (release: 2026.11.17 — layout-aware openspec pointer; green pre-commit); 107e67156ab23b9392cda474894c386a9db77201 (bd: file baseline-drift bug (pre-existing test failure)); 1c5ded10bada1e91cd6f389f887e3b293ebfffd3 (refactor(tests): table-drive way_check and help scenarios to clear lazy_cluster in doctor suite); 1dd83898ae9f8853317437942bcbbe0fb9dbbf9c (refactor(plugin): split plugin.rs into plugin/ submodules); 21b4e0b4b2ef7d1d6a0bf3b65482f97619dad37d (spec: make the corpus valid under openspec 2.1.0); 224096f91f8e95fd4fdf0ef7ea66ae0e8aee181b (refactor(src): split detect_patterns into per-pattern push helpers); 2428e0c955a4dd1a5f1a675368dd50e39303796b (refactor(tests): flatten walk dir traversal to reduce nesting); 2a8317b0c6770004d62727e76e2c2f7e7d84b9ba (chore(scripts): drop unused SESSIONS_DIR, inline token comment); 46ce48de86177a0804600f95d8433fdad57e5acc (docs: file README front-door and release tickets); 493abc501cf51f3195f15254c3b5ead65bfe61ab (refactor(src): decompose doctor checks_sync strategy checks; reduce mutable bindings); 5a9a1358350df5ba392158066fba7315c5192321 (fix(pipeline): terminate the bail macro so the newer-stable lint passes); 5f7c4921e0599ecfda7e6d32c494304361857bec (refactor(src): split ls run and discover_workspaces into helpers); 632aab2da537a86a95f5f735a73dc3e644c93cb8 (chore(skills): retire the pre-2.1 openspec workflows); 65f60c58d7a06c120f5950a3e8f46d0fdbfb48a3 (refactor(tests): dedupe matrix/plugin-list/tdd-ro5 lazy test clusters via tables and helpers); 6986cc6e20f7e6cd7c0843033d7f24a9c967ef2f (refactor(src): data-driven help tables; split render_main_help sections); 6d3c95609eb1b832b91cabc7e5879f2c1b6bb43d (refactor(tests): split epic-orchestrator walk test into phase helpers); 70b8f6cb4298a367b84692182c567e5397c3c70f (chore: remove superseded matrix.rs/plugin.rs/sync_core.rs; fmt touch-ups); 78b47385f34c81370f6182a688b0d36f8ab79a77 (refactor(src): decompose pipeline queries into per-phase helpers); 7f32379417f5fe15932016dc7c8178840b92e733 (refactor(tests): vary pipeline TOML helper structure to break lazy_cluster in common); 80ad7b0f983ab4233c5061c2c11722fd358f7dc3 (refactor(init): extract per-path handlers from run() dispatcher); 85b67dfcc714e01ae1f5e2d5708a9fb66055072b (refactor(scripts): split session-friction main into select/fetch/signals/aggregate helpers); 86e05f91aa82c465745153dd73cb0576376e18af (docs: apply issue-review fixes to README/release tickets); 86ea659d8b83869d7157f4d0b15ad0cf199e25f5 (refactor(src): split build_prompt into sections; remove mutable bindings in why/prompt.rs); 8845c882acb38d8ac26e286cf59779cd7364b442 (style: cargo fmt across pipeline/add modules and test suites); 936512c7898aea0f5908bdf7b665524bd9975c1a (chore(openspec): migrate project.md into config.yaml; pin 2.1.0); 93c282fbba95f2fa729697eed37b3374e1a9a4f0 (refactor(src): split close run into summary/remember helpers; tidy ls); 990cb7972e1426c21afe8e1e7b83059b2895fede (test: assert claim sha in walk test body for min_assertions); 9b9183d601dc2d9b2d090c512885292fd6773d14 (refactor(src): extract external-command dispatch helper in commands/mod.rs); 9c4422b054a08f53ceb8d637e464d4e828178934 (chore(openspec): adopt the 2.1 artifact layout); 9d6d6722e37e357d2ebe2cc1f75aef1dcabe3f5b (refactor(pipeline): extract model.rs and verify.rs from mod.rs; split tests into files); 9d95cd5e761feeed887f538e20f0c9c4fb2a9416 (chore(gates): render the managed gate blocks from .ddl/config.toml); a170021b433a504145701eaf1b866cd07a39fb55 (docs(brief): pretender debt fix brief (wai) — orchestrator artifact); a2776313bc4ee7f241b4e7fd0ae239a21e0aada5 (refactor(pipeline): split orchestration.rs into orchestration/ submodules); a31e6e83cc871388848b3aff0f87121e45dffa45 (refactor(src): split timeline run into collect/sort/print helpers); a38f071a820b67f1206284541ac61cd0642d24cb (refactor(sync): extract projection execution and from-main sync helpers); a53d51b31d07b5584c90b5b0f9fab99cd798795f (test(archive): extract make_archive/import_archive helpers from round-trip tests); a91c8167eb3082c79cf8c6cd608c2239b939e6ce (refactor(add): split add.rs into add/ module dir); ab26fa45d171e15b8235fcc49ff48ff44b389f63 (refactor(src): extract shared walk/budget helpers in reflect/context.rs); ad59b564212461a2600265bfe5a0d4e429749868 (fix(tests): replace unwrap/expect with panic-context alternatives); b035e7f10afb01be139b4bae2a170f8f241f7409 (refactor(plugin): extract per-subcommand handlers from run()); b600d07d286c30caf5cc3efbac69a24d405a5920 (refactor(tests): merge near-duplicate matrix lint tests below file_lines limit); b65e523f88e10c6feb1862fed8fb8feb9d3da847 (refactor(sync): flatten claude_code_needs_sync into iterator chains); b8b3892b6074129078164a7707f300edcb756a6a (refactor(src): extract plugin-context and content-template helpers in handoff.rs); bc2fad24b8feaa25f9d9523264c1111f17b99e03 (refactor(src): split tutorial run into step-runner and summary helpers); bd4a02bac28b998507b10b6ee5e0d4f49fb4a122 (refactor(src): decompose doctor checks_basic into per-concern helpers); be652db3db6a32ec6fac6d6f29728d81bb00a978 (style: cargo fmt freshness.rs); bf8181d7793dc080193ed70068351f440a207e0e (refactor(matrix): split matrix.rs into matrix/ submodules); c224ad2c6688aae47133c20a23362a7976903dea (refactor(tests): extract shared script/pipeline-file helpers in common); c269c677a280648236297881de1276d1084a8f74 (docs(scripts): trim session-friction docstring under file-line limit); c7c03bd31265cd8a651f3e7008fa25035bf8d9b6 (refactor(src): extract type/tag/line-match filters in search collect_matches); cb95f6a496e968081b6d23f2cc2dfb2fe9af0543 (refactor(src): split new run into per-kind handlers); d0409f675944aeaeb4f1404feb8fa11e1dc2f75c (refactor(src): split ensure_workspace_current into phase helpers); d39966055b7d6a95b29c892160d9fba6e97146f3 (refactor(sync_core): split tests out; decompose long projection fns); d820576934f2fff850d85f668d7a4e8a2fa29522 (refactor(tests): extract spawn/status runners to cut abc in liveness test); dc26d0225401e1c965cda725ddb6d5cc8250a48c (refactor(src): decompose search run and match collection into helpers); dd23d17a734ad687d5ccf7903713659b62b83383 (refactor(examples): hoist llm.txt body into const to cut abc); e1e7383809877443efad1137c3a38bdac9ab9b07 (refactor(add): remove superseded add.rs); e22c6a52441de0d7b888e681f380877ae747334c (refactor(status): decompose run() into per-section renderers); e42601ddddf50a7e88ee36662cedc235cdbc6c0d (refactor(src): split matrix run into per-subcommand handlers); e5a4f9f93bc319c9f5d76b54930e95b1388f5837 (refactor(src): split llm.rs into module dir (claude_api/claude_cli/ollama/agent/tests)); e7a58b1aad1182df7878f98719d94873af5ff5f1 (refactor(src): extract artifact-dir scan helpers in freshness.rs); ea5b07ac47f6723e5bccd3d2e360186e596f1f2d (style(tests): cargo fmt workflows_test); ef101ee3842fe59f43932001ba9f7ff1e83c07d4 (refactor(tests): merge near-duplicate workflow tests to clear lazy_cluster); f4987edceb4de0b970b8ec051df104c0c2db7055 (refactor(tests): keep matrix_test under file limit with fmt-stable helpers); f713539cd3d7cbc95c062d25be3b22205b6ad08f (docs: apply issue-review fixes to README/release tickets); f8ddfb355635491a193a94a1b0fc57f8c29bc00a (refactor(src): split config run into per-subcommand handlers); fa165c6306704203d1c92b8aac4b0c31a9d8ce52 (refactor(src): extract plugin-context and content-template helpers in handoff.rs); fb70c2e7b3109d27fa460534f124dcaf332254be (refactor(tests): extract run_pipeline helper to cut abc in bypass telemetry test)"
+        },
+        {
+          "kind": "spec_change_without_bead",
+          "reason": "openspec changes link no tracker id: `add-cross-tool-trace-ingestion` changed 0 days ago, `add-plugin-trust-model` changed 0 days ago, `adopt-genesis` changed 0 days ago"
+        }
+      ],
+      "owner": null,
+      "reason": "orphan_commits: 68 commits in the 14-day window link no tracker id or open work-item path: 01b44d833622a923674404235932be4fa7663b7a (release: 2026.11.17 — layout-aware openspec pointer; green pre-commit); 107e67156ab23b9392cda474894c386a9db77201 (bd: file baseline-drift bug (pre-existing test failure)); 1c5ded10bada1e91cd6f389f887e3b293ebfffd3 (refactor(tests): table-drive way_check and help scenarios to clear lazy_cluster in doctor suite); 1dd83898ae9f8853317437942bcbbe0fb9dbbf9c (refactor(plugin): split plugin.rs into plugin/ submodules); 21b4e0b4b2ef7d1d6a0bf3b65482f97619dad37d (spec: make the corpus valid under openspec 2.1.0); 224096f91f8e95fd4fdf0ef7ea66ae0e8aee181b (refactor(src): split detect_patterns into per-pattern push helpers); 2428e0c955a4dd1a5f1a675368dd50e39303796b (refactor(tests): flatten walk dir traversal to reduce nesting); 2a8317b0c6770004d62727e76e2c2f7e7d84b9ba (chore(scripts): drop unused SESSIONS_DIR, inline token comment); 46ce48de86177a0804600f95d8433fdad57e5acc (docs: file README front-door and release tickets); 493abc501cf51f3195f15254c3b5ead65bfe61ab (refactor(src): decompose doctor checks_sync strategy checks; reduce mutable bindings); 5a9a1358350df5ba392158066fba7315c5192321 (fix(pipeline): terminate the bail macro so the newer-stable lint passes); 5f7c4921e0599ecfda7e6d32c494304361857bec (refactor(src): split ls run and discover_workspaces into helpers); 632aab2da537a86a95f5f735a73dc3e644c93cb8 (chore(skills): retire the pre-2.1 openspec workflows); 65f60c58d7a06c120f5950a3e8f46d0fdbfb48a3 (refactor(tests): dedupe matrix/plugin-list/tdd-ro5 lazy test clusters via tables and helpers); 6986cc6e20f7e6cd7c0843033d7f24a9c967ef2f (refactor(src): data-driven help tables; split render_main_help sections); 6d3c95609eb1b832b91cabc7e5879f2c1b6bb43d (refactor(tests): split epic-orchestrator walk test into phase helpers); 70b8f6cb4298a367b84692182c567e5397c3c70f (chore: remove superseded matrix.rs/plugin.rs/sync_core.rs; fmt touch-ups); 78b47385f34c81370f6182a688b0d36f8ab79a77 (refactor(src): decompose pipeline queries into per-phase helpers); 7f32379417f5fe15932016dc7c8178840b92e733 (refactor(tests): vary pipeline TOML helper structure to break lazy_cluster in common); 80ad7b0f983ab4233c5061c2c11722fd358f7dc3 (refactor(init): extract per-path handlers from run() dispatcher); 85b67dfcc714e01ae1f5e2d5708a9fb66055072b (refactor(scripts): split session-friction main into select/fetch/signals/aggregate helpers); 86e05f91aa82c465745153dd73cb0576376e18af (docs: apply issue-review fixes to README/release tickets); 86ea659d8b83869d7157f4d0b15ad0cf199e25f5 (refactor(src): split build_prompt into sections; remove mutable bindings in why/prompt.rs); 8845c882acb38d8ac26e286cf59779cd7364b442 (style: cargo fmt across pipeline/add modules and test suites); 936512c7898aea0f5908bdf7b665524bd9975c1a (chore(openspec): migrate project.md into config.yaml; pin 2.1.0); 93c282fbba95f2fa729697eed37b3374e1a9a4f0 (refactor(src): split close run into summary/remember helpers; tidy ls); 990cb7972e1426c21afe8e1e7b83059b2895fede (test: assert claim sha in walk test body for min_assertions); 9b9183d601dc2d9b2d090c512885292fd6773d14 (refactor(src): extract external-command dispatch helper in commands/mod.rs); 9c4422b054a08f53ceb8d637e464d4e828178934 (chore(openspec): adopt the 2.1 artifact layout); 9d6d6722e37e357d2ebe2cc1f75aef1dcabe3f5b (refactor(pipeline): extract model.rs and verify.rs from mod.rs; split tests into files); 9d95cd5e761feeed887f538e20f0c9c4fb2a9416 (chore(gates): render the managed gate blocks from .ddl/config.toml); a170021b433a504145701eaf1b866cd07a39fb55 (docs(brief): pretender debt fix brief (wai) — orchestrator artifact); a2776313bc4ee7f241b4e7fd0ae239a21e0aada5 (refactor(pipeline): split orchestration.rs into orchestration/ submodules); a31e6e83cc871388848b3aff0f87121e45dffa45 (refactor(src): split timeline run into collect/sort/print helpers); a38f071a820b67f1206284541ac61cd0642d24cb (refactor(sync): extract projection execution and from-main sync helpers); a53d51b31d07b5584c90b5b0f9fab99cd798795f (test(archive): extract make_archive/import_archive helpers from round-trip tests); a91c8167eb3082c79cf8c6cd608c2239b939e6ce (refactor(add): split add.rs into add/ module dir); ab26fa45d171e15b8235fcc49ff48ff44b389f63 (refactor(src): extract shared walk/budget helpers in reflect/context.rs); ad59b564212461a2600265bfe5a0d4e429749868 (fix(tests): replace unwrap/expect with panic-context alternatives); b035e7f10afb01be139b4bae2a170f8f241f7409 (refactor(plugin): extract per-subcommand handlers from run()); b600d07d286c30caf5cc3efbac69a24d405a5920 (refactor(tests): merge near-duplicate matrix lint tests below file_lines limit); b65e523f88e10c6feb1862fed8fb8feb9d3da847 (refactor(sync): flatten claude_code_needs_sync into iterator chains); b8b3892b6074129078164a7707f300edcb756a6a (refactor(src): extract plugin-context and content-template helpers in handoff.rs); bc2fad24b8feaa25f9d9523264c1111f17b99e03 (refactor(src): split tutorial run into step-runner and summary helpers); bd4a02bac28b998507b10b6ee5e0d4f49fb4a122 (refactor(src): decompose doctor checks_basic into per-concern helpers); be652db3db6a32ec6fac6d6f29728d81bb00a978 (style: cargo fmt freshness.rs); bf8181d7793dc080193ed70068351f440a207e0e (refactor(matrix): split matrix.rs into matrix/ submodules); c224ad2c6688aae47133c20a23362a7976903dea (refactor(tests): extract shared script/pipeline-file helpers in common); c269c677a280648236297881de1276d1084a8f74 (docs(scripts): trim session-friction docstring under file-line limit); c7c03bd31265cd8a651f3e7008fa25035bf8d9b6 (refactor(src): extract type/tag/line-match filters in search collect_matches); cb95f6a496e968081b6d23f2cc2dfb2fe9af0543 (refactor(src): split new run into per-kind handlers); d0409f675944aeaeb4f1404feb8fa11e1dc2f75c (refactor(src): split ensure_workspace_current into phase helpers); d39966055b7d6a95b29c892160d9fba6e97146f3 (refactor(sync_core): split tests out; decompose long projection fns); d820576934f2fff850d85f668d7a4e8a2fa29522 (refactor(tests): extract spawn/status runners to cut abc in liveness test); dc26d0225401e1c965cda725ddb6d5cc8250a48c (refactor(src): decompose search run and match collection into helpers); dd23d17a734ad687d5ccf7903713659b62b83383 (refactor(examples): hoist llm.txt body into const to cut abc); e1e7383809877443efad1137c3a38bdac9ab9b07 (refactor(add): remove superseded add.rs); e22c6a52441de0d7b888e681f380877ae747334c (refactor(status): decompose run() into per-section renderers); e42601ddddf50a7e88ee36662cedc235cdbc6c0d (refactor(src): split matrix run into per-subcommand handlers); e5a4f9f93bc319c9f5d76b54930e95b1388f5837 (refactor(src): split llm.rs into module dir (claude_api/claude_cli/ollama/agent/tests)); e7a58b1aad1182df7878f98719d94873af5ff5f1 (refactor(src): extract artifact-dir scan helpers in freshness.rs); ea5b07ac47f6723e5bccd3d2e360186e596f1f2d (style(tests): cargo fmt workflows_test); ef101ee3842fe59f43932001ba9f7ff1e83c07d4 (refactor(tests): merge near-duplicate workflow tests to clear lazy_cluster); f4987edceb4de0b970b8ec051df104c0c2db7055 (refactor(tests): keep matrix_test under file limit with fmt-stable helpers); f713539cd3d7cbc95c062d25be3b22205b6ad08f (docs: apply issue-review fixes to README/release tickets); f8ddfb355635491a193a94a1b0fc57f8c29bc00a (refactor(src): split config run into per-subcommand handlers); fa165c6306704203d1c92b8aac4b0c31a9d8ce52 (refactor(src): extract plugin-context and content-template helpers in handoff.rs); fb70c2e7b3109d27fa460534f124dcaf332254be (refactor(tests): extract run_pipeline helper to cut abc in bypass telemetry test); spec_change_without_bead: openspec changes link no tracker id: `add-cross-tool-trace-ingestion` changed 0 days ago, `add-plugin-trust-model` changed 0 days ago, `adopt-genesis` changed 0 days ago"
+    },
+    "truncation": {
+      "applied": true,
+      "omitted_counts": {
+        "next": 74,
+        "recent": 195
+      }
+    },
+    "head_sha": "9d95cd5e761feeed887f538e20f0c9c4fb2a9416",
+    "source_hash": "3d684e0affe4344e551c7d0e31711536522aa675e4c63c31386875fad11b8d3c",
+    "warnings": [
+      {
+        "source": "beads",
+        "code": "beads_parse_error",
+        "detail": "44 malformed line(s) skipped in .beads/issues.jsonl"
+      }
+    ]
+  },
+  "warnings": [],
+  "hints": [],
+  "meta": {
+    "duration_ms": 0,
+    "tx": null,
+    "request_id": null
+  }
+}
