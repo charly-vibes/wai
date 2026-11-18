@@ -21,7 +21,7 @@ Providing both timeline and search views is a **Type 2 decision** based on two f
 
 Both timeline and search support project-scoped queries (most common) and global queries (cross-project discovery). This dual scope matches how developers think: usually focused on one project, occasionally needing to find something across all work.
 
-## Scope and Requirements
+## Scope
 
 This spec covers the timeline and search commands and their filtering capabilities.
 
@@ -31,6 +31,8 @@ This spec covers the timeline and search commands and their filtering capabiliti
 - Search ranking or relevance scoring
 - Real-time search updates or watch mode
 - Integration with external search tools
+
+## Requirements
 
 ### Requirement: Timeline View
 

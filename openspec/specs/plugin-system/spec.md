@@ -39,7 +39,7 @@ Three plugins ship with wai as built-ins:
 
 Plugins can register commands that pass through to external CLIs. For example, `wai beads list` delegates to `bd list --json`. This provides a unified interface while leveraging existing tools.
 
-## Scope and Requirements
+## Scope
 
 This spec covers the plugin configuration format, lifecycle hooks, command routing, and built-in plugin definitions.
 
@@ -49,6 +49,8 @@ This spec covers the plugin configuration format, lifecycle hooks, command routi
 - Plugin sandboxing or security model
 - Plugin versioning or dependency resolution
 - Remote plugin installation
+
+## Requirements
 
 ### Requirement: Plugin Configuration
 

@@ -101,3 +101,13 @@ MUST be subject to the trust model.
 - **AND** those hooks are not in the trust store
 - **THEN** `wai status`, `wai prime`, `wai new`, `wai phase`, and `wai handoff` do NOT execute them
 - **AND** each skipped hook is reported as a warning
+
+#### Scenario: Hook execution
+- **WHEN** a lifecycle event occurs (e.g., project creation, phase transition)
+- **THEN** the system calls all registered hooks for that event
+- **AND** collects hook output for use by the triggering command
+
+#### Scenario: Handoff enrichment
+- **WHEN** generating a handoff
+- **THEN** the system calls `on_handoff_generate` hooks on all enabled plugins
+- **AND** injects the collected data into the handoff template

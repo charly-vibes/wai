@@ -26,7 +26,7 @@ The primary verbs (`new`, `add`, `show`, `move`) provide a minimal, orthogonal s
 
 Wai organizes artifacts using the PARA method (Projects, Areas, Resources, Archives). This replaces the previous bead-centric model with a proven organizational framework. Beads (`.beads/`) is an external tool that wai detects via its plugin system but does not manage directly.
 
-## Scope and Requirements
+## Scope
 
 This spec covers the foundational elements of the CLI.
 
@@ -37,6 +37,7 @@ This spec covers the foundational elements of the CLI.
 - Specific output formats like JSON or YAML, beyond the standard text output.
 - A graphical user interface.
 
+## Requirements
 ### Requirement: Command Structure
 
 The CLI SHALL use consistent verb-noun command patterns with primary verbs: `new`, `add`, `show`, `move`, plus dedicated top-level commands for `phase`, `sync`, `config`, `handoff`, `search`, `timeline`, `why`, `reflect`, and `doctor`.
@@ -292,7 +293,7 @@ The CLI SHALL provide `wai doctor` to diagnose workspace health and report issue
 
 - **WHEN** user runs `wai doctor` outside a wai workspace
 - **THEN** the system reports the standard not-initialized error with `wai init` suggestion
-## Requirements
+
 ### Requirement: Way Command
 
 The CLI SHALL provide `wai way` to validate repository best practices and provide opinionated recommendations ("the wai way") using a dedicated status model separate from `wai doctor`.

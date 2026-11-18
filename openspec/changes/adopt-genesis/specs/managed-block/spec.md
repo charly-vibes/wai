@@ -16,3 +16,14 @@ read/inject/replace mechanics to genesis.
   SHALL be injected/refreshed via `genesis::managed_block`
 - **AND** the block body SHALL remain wai's plugin-aware slim content
 - **AND** no local injector code SHALL remain in `src/managed_block.rs`.
+
+#### Scenario: Both plugins detected
+- **WHEN** `wai init` or `wai reflect` runs
+- **AND** both beads and openspec plugins are detected
+- **THEN** the generated WAI block includes a "Tracking Work Across Tools"
+  section with the cross-reference format and sync rule
+
+#### Scenario: Only one plugin detected
+- **WHEN** `wai init` or `wai reflect` runs
+- **AND** only one of beads or openspec is detected (not both)
+- **THEN** the "Tracking Work Across Tools" section is NOT included

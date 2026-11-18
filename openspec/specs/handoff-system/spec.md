@@ -25,7 +25,7 @@ The handoff generation process calls plugin hooks to gather contextual data. Thi
 - Recent git commits and uncommitted changes
 - OpenSpec changes in progress
 
-## Scope and Requirements
+## Scope
 
 This spec covers the handoff artifact format, generation command, and plugin integration points.
 
@@ -36,6 +36,7 @@ This spec covers the handoff artifact format, generation command, and plugin int
 - Multi-format output (PDF, HTML, etc.)
 - Collaborative editing of handoffs
 
+## Requirements
 ### Requirement: Handoff Format
 
 Handoffs SHALL be markdown files with structured frontmatter, including dedicated
@@ -104,7 +105,7 @@ Handoffs SHALL be stored in the project's handoffs directory with date prefixes.
 - **WHEN** a handoff is created for project "my-app"
 - **THEN** it is stored at `.wai/projects/my-app/handoffs/YYYY-MM-DD-session-end.md`
 - **AND** multiple handoffs per day are differentiated by suffix
-## Requirements
+
 ### Requirement: Pending-Resume Signal
 
 `wai close` SHALL write a `.pending-resume` file to the project directory after

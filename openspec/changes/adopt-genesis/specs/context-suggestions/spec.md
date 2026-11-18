@@ -18,3 +18,12 @@ The `Suggestion` enum and its variants SHALL be sourced from `genesis::suggestio
 - **THEN** it SHALL register its valid-command list with
   `genesis::suggestions::SuggestionEngine` so typo detection works without
   wai reimplementing the Jaro/Levenshtein matching.
+
+#### Scenario: Suggestion block formatting
+- **WHEN** status suggestions are shown
+- **THEN** they appear under a `Suggestions:` heading
+- **AND** each suggestion includes a short label and a suggested command
+
+#### Scenario: Suggestions as JSON
+- **WHEN** user runs `wai status --json`
+- **THEN** the suggestions are returned as an array with `label` and `command` fields

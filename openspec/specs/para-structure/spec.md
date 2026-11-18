@@ -29,7 +29,7 @@ Each project contains standard subdirectories (`research/`, `plans/`, `designs/`
 
 Artifacts use date-prefixed filenames (e.g., `2026-01-20-initial-research.md`) for chronological sorting. This convention enables timeline views and makes recency immediately visible in file listings.
 
-## Scope and Requirements
+## Scope
 
 This spec defines the directory structure and organizational rules for artifacts within `.wai/`.
 
@@ -39,6 +39,8 @@ This spec defines the directory structure and organizational rules for artifacts
 - Full-text search across artifacts (covered by timeline-search spec)
 - State machine for project phases (covered by project-state-machine spec)
 - Plugin storage and configuration (covered by plugin-system spec)
+
+## Requirements
 
 ### Requirement: PARA Directory Structure
 

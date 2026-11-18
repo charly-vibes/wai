@@ -23,3 +23,19 @@ shares the same top-level keys.
 - **WHEN** `wai prime --json` is run
 - **THEN** `PrimePayload` SHALL be wrapped in `genesis::envelope::Envelope`
   rather than emitted as a bare domain object.
+
+#### Scenario: Status as JSON
+- **WHEN** user runs `wai status --json`
+- **THEN** the system outputs JSON containing phase, plugin statuses, and suggestion lists
+
+#### Scenario: Search as JSON
+- **WHEN** user runs `wai search <query> --json`
+- **THEN** the system outputs JSON containing matches with file paths, line numbers, and context
+
+#### Scenario: Timeline as JSON
+- **WHEN** user runs `wai timeline <project> --json`
+- **THEN** the system outputs JSON containing entries with date, type, title, and path
+
+#### Scenario: Plugin list as JSON
+- **WHEN** user runs `wai plugin list --json`
+- **THEN** the system outputs JSON containing plugin name, status, and detector metadata

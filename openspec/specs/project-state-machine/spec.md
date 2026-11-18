@@ -29,7 +29,7 @@ Unlike strict linear workflows, wai allows **flexible transitions** — users ca
 
 Project state is stored as a YAML `.state` file within the project directory. This keeps state co-located with the project's artifacts and naturally version-controllable.
 
-## Scope and Requirements
+## Scope
 
 This spec defines the state machine phases, transitions, and persistence format for projects.
 
@@ -39,6 +39,8 @@ This spec defines the state machine phases, transitions, and persistence format 
 - Phase-specific validation rules (e.g., requiring certain artifacts before advancing)
 - Multi-project phase coordination
 - Custom user-defined phases
+
+## Requirements
 
 ### Requirement: Phase Definitions
 
@@ -109,7 +111,7 @@ The system SHALL maintain a complete history of phase transitions.
 - **THEN** the system records the previous phase completion time
 - **AND** records the new phase start time
 - **AND** the history is visible via `wai phase`
-## Requirements
+
 ### Requirement: Matrix-Aware Design to Plan Transition
 
 The system SHALL gate the `design → plan` phase transition on matrix currency
