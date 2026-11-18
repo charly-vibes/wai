@@ -1,0 +1,67 @@
+schema: spec-driven
+
+context: |
+  wai is a workflow manager for AI-driven development: it captures the *why*
+  behind decisions (research, reasoning, design) so an AI-assisted developer can
+  recover a project's full context quickly — target: `wai prime` to correct
+  phase/purpose/latest-decision identification in under 2 minutes, against
+  reading git log, source comments, and the README unaided.
+
+  Artifacts follow PARA (Projects, Areas, Resources, Archives) with project
+  phase tracking, agent-config sync, handoff generation, and plugin integration.
+  Beads (`.beads/`) is an external tool wai detects and integrates with through
+  its plugin system; it is not managed by wai.
+
+  Stack: Rust (clap CLI, miette diagnostics, cliclack interactive prompts); TOML
+  for top-level config; YAML for state files, projections, and plugin configs;
+  file-based storage under `.wai/`; chrono, walkdir, slug.
+
+  Conventions: idiomatic Rust with clear error handling; `miette` for
+  user-facing errors with diagnostic codes and help text; `cliclack` for
+  interactive prompts; `owo_colors` for terminal styling; `&Path` rather than
+  `&PathBuf` in signatures. Command pattern: `src/commands/<command>.rs` per
+  command; CLI in `src/cli.rs` (clap derive); errors in `src/error.rs`; PARA
+  helpers in `src/config.rs`; the project state machine in `src/state.rs`.
+  Conventional commits (feat:, fix:, docs:); feature branches off main.
+  Tests: unit tests inline with modules, integration tests in `tests/`, and
+  error-message/help-text assertions.
+
+  Domain: a Project is an active effort with a defined outcome, tracked through
+  phases (research → design → plan → implement → review → archive); an Area is
+  an ongoing responsibility without an end date; a Resource is reference
+  material used across projects; an Archive preserves completed or inactive
+  items. A Phase is the project workflow state; a Handoff is a first-class
+  artifact for session context transfer; a Plugin detects an external tool and
+  integrates its data; Agent Config is the single source of truth for AI
+  assistant configuration, projected to tool-specific formats.
+
+  Layout: `.wai/config.toml`, `.wai/projects/<name>/` (`.state` YAML plus
+  date-prefixed research/plans/designs/handoffs), `.wai/areas/`,
+  `.wai/resources/` (agent-config with skills/rules/context and
+  `.projections.yml`, templates, patterns), `.wai/archives/`, `.wai/plugins/`.
+
+  Constraints: CLI stays fast (<100ms for simple commands); errors suggest
+  fixes (self-healing); progressive disclosure (simple by default, powerful when
+  needed); works offline-first with file-based storage; the managed
+  `<!-- WAI:START -->` block in `AGENTS.md` is the agent-facing contract and is
+  regenerated only by `wai init`, rendering the openspec pointer from the repo
+  layout rather than naming a file openspec may have deleted.
+
+rules:
+  proposal:
+    - Name the artifact or command surface the change affects and state what is
+      out of scope
+    - Record rejected alternatives in the change's design.md, not the deployed
+      specs
+  tasks:
+    - Map each task to a spec scenario and a red→green→refactor cycle
+
+operations:
+  apply:
+    guidance:
+      - Refresh generated agent blocks with the tool that owns them (wai init
+        for WAI, openspec update for openspec) — never hand-edit a managed block
+  archive:
+    guidance:
+      - Confirm the managed-block contract and `.wai/AGENTS.md` reference still
+        match the archived behavior
