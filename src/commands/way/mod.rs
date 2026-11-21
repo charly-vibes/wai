@@ -47,7 +47,7 @@ mod guide;
 use checks::*;
 use guide::{
     guide_ai, guide_ci, guide_code_quality, guide_coverage, guide_devxp, guide_docs, guide_gh,
-    guide_hooks, guide_issues, guide_specs,
+    guide_hooks, guide_issues, guide_specs, guide_testing,
 };
 
 fn collect_checks(repo_root: &Path) -> Vec<WayCheckEntry> {
@@ -137,6 +137,7 @@ const AVAILABLE_TOPICS: &[&str] = &[
     "hooks",
     "issues",
     "specs",
+    "testing",
 ];
 
 fn print_topic_guide(topic: &str, repo_root: &Path) -> Result<()> {
@@ -151,6 +152,7 @@ fn print_topic_guide(topic: &str, repo_root: &Path) -> Result<()> {
         "hooks" => guide_hooks(repo_root),
         "issues" => guide_issues(repo_root),
         "specs" => guide_specs(repo_root),
+        "testing" => guide_testing(repo_root),
         other => {
             miette::bail!(
                 "Unknown topic '{}'. Available: {}",

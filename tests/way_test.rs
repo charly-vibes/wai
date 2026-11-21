@@ -101,6 +101,42 @@ fn way_pretender_check_passes_when_config_present() {
 }
 
 #[test]
+fn way_testing_topic_prints_recommended_pbt_stack() {
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+
+    let out = wai_cmd(tmp.path())
+        .args(["way", "testing"])
+        .output()
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success());
+    assert!(stdout.contains("Testing Guide"));
+    // Hegel — Rust property-based testing (https://hegel.dev/)
+    assert!(stdout.contains("Hegel"));
+    assert!(stdout.contains("hegel.dev"));
+    // Bombadil — UI property-based testing (https://github.com/antithesishq/bombadil)
+    assert!(stdout.contains("Bombadil"));
+    assert!(stdout.contains("antithesishq/bombadil"));
+    // Kani — Rust model checking (https://model-checking.github.io/kani/)
+    assert!(stdout.contains("Kani"));
+    assert!(stdout.contains("model-checking.github.io/kani"));
+}
+
+#[test]
+fn way_unknown_topic_error_lists_testing() {
+    let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
+
+    let out = wai_cmd(tmp.path())
+        .args(["way", "nonexistent"])
+        .output()
+        .unwrap_or_else(|e| panic!("command should run: {e}"));
+    assert!(!out.status.success());
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("Available"));
+    assert!(stderr.contains("testing"));
+}
+
+#[test]
 fn way_code_quality_topic_prints_guide() {
     let tmp = TempDir::new().unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 

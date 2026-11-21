@@ -10,6 +10,7 @@ mod gh;
 mod hooks;
 mod issues;
 mod specs;
+mod testing;
 
 pub(crate) use ai::guide_ai;
 pub(crate) use ci::guide_ci;
@@ -21,3 +22,4 @@ pub(crate) use gh::guide_gh;
 pub(crate) use hooks::guide_hooks;
 pub(crate) use issues::guide_issues;
 pub(crate) use specs::guide_specs;
+pub(crate) use testing::guide_testing;
