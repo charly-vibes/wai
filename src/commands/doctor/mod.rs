@@ -21,7 +21,7 @@ mod checks_workspace;
 use checks_blocks::{check_agent_instructions, check_managed_block_staleness};
 use checks_pipeline::{
     check_artifact_locks, check_dont_drift_signals, check_pipeline_definitions,
-    check_pipeline_utilization, check_stale_pipeline_runs,
+    check_pipeline_utilization, check_stale_pipeline_runs, check_tdd_ro5_gate,
 };
 use checks_session::{check_claude_session_hook, check_pi_session_hook};
 use checks_workspace::{check_agent_tool_coverage, check_skills_in_repo};
@@ -154,6 +154,11 @@ const DOCTOR_CHECKS: &[CheckEntry] = &[
         "stale-pipeline-runs",
         "Detect abandoned mid-flight pipeline runs",
         |root| check_stale_pipeline_runs(root),
+    ),
+    (
+        "tdd-ro5-gate",
+        "Check that pipeline-opted repos install the omp TTSR gate rule",
+        |root| check_tdd_ro5_gate(root),
     ),
     ("readme-badge", "Check that README has wai badge", |root| {
         checks_basic::check_readme_badge(root)
@@ -890,6 +895,91 @@ export default function (pi: ExtensionAPI) {
             entries.is_empty(),
             "fresh injection must not be stale, got: {:?}",
             entries.iter().map(|e| &e.message).collect::<Vec<_>>()
+        );
+        drop(tmp);
+    }
+
+    // ---- tdd-ro5 gate rule presence ----
+
+    /// Fixture: opt the workspace into the tdd-ro5 pipeline.
+    fn write_tdd_ro5_pipeline(root: &Path) {
+        let dir = root.join(".wai/resources/pipelines");
+        std::fs::create_dir_all(&dir).expect("create pipelines dir");
+        std::fs::write(
+            dir.join("tdd-ro5.toml"),
+            "[pipeline]\nname = \"tdd-ro5\"\ndescription = \"test pipeline\"\n",
+        )
+        .expect("write pipeline fixture");
+    }
+
+    #[test]
+    fn tdd_ro5_gate_warns_when_opted_in_and_rule_missing() {
+        let tmp = setup_workspace();
+        write_tdd_ro5_pipeline(tmp.path());
+        let entries = check_tdd_ro5_gate(tmp.path());
+        assert_eq!(entries.len(), 1, "missing rule must warn");
+        assert_eq!(entries[0].status, CheckStatus::Warn);
+        assert!(entries[0].message.contains(".omp/rules/tdd-ro5-gate.md"));
+        assert!(entries[0].fix_fn.is_some(), "warn must carry a fix");
+        drop(tmp);
+    }
+
+    #[test]
+    fn tdd_ro5_gate_silent_when_rule_present() {
+        let tmp = setup_workspace();
+        write_tdd_ro5_pipeline(tmp.path());
+        let rule = tmp.path().join(".omp/rules/tdd-ro5-gate.md");
+        std::fs::create_dir_all(rule.parent().unwrap()).expect("mkdir rules");
+        std::fs::write(&rule, "---\ndescription: probe\n---\nbody\n").expect("write rule");
+        assert!(
+            check_tdd_ro5_gate(tmp.path()).is_empty(),
+            "present rule must stay silent"
+        );
+        drop(tmp);
+    }
+
+    #[test]
+    fn tdd_ro5_gate_silent_without_pipeline_optin() {
+        let tmp = setup_workspace();
+        assert!(
+            check_tdd_ro5_gate(tmp.path()).is_empty(),
+            "repos without tdd-ro5.toml are not opted in — no warning"
+        );
+        drop(tmp);
+    }
+
+    #[test]
+    fn tdd_ro5_gate_silent_when_other_pipeline_only() {
+        let tmp = setup_workspace();
+        let dir = tmp.path().join(".wai/resources/pipelines");
+        std::fs::create_dir_all(&dir).expect("create pipelines dir");
+        std::fs::write(dir.join("other.toml"), "[pipeline]\nname = \"other\"\n")
+            .expect("write other pipeline");
+        assert!(
+            check_tdd_ro5_gate(tmp.path()).is_empty(),
+            "a pipelines dir without tdd-ro5.toml is not opt-in — no warning"
+        );
+        drop(tmp);
+    }
+
+    #[test]
+    fn tdd_ro5_gate_fix_installs_rule() {
+        let tmp = setup_workspace();
+        write_tdd_ro5_pipeline(tmp.path());
+        let mut entries = check_tdd_ro5_gate(tmp.path());
+        let entry = entries.pop().expect("warn entry");
+        let fix = entry.fix_fn.expect("fix closure");
+        fix(tmp.path()).expect("apply fix");
+        let rule = tmp.path().join(".omp/rules/tdd-ro5-gate.md");
+        let body = std::fs::read_to_string(&rule).expect("rule written by fix");
+        assert!(
+            body.contains("tdd-ro5 gate"),
+            "installed rule is the template"
+        );
+        // Post-fix, the check must go green.
+        assert!(
+            check_tdd_ro5_gate(tmp.path()).is_empty(),
+            "fix must clear the warning"
         );
         drop(tmp);
     }
