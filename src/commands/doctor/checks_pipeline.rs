@@ -6,9 +6,12 @@
 
 use genesis::doctor::CheckStatus;
 
+use miette::IntoDiagnostic;
+
 use super::WaiCheckEntry;
 use super::checks_session::read_non_managed_block_content;
 use crate::commands::pipeline::find_stale_runs;
+use crate::config::pipelines_dir;
 use crate::config::projects_dir;
 use crate::workspace::detect_installed_pipelines;
 use std::path::Path;
@@ -59,8 +62,6 @@ fn pipeline_entry(file_stem: &str, status: CheckStatus, message: String) -> WaiC
 
 /// Validate pipeline TOML definitions for correctness.
 pub(super) fn check_pipeline_definitions(project_root: &Path) -> Vec<WaiCheckEntry> {
-    use crate::config::pipelines_dir;
-
     let pipelines = pipelines_dir(project_root);
     if !pipelines.exists() {
         return vec![];
@@ -514,5 +515,44 @@ pub(super) fn drift_signals_to_check_results(json_bytes: &[u8]) -> Vec<WaiCheckE
         ),
         fix: Some("Run: dont doctor --json to inspect violations".to_string()),
         fix_fn: None,
+    }]
+}
+
+/// Embedded omp TTSR rule that nudges production edits toward the tdd-ro5
+/// pipeline. Written to `<repo>/.omp/rules/tdd-ro5-gate.md` by [`check_tdd_ro5_gate`].
+const TDD_RO5_GATE_RULE: &str = include_str!("../../templates/tdd-ro5-gate.md");
+
+/// Doctor check: repos that opt into the tdd-ro5 pipeline
+/// (`.wai/resources/pipelines/tdd-ro5.toml` present) should carry the omp TTSR
+/// gate rule at `.omp/rules/tdd-ro5-gate.md`, so production edits are nudged
+/// toward starting/resuming a pipeline run without a human instruction.
+/// Silent when green or when the repo did not opt in; fail-open like every
+/// pipeline check.
+pub(super) fn check_tdd_ro5_gate(project_root: &Path) -> Vec<WaiCheckEntry> {
+    let opted_in = pipelines_dir(project_root).join("tdd-ro5.toml").exists();
+    if !opted_in {
+        return vec![];
+    }
+    let rule_path = project_root
+        .join(".omp")
+        .join("rules")
+        .join("tdd-ro5-gate.md");
+    if rule_path.exists() {
+        return vec![];
+    }
+    vec![WaiCheckEntry {
+        name: "Pipeline: tdd-ro5-gate".to_string(),
+        status: CheckStatus::Warn,
+        message: format!(
+            "tdd-ro5 pipeline present but omp gate rule missing at {} — agent edits won't be nudged toward the pipeline",
+            rule_path.display()
+        ),
+        fix: Some("Run: wai doctor --fix (installs .omp/rules/tdd-ro5-gate.md)".to_string()),
+        fix_fn: Some(Box::new(move |project_root| {
+            let dir = project_root.join(".omp").join("rules");
+            std::fs::create_dir_all(&dir).into_diagnostic()?;
+            std::fs::write(dir.join("tdd-ro5-gate.md"), TDD_RO5_GATE_RULE).into_diagnostic()?;
+            Ok(())
+        })),
     }]
 }

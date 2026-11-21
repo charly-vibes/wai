@@ -5,6 +5,24 @@ All notable changes to wai will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Calendar Versioning](https://calver.org/) (YYYY.M.MICRO).
 
+## [Unreleased]
+
+### Added
+
+- `wai way testing` topic: facilitation guide for the recommended testing
+  stack — Hegel ([hegel.dev](https://hegel.dev/)) for Rust property-based
+  testing, Bombadil ([antithesishq/bombadil](https://github.com/antithesishq/bombadil))
+  for web/terminal UI property testing, Kani
+  ([model-checking.github.io/kani](https://model-checking.github.io/kani/))
+  for Rust model checking, and testaruda as the exec harness. Detects
+  existing `hegeltest`/`proptest`/`kani` usage to report current state.
+
+- Doctor check `tdd-ro5-gate`: repos that opt into the `tdd-ro5` pipeline
+  (`.wai/resources/pipelines/tdd-ro5.toml`) but lack the omp TTSR gate rule
+  (`.omp/rules/tdd-ro5-gate.md`) now get a doctor warning, and `wai doctor
+  --fix` installs the embedded rule so agent edits are nudged toward
+  starting/resuming a pipeline run without a human instruction.
+
 ## [2026.11.17] - 2026-11-17
 
 ### Fixed
