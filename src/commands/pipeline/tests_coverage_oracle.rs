@@ -3,9 +3,9 @@
 use super::tests_definition::write_toml;
 use crate::commands::pipeline::definition::load_pipeline_toml;
 use crate::commands::pipeline::gates::{
-    evaluate_gates, execute_oracle, format_gate_summary, resolve_oracle_command,
+    OracleOutcome, evaluate_gates, execute_oracle, format_gate_summary, resolve_oracle_command,
 };
-use crate::commands::pipeline::model::CoverageGate;
+use crate::commands::pipeline::model::{ApprovalGate, CoverageGate, OracleGate};
 use crate::commands::pipeline::setup::{builtin_template_names, get_builtin_template};
 use crate::commands::pipeline::{PipelineDefinition, PipelineRun, PipelineStep, StepGate};
 use std::fs;
@@ -245,17 +245,16 @@ fn resolve_oracle_probes_in_order() {
 #[test]
 fn execute_oracle_success() {
     let result = execute_oracle("true", &[], 30).unwrap();
-    assert!(
-        result.is_none(),
-        "expected None (success), got: {:?}",
-        result
-    );
+    assert!(matches!(result, OracleOutcome::Passed), "got: {result:?}");
 }
 
 #[test]
 fn execute_oracle_failure() {
     let result = execute_oracle("false", &[], 30).unwrap();
-    assert!(result.is_some(), "expected Some (failure)");
+    assert!(
+        matches!(result, OracleOutcome::Failed(_)),
+        "expected Failed, got: {result:?}"
+    );
 }
 
 // ── built-in templates ────────────────────────────────────────────────
@@ -346,4 +345,110 @@ fn all_builtin_template_names_resolve_to_templates() {
             "built-in template name '{name}' should resolve"
         );
     }
+}
+
+// ── oracle timeout enforcement ─────────────────────────────────────
+
+#[test]
+fn execute_oracle_enforces_timeout() {
+    let started = std::time::Instant::now();
+    let outcome = execute_oracle("sleep", &["5"], 1);
+    let elapsed = started.elapsed();
+    assert!(
+        matches!(&outcome, Ok(OracleOutcome::TimedOut(1))),
+        "expected TimedOut(1), got {outcome:?}"
+    );
+    assert!(
+        elapsed < std::time::Duration::from_secs(4),
+        "oracle must be killed near the deadline, took {elapsed:?}"
+    );
+}
+
+// ── approval evaluated before oracles ──────────────────────────────
+
+/// Scaffold: one tagged research artifact plus an approval-gated step.
+fn approval_oracle_scaffold(
+    dir: &std::path::Path,
+    oracle: OracleGate,
+) -> (
+    std::path::PathBuf,
+    StepGate,
+    PipelineStep,
+    PipelineRun,
+    PipelineDefinition,
+) {
+    let projects = dir.join(".wai/projects/proj/research");
+    fs::create_dir_all(&projects).unwrap();
+    let artifact = projects.join("note.md");
+    fs::write(
+        &artifact,
+        "---\ntags: [pipeline-run:test-run, pipeline-step:gen]\n---\nbody\n",
+    )
+    .unwrap();
+
+    let gate = StepGate {
+        approval: Some(ApprovalGate {
+            required: true,
+            message: Some("Needs human approval.".to_string()),
+        }),
+        oracles: vec![oracle],
+        ..Default::default()
+    };
+    let step = PipelineStep {
+        id: "gen".to_string(),
+        prompt: "test".to_string(),
+        gate: Some(gate.clone()),
+        lock: false,
+    };
+    let run = PipelineRun {
+        run_id: "test-run".to_string(),
+        pipeline: "test".to_string(),
+        topic: "topic".to_string(),
+        created_at: "2026-04-02T00:00:00Z".to_string(),
+        current_step: 0,
+        approvals: HashMap::new(),
+        epic: None,
+        child_issues: Vec::new(),
+        child_runs: Vec::new(),
+        handoff_artifact: None,
+        bypasses: Vec::new(),
+    };
+    let def = PipelineDefinition {
+        name: "test".to_string(),
+        description: None,
+        steps: vec![step.clone()],
+        metadata: None,
+    };
+    (artifact, gate, step, run, def)
+}
+
+#[test]
+fn approval_gate_blocks_oracle_execution() {
+    let dir = tempfile::tempdir().unwrap();
+    let oracle = OracleGate {
+        name: "touch-oracle".to_string(),
+        command: Some("touch".to_string()),
+        description: None,
+        timeout: Some(30),
+        scope: Some("artifact".to_string()),
+    };
+    let (artifact, gate, step, run, def) = approval_oracle_scaffold(dir.path(), oracle);
+
+    let before = fs::metadata(&artifact).unwrap().modified().unwrap();
+    let failures = evaluate_gates(&gate, &step, &run, &def, dir.path()).unwrap();
+    let after = fs::metadata(&artifact).unwrap().modified().unwrap();
+
+    assert!(
+        failures[0].contains("Needs human approval."),
+        "approval must be the first failure, got: {failures:?}"
+    );
+    assert_eq!(
+        1,
+        failures.len(),
+        "oracles must not run (nor add failures) while approval blocks: {failures:?}"
+    );
+    assert_eq!(
+        before, after,
+        "oracle must not run while approval is unsatisfied"
+    );
 }

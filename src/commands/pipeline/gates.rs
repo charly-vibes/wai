@@ -307,21 +307,23 @@ pub(super) fn evaluate_gates(
         )]);
     }
 
-    // Tier 4: Oracles
+    // Tier 4: Approval — evaluated before oracles. Oracles can run for
+    // minutes; burning that wall-time when the human checkpoint is still
+    // unsatisfied wedges callers that wrap `wai pipeline next` in a timeout.
+    if let Some(ag) = &gate.approval
+        && ag.required
+    {
+        let failures = approval_failures(ag, run, step, &step_artifacts);
+        if !failures.is_empty() {
+            return Ok(failures);
+        }
+    }
+
+    // Tier 5: Oracles
     let mut failures = Vec::new();
     for oracle in &gate.oracles {
         let oracle_failures = run_oracle(oracle, &step_artifacts, project_root)?;
         failures.extend(oracle_failures);
-    }
-    if !failures.is_empty() {
-        return Ok(failures);
-    }
-
-    // Tier 5: Approval
-    if let Some(ref ag) = gate.approval
-        && ag.required
-    {
-        return Ok(approval_failures(ag, run, step, &step_artifacts));
     }
 
     Ok(failures)
@@ -463,8 +465,6 @@ pub(super) fn run_oracle(
 
     let timeout_secs = oracle.timeout.unwrap_or(30);
     let scope = oracle.scope.as_deref().unwrap_or("artifact");
-
-    // Filter to non-review artifacts for oracle checking
     let applicable: Vec<_> = artifacts
         .iter()
         .filter(|a| a.artifact_type != "review")
@@ -481,27 +481,59 @@ pub(super) fn run_oracle(
             .filter_map(|a| find_artifact_path(&projects, &a.filename))
             .collect();
         if !paths.is_empty() {
-            let args: Vec<&str> = paths.iter().map(|s| s.as_str()).collect();
-            if let Some(err) = execute_oracle(&command, &args, timeout_secs)? {
-                failures.push(format!("Oracle '{}' failed: {}", oracle.name, err));
-            }
+            let args: Vec<&str> = paths.iter().map(String::as_str).collect();
+            push_oracle_failure(
+                &mut failures,
+                oracle,
+                None,
+                execute_oracle(&command, &args, timeout_secs)?,
+            );
         }
     } else {
         // Per-artifact invocation
         let projects = crate::config::projects_dir(project_root);
         for artifact in &applicable {
-            if let Some(path) = find_artifact_path(&projects, &artifact.filename)
-                && let Some(err) = execute_oracle(&command, &[&path], timeout_secs)?
-            {
-                failures.push(format!(
-                    "Oracle '{}' failed for '{}': {}",
-                    oracle.name, artifact.filename, err
-                ));
-            }
+            let Some(path) = find_artifact_path(&projects, &artifact.filename) else {
+                continue;
+            };
+            push_oracle_failure(
+                &mut failures,
+                oracle,
+                Some(&artifact.filename),
+                execute_oracle(&command, &[&path], timeout_secs)?,
+            );
         }
     }
 
     Ok(failures)
+}
+
+/// Convert an oracle outcome into a gate-failure message and record it.
+fn push_oracle_failure(
+    failures: &mut Vec<String>,
+    oracle: &OracleGate,
+    artifact: Option<&str>,
+    outcome: OracleOutcome,
+) {
+    let message = match outcome {
+        OracleOutcome::Passed => return,
+        OracleOutcome::Failed(err) => match artifact {
+            Some(filename) => {
+                format!(
+                    "Oracle '{}' failed for '{}': {}",
+                    oracle.name, filename, err
+                )
+            }
+            None => format!("Oracle '{}' failed: {}", oracle.name, err),
+        },
+        OracleOutcome::TimedOut(secs) => {
+            format!(
+                "Oracle '{}' timed out after {}s (killed)",
+                oracle.name, secs
+            )
+        }
+    };
+    failures.push(message);
 }
 
 /// Resolve oracle name to an executable path in .wai/resources/oracles/.
@@ -523,47 +555,132 @@ pub(super) fn resolve_oracle_command(name: &str, project_root: &Path) -> Result<
     ))
 }
 
-/// Execute an oracle command with arguments. Returns None on success (exit 0),
-/// or Some(stderr) on failure.
+/// Outcome of an oracle execution.
+#[derive(Debug)]
+pub(super) enum OracleOutcome {
+    /// Exited with code 0.
+    Passed,
+    /// Exited non-zero; carries the trimmed stderr (or exit-code text).
+    Failed(String),
+    /// Did not exit within the configured timeout; process killed and reaped.
+    TimedOut(u64),
+}
+
+/// Spawn an oracle command with both output pipes captured.
+fn spawn_oracle(command: &str, args: &[&str]) -> Result<std::process::Child> {
+    use std::process::{Command, Stdio};
+
+    let mut cmd = Command::new(command);
+    cmd.args(args);
+    cmd.stdout(Stdio::piped());
+    cmd.stderr(Stdio::piped());
+    cmd.spawn()
+        .map_err(|e| miette::miette!("Failed to execute oracle '{}': {}", command, e))
+}
+
+/// Drain both pipes on background threads so a chatty oracle cannot fill the
+/// OS pipe buffers and block on write while the deadline is polled. Returns
+/// the join handles; killing the child closes the pipes at EOF.
+fn drain_oracle_pipes(
+    child: &mut std::process::Child,
+) -> (
+    std::thread::JoinHandle<Vec<u8>>,
+    std::thread::JoinHandle<Vec<u8>>,
+) {
+    use std::io::Read;
+
+    let stdout_pipe = child.stdout.take();
+    let stderr_pipe = child.stderr.take();
+    let stdout_reader = std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        if let Some(mut pipe) = stdout_pipe {
+            let _ = pipe.read_to_end(&mut buf);
+        }
+        buf
+    });
+    let stderr_reader = std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        if let Some(mut pipe) = stderr_pipe {
+            let _ = pipe.read_to_end(&mut buf);
+        }
+        buf
+    });
+    (stdout_reader, stderr_reader)
+}
+
+/// Poll until the oracle exits, the deadline passes, or wait fails. On
+/// deadline or error the child is killed and reaped so it cannot outlive the
+/// gate. Returns its exit status (None on timeout/error) and any wait error.
+fn poll_oracle_exit(
+    child: &mut std::process::Child,
+    deadline: Option<std::time::Instant>,
+) -> (Option<std::process::ExitStatus>, Option<std::io::Error>) {
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => return (Some(status), None),
+            Ok(None) => {
+                if deadline.is_some_and(|d| std::time::Instant::now() >= d) {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return (None, None);
+                }
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+            Err(e) => {
+                // Best-effort cleanup so the oracle cannot outlive the call.
+                let _ = child.kill();
+                let _ = child.wait();
+                return (None, Some(e));
+            }
+        }
+    }
+}
+
+/// Map a poll result to the oracle outcome.
+fn oracle_outcome(
+    status: Option<std::process::ExitStatus>,
+    stderr: &[u8],
+    timeout_secs: u64,
+) -> OracleOutcome {
+    let Some(status) = status else {
+        // Deadline exceeded: the oracle was killed and reaped.
+        return OracleOutcome::TimedOut(timeout_secs);
+    };
+    if status.success() {
+        return OracleOutcome::Passed;
+    }
+    let stderr = String::from_utf8_lossy(stderr).trim().to_string();
+    OracleOutcome::Failed(if stderr.is_empty() {
+        format!("exit code {}", status.code().unwrap_or(-1))
+    } else {
+        stderr
+    })
+}
+
+/// Execute an oracle command with arguments. A timeout of 0 waits
+/// indefinitely; any other value kills and reaps the oracle at the deadline
+/// and yields [`OracleOutcome::TimedOut`].
 pub(super) fn execute_oracle(
     command: &str,
     args: &[&str],
     timeout_secs: u64,
-) -> Result<Option<String>> {
-    use std::process::Command;
+) -> Result<OracleOutcome> {
+    use std::time::{Duration, Instant};
 
-    let mut cmd = Command::new(command);
-    cmd.args(args);
-    cmd.stdout(std::process::Stdio::piped());
-    cmd.stderr(std::process::Stdio::piped());
+    let mut child = spawn_oracle(command, args)?;
+    let (stdout_reader, stderr_reader) = drain_oracle_pipes(&mut child);
 
-    let child = cmd
-        .spawn()
-        .map_err(|e| miette::miette!("Failed to execute oracle '{}': {}", command, e))?;
+    let deadline = (timeout_secs > 0).then(|| Instant::now() + Duration::from_secs(timeout_secs));
+    let (status, wait_err) = poll_oracle_exit(&mut child, deadline);
 
-    let output = if timeout_secs > 0 {
-        // Wait with timeout
-        let result = child.wait_with_output();
-        match result {
-            Ok(o) => o,
-            Err(e) => return Err(miette::miette!("Oracle execution failed: {}", e)),
-        }
-    } else {
-        child
-            .wait_with_output()
-            .map_err(|e| miette::miette!("Oracle execution failed: {}", e))?
-    };
+    // Reap the drain threads; killing the child closes the pipes at EOF.
+    let _ = stdout_reader.join();
+    let stderr = stderr_reader.join().unwrap_or_default();
 
-    if output.status.success() {
-        Ok(None)
-    } else {
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        Ok(Some(if stderr.is_empty() {
-            format!("exit code {}", output.status.code().unwrap_or(-1))
-        } else {
-            stderr
-        }))
+    if let Some(e) = wait_err {
+        return Err(miette::miette!("Oracle execution failed: {}", e));
     }
+    Ok(oracle_outcome(status, &stderr, timeout_secs))
 }
 
 /// Find the absolute path of an artifact by filename, searching all project artifact directories.
