@@ -156,6 +156,18 @@ jobs:
           (cd bins/windows_amd64 && zip "../../dist/wai_${VERSION}_windows_amd64.zip" wai.exe)
           cd dist && sha256sum *.tar.gz *.zip > checksums.txt
 
+      # Rung-2 shadow pilot (mirrors testaruda's release contract-bundle
+      # step, openspec add-wild-contract-bundle-convention task 3.2):
+      # extract the contract bundle from the exact release checkout (this
+      # job's checkout) and attach it to the release. The pinned extractor
+      # version is part of the bundle's trust chain
+      # (manifest.extractor_version) — never `latest`.
+      - name: Install wild extractor
+        run: cargo install wild-vibes --version 0.2.1 --locked
+
+      - name: Extract contract bundle
+        run: bash scripts/make-contract-bundle.sh "${{ steps.pkg.outputs.version }}" dist
+
       # DDL-wof (SEC-03/06): publish cryptographically verifiable provenance
       # for every supported binary. provenance.json binds each published
       # artifact's sha256 to the publisher/build identity (repository,
@@ -209,6 +221,7 @@ jobs:
             dist/wai_${VERSION}_darwin_amd64.tar.gz \
             dist/wai_${VERSION}_darwin_arm64.tar.gz \
             dist/wai_${VERSION}_windows_amd64.zip \
+            dist/wai-$VERSION-contract-bundle.tar.gz \
             dist/checksums.txt \
             dist/provenance.json
         env:
