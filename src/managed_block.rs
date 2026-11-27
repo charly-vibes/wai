@@ -1,4 +1,6 @@
-use genesis::managed_block::{BlockDef, BlockInjector, BlockRegistry, InjectResult};
+use genesis::managed_block::{
+    BlockDef, BlockInjector, BlockRegistry, InjectResult, split_provenance_footer,
+};
 use std::path::Path;
 
 pub(crate) const WAI_START: &str = "<!-- WAI:START -->";
@@ -304,7 +306,7 @@ pub fn inject_managed_block(
     // footer records generator/version/source plus a content hash covering
     // only the block content, so version bumps never move the hash and
     // doctor can detect post-init edits via the footer-sha fast path.
-    let injector = BlockInjector::new(reg).with_provenance("wai");
+    let injector = BlockInjector::new(reg).with_provenance("wai", env!("CARGO_PKG_VERSION"));
 
     let wai_result = injector.inject(path, "WAI", &wai_content)?;
 
@@ -377,38 +379,6 @@ pub fn read_managed_block_parts(path: &Path) -> Option<ManagedBlockRead> {
         body: body.to_string(),
         footer_sha: footer_sha.map(str::to_string),
     })
-}
-
-/// Split a trailing provenance footer off managed-block inner content.
-///
-/// Returns the footer-free body and, when the last line is a provenance
-/// footer, its `sha=` value. Matches the genesis inject format
-/// `{content}\n{footer}\n` — the separating newline is dropped too, so the
-/// body hashes byte-identically to the generator's content.
-pub fn split_provenance_footer(inner: &str) -> (&str, Option<&str>) {
-    let trimmed = inner.trim_end_matches('\n');
-    let last_line = match trimmed.rfind('\n') {
-        Some(idx) => &trimmed[idx + 1..],
-        None if !trimmed.is_empty() => trimmed,
-        None => return (inner, None),
-    };
-    match parse_footer_sha(last_line) {
-        Some(sha) => {
-            let cut = trimmed.len() - last_line.len();
-            (&trimmed[..cut.saturating_sub(1)], Some(sha))
-        }
-        None => (inner, None),
-    }
-}
-
-/// Extract `sha=<value>` from a provenance footer line, if it is one.
-fn parse_footer_sha(line: &str) -> Option<&str> {
-    let rest = line
-        .strip_prefix("<!-- provenance: ")?
-        .strip_suffix(" -->")?;
-    let idx = rest.find("sha=")?;
-    let sha = &rest[idx + 4..];
-    Some(sha.split_whitespace().next().unwrap_or(sha))
 }
 
 pub fn has_managed_block(path: &Path) -> bool {

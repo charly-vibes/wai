@@ -1,89 +1,73 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use super::WayCheckEntry;
 use genesis::doctor::CheckStatus;
+use genesis::git_hooks::{self, EffectiveHooksDir, HookName, HooksDirScope, Owner};
 
-/// Read a hook file from an arbitrary path. Returns `None` if the file does not
-/// exist, is a directory, or cannot be read.
-pub(super) fn read_hook_from_path(path: &Path) -> Option<String> {
-    if !path.exists() || path.is_dir() {
-        return None;
+/// The hooks directory git will invoke hooks from, honoring a repo-local
+/// `core.hooksPath` (genesis `effective_hooks_dir`). An empty/disabled value,
+/// a global/system-scope setting, or an unset value all fall back to the
+/// default `.git/hooks` — matching the previous local logic, which only
+/// reacted to a repo-local setting.
+fn local_or_default_hooks_dir(repo_root: &Path) -> PathBuf {
+    match git_hooks::effective_hooks_dir(repo_root) {
+        Ok(EffectiveHooksDir {
+            path,
+            scope: HooksDirScope::Local,
+        }) => path,
+        _ => repo_root.join(".git/hooks"),
     }
-    std::fs::read_to_string(path).ok()
 }
 
-pub(super) fn read_hook(repo_root: &Path, hook_name: &str) -> Option<String> {
-    let hook_path = repo_root.join(".git/hooks").join(hook_name);
-    if !hook_path.exists() || hook_path.is_dir() {
-        return None;
-    }
-    std::fs::read_to_string(&hook_path).ok()
+/// Read a hook file from the effective hooks directory. Returns `None` if
+/// the file does not exist or cannot be read.
+fn read_hook(repo_root: &Path, hook_name: &str) -> Option<String> {
+    std::fs::read_to_string(local_or_default_hooks_dir(repo_root).join(hook_name)).ok()
 }
 
 /// Return `true` if pre-commit **or** pre-push hook contains `needle`.
-pub(super) fn hook_contains(repo_root: &Path, needle: &str) -> bool {
+fn hook_contains(repo_root: &Path, needle: &str) -> bool {
     read_hook(repo_root, "pre-commit").is_some_and(|c| c.contains(needle))
         || read_hook(repo_root, "pre-push").is_some_and(|c| c.contains(needle))
 }
 
 /// Return `true` if the pre-commit hook file exists and is non-empty.
-pub(super) fn hook_exists_nonempty(repo_root: &Path) -> bool {
+fn hook_exists_nonempty(repo_root: &Path) -> bool {
     read_hook(repo_root, "pre-commit").is_some_and(|c| !c.trim().is_empty())
 }
 
-/// Return the repo-local `core.hooksPath` git config value, else `None`.
-///
-/// Only checks `--local` scope. Global/system `core.hooksPath` is a machine-level
-/// setting outside the repo's control and not something a repo best-practices
-/// check should flag.
-pub(super) fn git_core_hooks_path(repo_root: &Path) -> Option<String> {
-    let output = std::process::Command::new("git")
-        .args([
-            "-C",
-            &repo_root.to_string_lossy(),
-            "config",
-            "--local",
-            "core.hooksPath",
-        ])
-        .output()
-        .ok()?;
-    if output.status.success() {
-        let val = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        if !val.is_empty() { Some(val) } else { None }
-    } else {
-        None
+/// Human-readable name for a hook owner, for user-facing messages.
+fn owner_name(owner: Owner) -> &'static str {
+    match owner {
+        Owner::Lefthook => "lefthook",
+        Owner::Husky => "husky",
+        Owner::Bd => "bd",
+        Owner::Prek => "prek",
+        Owner::PreCommit => "pre-commit",
     }
 }
 
 /// Identify which known tool owns the pre-commit hook, or `None`.
 ///
-/// Checks for the same sigils that the rest of `check_git_hooks` uses:
-/// `bd`, `lefthook`, `husky`, `pre-commit` (the framework).
-pub(super) fn hook_owner(repo_root: &Path) -> Option<&'static str> {
-    let content = read_hook(repo_root, "pre-commit")?;
-    // Check more-specific patterns first to avoid false matches.
-    for (needle, name) in &[
-        ("lefthook", "lefthook"),
-        ("husky", "husky"),
-        ("bd", "bd"),
-        ("pre-commit", "pre-commit"),
-    ] {
-        if content.contains(needle) {
-            return Some(name);
-        }
-    }
-    None
+/// Delegates to the genesis sigil table (`genesis::git_hooks::owner`):
+/// `bd`, `lefthook`, `husky`, `prek`, `pre-commit` (the framework).
+fn hook_owner(repo_root: &Path) -> Option<&'static str> {
+    git_hooks::owner(repo_root, &HookName::PreCommit).map(owner_name)
 }
 
 /// Outcome for the prek branch of `check_git_hooks`.
 fn prek_outcome(repo_root: &Path) -> (CheckStatus, String, Option<String>) {
-    // core.hooksPath being set means prek refuses to install — report this first.
-    if let Some(hooks_path) = git_core_hooks_path(repo_root) {
+    // A repo-local core.hooksPath means prek refuses to install — report this first.
+    if let Ok(EffectiveHooksDir {
+        path,
+        scope: HooksDirScope::Local,
+    }) = git_hooks::effective_hooks_dir(repo_root)
+    {
         return (
             CheckStatus::Warn,
             format!(
                 "prek.toml found but core.hooksPath is set ('{}') — prek cannot install",
-                hooks_path
+                path.display()
             ),
             Some("Unset it first: git config --local --unset core.hooksPath".to_string()),
         );
@@ -117,13 +101,16 @@ fn prek_outcome(repo_root: &Path) -> (CheckStatus, String, Option<String>) {
 /// Outcome for the lefthook branch of `check_git_hooks`.
 fn lefthook_outcome(repo_root: &Path) -> (CheckStatus, String, Option<String>) {
     // Check the delegated core.hooksPath first (e.g., when beads/bd sets hooksPath)
-    if let Some(hooks_path) = git_core_hooks_path(repo_root) {
-        let delegated_precommit = repo_root.join(&hooks_path).join("pre-commit");
-        let delegated_prepush = repo_root.join(&hooks_path).join("pre-push");
-
-        let lefthook_in_delegated = read_hook_from_path(&delegated_precommit)
-            .is_some_and(|c| c.contains("lefthook"))
-            || read_hook_from_path(&delegated_prepush).is_some_and(|c| c.contains("lefthook"));
+    if let Ok(EffectiveHooksDir {
+        path: delegated,
+        scope: HooksDirScope::Local,
+    }) = git_hooks::effective_hooks_dir(repo_root)
+    {
+        let lefthook_in_delegated = ["pre-commit", "pre-push"].iter().any(|hook| {
+            std::fs::read_to_string(delegated.join(hook))
+                .ok()
+                .is_some_and(|c| c.contains("lefthook"))
+        });
 
         if lefthook_in_delegated {
             return (
@@ -136,7 +123,7 @@ fn lefthook_outcome(repo_root: &Path) -> (CheckStatus, String, Option<String>) {
             CheckStatus::Warn,
             format!(
                 "lefthook.yml found but core.hooksPath is set ('{}') — lefthook not found in delegated path",
-                hooks_path,
+                delegated.display()
             ),
             Some("Run: lefthook install".to_string()),
         );
@@ -238,6 +225,16 @@ mod tests {
     use std::fs;
 
     fn setup_git_repo() -> tempfile::TempDir {
+        // Hermetic git config: the ambient global/system config may set
+        // core.hooksPath (e.g., a machine-wide hook shim), which
+        // `genesis::git_hooks` correctly honors and would make hook
+        // detection miss the test repo's `.git/hooks`. serial_test keeps
+        // process-global env change off other tests.
+        // SAFETY: test setup; serialized via #[serial_test::serial] below.
+        unsafe {
+            std::env::set_var("GIT_CONFIG_GLOBAL", "/dev/null");
+            std::env::set_var("GIT_CONFIG_SYSTEM", "/dev/null");
+        }
         let dir = tempfile::tempdir().unwrap();
         std::process::Command::new("git")
             .args(["init"])
@@ -264,6 +261,7 @@ mod tests {
     // -- core.hooksPath conflict --
 
     #[test]
+    #[serial_test::serial]
     fn prek_toml_with_core_hooks_path_set_reports_conflict() {
         let dir = setup_git_repo();
         write_prek_toml(&dir);
@@ -291,6 +289,7 @@ mod tests {
     // -- hook owner detection --
 
     #[test]
+    #[serial_test::serial]
     fn prek_toml_with_bd_shim_reports_bd_as_owner() {
         let dir = setup_git_repo();
         write_prek_toml(&dir);
@@ -310,6 +309,7 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial]
     fn prek_toml_with_lefthook_shim_reports_lefthook_as_owner() {
         let dir = setup_git_repo();
         write_prek_toml(&dir);
@@ -331,6 +331,7 @@ mod tests {
     // -- prek pass cases --
 
     #[test]
+    #[serial_test::serial]
     fn prek_toml_with_prek_in_precommit_passes() {
         let dir = setup_git_repo();
         write_prek_toml(&dir);
@@ -346,6 +347,7 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial]
     fn prek_toml_with_prek_in_prepush_passes() {
         let dir = setup_git_repo();
         write_prek_toml(&dir);
@@ -361,6 +363,7 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial]
     fn bd_hook_that_chains_prek_passes() {
         let dir = setup_git_repo();
         write_prek_toml(&dir);
@@ -377,6 +380,7 @@ mod tests {
     // -- lefthook via delegated core.hooksPath --
 
     #[test]
+    #[serial_test::serial]
     fn lefthook_yml_with_delegated_hooks_path_detects_lefthook() {
         let dir = setup_git_repo();
         // Write lefthook.yml
@@ -412,6 +416,7 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial]
     fn lefthook_yml_with_delegated_hooks_path_missing_lefthook_reports_conflict() {
         let dir = setup_git_repo();
         // Write lefthook.yml
@@ -447,6 +452,7 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial]
     fn lefthook_yml_without_any_hooks_still_suggests_install() {
         let dir = setup_git_repo();
         // Write lefthook.yml
@@ -464,6 +470,7 @@ mod tests {
     // -- no hooks at all --
 
     #[test]
+    #[serial_test::serial]
     fn prek_toml_with_no_hooks_suggests_install() {
         let dir = setup_git_repo();
         write_prek_toml(&dir);
@@ -480,6 +487,7 @@ mod tests {
     // -- no prek.toml --
 
     #[test]
+    #[serial_test::serial]
     fn no_prek_toml_does_not_fire_prek_branch() {
         let dir = setup_git_repo();
         // No prek.toml written — prek branch must not trigger.

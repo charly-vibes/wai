@@ -98,6 +98,7 @@ fn handle_command_error(err: miette::Report, argv: &[String]) -> Result<()> {
             exit: 1,
             footer,
             kind: "error".to_string(),
+            message: None,
         },
     );
 
@@ -129,6 +130,7 @@ fn print_json_error(err: &miette::Report) {
     )
     .expect("remediation must be non-empty");
     let _ = print_json_line(&Envelope::error(
+        env!("CARGO_PKG_VERSION"),
         env!("CARGO_PKG_VERSION"),
         err_result,
         vec![],

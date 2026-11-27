@@ -43,6 +43,7 @@ fn no_notice_when_installed_version_newer_than_cached_latest() {
         "2026.10.4",
         &cache_dir,
         update_check::CRATES_IO_API,
+        None,
     );
     assert!(
         info.is_none(),
@@ -61,6 +62,7 @@ fn notice_when_cached_latest_is_newer() {
         "2026.9.28",
         &cache_dir,
         update_check::CRATES_IO_API,
+        None,
     );
     let info = info.unwrap_or_else(|| panic!("newer cached latest must produce UpdateInfo"));
     assert_eq!(info.latest, "2026.10.4");
@@ -78,6 +80,7 @@ fn no_notice_when_versions_equal() {
         "2026.10.4",
         &cache_dir,
         update_check::CRATES_IO_API,
+        None,
     );
     assert!(info.is_none(), "equal versions must not notify: {info:?}");
 }

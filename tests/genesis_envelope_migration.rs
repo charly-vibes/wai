@@ -16,6 +16,7 @@ fn test_envelope_wraps_payload() {
 
     let env = Envelope::success(
         env!("CARGO_PKG_VERSION"),
+        env!("CARGO_PKG_VERSION"),
         EnvelopeKind::Ok,
         payload,
         vec![],
@@ -27,7 +28,7 @@ fn test_envelope_wraps_payload() {
 
     let json = serde_json::to_value(&env).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert_eq!(json["ok"], true);
-    assert_eq!(json["envelope_version"], "0.1");
+    assert_eq!(json["envelope_version"], env!("CARGO_PKG_VERSION"));
     assert_eq!(json["envelope_kind"], "ok");
     assert_eq!(json["data"]["value"], "hello");
     assert!(json.get("hints").is_some());
@@ -40,6 +41,7 @@ fn test_envelope_round_trips() {
     };
 
     let env = Envelope::success(
+        env!("CARGO_PKG_VERSION"),
         env!("CARGO_PKG_VERSION"),
         EnvelopeKind::Ok,
         payload,
@@ -60,6 +62,7 @@ fn test_envelope_status_fields() {
     });
 
     let env = Envelope::success(
+        env!("CARGO_PKG_VERSION"),
         env!("CARGO_PKG_VERSION"),
         EnvelopeKind::Ok,
         payload,
@@ -98,7 +101,12 @@ fn test_envelope_error() {
     )
     .unwrap_or_else(|e| panic!("unwrap failed: {e}"));
 
-    let env = Envelope::error(env!("CARGO_PKG_VERSION"), err, vec![]);
+    let env = Envelope::error(
+        env!("CARGO_PKG_VERSION"),
+        env!("CARGO_PKG_VERSION"),
+        err,
+        vec![],
+    );
     let json = serde_json::to_value(&env).unwrap_or_else(|e| panic!("unwrap failed: {e}"));
     assert_eq!(json["ok"], false);
     assert_eq!(json["envelope_kind"], "error");
@@ -270,6 +278,7 @@ fn test_wai_version_json_envelope_shape() {
 fn test_output_has_envelope_shape() {
     let payload = serde_json::json!({"msg": "hello"});
     let env = Envelope::success(
+        env!("CARGO_PKG_VERSION"),
         env!("CARGO_PKG_VERSION"),
         EnvelopeKind::Ok,
         payload,
