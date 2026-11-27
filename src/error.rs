@@ -177,6 +177,25 @@ pub enum WaiError {
     LlmNotAvailable,
 }
 
+/// Map `genesis::fs` errors into wai's error type so genesis types never
+/// leak through wai APIs. `atomic_write` can only surface the I/O-ish
+/// variants here; JSON mapping exists for exhaustiveness.
+impl From<genesis::fs::FsError> for WaiError {
+    fn from(err: genesis::fs::FsError) -> Self {
+        match err {
+            genesis::fs::FsError::Io(io) => WaiError::Io(io),
+            genesis::fs::FsError::NoParent(path) => WaiError::Io(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("path has no parent directory: {}", path.display()),
+            )),
+            genesis::fs::FsError::Json { path, source } => WaiError::Io(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("invalid JSON in {}: {source}", path.display()),
+            )),
+        }
+    }
+}
+
 #[derive(Debug, Serialize)]
 pub struct ErrorPayload {
     pub code: String,

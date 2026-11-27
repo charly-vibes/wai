@@ -74,33 +74,19 @@ pub fn store_memory(project_root: &Path, text: &str) -> Result<(), String> {
 /// Detect if the current working directory is a git worktree (not the main worktree).
 /// Returns the main worktree root path if we're in an additional worktree, otherwise None.
 pub fn detect_main_worktree_root(project_root: &Path) -> Option<std::path::PathBuf> {
-    let git_dir = std::process::Command::new("git")
-        .args(["rev-parse", "--git-dir"])
-        .current_dir(project_root)
-        .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())?;
-
-    let git_common_dir = std::process::Command::new("git")
-        .args(["rev-parse", "--git-common-dir"])
-        .current_dir(project_root)
-        .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())?;
-
-    // If --git-dir != --git-common-dir, we're in an additional worktree.
-    if git_dir == git_common_dir {
+    // genesis::git runs the rev-parse pair and parses the two lines;
+    // a non-git root surfaces as a GitError, mapped to None like before.
+    let facts = genesis::git::worktree_facts(project_root).ok()?;
+    if !facts.is_linked_worktree {
         return None;
     }
 
-    // Main worktree root is the parent of --git-common-dir.
-    // git-common-dir is the .git directory (e.g. /path/to/main/.git).
-    let common_dir_path = if std::path::Path::new(&git_common_dir).is_absolute() {
-        std::path::PathBuf::from(&git_common_dir)
+    // Main worktree root is the parent of the common dir: the main
+    // repository's .git directory (e.g. /path/to/main/.git).
+    let common_dir_path = if std::path::Path::new(&facts.common_dir).is_absolute() {
+        std::path::PathBuf::from(&facts.common_dir)
     } else {
-        project_root.join(&git_common_dir)
+        project_root.join(&facts.common_dir)
     };
 
     common_dir_path.parent().map(|p| p.to_path_buf())

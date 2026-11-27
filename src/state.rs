@@ -121,12 +121,10 @@ impl ProjectState {
 
     pub fn save(&self, state_path: &Path) -> Result<(), WaiError> {
         let content = serde_yml::to_string(self)?;
-        // Write atomically: write to a temp file in the same directory, then
-        // rename so readers never see a partial state file.
-        let dir = state_path.parent().unwrap_or_else(|| Path::new("."));
-        let tmp_path = dir.join("state.yml.tmp");
-        std::fs::write(&tmp_path, &content)?;
-        std::fs::rename(&tmp_path, state_path)?;
+        // Atomic replace via genesis::fs (genesis-mqt): unique staging
+        // sibling + fsync + rename, so two concurrent writers can never
+        // publish each other's bytes through a shared fixed-name tmp file.
+        genesis::fs::atomic_write(state_path, content.as_bytes())?;
         Ok(())
     }
 
@@ -177,5 +175,84 @@ impl ProjectState {
             })?;
         self.transition_to(prev)?;
         Ok(prev)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Arc;
+
+    /// Regression (genesis-mqt): two rapid `save` calls to the same state
+    /// file must never interleave. The fixed `state.yml.tmp` name let one
+    /// writer's rename publish the other writer's bytes; genesis's unique
+    /// staging names mean the rename always publishes a whole file, so the
+    /// final content is exactly one writer's serialization, and no staging
+    /// debris is left behind.
+    #[test]
+    fn concurrent_saves_publish_whole_files_without_debris() {
+        let dir = tempfile::tempdir().unwrap_or_else(|e| panic!("tempdir: {e}"));
+        let target = dir.path().join("state.yml");
+        let writers: Vec<Arc<ProjectState>> = (1..=2)
+            .map(|entries| Arc::new(state_with_entries(entries)))
+            .collect();
+
+        let handles: Vec<std::thread::JoinHandle<()>> = writers
+            .iter()
+            .map(|state| {
+                let target = target.clone();
+                let state = Arc::clone(state);
+                std::thread::spawn(move || {
+                    for _ in 0..64 {
+                        state
+                            .save(&target)
+                            .unwrap_or_else(|e| panic!("concurrent save: {e}"));
+                    }
+                })
+            })
+            .collect();
+        for handle in handles {
+            handle
+                .join()
+                .unwrap_or_else(|p| panic!("writer thread panicked: {p:?}"));
+        }
+
+        let final_content =
+            std::fs::read_to_string(&target).unwrap_or_else(|e| panic!("read final state: {e}"));
+        let writer_contents: Vec<String> = writers
+            .iter()
+            .map(|s| {
+                serde_yml::to_string(Arc::as_ref(s)).unwrap_or_else(|e| panic!("serialize: {e}"))
+            })
+            .collect();
+        assert!(
+            writer_contents.contains(&final_content),
+            "final state file must be exactly one writer's content, got: {final_content:?}"
+        );
+
+        let debris: Vec<String> = std::fs::read_dir(dir.path())
+            .unwrap_or_else(|e| panic!("read state dir: {e}"))
+            .filter_map(|e| e.ok())
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .filter(|name| name.starts_with(".state.yml") && name.ends_with(".tmp"))
+            .collect();
+        assert!(debris.is_empty(), "staging debris left behind: {debris:?}");
+    }
+
+    /// Distinct-but-valid states: `entries` history rows make writer
+    /// serializations differ, so an interleaved/torn publish is detectable.
+    fn state_with_entries(entries: usize) -> ProjectState {
+        let now = Utc::now();
+        ProjectState {
+            current: Phase::Research,
+            history: vec![
+                PhaseEntry {
+                    phase: Phase::Research,
+                    started: now,
+                    completed: None,
+                };
+                entries
+            ],
+        }
     }
 }
